@@ -1,0 +1,677 @@
+[
+  {
+    "job_code": "AS122",
+    "clinic_name": "מרפאת שיניים שטרייכמן 10",
+    "phone": "526626082"
+  },
+  {
+    "job_code": "ADM19",
+    "clinic_name": "ד״ר הרצל מיכאל",
+    "phone": "544979993"
+  },
+  {
+    "job_code": "ADM2",
+    "clinic_name": "ד\"ר רוברט חדמי",
+    "phone": "509836878"
+  },
+  {
+    "job_code": "ADM30",
+    "clinic_name": "מרפאת גבריאלוב",
+    "phone": "525074444"
+  },
+  {
+    "job_code": "ADM32",
+    "clinic_name": "מרפאת שביט קליניק",
+    "phone": "526333887"
+  },
+  {
+    "job_code": "ADM34",
+    "clinic_name": "דנט פרימיום בע\"\"מ",
+    "phone": "543456489"
+  },
+  {
+    "job_code": "ADM9",
+    "clinic_name": "החיוך של נועה",
+    "phone": "503113113"
+  },
+  {
+    "job_code": "AS1",
+    "clinic_name": "דר ליויו שפקרו",
+    "phone": "522503121"
+  },
+  {
+    "job_code": "AS101",
+    "clinic_name": "דר יצחק ג'יניאו",
+    "phone": "546661771"
+  },
+  {
+    "job_code": "AS104",
+    "clinic_name": "מרפאת טיפול בחיוך",
+    "phone": "522646418"
+  },
+  {
+    "job_code": "AS105",
+    "clinic_name": "ד״ר חורי אבנר",
+    "phone": "527219721"
+  },
+  {
+    "job_code": "AS106",
+    "clinic_name": "מרפאת יסקין",
+    "phone": "526333994"
+  },
+  {
+    "job_code": "AS107",
+    "clinic_name": "מדארט גלאור מרפאות שיניים בע\"מ",
+    "phone": "542340180"
+  },
+  {
+    "job_code": "AS108",
+    "clinic_name": "פרופ איתן מיזיריצקי",
+    "phone": "542457224"
+  },
+  {
+    "job_code": "AS109",
+    "clinic_name": "מרפאת שיניים דר יולי גולדמן",
+    "phone": "505455069"
+  },
+  {
+    "job_code": "AS116",
+    "clinic_name": "ד״ר סיון קארס",
+    "phone": "523442241"
+  },
+  {
+    "job_code": "AS117",
+    "clinic_name": "החיוך של נועה",
+    "phone": "503113113"
+  },
+  {
+    "job_code": "AS121",
+    "clinic_name": "ד\"ר עדי בייר",
+    "phone": "544299302"
+  },
+  {
+    "job_code": "AS124",
+    "clinic_name": "מרפאת הימל קליניקס",
+    "phone": "542122212"
+  },
+  {
+    "job_code": "AS125",
+    "clinic_name": "טויל דנט",
+    "phone": "528271306"
+  },
+  {
+    "job_code": "AS126",
+    "clinic_name": "מרכז מומחים דנטלי - פרופ׳ וייס ודר שטיינקלר",
+    "phone": "523735879"
+  },
+  {
+    "job_code": "AS127",
+    "clinic_name": "ענבל מרפאות",
+    "phone": "504416526"
+  },
+  {
+    "job_code": "AS128",
+    "clinic_name": "ד\"ר אטרי צ'אק",
+    "phone": "544832765"
+  },
+  {
+    "job_code": "AS130",
+    "clinic_name": "דר יוסי פיש",
+    "phone": "523330456"
+  },
+  {
+    "job_code": "AS21",
+    "clinic_name": "מרפאת הימל קליניקס",
+    "phone": "542122212"
+  },
+  {
+    "job_code": "AS24",
+    "clinic_name": "מרכז מומחים דנטלי - פרופ׳ וייס ודר שטיינקלר",
+    "phone": "523735879"
+  },
+  {
+    "job_code": "AS25",
+    "clinic_name": "ד\"ר קוטון אביהו",
+    "phone": "524371415"
+  },
+  {
+    "job_code": "AS28",
+    "clinic_name": "פרופ 'צחי אברמוביץ",
+    "phone": "505847184"
+  },
+  {
+    "job_code": "AS29",
+    "clinic_name": "פרופסור עמי שמידט",
+    "phone": "522500058"
+  },
+  {
+    "job_code": "AS30",
+    "clinic_name": "דר עוזי ברגר",
+    "phone": "544484950"
+  },
+  {
+    "job_code": "AS33",
+    "clinic_name": "דנטל קאר",
+    "phone": "544687654"
+  },
+  {
+    "job_code": "AS36",
+    "clinic_name": "א.ר.ז רפואת שיניים מתקדמת",
+    "phone": "542204880"
+  },
+  {
+    "job_code": "AS40",
+    "clinic_name": "דר סולי ברגמן",
+    "phone": "525521513"
+  },
+  {
+    "job_code": "AS41",
+    "clinic_name": "שפר קליניקס",
+    "phone": "523109080"
+  },
+  {
+    "job_code": "AS43",
+    "clinic_name": "עיאט דנט בע\"מ",
+    "phone": "507884844"
+  },
+  {
+    "job_code": "AS44",
+    "clinic_name": "דר מירלה פררו",
+    "phone": "549020009"
+  },
+  {
+    "job_code": "AS45",
+    "clinic_name": "ד״ר שרון ינושבסקי",
+    "phone": "549558200"
+  },
+  {
+    "job_code": "AS48",
+    "clinic_name": "דר אירנה ויינשטין",
+    "phone": "546221996"
+  },
+  {
+    "job_code": "AS50",
+    "clinic_name": "דנט פרימיום בע\"\"מ",
+    "phone": "543456489"
+  },
+  {
+    "job_code": "AS501",
+    "clinic_name": "דר יוליאן לזר",
+    "phone": "545888126"
+  },
+  {
+    "job_code": "AS52",
+    "clinic_name": "דר יוסף קובלסקי בעמ",
+    "phone": "545932048"
+  },
+  {
+    "job_code": "AS55",
+    "clinic_name": "ד״ר מיכאל שושני",
+    "phone": "507717772"
+  },
+  {
+    "job_code": "AS57",
+    "clinic_name": "דנאל קליניק ש.מ בע\"מ",
+    "phone": "528301831"
+  },
+  {
+    "job_code": "AS58",
+    "clinic_name": "ביודנט",
+    "phone": "522937939"
+  },
+  {
+    "job_code": "AS61",
+    "clinic_name": "מכבים דנט",
+    "phone": "526616421"
+  },
+  {
+    "job_code": "AS62",
+    "clinic_name": "מרפאת האומה",
+    "phone": "546432566"
+  },
+  {
+    "job_code": "AS63",
+    "clinic_name": "מרפאת האומה",
+    "phone": "546432566"
+  },
+  {
+    "job_code": "AS66",
+    "clinic_name": "דר מיקלר",
+    "phone": "546460285"
+  },
+  {
+    "job_code": "AS71",
+    "clinic_name": "חנץ מרפאות שיניים בע\"מ",
+    "phone": "507177486"
+  },
+  {
+    "job_code": "AS72",
+    "clinic_name": "ד\"ר בעז גורדון",
+    "phone": "525926060"
+  },
+  {
+    "job_code": "AS73",
+    "clinic_name": "מרפאת עטרה",
+    "phone": "507673789"
+  },
+  {
+    "job_code": "AS74",
+    "clinic_name": "שנאון גן יבנה מרפאת שיניים",
+    "phone": "526694117"
+  },
+  {
+    "job_code": "AS76",
+    "clinic_name": "מרפאת שיניים אפרת",
+    "phone": "528979654"
+  },
+  {
+    "job_code": "AS77",
+    "clinic_name": "מרפאת קו",
+    "phone": "505448166"
+  },
+  {
+    "job_code": "AS79",
+    "clinic_name": "סדרי סמייל",
+    "phone": "585805105"
+  },
+  {
+    "job_code": "AS82",
+    "clinic_name": "מרפאת גבריאלוב",
+    "phone": "525074444"
+  },
+  {
+    "job_code": "AS84",
+    "clinic_name": "מרכז כירורגי דולב",
+    "phone": "524469937"
+  },
+  {
+    "job_code": "AS96",
+    "clinic_name": "מרפאת עדי",
+    "phone": "545544833"
+  },
+  {
+    "job_code": "AS97",
+    "clinic_name": "ד\"ר הילה קליין",
+    "phone": "522859234"
+  },
+  {
+    "job_code": "AS98",
+    "clinic_name": "דר גבי לביא",
+    "phone": "522511542"
+  },
+  {
+    "job_code": "AS99",
+    "clinic_name": "מרפאת שיניים איידנט",
+    "phone": "502902224"
+  },
+  {
+    "job_code": "DOC1000",
+    "clinic_name": "",
+    "phone": ""
+  },
+  {
+    "job_code": "DOC11",
+    "clinic_name": "חנץ מרפאות שיניים בע\"מ",
+    "phone": "507177486"
+  },
+  {
+    "job_code": "DOC17",
+    "clinic_name": "ד״ר סיון קארס",
+    "phone": "522761276"
+  },
+  {
+    "job_code": "DOC23",
+    "clinic_name": "דר יוסי שמרלינג",
+    "phone": "505866338"
+  },
+  {
+    "job_code": "DOC24",
+    "clinic_name": "החיוך של נועה",
+    "phone": "503113113"
+  },
+  {
+    "job_code": "DOC29",
+    "clinic_name": "מרפאת גט סמייל",
+    "phone": "502161704"
+  },
+  {
+    "job_code": "DOC31",
+    "clinic_name": "דר אנדי אריאל בויאנג'יו",
+    "phone": "536229858"
+  },
+  {
+    "job_code": "DOC33",
+    "clinic_name": "מרפאת גט סמייל",
+    "phone": "502161704"
+  },
+  {
+    "job_code": "DOC35",
+    "clinic_name": "החיוך של נועה",
+    "phone": "503113113"
+  },
+  {
+    "job_code": "DOC4000",
+    "clinic_name": "",
+    "phone": ""
+  },
+  {
+    "job_code": "DOC44",
+    "clinic_name": "מרפאות ע.צ",
+    "phone": "522501900"
+  },
+  {
+    "job_code": "DOC46",
+    "clinic_name": "דר סבטלנה זבולונוב",
+    "phone": "527328098"
+  },
+  {
+    "job_code": "DOC48",
+    "clinic_name": "ענבל מרפאות",
+    "phone": "504416526"
+  },
+  {
+    "job_code": "DOC50",
+    "clinic_name": "מרפאת מרום דנט",
+    "phone": "545777394"
+  },
+  {
+    "job_code": "DOC56",
+    "clinic_name": "דר' אייל אבי מרפאת שיניים בע\"מ",
+    "phone": "547334933"
+  },
+  {
+    "job_code": "DOC59",
+    "clinic_name": "דר שנהב ללי",
+    "phone": "523412947"
+  },
+  {
+    "job_code": "DOC60",
+    "clinic_name": "מרפאת שיניים לובנדנט",
+    "phone": "528560916"
+  },
+  {
+    "job_code": "DOC67",
+    "clinic_name": "מרפאת קוריאל",
+    "phone": "545291555"
+  },
+  {
+    "job_code": "DOC7000",
+    "clinic_name": "",
+    "phone": ""
+  },
+  {
+    "job_code": "DOC72",
+    "clinic_name": "מרפאת גט סמייל",
+    "phone": "502161704"
+  },
+  {
+    "job_code": "DOC78",
+    "clinic_name": "מרפאת שיפר",
+    "phone": "526010063"
+  },
+  {
+    "job_code": "MITOG5",
+    "clinic_name": "דר מוניקה רות לומניץ",
+    "phone": "545864901"
+  },
+  {
+    "job_code": "MITOG6",
+    "clinic_name": "מרפאת לנדסברג",
+    "phone": "542525643"
+  },
+  {
+    "job_code": "MITOG7",
+    "clinic_name": "פלייסיג אורתודונטיקס בע\"מ",
+    "phone": "525655111"
+  },
+  {
+    "job_code": "SE101",
+    "clinic_name": "ענבל מרפאות",
+    "phone": "504416526"
+  },
+  {
+    "job_code": "SE102",
+    "clinic_name": "מרפאת אברבוך",
+    "phone": "505701571"
+  },
+  {
+    "job_code": "DOC8000",
+    "clinic_name": "",
+    "phone": ""
+  },
+  {
+    "job_code": "DOC83",
+    "clinic_name": "ד״ר שרון ינושבסקי",
+    "phone": "549558200"
+  },
+  {
+    "job_code": "DOC9000",
+    "clinic_name": "",
+    "phone": ""
+  },
+  {
+    "job_code": "HY1",
+    "clinic_name": "מרפאת קוריאל",
+    "phone": "545291555"
+  },
+  {
+    "job_code": "HY18",
+    "clinic_name": "סדרי סמייל",
+    "phone": "585805105"
+  },
+  {
+    "job_code": "HY19",
+    "clinic_name": "מרפאת שיניים קלס-ולטר",
+    "phone": "507289700"
+  },
+  {
+    "job_code": "HY2",
+    "clinic_name": "מרפאת קוריאל",
+    "phone": "545291555"
+  },
+  {
+    "job_code": "HY20",
+    "clinic_name": "דר חיים דנן",
+    "phone": "506850991"
+  },
+  {
+    "job_code": "HY22",
+    "clinic_name": "מרפאת קוריאל",
+    "phone": "545291555"
+  },
+  {
+    "job_code": "HY31",
+    "clinic_name": "דר יחזקאלי ניצה",
+    "phone": "522472679"
+  },
+  {
+    "job_code": "HY34",
+    "clinic_name": "מרפאת קולרמן",
+    "phone": "522436752"
+  },
+  {
+    "job_code": "HY37",
+    "clinic_name": "גרה קליניק",
+    "phone": "549989317"
+  },
+  {
+    "job_code": "MITOG1",
+    "clinic_name": "דר יובל בר",
+    "phone": "508464595"
+  },
+  {
+    "job_code": "MITOG2",
+    "clinic_name": "שרון קליניק - שיקום הפה פנים ולסתות",
+    "phone": "586236262"
+  },
+  {
+    "job_code": "MITOG3",
+    "clinic_name": "מרפאת לם",
+    "phone": "526774459"
+  },
+  {
+    "job_code": "MITOG4",
+    "clinic_name": "מרפאת לם",
+    "phone": "526774459"
+  },
+  {
+    "job_code": "SE105",
+    "clinic_name": "דר אמיר עיני (שיקום)",
+    "phone": "547749800"
+  },
+  {
+    "job_code": "SE106",
+    "clinic_name": "דר דניאל וקסלר",
+    "phone": "508345209"
+  },
+  {
+    "job_code": "SE108",
+    "clinic_name": "סמבן דנט",
+    "phone": "508894157"
+  },
+  {
+    "job_code": "SE111",
+    "clinic_name": "מרפאת דיאמנט",
+    "phone": "544611912"
+  },
+  {
+    "job_code": "SE112",
+    "clinic_name": "ד\"ר רוני אמיד אסתטיקה דנטלית",
+    "phone": "545913913"
+  },
+  {
+    "job_code": "SE15",
+    "clinic_name": "מרפאת מרום דנט",
+    "phone": "545777394"
+  },
+  {
+    "job_code": "SE18",
+    "clinic_name": "מרכז מומחים דנטלי - פרופ׳ וייס ודר שטיינקלר",
+    "phone": "523735879"
+  },
+  {
+    "job_code": "SE2",
+    "clinic_name": "מרכז רפואי עדן",
+    "phone": "522523015"
+  },
+  {
+    "job_code": "SE21",
+    "clinic_name": "דר יוסי שמרלינג",
+    "phone": "505866338"
+  },
+  {
+    "job_code": "SE24",
+    "clinic_name": "דר איתי לייסר",
+    "phone": "522906441"
+  },
+  {
+    "job_code": "SE25",
+    "clinic_name": "מרפאת קוריאל",
+    "phone": "545291555"
+  },
+  {
+    "job_code": "SE26",
+    "clinic_name": "פרופ איתן מיזיריצקי",
+    "phone": "542457224"
+  },
+  {
+    "job_code": "SE27",
+    "clinic_name": "דר צבי פוס",
+    "phone": "543020412"
+  },
+  {
+    "job_code": "SE28",
+    "clinic_name": "דר ליויו שפקרו",
+    "phone": "522503121"
+  },
+  {
+    "job_code": "SE29",
+    "clinic_name": "דר' איתן קורף",
+    "phone": "522758910"
+  },
+  {
+    "job_code": "SE34",
+    "clinic_name": "דר ירון דבקרוב",
+    "phone": "542077705"
+  },
+  {
+    "job_code": "SE38",
+    "clinic_name": "ד״ר שרון ינושבסקי",
+    "phone": "549558200"
+  },
+  {
+    "job_code": "SE40",
+    "clinic_name": "רוזמדיקס מרכז רפואי",
+    "phone": "528986987"
+  },
+  {
+    "job_code": "SE43",
+    "clinic_name": "אייטק דנטל קליניקס מרכז",
+    "phone": "525555302"
+  },
+  {
+    "job_code": "SE51",
+    "clinic_name": "דר יוסף קובלסקי בעמ",
+    "phone": "545932048"
+  },
+  {
+    "job_code": "SE54",
+    "clinic_name": "ד״ר מיכאל שושני",
+    "phone": "507717772"
+  },
+  {
+    "job_code": "SE57",
+    "clinic_name": "מרפאת בורוכוב -המרכז לרפואת שיניים מתקדמת",
+    "phone": "523346515"
+  },
+  {
+    "job_code": "SE58",
+    "clinic_name": "ד\"ר ארי גרינספן",
+    "phone": "525547206"
+  },
+  {
+    "job_code": "SE59",
+    "clinic_name": "ביודנט",
+    "phone": "522937939"
+  },
+  {
+    "job_code": "SE60",
+    "clinic_name": "מכבים דנט",
+    "phone": "526616421"
+  },
+  {
+    "job_code": "SE78",
+    "clinic_name": "החיוך של נועה",
+    "phone": "503113113"
+  },
+  {
+    "job_code": "SE79",
+    "clinic_name": "ד\"ר גיא לוי מרפאת מומחים",
+    "phone": "547553962"
+  },
+  {
+    "job_code": "SE85",
+    "clinic_name": "דר' יצקייר גוסטבו",
+    "phone": "508650868"
+  },
+  {
+    "job_code": "SE86",
+    "clinic_name": "ד\"ר סאטוצ'נה אלחנדרו",
+    "phone": "545819822"
+  },
+  {
+    "job_code": "SE90",
+    "clinic_name": "דר מוחמד ואלכסנדרה וותד",
+    "phone": "527714423"
+  },
+  {
+    "job_code": "TEC4",
+    "clinic_name": "אימפלנט יוסף בעמ",
+    "phone": "507431629"
+  },
+  {
+    "job_code": "ADM50",
+    "clinic_name": "",
+    "phone": ""
+  }
+]

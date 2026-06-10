@@ -1,0 +1,182 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 180 100% 25%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 180 100% 25%;
+    --radius: 0.5rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply text-foreground font-heebo antialiased;
+    background-color: #F9FAFB;
+    color: #111827;
+    direction: rtl;
+  }
+}
+
+/* ───────────────────────────────────────
+   AllDent Premium Public Design Tokens
+   ─────────────────────────────────────── */
+:root {
+  --ink:        #0F0F10;
+  --ink-2:      #1A1A1C;
+  --ink-3:      #242427;
+  --paper:      #FAFAF7;
+  --mist:       #F2F4F3;
+  --teal:       #008080;
+  --teal-deep:  #006D6D;
+  --teal-mist:  #E6F7F7;
+  --gold:       #D9A928;
+  --gold-warm:  #F4B400;
+  --rule:       rgba(15,15,16,0.08);
+
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Branded selection */
+::selection {
+  background: var(--teal);
+  color: var(--paper);
+}
+
+/* Modern form field — clean Hireox style */
+.field-modern {
+  @apply w-full px-4 py-3 text-[14px] text-ink bg-mist border border-transparent rounded-xl outline-none transition-all;
+  @apply focus:border-teal focus:bg-white focus:ring-2 focus:ring-teal/15;
+  @apply placeholder:text-ink/35;
+}
+
+/* Public form field — underline style */
+.field-underline {
+  @apply w-full px-0 py-3 text-base bg-transparent border-0 border-b border-[#E5E7EB] outline-none transition-colors;
+  @apply focus:border-teal placeholder:text-[#9CA3AF];
+}
+
+.field-input {
+  @apply w-full px-3 py-2 text-sm text-[#111827] bg-[#F8FAFC] border border-[#E5E7EB] rounded-lg outline-none transition-colors;
+  @apply focus:ring-2 focus:ring-primary-300 focus:border-primary-400;
+  @apply placeholder:text-[#9CA3AF];
+}
+
+/* Display type — clean bold sans (Hireox/JobStock style) */
+.font-display {
+  font-family: 'Heebo', sans-serif;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.font-mono {
+  font-family: 'JetBrains Mono', monospace;
+  font-feature-settings: 'tnum';
+}
+
+/* Marquee track */
+.marquee-track {
+  display: flex;
+  width: max-content;
+  will-change: transform;
+}
+
+/* Hover underline nav link */
+.nav-link {
+  position: relative;
+}
+.nav-link::after {
+  content: '';
+  position: absolute;
+  inset-inline-start: 0;
+  bottom: -4px;
+  width: 100%;
+  height: 1px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.5s var(--ease-out-expo);
+}
+.nav-link:hover::after,
+.nav-link.is-active::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}
+
+/* Magnetic-button container */
+.magnetic {
+  display: inline-flex;
+  transition: transform 0.4s var(--ease-out-expo);
+  will-change: transform;
+}
+
+/* Reveal-on-scroll base */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.9s var(--ease-out-expo), transform 0.9s var(--ease-out-expo);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  .marquee-track {
+    animation: none !important;
+  }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Custom utility classes */
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

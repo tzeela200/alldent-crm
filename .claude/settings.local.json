@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(mkdir -p \"C:\\\\Users\\\\Allbi\\\\alldent-crm\\\\public\\\\images\\\\fallback\")",
+      "Bash(Copy-Item \"C:\\\\Users\\\\Allbi\\\\OneDrive\\\\שולחן העבודה\\\\ALLDENT\\\\04 - שיווק - Marketing\\\\לוגו - Logo\\\\לוגו\\\\קטן ושקוף.png\" \"C:\\\\Users\\\\Allbi\\\\alldent-crm\\\\public\\\\images\\\\logo.png\")",
+      "Bash(Copy-Item \"C:\\\\Users\\\\Allbi\\\\OneDrive\\\\שולחן העבודה\\\\ALLDENT\\\\04 - שיווק - Marketing\\\\לוגו - Logo\\\\לוגו\\\\לוגו+לבן+סופי.png\" \"C:\\\\Users\\\\Allbi\\\\alldent-crm\\\\public\\\\images\\\\logo-teal.png\")",
+      "Bash(mkdir -p \"/mnt/c/Users/Allbi/alldent-crm/public/images/fallback\")",
+      "Bash(cp \"/mnt/c/Users/Allbi/OneDrive/שולחן העבודה/ALLDENT/04 - שיווק - Marketing/לוגו - Logo/לוגו/קטן ושקוף.png\" \"/mnt/c/Users/Allbi/alldent-crm/public/images/logo.png\")",
+      "Bash(cp \"/mnt/c/Users/Allbi/OneDrive/שולחן העבודה/ALLDENT/04 - שיווק - Marketing/לוגו - Logo/לוגו/לוגו+לבן+סופי.png\" \"/mnt/c/Users/Allbi/alldent-crm/public/images/logo-teal.png\")",
+      "Bash(npx tsc *)",
+      "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__execute_sql",
+      "Bash(python create_missing_employer_accounts.py --dry-run)"
+    ]
+  }
+}
