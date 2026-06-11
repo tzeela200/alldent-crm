@@ -9,7 +9,9 @@
       "Bash(cp \"/mnt/c/Users/Allbi/OneDrive/שולחן העבודה/ALLDENT/04 - שיווק - Marketing/לוגו - Logo/לוגו/לוגו+לבן+סופי.png\" \"/mnt/c/Users/Allbi/alldent-crm/public/images/logo-teal.png\")",
       "Bash(npx tsc *)",
       "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__execute_sql",
-      "Bash(python create_missing_employer_accounts.py --dry-run)"
+      "Bash(python create_missing_employer_accounts.py --dry-run)",
+      "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__list_tables",
+      "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__apply_migration"
     ]
   }
 }

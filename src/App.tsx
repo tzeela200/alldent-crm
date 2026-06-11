@@ -18,6 +18,7 @@ import JobDetailsPage from '@/pages/JobDetailsPage'
 import AdminApplicationsPage from '@/pages/AdminApplicationsPage'
 import ATSPipelinePage from '@/pages/ATSPipelinePage'
 import SmartMatchPage from '@/pages/SmartMatchPage'
+import InboxV2Page from '@/pages/InboxV2Page'
 import CandidateProfilePage from '@/pages/CandidateProfilePage'
 import EmployerProfilePage from '@/pages/EmployerProfilePage'
 
@@ -37,6 +38,7 @@ export default function App() {
         <Route index element={<DashboardPage />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="inbox" element={<InboxPage />} />
+        <Route path="inbox-v2" element={<InboxV2Page />} />
 
         {/* Contacts & Candidates */}
         <Route path="contacts" element={<AdminContactsPage />} />
