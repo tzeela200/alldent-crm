@@ -18,7 +18,7 @@ export function getRoleImageFallback(roleId: number | null | undefined): string 
 }
 
 export function getJobImage(job: PublicJob): string {
-  if (job.image_url?.trim()) return job.image_url
+  if (job.public_image_url?.trim()) return job.public_image_url
   return getRoleImageFallback(job.job_role)
 }
 

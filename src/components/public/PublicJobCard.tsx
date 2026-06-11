@@ -45,7 +45,7 @@ export default function PublicJobCard({ job, onClick }: Props) {
       <div className="absolute inset-x-0 bottom-0 p-5 md:p-6 text-white">
         {/* Categories (small caps) */}
         <p className="text-[10px] md:text-[11px] font-bold tracking-[0.2em] uppercase text-gold mb-2.5">
-          {[job.job_role_name, job.scope_name].filter(Boolean).join(' · ')}
+          {[job.job_role_name, job.scope_names].filter(Boolean).join(' · ')}
         </p>
 
         {/* Title */}
@@ -63,8 +63,8 @@ export default function PublicJobCard({ job, onClick }: Props) {
 
         {/* CTA */}
         <div className="pt-4 border-t border-white/20 flex items-center justify-between">
-          {job.salary_range && (
-            <span className="text-gold font-mono font-bold text-[12px]">{job.salary_range}</span>
+          {job.salary_expectation_hourly && (
+            <span className="text-gold font-mono font-bold text-[12px]">₪{job.salary_expectation_hourly}/שעה</span>
           )}
           <span className="flex items-center gap-1.5 text-[11.5px] font-bold tracking-[0.18em] uppercase text-white group-hover:gap-3 transition-all duration-300 mr-auto">
             לפרטים
