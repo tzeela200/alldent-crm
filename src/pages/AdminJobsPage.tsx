@@ -36,7 +36,8 @@ import {
 } from '@/components/layout/Shell'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { jobStatusColors, getStatusBadge } from '@/lib/statusColors'
+import { jobStatusColors, getAdminBadgeVariant } from '@/lib/statusColors'
+import { AdminBadge } from '@/components/admin/AdminBadge'
 import { formatDate } from '@/lib/timeAgo'
 import type { Job, JobFilters, DictItem } from '@/types'
 
@@ -751,21 +752,21 @@ export default function AdminJobsPage() {
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <details className="relative">
-            <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-semibold text-[#2D2D2D] transition hover:bg-[#F3F4F6]">
               <Columns3 className="h-4 w-4" />
               בחירת עמודות
             </summary>
-            <div className="absolute left-0 top-full z-30 mt-2 w-64 rounded-2xl border border-slate-200 bg-white p-3 shadow-md">
-              <div className="mb-3 text-[13px] font-bold text-slate-900">בחירת עמודות</div>
+            <div className="absolute left-0 top-full z-30 mt-2 w-64 rounded-[18px] border border-[#D9D9D9] bg-white p-3 shadow-md">
+              <div className="mb-3 text-[13px] font-bold text-[#2D2D2D]">בחירת עמודות</div>
               <div className="grid gap-2">
                 {ALL_JOB_COLUMNS.map((col) => (
-                  <label key={col.key} className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-[13px]">
+                  <label key={col.key} className="flex items-center justify-between rounded-xl border border-[#D9D9D9] px-3 py-2 text-[13px]">
                     <span>{col.label}</span>
                     <input
                       type="checkbox"
                       checked={visibleColumns.includes(col.key)}
                       onChange={() => toggleColumn(col.key)}
-                      className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
+                      className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]"
                     />
                   </label>
                 ))}
@@ -786,7 +787,7 @@ export default function AdminJobsPage() {
         </div>
       }
     >
-      <div dir="rtl" className="min-h-screen bg-[#F8FAFC] font-['Heebo'] text-[#0F172A]">
+      <div dir="rtl" className="min-h-screen bg-[#F3F4F6] font-['Heebo'] text-[#2D2D2D]">
         <div className="space-y-6">
           <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
             <KpiCard
@@ -840,15 +841,12 @@ export default function AdminJobsPage() {
 
 
           <Toolbar>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div>
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[#008080]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F3F3] text-[#008080]">
                   <Briefcase className="h-4 w-4" />
                 </div>
-                <h2 className="text-[15px] font-bold text-[#0F172A]">חיפוש וסינון</h2>
-                <span className="rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[12px] font-semibold text-slate-500">
-                  מסך תפעולי צפוף אך קריא
-                </span>
+                <h2 className="text-[15px] font-bold text-[#2D2D2D]">חיפוש וסינון</h2>
               </div>
 
 
@@ -998,7 +996,7 @@ export default function AdminJobsPage() {
               </div>
 
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#D9D9D9] pt-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <InfoPill label={`סה״כ תוצאות: ${filteredJobs.length}`} />
                   <InfoPill label={`ללא מועמדים: ${kpis.withoutApplicants}`} tone="warning" />
@@ -1020,13 +1018,13 @@ export default function AdminJobsPage() {
 
           {selectedRows.length > 0 && (
             <Toolbar>
-              <div className="rounded-2xl border border-[#D97706]/20 bg-[#FFFBEB] p-4 shadow-sm">
+              <div className="rounded-[18px] border border-[#D97706]/20 bg-[#FFFBEB] p-4 shadow-sm">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">
                       נבחרו {selectedRows.length} משרות
                     </span>
-                    <span className="text-[13px] font-medium text-slate-600">
+                    <span className="text-[13px] font-medium text-[#6B6B6B]">
                       פעולות מרובות על הרשומות המסומנות
                     </span>
                   </div>
@@ -1052,7 +1050,7 @@ export default function AdminJobsPage() {
                         handleBulkStatusChange(nextStatus)
                         event.currentTarget.value = ''
                       }}
-                      className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
+                      className="h-10 rounded-full border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none focus:border-[#008080]"
                     >
                       <option value="">שינוי סטטוס מרובה</option>
                       {jobStatuses.map((item) => (
@@ -1073,7 +1071,7 @@ export default function AdminJobsPage() {
 
           <Toolbar>
             {localJobs.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8 shadow-sm">
                 <EmptyState
                   icon={Briefcase}
                   title="אין משרות במערכת"
@@ -1081,7 +1079,7 @@ export default function AdminJobsPage() {
                 />
               </div>
             ) : pageData.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+              <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8 shadow-sm">
                 <EmptyState
                   icon={Briefcase}
                   title="לא נמצאו תוצאות"
@@ -1089,17 +1087,17 @@ export default function AdminJobsPage() {
                 />
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-[18px] border border-[#D9D9D9] bg-white">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1900px] w-full border-collapse text-right">
-                    <thead className="bg-[#F8FAFC]">
-                      <tr className="border-b border-slate-200 text-[13px] font-semibold text-slate-500">
+                  <table className="min-w-[1900px] w-full border-collapse text-right text-[14px]">
+                    <thead className="bg-[#F3F4F6]">
+                      <tr className="border-b border-[#D9D9D9] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">
                         <th className="px-4 py-3">
                           <input
                             type="checkbox"
                             checked={pageData.length > 0 && pageData.every((job) => selectedRows.includes(String(job.job_code)))}
                             onChange={togglePageSelection}
-                            className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
+                            className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]"
                           />
                         </th>
                         {visibleColumns.includes('job_code') && <SortableTh label="קוד משרה" sortKey="job_code" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} width={colWidths['job_code']} onResizeStart={handleResizeStart} />}
@@ -1115,15 +1113,14 @@ export default function AdminJobsPage() {
                         {visibleColumns.includes('last_publish_date') && <PlainJobTh label="פרסום אחרון" colKey="last_publish_date" width={colWidths['last_publish_date']} onResizeStart={handleResizeStart} />}
                         {visibleColumns.includes('created_time') && <SortableTh label="נוצרה" sortKey="created_time" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} width={colWidths['created_time']} onResizeStart={handleResizeStart} />}
                         {visibleColumns.includes('days_live') && <PlainJobTh label="ימים באוויר" colKey="days_live" width={colWidths['days_live']} onResizeStart={handleResizeStart} />}
-                        <th className="px-4 py-3">פעולות</th>
+                        <th className="px-3 py-3">פעולות</th>
                       </tr>
                     </thead>
 
 
-                    <tbody className="divide-y divide-slate-100 bg-white">
+                    <tbody className="divide-y divide-[#F3F4F6] bg-white">
                       {pageData.map((job) => {
                         const jobCode = String(job.job_code)
-                        const status = getStatusBadge(jobStatusColors, job.job_status)
                         const selected = selectedRows.includes(jobCode)
                         const publishDisabled = !canPublish(job) || isPublished(job)
                         const fillDisabled = CLOSED_OR_FILLED_STATUS_IDS.includes(Number(job.job_status))
@@ -1134,8 +1131,8 @@ export default function AdminJobsPage() {
                         return (
                           <tr
                             key={jobCode}
-                            className={`text-[13px] font-medium text-[#0F172A] transition ${
-                              selected ? 'bg-[#F0FDFC]' : 'hover:bg-slate-50'
+                            className={`text-[14px] font-medium text-[#2D2D2D] transition ${
+                              selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#F9FAFB]'
                             }`}
                           >
                             <td className="px-4 py-3">
@@ -1143,7 +1140,7 @@ export default function AdminJobsPage() {
                                 type="checkbox"
                                 checked={selected}
                                 onChange={() => toggleRowSelection(jobCode)}
-                                className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
+                                className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]"
                               />
                             </td>
 
@@ -1168,7 +1165,7 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('job_title') && (
                               <td className="px-4 py-3">
                                 <div className="max-w-[240px]">
-                                  <div className="font-semibold text-[#0F172A]">{job.job_title ?? '—'}</div>
+                                  <div className="font-semibold text-[#2D2D2D]">{job.job_title ?? '—'}</div>
                                 </div>
                               </td>
                             )}
@@ -1176,7 +1173,7 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('job_sub_role') && (
                               <td className="px-4 py-3">
                                 {job.job_sub_role ? (
-                                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-semibold text-slate-700">
+                                  <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#2D2D2D]">
                                     {subRoleName(job.job_sub_role)}
                                   </span>
                                 ) : (
@@ -1189,7 +1186,7 @@ export default function AdminJobsPage() {
                                 {job.account_link ? (
                                   <Link
                                     to={`/employers/${job.account_link}`}
-                                    className="inline-flex items-center gap-1.5 rounded-xl bg-slate-50 px-2.5 py-1 text-[12px] font-semibold text-[#008080] hover:bg-slate-100"
+                                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#008080] hover:bg-[#F3F4F6]"
                                   >
                                     <Building2 className="h-3.5 w-3.5" />
                                     {job.account_name ?? '—'}
@@ -1203,15 +1200,13 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('city_id') && <td className="px-4 py-3">{cityName(job.city_id)}</td>}
                             {visibleColumns.includes('scope') && <td className="px-4 py-3">{scopeName(job.scope)}</td>}
                             {visibleColumns.includes('job_status') && (
-                              <td className="px-4 py-3">
-                                <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${status.bg} ${status.text}`}>
-                                  {status.label}
-                                </span>
+                              <td className="px-3">
+                                <AdminBadge {...getAdminBadgeVariant(jobStatusColors, job.job_status)} />
                               </td>
                             )}
                             {visibleColumns.includes('total_applicants') && (
                               <td className="px-4 py-3">
-                                <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[12px] font-bold text-slate-700">
+                                <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">
                                   {Number(job.total_applicants ?? 0)}
                                 </span>
                               </td>
@@ -1221,7 +1216,7 @@ export default function AdminJobsPage() {
                                 {job.last_publish_date ? (
                                   <div className="space-y-1">
                                     <div>{formatDate(job.last_publish_date)}</div>
-                                    <div className="text-[12px] text-slate-500">{distributionLabel(job)}</div>
+                                    <div className="text-[12px] text-[#6B6B6B]">{distributionLabel(job)}</div>
                                   </div>
                                 ) : (
                                   <span className="text-slate-400">לא פורסמה</span>
@@ -1235,7 +1230,7 @@ export default function AdminJobsPage() {
                             )}
                             {visibleColumns.includes('days_live') && (
                               <td className="px-4 py-3">
-                                <div className="inline-flex items-center gap-1.5 rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[12px] font-semibold text-slate-700">
+                                <div className="inline-flex items-center gap-1.5 rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#2D2D2D]">
                                   <Clock3 className="h-3.5 w-3.5" />
                                   {getDaysLive(job)}
                                 </div>
@@ -1261,7 +1256,7 @@ export default function AdminJobsPage() {
                                     if (!nextStatus) return
                                     handleQuickStatusChange(jobCode, nextStatus)
                                   }}
-                                  className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
+                                  className="h-9 rounded-full border border-[#D9D9D9] bg-white px-2 text-[12px] font-medium text-[#2D2D2D] outline-none focus:border-[#008080]"
                                 >
                                   <option value="">סטטוס מהיר</option>
                                   {getAllowedStatusTransitions(job.job_status).map((statusId) => (
@@ -1288,7 +1283,7 @@ export default function AdminJobsPage() {
                 </div>
 
 
-                <div className="border-t border-slate-200 bg-white px-4 py-3">
+                <div className="border-t border-[#D9D9D9] bg-white px-4 py-3">
                   <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filteredJobs.length} />
                 </div>
               </div>
@@ -1300,25 +1295,19 @@ export default function AdminJobsPage() {
         {quickSheet.open && selectedJob && (
           <div className="fixed inset-0 z-50 flex justify-start">
             <div className="absolute inset-0 bg-slate-900/30" onClick={() => setQuickSheet({ open: false, jobCode: null })} />
-            <aside className="relative z-10 h-full w-full max-w-[560px] overflow-y-auto border-l border-slate-200 bg-white shadow-xl">
-              <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
+            <aside className="relative z-10 h-full w-full max-w-[560px] overflow-y-auto border-s border-[#D9D9D9] bg-white shadow-xl">
+              <div className="sticky top-0 z-20 border-b border-[#D9D9D9] bg-white/95 backdrop-blur-sm">
                 <div className="flex items-start justify-between gap-3 px-5 py-5">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-[#F0FDFC] px-2.5 py-1 text-[12px] font-bold text-[#008080]">
+                      <span className="rounded-full bg-[#E6F3F3] px-2.5 py-1 text-[12px] font-bold text-[#008080]">
                         {selectedJob.job_code}
                       </span>
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${
-                          getStatusBadge(jobStatusColors, selectedJob.job_status).bg
-                        } ${getStatusBadge(jobStatusColors, selectedJob.job_status).text}`}
-                      >
-                        {getStatusBadge(jobStatusColors, selectedJob.job_status).label}
-                      </span>
+                      <AdminBadge {...getAdminBadgeVariant(jobStatusColors, selectedJob.job_status)} />
                     </div>
 
 
-                    <h2 className="text-[24px] font-bold text-[#0F172A]">{selectedJob.job_title ?? '—'}</h2>
+                    <h2 className="text-[24px] font-bold text-[#2D2D2D]">{selectedJob.job_title ?? '—'}</h2>
 
 
                     <div className="flex flex-wrap gap-2">
@@ -1332,7 +1321,7 @@ export default function AdminJobsPage() {
                   <button
                     type="button"
                     onClick={() => setQuickSheet({ open: false, jobCode: null })}
-                    className="rounded-xl p-2 text-slate-500 hover:bg-slate-100"
+                    className="rounded-xl p-2 text-[#6B6B6B] hover:bg-[#F3F4F6]"
                   >
                     <X className="h-5 w-5" />
                   </button>
@@ -1364,7 +1353,7 @@ export default function AdminJobsPage() {
 
 
                 <SheetCard title="תקציר משרה">
-                  <p className="text-[13px] leading-6 text-slate-700">
+                  <p className="text-[13px] leading-6 text-[#2D2D2D]">
                     {buildTeaser(selectedJob.job_description || selectedJob.job_requirements || 'אין תקציר זמין')}
                   </p>
                 </SheetCard>
@@ -1380,16 +1369,16 @@ export default function AdminJobsPage() {
 
 
                 <div className="grid grid-cols-2 gap-3">
-                  <Link className="inline-flex items-center justify-center rounded-xl bg-[#008080] px-4 py-2.5 text-[13px] font-semibold text-white hover:opacity-95" to={`/jobs/${selectedJob.job_code}`}>
+                  <Link className="inline-flex items-center justify-center rounded-full bg-[#D97706] px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-[#B45309]" to={`/jobs/${selectedJob.job_code}`}>
                     פרטי משרה
                   </Link>
-                  <Link className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50" to={`/employers/${selectedJob.account_link}`}>
+                  <Link className="inline-flex items-center justify-center rounded-xl border border-[#D9D9D9] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#2D2D2D] hover:bg-[#F3F4F6]" to={`/employers/${selectedJob.account_link}`}>
                     Employer 360
                   </Link>
-                  <Link className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50" to={`/smart-match?job=${selectedJob.job_code}`}>
+                  <Link className="inline-flex items-center justify-center rounded-xl border border-[#D9D9D9] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#2D2D2D] hover:bg-[#F3F4F6]" to={`/smart-match?job=${selectedJob.job_code}`}>
                     Smart Match
                   </Link>
-                  <Link className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50" to={`/ats?job=${selectedJob.job_code}`}>
+                  <Link className="inline-flex items-center justify-center rounded-xl border border-[#D9D9D9] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#2D2D2D] hover:bg-[#F3F4F6]" to={`/ats?job=${selectedJob.job_code}`}>
                     ATS
                   </Link>
                 </div>
@@ -1401,7 +1390,7 @@ export default function AdminJobsPage() {
 
         {toast.open && (
           <div className="pointer-events-none fixed bottom-4 left-4 z-[60]">
-            <div className={`rounded-2xl border px-4 py-3 shadow-md ${toastClassName(toast.tone)}`}>
+            <div className={`rounded-[18px] border px-4 py-3 shadow-md ${toastClassName(toast.tone)}`}>
               <div className="flex items-center gap-2 text-[13px] font-semibold">
                 {toast.tone === 'success' && <CheckCircle2 className="h-4 w-4" />}
                 {toast.tone === 'error' && <AlertTriangle className="h-4 w-4" />}
@@ -1417,14 +1406,14 @@ export default function AdminJobsPage() {
         {editOpen && (
           <div className="fixed inset-0 z-50 flex justify-end">
             <div className="absolute inset-0 bg-slate-900/30" onClick={() => setEditOpen(false)} />
-            <aside className="relative z-10 flex h-full w-full max-w-[540px] flex-col border-l border-slate-200 bg-slate-50 shadow-xl">
+            <aside className="relative z-10 flex h-full w-full max-w-[540px] flex-col border-s border-[#D9D9D9] bg-[#F3F4F6] shadow-xl">
               {/* Header */}
-              <div className="sticky top-0 z-20 flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4">
+              <div className="sticky top-0 z-20 flex items-center justify-between border-b border-[#D9D9D9] bg-white px-5 py-4">
                 <div>
-                  <h2 className="text-[16px] font-bold text-[#0F172A]">עריכת משרה</h2>
-                  <p className="text-[12px] text-slate-500">{editJobCode}</p>
+                  <h2 className="text-[16px] font-bold text-[#2D2D2D]">עריכת משרה</h2>
+                  <p className="text-[12px] text-[#6B6B6B]">{editJobCode}</p>
                 </div>
-                <button type="button" onClick={() => setEditOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-slate-100">
+                <button type="button" onClick={() => setEditOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-[#F3F4F6]">
                   <X className="h-4 w-4" />
                 </button>
               </div>
@@ -1468,11 +1457,11 @@ export default function AdminJobsPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex justify-end gap-3 border-t border-slate-200 bg-white px-5 py-4">
-                <button type="button" onClick={() => setEditOpen(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-50">
+              <div className="flex justify-end gap-3 border-t border-[#D9D9D9] bg-white px-5 py-4">
+                <button type="button" onClick={() => setEditOpen(false)} className="rounded-full border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">
                   ביטול
                 </button>
-                <button type="button" onClick={handleSaveEdit} disabled={savingEdit} className="rounded-xl bg-[#008080] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#006666] disabled:opacity-60">
+                <button type="button" onClick={handleSaveEdit} disabled={savingEdit} className="rounded-full bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309] disabled:opacity-60">
                   {savingEdit ? 'שומר...' : 'שמור'}
                 </button>
               </div>
@@ -1503,7 +1492,7 @@ function KpiCard({
       ? 'border-[#FDE68A] bg-[#FFFBEB]'
       : tone === 'success'
         ? 'border-[#BBF7D0] bg-[#F0FDF4]'
-        : 'border-slate-200 bg-white'
+        : 'border-[#D9D9D9] bg-white'
 
 
   const valueClasses =
@@ -1518,11 +1507,11 @@ function KpiCard({
     <button
       type="button"
       onClick={onClick}
-      className={`rounded-2xl border p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}
+      className={`rounded-[18px] border p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}
     >
-      <div className="text-[13px] font-semibold text-slate-500">{label}</div>
+      <div className="text-[13px] font-semibold text-[#6B6B6B]">{label}</div>
       <div className={`mt-2 text-[24px] font-bold ${valueClasses}`}>{value}</div>
-      <div className="mt-1 text-[12px] font-medium text-slate-500">{hint}</div>
+      <div className="mt-1 text-[12px] font-medium text-[#6B6B6B]">{hint}</div>
     </button>
   )
 }
@@ -1532,7 +1521,7 @@ function InfoPill({ label, tone = 'default' }: { label: string; tone?: 'default'
   return (
     <span
       className={`rounded-full px-3 py-1 text-[12px] font-semibold ${
-        tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F8FAFC] text-slate-600'
+        tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'
       }`}
     >
       {label}
@@ -1555,7 +1544,7 @@ function SmallActionButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-semibold text-[#2D2D2D] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}
     </button>
@@ -1576,7 +1565,7 @@ function LinkIconButton({
     <Link
       to={to}
       title={title}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#008080]"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D9D9D9] bg-white text-[#6B6B6B] transition hover:bg-[#F3F4F6] hover:text-[#008080]"
     >
       {icon}
     </Link>
@@ -1603,7 +1592,7 @@ function IconButton({
       title={title}
       onClick={onClick}
       disabled={disabled || pending}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-40"
+      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D9D9D9] bg-white text-[#6B6B6B] transition hover:bg-[#F3F4F6] hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-40"
     >
       {icon}
     </button>
@@ -1621,7 +1610,7 @@ function MiniSignal({
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-        tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-slate-100 text-slate-600'
+        tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'
       }`}
     >
       {children}
@@ -1638,8 +1627,8 @@ function SheetCard({
   children: React.ReactNode
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h3 className="mb-3 text-[15px] font-bold text-[#0F172A]">{title}</h3>
+    <section className="rounded-[18px] border border-[#D9D9D9] bg-white p-4 shadow-sm">
+      <h3 className="mb-3 text-[15px] font-bold text-[#2D2D2D]">{title}</h3>
       <div className="space-y-2">{children}</div>
     </section>
   )
@@ -1648,9 +1637,9 @@ function SheetCard({
 
 function LabelValue({ label, value }: { label: string; value: React.ReactNode }) {
   return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-2 text-[13px] last:border-b-0 last:pb-0">
-      <span className="font-medium text-slate-500">{label}</span>
-      <span className="text-left font-semibold text-[#0F172A]">{value}</span>
+    <div className="flex items-start justify-between gap-4 border-b border-[#F3F4F6] pb-2 text-[13px] last:border-b-0 last:pb-0">
+      <span className="font-medium text-[#6B6B6B]">{label}</span>
+      <span className="text-left font-semibold text-[#2D2D2D]">{value}</span>
     </div>
   )
 }
@@ -1658,7 +1647,7 @@ function LabelValue({ label, value }: { label: string; value: React.ReactNode })
 
 function InfoBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[12px] font-semibold text-slate-700">
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#2D2D2D]">
       {icon}
       {label}
     </span>
@@ -1791,8 +1780,8 @@ function buildCsv(rows: Array<Record<string, string | number>>) {
 
 function EditSectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="mb-4 text-[16px] font-bold text-[#0F172A]">{title}</h3>
+    <section className="rounded-[18px] border border-[#D9D9D9] bg-white p-5 shadow-sm">
+      <h3 className="mb-4 text-[16px] font-bold text-[#2D2D2D]">{title}</h3>
       {children}
     </section>
   )
@@ -1801,9 +1790,9 @@ function EditSectionCard({ title, children }: { title: string; children: React.R
 function EditTextField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-slate-500">{label}</span>
+      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
       <input dir="rtl" type={type} value={value} onChange={(e) => onChange(e.target.value)}
-        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10" />
+        className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-1 focus:ring-[#008080]/20" />
     </label>
   )
 }
@@ -1811,9 +1800,9 @@ function EditTextField({ label, value, onChange, type = 'text' }: { label: strin
 function EditSelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-slate-500">{label}</span>
+      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
       <select dir="rtl" value={value} onChange={(e) => onChange(e.target.value)}
-        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10">
+        className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-1 focus:ring-[#008080]/20">
         <option value="">בחר</option>
         {options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
       </select>
@@ -1824,9 +1813,9 @@ function EditSelectField({ label, value, onChange, options }: { label: string; v
 function EditTextareaField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-slate-500">{label}</span>
+      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
       <textarea dir="rtl" rows={4} value={value} onChange={(e) => onChange(e.target.value)}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10" />
+        className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-1 focus:ring-[#008080]/20" />
     </label>
   )
 }
@@ -1838,7 +1827,7 @@ function SortableTh({ label, sortKey, sortBy, sortDir, onSort, width, onResizeSt
   const active = sortBy === sortKey
   return (
     <th
-      className="relative cursor-pointer select-none px-4 py-4 hover:bg-slate-100"
+      className="relative cursor-pointer select-none px-4 py-4 hover:bg-[#F3F4F6]"
       style={width ? { width, minWidth: 80 } : { minWidth: 80 }}
       onClick={() => onSort(sortKey)}
     >
