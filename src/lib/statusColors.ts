@@ -60,3 +60,24 @@ export function getStatusBadge(
   }
   return statusMap[statusId]
 }
+
+import type { AdminBadgeVariant } from '@/components/admin/AdminBadge'
+
+export function getAdminBadgeVariant(
+  statusMap: Record<number, { bg: string; text: string; label: string }>,
+  statusId: number | null | undefined
+): { label: string; variant: AdminBadgeVariant } {
+  const entry = statusId ? statusMap[statusId] : null
+  if (!entry) return { label: 'לא הוגדר', variant: 'neutral' }
+
+  const bg = entry.bg
+  let variant: AdminBadgeVariant = 'neutral'
+  if (bg.includes('green') || bg.includes('emerald')) variant = 'success'
+  else if (bg.includes('teal') || bg.includes('lime')) variant = 'teal'
+  else if (bg.includes('yellow') || bg.includes('amber') || bg.includes('orange')) variant = 'warning'
+  else if (bg.includes('red') || bg.includes('rose')) variant = 'error'
+  else if (bg.includes('blue') || bg.includes('sky') || bg.includes('cyan') || bg.includes('indigo')) variant = 'info'
+  else if (bg.includes('purple') || bg.includes('violet')) variant = 'purple'
+
+  return { label: entry.label, variant }
+}
