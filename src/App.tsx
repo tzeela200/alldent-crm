@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 
 // Layouts
 import AdminLayout from '@/components/layout/AdminLayout'
+import PublicLayout from '@/components/layout/PublicLayout'
 
 // Admin pages
 import DashboardPage from '@/pages/DashboardPage'
@@ -21,18 +22,19 @@ import SmartMatchPage from '@/pages/SmartMatchPage'
 import InboxV2Page from '@/pages/InboxV2Page'
 import CandidateProfilePage from '@/pages/CandidateProfilePage'
 import EmployerProfilePage from '@/pages/EmployerProfilePage'
+import PublicHomePage from '@/pages/PublicHomePage'
 import PublicJobsPage from '@/pages/PublicJobsPage'
 import PublicJobPage from '@/pages/PublicJobPage'
 
 export default function App() {
   return (
     <Routes>
-      {/* redirect from root to public jobs */}
-      <Route path="/" element={<Navigate to="/jobs" replace />} />
-
-      {/* ─── Public routes (no sidebar) ─── */}
-      <Route path="/jobs" element={<PublicJobsPage />} />
-      <Route path="/jobs/:jobCode" element={<PublicJobPage />} />
+      {/* ─── Public routes (with PublicLayout) ─── */}
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<PublicHomePage />} />
+        <Route path="/jobs" element={<PublicJobsPage />} />
+        <Route path="/jobs/:jobCode" element={<PublicJobPage />} />
+      </Route>
       <Route path="/candidate/:contactId" element={<CandidateProfilePage />} />
       <Route path="/profile/:token" element={<CandidateProfilePage />} />
       <Route path="/employer-profile/:id" element={<EmployerProfilePage />} />

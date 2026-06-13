@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { SiteHeader } from '@/components/public/PublicHeader'
-import { SiteFooter } from '@/components/public/SiteFooter'
 import ApplyModal from '@/components/public/ApplyModal'
 import { getPublicJobByCode } from '@/services/publicJobsService'
 import type { PublicJob } from '@/services/publicJobsService'
@@ -38,8 +36,6 @@ export default function PublicJobPage() {
 
   return (
     <div className="bg-[#FAFAF6] min-h-screen" dir="rtl" style={{ fontFamily: 'Heebo, sans-serif' }}>
-
-      <SiteHeader />
 
       {/* HERO */}
       <section className="relative h-[420px] text-white overflow-hidden">
@@ -78,10 +74,10 @@ export default function PublicJobPage() {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-6">
             <InfoCell label="עיר" value={job.city_name} />
             <InfoCell label="אזור" value={job.region_name} />
-            <InfoCell label="היקף" value={job.scope_names} />
+            <InfoCell label="היקף" value={Array.isArray(job.scope_names) ? job.scope_names.join(', ') : job.scope_names} />
             <InfoCell label="ניסיון" value={job.required_experience_name} />
-            <InfoCell label="שפות" value={job.required_languages} />
-            <InfoCell label="מערכות" value={job.system_names} />
+            <InfoCell label="שפות" value={Array.isArray(job.required_languages) ? job.required_languages.join(', ') : job.required_languages} />
+            <InfoCell label="מערכות" value={Array.isArray(job.system_names) ? job.system_names.join(', ') : job.system_names} />
             <InfoCell label="ניידות" value={job.mobility_name} />
             <InfoCell label="מיסוי" value={job.tax_type_name} />
           </div>
@@ -147,8 +143,6 @@ export default function PublicJobPage() {
 
         </div>
       </section>
-
-      <SiteFooter />
 
       <ApplyModal
         isOpen={applyOpen}
