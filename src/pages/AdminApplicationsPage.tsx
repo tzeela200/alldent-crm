@@ -535,7 +535,7 @@ function ApplicationsTable({
             <th className="px-3 py-3">פעולות</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-[#F3F4F6]">
           {rows.map((row) => {
             const appBadge = getStatusBadge(applicationStatusColors, row.application_status)
             const checkBadge = getStatusBadge(checkStatusColors, row.check_status)
@@ -546,9 +546,9 @@ function ApplicationsTable({
             return (
               <tr
                 key={row.application_id}
-                className={`border-b border-slate-100 transition-colors hover:bg-slate-50 ${isSelected ? 'bg-teal-50/40' : ''}`}
+                className={`text-[13px] text-[#2D2D2D] transition-colors hover:bg-[#FAFAF7] ${isSelected ? 'bg-[#F0FDFC]' : ''}`}
               >
-                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                   <input
                     type="checkbox"
                     checked={isSelected}
@@ -558,34 +558,34 @@ function ApplicationsTable({
                 </td>
                 {/* שם — contact name if linked, otherwise candidate_name */}
                 <td
-                  className="cursor-pointer px-3 py-2 font-medium text-slate-900 hover:text-teal-700"
+                  className="cursor-pointer px-3 py-3 font-medium text-slate-900 hover:text-teal-700"
                   onClick={() => onRowClick(row.application_id)}
                 >
                   {row.candidate_name ?? '—'}
                 </td>
-                <td className="px-3 py-2 font-mono text-xs text-slate-600" dir="ltr">
+                <td className="px-3 py-3 font-mono text-xs text-slate-600" dir="ltr">
                   {row.candidate_phone ?? '—'}
                 </td>
                 {/* מצב פרופיל */}
-                <td className="px-3 py-2">
+                <td className="px-3 py-3">
                   {row.is_new_candidate
                     ? <span className="rounded-[6px] bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">לא קיים פרופיל</span>
                     : <span className="rounded-[6px] bg-teal-50 px-2 py-0.5 text-[10px] text-teal-700">קיים פרופיל</span>
                   }
                 </td>
-                <td className="px-3 py-2 font-mono text-xs font-semibold text-slate-700">
+                <td className="px-3 py-3 font-mono text-xs font-semibold text-slate-700">
                   {row.job_code ?? '—'}
                 </td>
-                <td className="px-3 py-2 text-xs text-slate-600">{row.job_role ?? '—'}</td>
-                <td className="px-3 py-2 text-xs text-slate-500">{row.job_region ?? '—'}</td>
-                <td className="px-3 py-2 text-xs text-slate-600">{row.account_name ?? '—'}</td>
-                <td className="px-3 py-2">
+                <td className="px-3 py-3 text-xs text-slate-600">{row.job_role ?? '—'}</td>
+                <td className="px-3 py-3 text-xs text-slate-500">{row.job_region ?? '—'}</td>
+                <td className="px-3 py-3 text-xs text-slate-600">{row.account_name ?? '—'}</td>
+                <td className="px-3 py-3">
                   <span className={`rounded-[6px] px-2 py-0.5 text-xs font-medium ${appBadge.bg} ${appBadge.text}`}>
                     {appLabel}
                   </span>
                 </td>
                 {/* קו"ח */}
-                <td className="px-3 py-2">
+                <td className="px-3 py-3">
                   {row.has_cv && row.cv_link ? (
                     <a
                       href={row.cv_link}
@@ -601,14 +601,14 @@ function ApplicationsTable({
                   )}
                 </td>
                 {/* מקור */}
-                <td className="px-3 py-2 text-xs text-slate-500">{sourceLabel || '—'}</td>
-                <td className="px-3 py-2 text-xs text-slate-400">
+                <td className="px-3 py-3 text-xs text-slate-500">{sourceLabel || '—'}</td>
+                <td className="px-3 py-3 text-xs text-slate-400">
                   {formatDate(row.submission_date)}
                 </td>
-                <td className="max-w-[120px] truncate px-3 py-2 text-xs text-slate-400">
+                <td className="max-w-[120px] truncate px-3 py-3 text-xs text-slate-400">
                   {row.internal_notes ?? '—'}
                 </td>
-                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
                       {row.candidate_phone && (

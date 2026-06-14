@@ -1045,7 +1045,7 @@ export default function AdminContactsPage() {
                       </tr>
                     </thead>
 
-                    <tbody className="divide-y divide-slate-100 bg-white">
+                    <tbody className="divide-y divide-[#F3F4F6] bg-white">
                       {pageData.map((contact) => {
                         const warnings = buildWarnings(contact)
                         const selected = selectedRows.includes(Number(contact.contact_id))
@@ -1053,12 +1053,12 @@ export default function AdminContactsPage() {
                         return (
                           <tr
                             key={contact.contact_id}
-                            className={`cursor-pointer text-[13px] font-medium text-[#0F172A] transition ${
-                              selected ? 'bg-[#F0FDFC]' : 'hover:bg-slate-50'
+                            className={`cursor-pointer text-[13px] font-medium text-[#2D2D2D] transition ${
+                              selected ? 'bg-[#F0FDFC]' : 'hover:bg-[#FAFAF7]'
                             }`}
                             onClick={() => setSelectedId(Number(contact.contact_id))}
                           >
-                            <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                            <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={selected}
@@ -1068,7 +1068,7 @@ export default function AdminContactsPage() {
                             </td>
 
                             {visibleColumns.includes('full_name') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <div className="min-w-[220px]">
                                   <div className="flex items-start gap-3">
                                     <div className="space-y-1">
@@ -1097,7 +1097,7 @@ export default function AdminContactsPage() {
                             )}
 
                             {visibleColumns.includes('phone') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <div className="space-y-1">
                                   <div className="font-semibold text-slate-700">
                                     {contact.phone_norm ? formatPhone(contact.phone_norm) : '—'}
@@ -1112,7 +1112,7 @@ export default function AdminContactsPage() {
                             )}
 
                             {visibleColumns.includes('email') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <div className="space-y-1">
                                   <div className="max-w-[220px] truncate">{contact.email ?? '—'}</div>
                                   {contact.second_email && (
@@ -1125,25 +1125,25 @@ export default function AdminContactsPage() {
                             )}
 
                             {visibleColumns.includes('role') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <RoleBadge label={roleName(contact.role)} roleId={Number(contact.role)} />
                               </td>
                             )}
 
                             {visibleColumns.includes('region') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <LightTag tone="slate">{regionName(contact.region_id)}</LightTag>
                               </td>
                             )}
 
                             {visibleColumns.includes('city') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <LightTag tone="slate">{cityName(contact.city_id)}</LightTag>
                               </td>
                             )}
 
                             {visibleColumns.includes('availability') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <Badge tone={availabilityTone(contact.availability)}>
                                   {availabilityName(contact.availability)}
                                 </Badge>
@@ -1151,17 +1151,17 @@ export default function AdminContactsPage() {
                             )}
 
                             {visibleColumns.includes('cv') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <CvStateBadge hasCv={Boolean(contact.has_cv)} broken={contact.hasBrokenCv} />
                               </td>
                             )}
 
                             {visibleColumns.includes('profile_type') && (
-                              <td className="px-4 py-3">{profileTypeName(contact.profile_type)}</td>
+                              <td className="px-3 py-3">{profileTypeName(contact.profile_type)}</td>
                             )}
 
                             {visibleColumns.includes('linked_org') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 {contact.linked_org_name ? (
                                   <button
                                     type="button"
@@ -1180,15 +1180,15 @@ export default function AdminContactsPage() {
                             )}
 
                             {visibleColumns.includes('whatsapp') && (
-                              <td className="px-4 py-3">{formatDate(contact.whatsapp_campaign_last_sent)}</td>
+                              <td className="px-3 py-3">{formatDate(contact.whatsapp_campaign_last_sent)}</td>
                             )}
 
                             {visibleColumns.includes('last_contact') && (
-                              <td className="px-4 py-3">{formatDate(contact.last_contact_date)}</td>
+                              <td className="px-3 py-3">{formatDate(contact.last_contact_date)}</td>
                             )}
 
 
-                            <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                            <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1">
                                 <IconAction
                                   title="תצוגה מהירה"
@@ -1227,7 +1227,7 @@ export default function AdminContactsPage() {
                   </table>
                 </div>
 
-                <div className="border-t border-slate-200 bg-white px-4 py-3">
+                <div className="border-t border-slate-200 bg-white px-3 py-3">
                   <Pagination
                     page={page}
                     totalPages={totalPages}
@@ -1517,7 +1517,7 @@ export default function AdminContactsPage() {
 
                 <SectionCard title='קבצים'>
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3">
+                    <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-[#F8FAFC] px-3 py-3">
                       <div className="space-y-1">
                         <div className="text-[14px] font-bold text-[#0F172A]">סטטוס קו"ח</div>
                         <div className="text-[13px] text-slate-500">
@@ -1773,7 +1773,7 @@ export default function AdminContactsPage() {
                   })}
                 </div>
 
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-medium text-amber-800 mb-5">
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-[13px] font-medium text-amber-800 mb-5">
                   שדות ריקים ברשומה הראשית יושלמו מהרשומה המשנית. תגיות הרשומה המשנית יועברו לראשית.
                 </div>
 
@@ -1795,7 +1795,7 @@ export default function AdminContactsPage() {
         {toast.open && (
           <div className="fixed bottom-5 left-5 z-[70]">
             <div
-              className={`rounded-2xl border px-4 py-3 shadow-md ${
+              className={`rounded-2xl border px-3 py-3 shadow-md ${
                 toast.tone === 'success'
                   ? 'border-green-200 bg-green-50 text-green-700'
                   : toast.tone === 'error'
@@ -1871,7 +1871,7 @@ function ComputedFilterCard({
   subtitle: string
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
       <div className="text-[12px] font-semibold text-slate-500">{label}</div>
       <div className="mt-1 text-[24px] font-bold text-[#0F172A]">{value}</div>
       <div className="mt-1 text-[12px] font-medium text-slate-600">{subtitle}</div>

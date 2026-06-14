@@ -887,45 +887,45 @@ export default function AdminEmployersPage({
             ) : (
               <div className="overflow-hidden rounded-[18px] border border-[#D9D9D9] bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1600px] w-full border-collapse text-right text-[14px]">
+                  <table className="min-w-[1600px] w-full border-collapse text-right text-[13px]">
                     <thead className="bg-[#F9FAFB]">
                       <tr className="border-b border-[#D9D9D9] text-[12px] font-semibold text-[#6B6B6B]">
-                        <th className="px-4 py-3"><input type="checkbox" checked={pageData.length > 0 && pageData.every((row) => selectedRows.includes(Number(row.account_id)))} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
+                        <th className="px-3 py-3"><input type="checkbox" checked={pageData.length > 0 && pageData.every((row) => selectedRows.includes(Number(row.account_id)))} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
                         {visibleColumns.includes('account_name') && <SortableTh label="שם ארגון" sortKey="account_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
-                        {visibleColumns.includes('primary_contact') && <th className="px-4 py-3">שם מעסיק</th>}
+                        {visibleColumns.includes('primary_contact') && <th className="px-3 py-3">שם מעסיק</th>}
                         {visibleColumns.includes('account_type') && <SortableTh label="סוג" sortKey="account_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
                         {visibleColumns.includes('account_status') && <SortableTh label="סטטוס" sortKey="account_status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
-                        {visibleColumns.includes('phone') && <th className="px-4 py-3">טלפון</th>}
-                        {visibleColumns.includes('email') && <th className="px-4 py-3">מייל</th>}
-                        {visibleColumns.includes('region') && <th className="px-4 py-3">אזור</th>}
-                        {visibleColumns.includes('city') && <th className="px-4 py-3">עיר</th>}
+                        {visibleColumns.includes('phone') && <th className="px-3 py-3">טלפון</th>}
+                        {visibleColumns.includes('email') && <th className="px-3 py-3">מייל</th>}
+                        {visibleColumns.includes('region') && <th className="px-3 py-3">אזור</th>}
+                        {visibleColumns.includes('city') && <th className="px-3 py-3">עיר</th>}
                         {visibleColumns.includes('active_jobs') && <SortableTh label="משרות פעילות" sortKey="activeJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
                         {visibleColumns.includes('total_jobs') && <SortableTh label="סה״כ משרות" sortKey="totalJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
-                        {visibleColumns.includes('contacts') && <th className="px-4 py-3">אנשי קשר</th>}
-                        {visibleColumns.includes('follow_up') && <th className="px-4 py-3">פולו־אפ</th>}
-                        <th className="px-4 py-3">פעולות</th>
+                        {visibleColumns.includes('contacts') && <th className="px-3 py-3">אנשי קשר</th>}
+                        {visibleColumns.includes('follow_up') && <th className="px-3 py-3">פולו־אפ</th>}
+                        <th className="px-3 py-3">פעולות</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-[#F3F4F6] bg-white">
+                    <tbody className="divide-y divide-[#F3F4F6] bg-white text-[13px] text-[#2D2D2D]">
                       {pageData.map((account) => {
                         const selected = selectedRows.includes(Number(account.account_id))
                         const status = getEmployerStatusBadge(account.account_status, accountStatusName(account.account_status))
                         return (
-                          <tr key={account.account_id} onClick={() => openSheet(Number(account.account_id), 'view')} className={`text-[14px] font-medium transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#F9FAFB]'}`}>
-                            <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleRowSelection(Number(account.account_id))} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></td>
-                            {visibleColumns.includes('account_name') && <td style={{ width: columnWidths.account_name }} className="px-4 py-3"><div className="font-bold text-[#2D2D2D]">{account.account_name ?? '—'}</div></td>}
+                          <tr key={account.account_id} onClick={() => openSheet(Number(account.account_id), 'view')} className={`font-medium transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#FAFAF7]'}`}>
+                            <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleRowSelection(Number(account.account_id))} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></td>
+                            {visibleColumns.includes('account_name') && <td style={{ width: columnWidths.account_name }} className="px-3 py-3"><div className="font-bold text-[#2D2D2D]">{account.account_name ?? '—'}</div></td>}
                             {visibleColumns.includes('primary_contact') && <td style={{ width: columnWidths.primary_contact }} className="px-4 py-3 font-bold text-[#2D2D2D]">{account.primaryEmployerName}</td>}
-                            {visibleColumns.includes('account_type') && <td style={{ width: columnWidths.account_type }} className="px-4 py-3">{accountTypeName(account.account_type)}</td>}
-                            {visibleColumns.includes('account_status') && <td style={{ width: columnWidths.account_status }} className="px-4 py-3"><select dir="rtl" value={String(account.account_status ?? '')} onChange={(event) => updateAccountStatusInline(Number(account.account_id), Number(event.target.value))} className={`h-9 rounded-[8px] border px-2.5 text-[12px] font-bold outline-none ${status.bg} ${status.text} ${status.border}`}>{(isEmployersBoard ? accountStatuses.filter((item) => EMPLOYER_STATUS_IDS.includes(item.id)) : accountStatuses).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></td>}
+                            {visibleColumns.includes('account_type') && <td style={{ width: columnWidths.account_type }} className="px-3 py-3">{accountTypeName(account.account_type)}</td>}
+                            {visibleColumns.includes('account_status') && <td style={{ width: columnWidths.account_status }} className="px-3 py-3"><select dir="rtl" value={String(account.account_status ?? '')} onChange={(event) => updateAccountStatusInline(Number(account.account_id), Number(event.target.value))} className={`h-9 rounded-[8px] border px-2.5 text-[12px] font-bold outline-none ${status.bg} ${status.text} ${status.border}`}>{(isEmployersBoard ? accountStatuses.filter((item) => EMPLOYER_STATUS_IDS.includes(item.id)) : accountStatuses).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></td>}
                             {visibleColumns.includes('phone') && <td style={{ width: columnWidths.phone }} dir="ltr" className="px-4 py-3 font-mono text-[12px]">{formatPhone(account.phone)}</td>}
                             {visibleColumns.includes('email') && <td style={{ width: columnWidths.email }} dir="ltr" className="px-4 py-3 text-[12px]">{account.email ?? '—'}</td>}
-                            {visibleColumns.includes('region') && <td style={{ width: columnWidths.region }} className="px-4 py-3">{regionName(account.displayRegionId)}</td>}
-                            {visibleColumns.includes('city') && <td style={{ width: columnWidths.city }} className="px-4 py-3">{account.locationLabel || cityName(account.displayCityId)}</td>}
-                            {visibleColumns.includes('active_jobs') && <td style={{ width: columnWidths.active_jobs }} className="px-4 py-3"><span className="rounded-[6px] bg-[#F0FDF4] px-2.5 py-1 text-[12px] font-bold text-[#16A34A]">{account.activeJobsCount}</span></td>}
-                            {visibleColumns.includes('total_jobs') && <td style={{ width: columnWidths.total_jobs }} className="px-4 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{account.totalJobsCount}</span></td>}
-                            {visibleColumns.includes('contacts') && <td style={{ width: columnWidths.contacts }} className="px-4 py-3"><div className="truncate">{account.linkedContactSummary || '—'}</div></td>}
-                            {visibleColumns.includes('follow_up') && <td style={{ width: columnWidths.follow_up }} className="px-4 py-3">{formatDate((account as any).next_follow_up)}</td>}
-                            <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                            {visibleColumns.includes('region') && <td style={{ width: columnWidths.region }} className="px-3 py-3">{regionName(account.displayRegionId)}</td>}
+                            {visibleColumns.includes('city') && <td style={{ width: columnWidths.city }} className="px-3 py-3">{account.locationLabel || cityName(account.displayCityId)}</td>}
+                            {visibleColumns.includes('active_jobs') && <td style={{ width: columnWidths.active_jobs }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F0FDF4] px-2.5 py-1 text-[12px] font-bold text-[#16A34A]">{account.activeJobsCount}</span></td>}
+                            {visibleColumns.includes('total_jobs') && <td style={{ width: columnWidths.total_jobs }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{account.totalJobsCount}</span></td>}
+                            {visibleColumns.includes('contacts') && <td style={{ width: columnWidths.contacts }} className="px-3 py-3"><div className="truncate">{account.linkedContactSummary || '—'}</div></td>}
+                            {visibleColumns.includes('follow_up') && <td style={{ width: columnWidths.follow_up }} className="px-3 py-3">{formatDate((account as any).next_follow_up)}</td>}
+                            <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1.5">
                                 <IconAction title="צפייה" onClick={() => openSheet(Number(account.account_id), 'view')} icon={<Eye className="h-4 w-4" />} />
                                 <IconAction title="עריכה" onClick={() => openSheet(Number(account.account_id), 'edit')} icon={<Edit2 className="h-4 w-4" />} />

@@ -956,7 +956,7 @@ export default function AdminCandidatesPage() {
               </div>
 
               <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <div className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
                   <div className="text-[12px] font-semibold text-slate-500">סינון מחושב</div>
                   <div className="mt-1 text-[24px] font-bold text-[#0F172A]">{filteredCandidates.length}</div>
                   <div className="mt-1 text-[12px] font-medium text-slate-600">
@@ -1067,19 +1067,19 @@ export default function AdminCandidatesPage() {
                       </tr>
                     </thead>
 
-                    <tbody className="divide-y divide-slate-100 bg-white">
+                    <tbody className="divide-y divide-[#F3F4F6] bg-white">
                       {pageData.map((candidate) => {
                         const selected = selectedRows.includes(candidate.contact_id)
 
                         return (
                           <tr
                             key={candidate.contact_id}
-                            className={`cursor-pointer text-[13px] font-medium text-[#0F172A] transition ${
-                              selected ? 'bg-[#F0FDFC]' : 'hover:bg-slate-50'
+                            className={`cursor-pointer text-[13px] font-medium text-[#2D2D2D] transition ${
+                              selected ? 'bg-[#F0FDFC]' : 'hover:bg-[#FAFAF7]'
                             }`}
                             onClick={() => openQuickSheet(candidate.contact_id)}
                           >
-                            <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                            <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={selected}
@@ -1089,7 +1089,7 @@ export default function AdminCandidatesPage() {
                             </td>
 
                             {visibleColumns.includes('name') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <div className="min-w-[220px]">
                                   <div className="flex items-start gap-3">
                                     <div className="space-y-1">
@@ -1114,7 +1114,7 @@ export default function AdminCandidatesPage() {
                             )}
 
                             {visibleColumns.includes('phone') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <div className="space-y-1">
                                   <div className="font-semibold text-slate-700">
                                     {candidate.phone_norm ? formatPhone(candidate.phone_norm) : '—'}
@@ -1127,21 +1127,21 @@ export default function AdminCandidatesPage() {
                             )}
 
                             {visibleColumns.includes('role') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <RoleBadge label={roleName(candidate.role)} roleId={Number(candidate.role)} />
                               </td>
                             )}
 
                             {visibleColumns.includes('sub_role') && (
-                              <td className="px-4 py-3">{subRoleName(candidate.sub_role)}</td>
+                              <td className="px-3 py-3">{subRoleName(candidate.sub_role)}</td>
                             )}
 
                             {visibleColumns.includes('experience') && (
-                              <td className="px-4 py-3">{experienceName(candidate.experience)}</td>
+                              <td className="px-3 py-3">{experienceName(candidate.experience)}</td>
                             )}
 
                             {visibleColumns.includes('availability') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <StatusBadge tone={availabilityTone(candidate.availability)}>
                                   {availabilityName(candidate.availability)}
                                 </StatusBadge>
@@ -1149,29 +1149,29 @@ export default function AdminCandidatesPage() {
                             )}
 
                             {visibleColumns.includes('scope') && (
-                              <td className="px-4 py-3">{candidate.preferred_scope ?? '—'}</td>
+                              <td className="px-3 py-3">{candidate.preferred_scope ?? '—'}</td>
                             )}
 
                             {visibleColumns.includes('languages') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <div className="max-w-[180px] whitespace-normal">{candidate.languages ?? '—'}</div>
                               </td>
                             )}
 
                             {visibleColumns.includes('city') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <LightChip>{cityName(candidate.city_id)}</LightChip>
                               </td>
                             )}
 
                             {visibleColumns.includes('region') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <LightChip>{regionName(candidate.region_id)}</LightChip>
                               </td>
                             )}
 
                             {visibleColumns.includes('cv') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <StatusBadge tone={candidate.derived.hasCv ? 'success' : 'muted'}>
                                   {candidate.derived.hasCv ? 'יש קו"ח' : 'ללא קו"ח'}
                                 </StatusBadge>
@@ -1179,7 +1179,7 @@ export default function AdminCandidatesPage() {
                             )}
 
                             {visibleColumns.includes('tags') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <div className="flex max-w-[220px] flex-wrap gap-1.5">
                                   {candidate.mergedTags.length ? (
                                     candidate.mergedTags.map((tag) => (
@@ -1193,20 +1193,20 @@ export default function AdminCandidatesPage() {
                             )}
 
                             {visibleColumns.includes('salary') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 {formatSalary(candidate.salary_expectation_hourly, candidate.salary_expectation_monthly)}
                               </td>
                             )}
 
                             {visibleColumns.includes('applications') && (
-                              <td className="px-4 py-3">
+                              <td className="px-3 py-3">
                                 <span className="rounded-md bg-slate-900 px-2.5 py-1 text-[12px] font-bold text-white">
                                   {candidate.prev_applications_count ?? 0}
                                 </span>
                               </td>
                             )}
 
-                            <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+                            <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
                               <div className="flex items-center justify-center gap-1">
                                 <IconAction
                                   title="פתיחת 360"
@@ -1247,7 +1247,7 @@ export default function AdminCandidatesPage() {
                   </table>
                 </div>
 
-                <div className="border-t border-slate-200 bg-white px-4 py-3">
+                <div className="border-t border-slate-200 bg-white px-3 py-3">
                   <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filteredCandidates.length} />
                 </div>
               </div>
@@ -1365,7 +1365,7 @@ export default function AdminCandidatesPage() {
                 </SectionCard>
 
                 <SectionCard title="קבצים">
-                  <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-[#F8FAFC] px-4 py-3">
+                  <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-[#F8FAFC] px-3 py-3">
                     <div>
                       <div className="text-[14px] font-bold text-[#0F172A]">קו"ח</div>
                       <div className="text-[13px] text-slate-500">
@@ -1416,7 +1416,7 @@ export default function AdminCandidatesPage() {
                 </label>
 
                 {createApplicationBlocked && (
-                  <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-semibold text-red-700">
+                  <div className="rounded-2xl border border-red-200 bg-red-50 px-3 py-3 text-[13px] font-semibold text-red-700">
                     קיימת כבר הגשה לאותה משרה. הפעולה חסומה.
                   </div>
                 )}
@@ -1441,7 +1441,7 @@ export default function AdminCandidatesPage() {
         {toast.open && (
           <div className="fixed bottom-5 left-5 z-[70]">
             <div
-              className={`rounded-2xl border px-4 py-3 shadow-md ${
+              className={`rounded-2xl border px-3 py-3 shadow-md ${
                 toast.tone === 'success'
                   ? 'border-green-200 bg-green-50 text-green-700'
                   : toast.tone === 'error'
