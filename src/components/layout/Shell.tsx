@@ -203,7 +203,7 @@ export function SelectFilter({ value, onChange, options, placeholder }: SelectFi
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="h-11 rounded-full border border-[#D9D9D9] bg-white px-3 text-sm outline-none transition-colors focus:border-[#008080]"
+      className="h-11 rounded-[14px] border border-[#D9D9D9] bg-white px-3 text-sm outline-none transition-colors focus:border-[#008080]"
     >
       <option value="">{placeholder}</option>
       {options.map((o) => (
@@ -239,7 +239,7 @@ export function ActionButton({ children, onClick, variant = 'secondary', icon: I
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`inline-flex items-center gap-2 rounded-full font-medium transition-colors disabled:opacity-50 ${buttonVariants[variant]} ${sizeClasses}`}
+      className={`inline-flex items-center gap-2 rounded-[14px] font-medium transition-all shadow-[4px_4px_8px_rgba(0,0,0,0.10)] hover:shadow-[2px_2px_4px_rgba(0,0,0,0.12)] disabled:opacity-50 ${buttonVariants[variant]} ${sizeClasses}`}
     >
       {Icon && <Icon className={size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'} />}
       {children}

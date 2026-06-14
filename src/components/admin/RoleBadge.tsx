@@ -14,7 +14,7 @@ export function getRoleColor(roleId: number | null | undefined): string {
 
 export function RoleBadge({ roleId, label }: { roleId: number | null | undefined; label: string }) {
   return (
-    <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold ${getRoleColor(roleId)}`}>
+    <span className={`inline-flex items-center rounded-[6px] px-2.5 py-0.5 text-[12px] font-semibold ${getRoleColor(roleId)}`}>
       {label}
     </span>
   )

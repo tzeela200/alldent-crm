@@ -621,7 +621,7 @@ export default function AdminJobsPage() {
       actions={
         <div className="flex flex-wrap items-center gap-2">
           <details className="relative">
-            <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-semibold text-[#2D2D2D] transition hover:bg-[#F3F4F6]">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-[10px] border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-semibold text-[#2D2D2D] transition hover:bg-[#F3F4F6]">
               <Columns3 className="h-4 w-4" />
               בחירת עמודות
             </summary>
@@ -739,7 +739,7 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('scope') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.scope)} labelById={scopeName} empty="—" /></td>}
                             {visibleColumns.includes('job_status') && <td className="px-3 py-3"><StatusPill label={statusName(job.job_status)} tone={jobStatusTone(Number(job.job_status))} /></td>}
                             {visibleColumns.includes('public_status') && <td className="px-3 py-3"><StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} /></td>}
-                            {visibleColumns.includes('total_applicants') && <td className="px-3 py-3"><span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold">{Number(job.total_applicants ?? 0)}</span></td>}
+                            {visibleColumns.includes('total_applicants') && <td className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold">{Number(job.total_applicants ?? 0)}</span></td>}
                             {visibleColumns.includes('last_publish_date') && <td className="px-3 py-3 text-[#6B6B6B]">{job.last_publish_date ? formatDate(job.last_publish_date) : '—'}</td>}
                             {visibleColumns.includes('updated_timestamp') && <td className="px-3 py-3 text-[#6B6B6B]">{job.updated_timestamp ? formatDate(job.updated_timestamp) : '—'}</td>}
                             <td className="px-3 py-3">
@@ -853,7 +853,7 @@ function UnifiedJobPanel({
         <header className="flex items-start justify-between gap-3 border-b border-[#D9D9D9] bg-white px-5 py-4">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-[#E6F3F3] px-2.5 py-1 font-mono text-[12px] font-bold text-[#008080]">{job.job_code}</span>
+              <span className="rounded-[6px] bg-[#E6F3F3] px-2.5 py-1 font-mono text-[12px] font-bold text-[#008080]">{job.job_code}</span>
               <StatusPill label={statusName(job.job_status)} tone={jobStatusTone(Number(job.job_status))} />
               <StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} />
             </div>
@@ -936,13 +936,13 @@ function UnifiedJobPanel({
         </main>
 
         <footer className="flex items-center justify-between gap-3 border-t border-[#D9D9D9] bg-white px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-full border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">סגור</button>
+          <button type="button" onClick={onClose} className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">סגור</button>
           {mode === 'view' ? (
-            <button type="button" onClick={onEdit} className="rounded-full bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]">ערוך משרה</button>
+            <button type="button" onClick={onEdit} className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]">ערוך משרה</button>
           ) : (
             <div className="flex gap-2">
-              <button type="button" onClick={onView} className="rounded-full border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">חזרה לצפייה</button>
-              <button type="button" onClick={onSave} disabled={saving} className="rounded-full bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309] disabled:opacity-60">{saving ? 'שומר...' : 'שמור'}</button>
+              <button type="button" onClick={onView} className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">חזרה לצפייה</button>
+              <button type="button" onClick={onSave} disabled={saving} className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309] disabled:opacity-60">{saving ? 'שומר...' : 'שמור'}</button>
             </div>
           )}
         </footer>
@@ -970,7 +970,7 @@ function ListKpiCard({ title, items, empty, onItemClick }: { title: string; item
         {items.length ? items.map((item) => (
           <button key={item.id} type="button" onClick={() => onItemClick(item.id)} className="flex w-full items-center justify-between rounded-xl px-2 py-1.5 text-[12px] hover:bg-[#F3F4F6]">
             <span className="truncate text-[#2D2D2D]">{item.name}</span>
-            <span className="rounded-full bg-[#E6F3F3] px-2 py-0.5 font-bold text-[#008080]">{item.count}</span>
+            <span className="rounded-[6px] bg-[#E6F3F3] px-2 py-0.5 font-bold text-[#008080]">{item.count}</span>
           </button>
         )) : <div className="text-[12px] text-[#6B6B6B]">{empty}</div>}
       </div>
@@ -980,7 +980,7 @@ function ListKpiCard({ title, items, empty, onItemClick }: { title: string; item
 
 function InfoPill({ label, tone = 'default' }: { label: string; tone?: 'default' | 'warning' | 'success' }) {
   const cls = tone === 'success' ? 'bg-[#F0FDF4] text-[#16A34A]' : tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'
-  return <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${cls}`}>{label}</span>
+  return <span className={`rounded-[6px] px-3 py-1 text-[12px] font-semibold ${cls}`}>{label}</span>
 }
 
 function SortableTh({ label, sortKey, sortBy, sortDir, onSort }: { label: string; sortKey: string; sortBy: string | null; sortDir: 'asc' | 'desc'; onSort: (key: string) => void }) {
@@ -998,7 +998,7 @@ function PlainTh({ label }: { label: string }) {
 
 function IconButton({ title, icon, onClick, disabled, pending }: { title: string; icon: React.ReactNode; onClick?: () => void; disabled?: boolean; pending?: boolean }) {
   return (
-    <button type="button" title={title} onClick={onClick} disabled={disabled || pending} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D9D9D9] bg-white text-[#6B6B6B] transition hover:bg-[#F3F4F6] hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-50">
+    <button type="button" title={title} onClick={onClick} disabled={disabled || pending} className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#D9D9D9] bg-white text-[#6B6B6B] shadow-[3px_3px_6px_rgba(0,0,0,0.08)] transition-all hover:shadow-[1px_1px_3px_rgba(0,0,0,0.10)] hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-50">
       {pending ? <Clock3 className="h-4 w-4 animate-spin" /> : icon}
     </button>
   )
@@ -1014,15 +1014,15 @@ function StatusPill({ label, tone }: { label: string; tone: 'default' | 'success
     danger: 'bg-[#FEE2E2] text-[#991B1B]',
     muted: 'bg-[#F3F4F6] text-[#6B6B6B]',
   }[tone]
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[12px] font-bold ${cls}`}>{label}</span>
+  return <span className={`inline-flex rounded-[6px] px-2.5 py-1 text-[12px] font-bold ${cls}`}>{label}</span>
 }
 
 function BadgeList({ ids, labelById, empty }: { ids: number[]; labelById: (id: number) => string; empty: string }) {
   if (!ids.length) return <span className="text-slate-400">{empty}</span>
   return (
     <div className="flex max-w-[260px] flex-wrap gap-1">
-      {ids.slice(0, 4).map((id) => <span key={id} className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[11px] font-semibold text-[#2D2D2D]">{labelById(id)}</span>)}
-      {ids.length > 4 && <span className="rounded-full bg-[#E6F3F3] px-2 py-0.5 text-[11px] font-bold text-[#008080]">+{ids.length - 4}</span>}
+      {ids.slice(0, 4).map((id) => <span key={id} className="rounded-[6px] bg-[#F3F4F6] px-2 py-0.5 text-[11px] font-semibold text-[#2D2D2D]">{labelById(id)}</span>)}
+      {ids.length > 4 && <span className="rounded-[6px] bg-[#E6F3F3] px-2 py-0.5 text-[11px] font-bold text-[#008080]">+{ids.length - 4}</span>}
     </div>
   )
 }

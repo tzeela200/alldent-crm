@@ -18,7 +18,7 @@ const variants: Record<AdminBadgeVariant, string> = {
 
 export function AdminBadge({ label, variant = 'neutral' }: AdminBadgeProps) {
   return (
-    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-[12px] font-semibold whitespace-nowrap ${variants[variant]}`}>
+    <span className={`inline-flex rounded-[6px] border px-2.5 py-0.5 text-[12px] font-semibold whitespace-nowrap ${variants[variant]}`}>
       {label}
     </span>
   )

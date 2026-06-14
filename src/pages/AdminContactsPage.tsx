@@ -1071,9 +1071,6 @@ export default function AdminContactsPage() {
                               <td className="px-4 py-3">
                                 <div className="min-w-[220px]">
                                   <div className="flex items-start gap-3">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[15px] font-bold text-[#008080] shadow-sm">
-                                      {(contact.full_name ?? contact.display_name ?? '?').charAt(0)}
-                                    </div>
                                     <div className="space-y-1">
                                       <div className="text-[14px] font-bold text-[#0F172A]">
                                         {contact.full_name ?? contact.display_name ?? '—'}
@@ -2004,7 +2001,7 @@ function IconAction({
       aria-label={title}
       disabled={pending}
       onClick={onClick}
-      className="rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+      className="rounded-[10px] border border-slate-200 bg-white p-2 text-slate-500 shadow-[3px_3px_6px_rgba(0,0,0,0.08)] transition-all hover:shadow-[1px_1px_3px_rgba(0,0,0,0.10)] hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-50"
     >
       {icon}
     </button>
