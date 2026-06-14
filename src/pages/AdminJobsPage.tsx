@@ -36,6 +36,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/timeAgo'
 import type { Job, DictItem } from '@/types'
+import { RoleBadge } from '@/components/admin/RoleBadge'
 
 const PAGE_SIZE = 20
 
@@ -65,6 +66,7 @@ const ALL_JOB_COLUMNS = [
   { key: 'job_role', label: 'תפקיד' },
   { key: 'job_sub_role', label: 'תתי־תפקידים' },
   { key: 'account_name', label: 'ארגון' },
+  { key: 'employer_name', label: 'מעסיק' },
   { key: 'region_id', label: 'אזור' },
   { key: 'city_id', label: 'עיר' },
   { key: 'scope', label: 'היקף' },
@@ -81,6 +83,7 @@ const DEFAULT_JOB_COLUMNS = [
   'job_role',
   'job_sub_role',
   'account_name',
+  'employer_name',
   'region_id',
   'city_id',
   'scope',
@@ -706,6 +709,7 @@ export default function AdminJobsPage() {
                         {visibleColumns.includes('job_role') && <PlainTh label="תפקיד" />}
                         {visibleColumns.includes('job_sub_role') && <PlainTh label="תתי־תפקידים" />}
                         {visibleColumns.includes('account_name') && <PlainTh label="ארגון" />}
+                        {visibleColumns.includes('employer_name') && <PlainTh label="מעסיק" />}
                         {visibleColumns.includes('region_id') && <PlainTh label="אזור" />}
                         {visibleColumns.includes('city_id') && <PlainTh label="עיר" />}
                         {visibleColumns.includes('scope') && <PlainTh label="היקף" />}
@@ -729,6 +733,7 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('job_role') && <td className="px-3 py-3"><RoleBadge roleId={Number(job.job_role)} label={roleName(job.job_role)} /></td>}
                             {visibleColumns.includes('job_sub_role') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.job_sub_role)} labelById={subRoleName} empty="—" /></td>}
                             {visibleColumns.includes('account_name') && <td className="max-w-[220px] px-3 py-3"><span className="inline-flex items-center gap-1.5 rounded-xl bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"><Building2 className="h-3.5 w-3.5" />{job.account_name ?? '—'}</span></td>}
+                            {visibleColumns.includes('employer_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.employer_contact_name ?? '—'}</td>}
                             {visibleColumns.includes('region_id') && <td className="px-3 py-3">{regionName(job.region_id)}</td>}
                             {visibleColumns.includes('city_id') && <td className="px-3 py-3">{cityName(job.city_id)}</td>}
                             {visibleColumns.includes('scope') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.scope)} labelById={scopeName} empty="—" /></td>}
@@ -999,18 +1004,7 @@ function IconButton({ title, icon, onClick, disabled, pending }: { title: string
   )
 }
 
-function RoleBadge({ roleId, label }: { roleId: number; label: string }) {
-  const classes = [
-    'bg-[#E6F3F3] text-[#006D6D]',
-    'bg-[#FEF3C7] text-[#B45309]',
-    'bg-[#EEF2FF] text-[#4338CA]',
-    'bg-[#FCE7F3] text-[#BE185D]',
-    'bg-[#ECFDF5] text-[#047857]',
-    'bg-[#F3F4F6] text-[#374151]',
-  ]
-  const cls = classes[Math.abs(roleId || 0) % classes.length]
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[12px] font-bold ${cls}`}>{label}</span>
-}
+// RoleBadge imported from shared component above
 
 function StatusPill({ label, tone }: { label: string; tone: 'default' | 'success' | 'warning' | 'danger' | 'muted' }) {
   const cls = {

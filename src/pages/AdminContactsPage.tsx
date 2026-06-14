@@ -47,6 +47,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { mockContactTags } from '@/mocks/data'
 import type { Contact } from '@/types'
+import { RoleBadge } from '@/components/admin/RoleBadge'
 
 type ExtendedFilters = {
   search?: string
@@ -178,7 +179,7 @@ export default function AdminContactsPage() {
 
   const pageSize = 20
 
-  const { data: rawContacts = [] } = useQuery<Contact[]>({
+  const { data: rawContacts = [], isError: contactsError, error: contactsFetchError } = useQuery<Contact[]>({
     queryKey: ['contacts'],
     queryFn: async () => {
       // Supabase מחזיר max 1000 שורות per request — שואבים בדפים עד שמסיימים
@@ -459,17 +460,7 @@ export default function AdminContactsPage() {
 
   const activeCityOptions = useMemo(() => {
     if (!filters.region_id) return cityOptions
-    const regionToCityIds: Record<number, number[]> = {
-      2: [3, 19],
-      3: [7, 9, 10, 11],
-      4: [4, 5, 12, 13, 14, 15, 20],
-      5: [1],
-      6: [2, 16],
-      8: [6, 8, 17],
-    }
-    const relevant = regionToCityIds[Number(filters.region_id)] ?? []
-    if (!relevant.length) return cityOptions
-    return cityOptions.filter((item) => relevant.includes(item.id))
+    return cityOptions.filter((item) => Number(item.region_id) === Number(filters.region_id))
   }, [filters.region_id, cityOptions])
 
   const clearFilters = () => {
@@ -1003,6 +994,12 @@ export default function AdminContactsPage() {
           )}
 
           <Toolbar>
+            {contactsError && (
+              <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-right">
+                <p className="text-sm font-semibold text-red-700">שגיאה בטעינת אנשי קשר מ-Supabase</p>
+                <p className="mt-0.5 text-xs text-red-500">{(contactsFetchError as Error)?.message ?? 'בעיית הרשאות RLS או חיבור'}</p>
+              </div>
+            )}
             {pageData.length === 0 ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
                 <EmptyState
@@ -1987,20 +1984,7 @@ function LightTag({
   return <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold ${classes}`}>{children}</span>
 }
 
-function RoleBadge({ label, roleId }: { label: string; roleId: number }) {
-  let classes = 'bg-slate-200 text-slate-800'
-  if ([1, 2, 3, 4, 5, 6, 7, 8].includes(roleId)) classes = 'bg-blue-100 text-blue-800'   // רופאים/מומחים
-  if (roleId === 9)  classes = 'bg-violet-100 text-violet-800'  // סייעת
-  if (roleId === 10) classes = 'bg-pink-100 text-pink-800'      // שיננית
-  if (roleId === 11) classes = 'bg-amber-100 text-amber-800'    // טכנאי
-  if (roleId === 12) classes = 'bg-indigo-100 text-indigo-800'  // מנהל
-  if (roleId === 13) classes = 'bg-green-100 text-green-800'    // מזכירה
-  if (roleId === 14) classes = 'bg-teal-100 text-teal-800'      // עובד דנטלי
-  if ([15, 17, 18].includes(roleId)) classes = 'bg-sky-100 text-sky-800'  // מכירות/רכש/צילום
-  if (roleId === 16) classes = 'bg-rose-100 text-rose-800'      // בעלים
-
-  return <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold ${classes}`}>{label}</span>
-}
+// RoleBadge imported from shared component above
 
 function IconAction({
   title,
