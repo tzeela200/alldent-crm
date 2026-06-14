@@ -702,7 +702,7 @@ export default function AdminJobsPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1680px] border-collapse text-right text-[13px]">
                     <thead className="bg-[#F9FAFB]">
-                      <tr className="border-b border-[#D9D9D9] text-[12px] font-bold text-[#6B6B6B]">
+                      <tr className="border-b border-[#D9D9D9] text-[12px] font-semibold text-[#6B6B6B]">
                         <th className="w-10 px-3 py-3"><input type="checkbox" checked={pageFullySelected} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
                         {visibleColumns.includes('job_code') && <SortableTh label="קוד" sortKey="job_code" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('job_title') && <SortableTh label="כותרת" sortKey="job_title" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}

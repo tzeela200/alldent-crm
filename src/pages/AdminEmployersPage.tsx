@@ -888,8 +888,8 @@ export default function AdminEmployersPage({
               <div className="overflow-hidden rounded-[18px] border border-[#D9D9D9] bg-white shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="min-w-[1600px] w-full border-collapse text-right text-[14px]">
-                    <thead className="bg-[#F3F4F6]">
-                      <tr className="border-b border-[#D9D9D9] text-[12px] font-bold text-[#6B6B6B]">
+                    <thead className="bg-[#F9FAFB]">
+                      <tr className="border-b border-[#D9D9D9] text-[12px] font-semibold text-[#6B6B6B]">
                         <th className="px-4 py-3"><input type="checkbox" checked={pageData.length > 0 && pageData.every((row) => selectedRows.includes(Number(row.account_id)))} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
                         {visibleColumns.includes('account_name') && <SortableTh label="שם ארגון" sortKey="account_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
                         {visibleColumns.includes('primary_contact') && <th className="px-4 py-3">שם מעסיק</th>}

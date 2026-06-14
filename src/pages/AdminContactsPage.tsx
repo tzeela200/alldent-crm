@@ -1016,9 +1016,9 @@ export default function AdminContactsPage() {
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="w-full overflow-x-auto">
                   <table className="min-w-[1800px] w-full border-collapse">
-                    <thead className="bg-[#F3F4F6]">
-                      <tr className="border-b border-slate-300 text-right text-[14px] font-bold text-black">
-                        <th className="px-4 py-4">
+                    <thead className="bg-[#F9FAFB]">
+                      <tr className="border-b border-[#D9D9D9] text-right text-[12px] font-semibold text-[#6B6B6B]">
+                        <th className="px-3 py-3">
                           <input
                             type="checkbox"
                             checked={
@@ -1041,7 +1041,7 @@ export default function AdminContactsPage() {
                         {visibleColumns.includes('linked_org') && <PlainTh label="ארגון מקושר" colKey="linked_org" width={colWidths['linked_org']} onResizeStart={handleResizeStart} />}
                         {visibleColumns.includes('whatsapp') && <PlainTh label="תאריך שליחת וואטאפ" colKey="whatsapp" width={colWidths['whatsapp']} onResizeStart={handleResizeStart} />}
                         {visibleColumns.includes('last_contact') && <PlainTh label="קשר אחרון" colKey="last_contact" width={colWidths['last_contact']} onResizeStart={handleResizeStart} />}
-                        <th className="px-4 py-4 text-center">פעולות</th>
+                        <th className="px-3 py-3 text-center">פעולות</th>
                       </tr>
                     </thead>
 
@@ -2242,7 +2242,7 @@ function SortableTh({
   const active = sortBy === sortKey
   return (
     <th
-      className="relative cursor-pointer select-none px-4 py-4 hover:bg-slate-100"
+      className="relative cursor-pointer select-none px-3 py-3 hover:bg-slate-100"
       style={width ? { width, minWidth: 80 } : { minWidth: 80 }}
       onClick={() => onSort(sortKey)}
     >
@@ -2277,7 +2277,7 @@ function PlainTh({
 }) {
   return (
     <th
-      className="relative px-4 py-4"
+      className="relative px-3 py-3"
       style={width ? { width, minWidth: 80 } : { minWidth: 80 }}
     >
       {label}

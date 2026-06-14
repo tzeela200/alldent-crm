@@ -510,9 +510,9 @@ function ApplicationsTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1400px] text-sm">
-        <thead>
-          <tr className="border-b border-slate-200 text-right text-xs font-medium text-slate-500">
-            <th className="w-10 px-3 py-2">
+        <thead className="bg-[#F9FAFB]">
+          <tr className="border-b border-[#D9D9D9] text-right text-[12px] font-semibold text-[#6B6B6B]">
+            <th className="w-10 px-3 py-3">
               <input
                 type="checkbox"
                 checked={allSelected}
@@ -520,19 +520,19 @@ function ApplicationsTable({
                 className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
               />
             </th>
-            <th className="px-3 py-2">שם</th>
-            <th className="px-3 py-2">נייד</th>
-            <th className="px-3 py-2">מצב פרופיל</th>
-            <th className="px-3 py-2">קוד משרה</th>
-            <th className="px-3 py-2">תפקיד</th>
-            <th className="px-3 py-2">אזור</th>
-            <th className="px-3 py-2">שם מעסיק</th>
-            <th className="px-3 py-2">סטטוס הגשה</th>
-            <th className="px-3 py-2">קו"ח</th>
-            <th className="px-3 py-2">מקור</th>
-            <th className="px-3 py-2">תאריך הגשה</th>
-            <th className="px-3 py-2">הערות</th>
-            <th className="px-3 py-2">פעולות</th>
+            <th className="px-3 py-3">שם</th>
+            <th className="px-3 py-3">נייד</th>
+            <th className="px-3 py-3">מצב פרופיל</th>
+            <th className="px-3 py-3">קוד משרה</th>
+            <th className="px-3 py-3">תפקיד</th>
+            <th className="px-3 py-3">אזור</th>
+            <th className="px-3 py-3">שם מעסיק</th>
+            <th className="px-3 py-3">סטטוס הגשה</th>
+            <th className="px-3 py-3">קו"ח</th>
+            <th className="px-3 py-3">מקור</th>
+            <th className="px-3 py-3">תאריך הגשה</th>
+            <th className="px-3 py-3">הערות</th>
+            <th className="px-3 py-3">פעולות</th>
           </tr>
         </thead>
         <tbody>

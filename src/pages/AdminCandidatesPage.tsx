@@ -1038,9 +1038,9 @@ export default function AdminCandidatesPage() {
               <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div className="overflow-x-auto">
                   <table className="min-w-[1700px] w-full border-collapse">
-                    <thead className="bg-[#F3F4F6]">
-                      <tr className="border-b border-slate-300 text-right text-[14px] font-bold text-black">
-                        <th className="px-4 py-4">
+                    <thead className="bg-[#F9FAFB]">
+                      <tr className="border-b border-[#D9D9D9] text-right text-[12px] font-semibold text-[#6B6B6B]">
+                        <th className="px-3 py-3">
                           <input
                             type="checkbox"
                             checked={pageData.length > 0 && pageData.every((row) => selectedRows.includes(row.contact_id))}
@@ -1049,21 +1049,21 @@ export default function AdminCandidatesPage() {
                           />
                         </th>
 
-                        {visibleColumns.includes('name') && <th className="px-4 py-4">שם</th>}
-                        {visibleColumns.includes('phone') && <th className="px-4 py-4">טלפון</th>}
-                        {visibleColumns.includes('role') && <th className="px-4 py-4">תפקיד</th>}
-                        {visibleColumns.includes('sub_role') && <th className="px-4 py-4">תת־תפקיד</th>}
-                        {visibleColumns.includes('experience') && <th className="px-4 py-4">ניסיון</th>}
-                        {visibleColumns.includes('availability') && <th className="px-4 py-4">זמינות</th>}
-                        {visibleColumns.includes('scope') && <th className="px-4 py-4">היקף מועדף</th>}
-                        {visibleColumns.includes('languages') && <th className="px-4 py-4">שפות</th>}
-                        {visibleColumns.includes('city') && <th className="px-4 py-4">עיר</th>}
-                        {visibleColumns.includes('region') && <th className="px-4 py-4">אזור</th>}
-                        {visibleColumns.includes('cv') && <th className="px-4 py-4">קו"ח</th>}
-                        {visibleColumns.includes('tags') && <th className="px-4 py-4">תגיות</th>}
-                        {visibleColumns.includes('salary') && <th className="px-4 py-4">ציפיות שכר</th>}
-                        {visibleColumns.includes('applications') && <th className="px-4 py-4">הגשות קודמות</th>}
-                        <th className="px-4 py-4 text-center">פעולות</th>
+                        {visibleColumns.includes('name') && <th className="px-3 py-3">שם</th>}
+                        {visibleColumns.includes('phone') && <th className="px-3 py-3">טלפון</th>}
+                        {visibleColumns.includes('role') && <th className="px-3 py-3">תפקיד</th>}
+                        {visibleColumns.includes('sub_role') && <th className="px-3 py-3">תת־תפקיד</th>}
+                        {visibleColumns.includes('experience') && <th className="px-3 py-3">ניסיון</th>}
+                        {visibleColumns.includes('availability') && <th className="px-3 py-3">זמינות</th>}
+                        {visibleColumns.includes('scope') && <th className="px-3 py-3">היקף מועדף</th>}
+                        {visibleColumns.includes('languages') && <th className="px-3 py-3">שפות</th>}
+                        {visibleColumns.includes('city') && <th className="px-3 py-3">עיר</th>}
+                        {visibleColumns.includes('region') && <th className="px-3 py-3">אזור</th>}
+                        {visibleColumns.includes('cv') && <th className="px-3 py-3">קו"ח</th>}
+                        {visibleColumns.includes('tags') && <th className="px-3 py-3">תגיות</th>}
+                        {visibleColumns.includes('salary') && <th className="px-3 py-3">ציפיות שכר</th>}
+                        {visibleColumns.includes('applications') && <th className="px-3 py-3">הגשות קודמות</th>}
+                        <th className="px-3 py-3 text-center">פעולות</th>
                       </tr>
                     </thead>
 
