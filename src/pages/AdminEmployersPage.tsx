@@ -1051,13 +1051,13 @@ function InfoPill({ label, tone = 'default' }: { label: string; tone?: 'default'
 }
 
 function MiniSignal({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'warning' }) {
-  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>{children}</span>
+  return <span className={`rounded-[6px] px-2 py-0.5 text-[11px] font-bold ${tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>{children}</span>
 }
 
 function SortableTh({ label, sortKey, sortBy, sortDir, onSort, width, onResize }: { label: string; sortKey: string; sortBy: string | null; sortDir: 'asc' | 'desc'; onSort: (key: string) => void; width?: number; onResize?: (delta: number) => void }) {
   const active = sortBy === sortKey
   return (
-    <th style={{ width, minWidth: width }} className="px-4 py-3 text-[14px] font-extrabold text-[#2D2D2D]">
+    <th style={{ width, minWidth: width }} className="px-3 py-3">
       <div className="flex items-center justify-between gap-2">
         <button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 hover:text-[#008080]">
           <span>{label}</span>
