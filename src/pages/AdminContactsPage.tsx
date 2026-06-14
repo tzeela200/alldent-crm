@@ -766,7 +766,7 @@ export default function AdminContactsPage() {
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <SearchFieldIcon />
                 <h2 className="text-[15px] font-bold text-[#0F172A]">סינון וחיפוש</h2>
-                <span className="rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[12px] font-semibold text-slate-500">
+                <span className="rounded-[6px] bg-[#F8FAFC] px-2.5 py-1 text-[12px] font-semibold text-slate-500">
                   צפוף אך קריא
                 </span>
               </div>
@@ -968,7 +968,7 @@ export default function AdminContactsPage() {
               <div className="rounded-2xl border border-[#D97706]/20 bg-[#FFFBEB] p-4 shadow-sm">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">
+                    <span className="rounded-[8px] bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">
                       נבחרו {selectedCount} רשומות
                     </span>
                     <span className="text-[13px] font-medium text-slate-600">

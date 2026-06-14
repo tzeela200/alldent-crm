@@ -569,8 +569,8 @@ function ApplicationsTable({
                 {/* מצב פרופיל */}
                 <td className="px-3 py-2">
                   {row.is_new_candidate
-                    ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">לא קיים פרופיל</span>
-                    : <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] text-teal-700">קיים פרופיל</span>
+                    ? <span className="rounded-[6px] bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">לא קיים פרופיל</span>
+                    : <span className="rounded-[6px] bg-teal-50 px-2 py-0.5 text-[10px] text-teal-700">קיים פרופיל</span>
                   }
                 </td>
                 <td className="px-3 py-2 font-mono text-xs font-semibold text-slate-700">
@@ -580,7 +580,7 @@ function ApplicationsTable({
                 <td className="px-3 py-2 text-xs text-slate-500">{row.job_region ?? '—'}</td>
                 <td className="px-3 py-2 text-xs text-slate-600">{row.account_name ?? '—'}</td>
                 <td className="px-3 py-2">
-                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${appBadge.bg} ${appBadge.text}`}>
+                  <span className={`rounded-[6px] px-2 py-0.5 text-xs font-medium ${appBadge.bg} ${appBadge.text}`}>
                     {appLabel}
                   </span>
                 </td>
@@ -693,7 +693,7 @@ function ApplicationsGrid({
                 </p>
               </div>
               <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${appBadge.bg} ${appBadge.text}`}
+                className={`rounded-[6px] px-2 py-0.5 text-xs font-medium ${appBadge.bg} ${appBadge.text}`}
               >
                 {appLabel}
               </span>

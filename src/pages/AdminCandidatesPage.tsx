@@ -765,7 +765,7 @@ export default function AdminCandidatesPage() {
                   <Search className="h-4 w-4" />
                 </div>
                 <h2 className="text-[15px] font-bold text-[#0F172A]">סרגל סינון גיוס</h2>
-                <span className="rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[12px] font-semibold text-slate-500">
+                <span className="rounded-[6px] bg-[#F8FAFC] px-2.5 py-1 text-[12px] font-semibold text-slate-500">
                   recruiter-first
                 </span>
               </div>
@@ -980,7 +980,7 @@ export default function AdminCandidatesPage() {
               <div className="rounded-2xl border border-[#D97706]/20 bg-[#FFFBEB] p-4 shadow-sm">
                 <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">
+                    <span className="rounded-[8px] bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">
                       נבחרו {selectedCount} מועמדים
                     </span>
                     <span className="text-[13px] font-medium text-slate-600">פעולות מרובות</span>
@@ -1092,9 +1092,6 @@ export default function AdminCandidatesPage() {
                               <td className="px-4 py-3">
                                 <div className="min-w-[220px]">
                                   <div className="flex items-start gap-3">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[15px] font-bold text-[#008080] shadow-sm">
-                                      {(candidate.full_name ?? candidate.display_name ?? '?').charAt(0)}
-                                    </div>
                                     <div className="space-y-1">
                                       <div className="text-[14px] font-bold text-[#0F172A]">
                                         {candidate.full_name ?? candidate.display_name ?? '—'}
@@ -1348,7 +1345,7 @@ export default function AdminCandidatesPage() {
                           key={tag}
                           type="button"
                           onClick={() => removeTagFromCandidate(selectedCandidate.contact_id, tag)}
-                          className="inline-flex items-center gap-1 rounded-full border border-[#99F6E4] bg-[#F0FDFC] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"
+                          className="inline-flex items-center gap-1 rounded-[6px] border border-[#99F6E4] bg-[#F0FDFC] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"
                         >
                           <Tag className="h-3 w-3" />
                           {tag}
@@ -1525,7 +1522,7 @@ function SignalChip({
 
 function TagChip({ children }: { children: React.ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[#99F6E4] bg-[#F0FDFC] px-2.5 py-1 text-[12px] font-semibold text-[#008080]">
+    <span className="inline-flex items-center gap-1 rounded-[6px] border border-[#99F6E4] bg-[#F0FDFC] px-2.5 py-1 text-[12px] font-semibold text-[#008080]">
       <Tag className="h-3 w-3" />
       {children}
     </span>
