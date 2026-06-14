@@ -33,7 +33,7 @@ export default function EmployersPage() {
           href="https://wa.me/972533959003"
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#D97706] text-white text-[14px] font-bold hover:bg-[#B45309] transition-colors min-h-[44px]"
+          className="inline-flex items-center gap-2 px-6 py-3 rounded-[20px] bg-[#D97706] text-white text-[14px] font-bold shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#B45309] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200 min-h-[44px]"
         >
           <MessageCircle className="h-4 w-4" aria-hidden="true" />
           דברו איתנו בוואטסאפ

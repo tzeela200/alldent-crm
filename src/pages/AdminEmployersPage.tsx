@@ -1,26 +1,24 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
 import {
-  Building2,
-  Plus,
-  Download,
-  Eye,
-  Edit2,
-  Phone,
-  Mail,
-  Globe,
-  MapPin,
-  RefreshCw,
-  CalendarClock,
-  Briefcase,
-  Search,
   AlertTriangle,
+  Briefcase,
+  Building2,
   CheckCircle2,
-  ChevronUp,
   ChevronDown,
+  Columns3,
+  Download,
+  Edit2,
+  Eye,
+  Globe,
+  Mail,
+  MessageCircle,
+  Phone,
+  Plus,
+  RefreshCw,
+  Search,
   X,
-  Users,
 } from 'lucide-react'
+
 import {
   Shell,
   Toolbar,
@@ -30,50 +28,13 @@ import {
   Pagination,
   EmptyState,
 } from '@/components/layout/Shell'
+
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { accountStatusColors, getStatusBadge } from '@/lib/statusColors'
 import { supabase } from '@/lib/supabase'
-import { DICT_ROLES } from '@/lib/dicts'
 import type { Account, Contact } from '@/types'
 
-// ===== טיפוסי פילטרים מורחבים =====
-// כל שדה ב-accounts שאפשר לסנן לפיו = פילטר זמין (זהה ל-AdminContactsPage)
-type ExtendedEmployerFilters = {
-  search?: string
-  account_status?: number
-  account_type?: number
-  region_id?: number
-  city_id?: number
-  clinic_type?: string
-  hiring_role?: string
-  specialty?: string
-  system_used?: number
-  active_jobs_only?: 'yes'
-  vip_only?: 'yes'
-  overdue_follow_up?: 'yes'
-  linked_contact_state?: 'linked' | 'unlinked'
-  has_email?: 'yes' | 'no'
-  has_phone?: 'yes' | 'no'
-  has_website?: 'yes' | 'no'
-  team_size_min?: number
-  team_size_max?: number
-  chairs_count_min?: number
-  chairs_count_max?: number
-  address?: string
-  bus_id?: string
-  created_from?: string
-  created_to?: string
-  updated_from?: string
-  updated_to?: string
-  last_contact_from?: string
-  last_contact_to?: string
-  next_follow_up_from?: string
-  next_follow_up_to?: string
-}
-
-
+type ViewMode = 'accounts' | 'employers'
 type ToastTone = 'success' | 'error' | 'info'
-
 
 type ToastState = {
   open: boolean
@@ -81,9 +42,34 @@ type ToastState = {
   message: string
 }
 
+type SheetState = {
+  open: boolean
+  accountId: number | null
+  mode: 'view' | 'edit' | 'create'
+}
 
-type BulkActionType = '' | 'status' | 'followup' | 'export' | 'mark_vip'
+type EmployerFilters = {
+  search?: string
+  account_status?: number
+  account_type?: number
+  region_id?: number
+  city_id?: number
+  has_jobs?: 'yes' | 'no'
+  active_jobs_only?: 'yes'
+  has_contact?: 'yes' | 'no'
+  has_phone?: 'yes' | 'no'
+  has_email?: 'yes' | 'no'
+  has_website?: 'yes' | 'no'
+}
 
+type JobLite = {
+  job_code: string
+  account_link: number | null
+  job_status: number | null
+  public_status: number | null
+  job_title: string | null
+  total_applicants: number | null
+}
 
 type EmployerDraft = {
   account_name: string
@@ -98,85 +84,175 @@ type EmployerDraft = {
   website_url: string
   region_id: number | null
   city_id: number | null
-  clinic_type: string
   team_size: string
   chairs_count: string
   notes: string
   next_follow_up: string
-  specialties: string[]
-  hiring_roles: string[]
 }
 
-
-const ACTIVE_EMPLOYER_STATUSES = [1, 2, 3, 4, 7]
-
-
-const CLINIC_TYPE_OPTIONS = [
-  'פרטית',
-  'רשת',
-  'פרטית מומחית',
-  'מרכז רפואי',
-  'ציבורית',
-  'קופת חולים',
-  'מעבדה',
-]
-
+type EnrichedAccount = Account & {
+  linkedContacts: Contact[]
+  relatedJobs: JobLite[]
+  activeJobsCount: number
+  totalJobsCount: number
+  linkedContactSummary: string
+  derived: {
+    hasJobs: boolean
+    hasActiveJobs: boolean
+    isActiveRecruiter: boolean
+    isOldRecruiter: boolean
+    missingPhone: boolean
+    missingLocation: boolean
+    linkedContactsCount: number
+    signals: string[]
+  }
+}
 
 interface AdminEmployersPageProps {
+  viewMode?: ViewMode
   initialTab?: 'active' | 'all'
   pageTitle?: string
   pageSubtitle?: string
 }
 
-export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מעסיקים', pageSubtitle }: AdminEmployersPageProps = {}) {
-  const [filters, setFilters] = useState<ExtendedEmployerFilters>({})
+const PAGE_SIZE = 20
+const ACTIVE_JOB_STATUS_ID = 3
+const ACTIVE_RECRUITER_STATUS_ID = 7
+const OLD_RECRUITER_STATUS_ID = 8
+const EMPLOYER_STATUS_IDS = [ACTIVE_RECRUITER_STATUS_ID, OLD_RECRUITER_STATUS_ID]
+
+function getEmployerStatusBadge(statusId: number | null | undefined, label: string) {
+  if (Number(statusId) === ACTIVE_RECRUITER_STATUS_ID) {
+    return { label, bg: 'bg-[#D1FAE5]', text: 'text-[#047857]', border: 'border-[#A7F3D0]' }
+  }
+  if (Number(statusId) === OLD_RECRUITER_STATUS_ID) {
+    return { label, bg: 'bg-[#FEF3C7]', text: 'text-[#B45309]', border: 'border-[#FDE68A]' }
+  }
+  return { label, bg: 'bg-[#F3F4F6]', text: 'text-[#6B6B6B]', border: 'border-[#D9D9D9]' }
+}
+
+const ALL_COLUMNS = [
+  { key: 'account_name', label: 'שם ארגון' },
+  { key: 'account_type', label: 'סוג ארגון' },
+  { key: 'account_status', label: 'סטטוס' },
+  { key: 'phone', label: 'נייד / טלפון' },
+  { key: 'email', label: 'מייל' },
+  { key: 'region', label: 'אזור' },
+  { key: 'city', label: 'עיר' },
+  { key: 'active_jobs', label: 'משרות פעילות' },
+  { key: 'total_jobs', label: 'סה״כ משרות' },
+  { key: 'contacts', label: 'אנשי קשר' },
+  { key: 'follow_up', label: 'פולו־אפ' },
+] as const
+
+const DEFAULT_COLUMNS = [
+  'account_name',
+  'account_type',
+  'account_status',
+  'phone',
+  'email',
+  'region',
+  'city',
+  'active_jobs',
+  'total_jobs',
+  'contacts',
+  'follow_up',
+] as const
+
+const EMPTY_DRAFT: EmployerDraft = {
+  account_name: '',
+  account_status: null,
+  account_type: null,
+  bus_id: '',
+  phone: '',
+  second_phone: '',
+  email: '',
+  billing_email: '',
+  address: '',
+  website_url: '',
+  region_id: null,
+  city_id: null,
+  team_size: '',
+  chairs_count: '',
+  notes: '',
+  next_follow_up: '',
+}
+
+function normalizeDigits(value?: string | null) {
+  return String(value ?? '').replace(/\D/g, '')
+}
+
+function formatPhone(value?: string | null) {
+  const digits = normalizeDigits(value)
+  if (!digits) return '—'
+  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+  return digits
+}
+
+function formatDate(value?: string | null) {
+  if (!value) return '—'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '—'
+  return new Intl.DateTimeFormat('he-IL', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
+}
+
+function toDateInputValue(value?: string | null) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toISOString().slice(0, 10)
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function isLikelyUrl(value: string) {
+  return /^https?:\/\//i.test(value)
+}
+
+function buildCsv(rows: Record<string, string>[]) {
+  if (!rows.length) return ''
+  const headers = Object.keys(rows[0])
+  const escapeValue = (value: string) => {
+    if (value.includes('"') || value.includes(',') || value.includes('\n')) return `"${value.replace(/"/g, '""')}"`
+    return value
+  }
+  return [headers.join(','), ...rows.map((row) => headers.map((header) => escapeValue(String(row[header] ?? ''))).join(','))].join('\n')
+}
+
+export default function AdminEmployersPage({
+  viewMode = 'employers',
+  initialTab = 'all',
+  pageTitle,
+  pageSubtitle,
+}: AdminEmployersPageProps = {}) {
+  const isEmployersBoard = viewMode === 'employers'
+  const title = pageTitle ?? (isEmployersBoard ? 'מעסיקים' : 'ארגונים')
+  const subtitle = pageSubtitle ?? (isEmployersBoard ? 'רק ארגונים עם משרות משויכות — מגייס פעיל או מגייס ישן' : 'כל הארגונים במערכת')
+
+  const [filters, setFilters] = useState<EmployerFilters>({})
   const [tab, setTab] = useState<'active' | 'all'>(initialTab)
   const [page, setPage] = useState(0)
   const [selectedRows, setSelectedRows] = useState<number[]>([])
-  const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [sheetOpen, setSheetOpen] = useState(false)
+  const [sheet, setSheet] = useState<SheetState>({ open: false, accountId: null, mode: 'view' })
   const [toast, setToast] = useState<ToastState>({ open: false, tone: 'info', message: '' })
-  const [bulkAction, setBulkAction] = useState<BulkActionType>('')
-  const [bulkValue, setBulkValue] = useState('')
+  const [draft, setDraft] = useState<EmployerDraft>(EMPTY_DRAFT)
   const [savingSheet, setSavingSheet] = useState(false)
   const [sortBy, setSortBy] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-
-  const handleSort = (key: string) => {
-    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    else { setSortBy(key); setSortDir('asc') }
-    setPage(0)
-  }
-
-  const pageSize = 20
-
-
-  const queryFilters = useMemo(
-    () => ({
-      search: filters.search,
-      account_status: filters.account_status,
-      account_type: filters.account_type,
-      region_id: filters.region_id,
-      city_id: filters.city_id,
-    }),
-    [filters],
-  )
-
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([...DEFAULT_COLUMNS])
 
   const queryClient = useQueryClient()
 
-  const { data: rawEmployers = [] } = useQuery<Account[]>({
-    queryKey: ['accounts'],
+  const { data: rawAccounts = [] } = useQuery<Account[]>({
+    queryKey: ['accounts', 'admin-board'],
     queryFn: async () => {
       const PAGE = 1000
       const all: Account[] = []
       let from = 0
       while (true) {
-        const { data, error } = await supabase
-          .from('accounts')
-          .select('*')
-          .order('account_id')
-          .range(from, from + PAGE - 1)
+        const { data, error } = await supabase.from('accounts').select('*').order('account_id').range(from, from + PAGE - 1)
         if (error) throw error
         const batch = (data ?? []) as Account[]
         if (!batch.length) break
@@ -190,7 +266,7 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
   })
 
   const { data: contacts = [] } = useQuery<Contact[]>({
-    queryKey: ['contacts'],
+    queryKey: ['contacts', 'account-links'],
     queryFn: async () => {
       const PAGE = 1000
       const all: Contact[] = []
@@ -198,7 +274,7 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
       while (true) {
         const { data, error } = await supabase
           .from('contact')
-          .select('contact_id,full_name,display_name,phone_norm,email,account_link,role')
+          .select('contact_id,full_name,display_name,phone,phone_norm,email,account_link,role')
           .order('contact_id')
           .range(from, from + PAGE - 1)
         if (error) throw error
@@ -213,27 +289,50 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
     staleTime: 60_000,
   })
 
-  const { data: regionOptions = [] } = useQuery<{ id: number; name: string }[]>({
+  const { data: jobs = [] } = useQuery<JobLite[]>({
+    queryKey: ['jobs', 'account-counts'],
+    queryFn: async () => {
+      const PAGE = 1000
+      const all: JobLite[] = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('job')
+          .select('job_code,account_link,job_status,public_status,job_title,total_applicants')
+          .order('job_code')
+          .range(from, from + PAGE - 1)
+        if (error) throw error
+        const batch = (data ?? []) as JobLite[]
+        if (!batch.length) break
+        all.push(...batch)
+        if (batch.length < PAGE) break
+        from += PAGE
+      }
+      return all
+    },
+    staleTime: 60_000,
+  })
+
+  const { data: regions = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['dict_regions'],
     queryFn: async () => {
       const { data, error } = await supabase.from('dict_regions').select('id,name').order('name')
       if (error) throw error
       return data ?? []
     },
-    staleTime: 5 * 60_000,
+    staleTime: 300_000,
   })
 
-  const { data: cityOptions = [] } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
+  const { data: cities = [] } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
     queryKey: ['dict_cities'],
     queryFn: async () => {
       const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
       if (error) throw error
       return data ?? []
     },
-    staleTime: 5 * 60_000,
+    staleTime: 300_000,
   })
 
-  // === Dict tables מ-Supabase (SSOT — לא hardcoded) ===
   const { data: accountStatuses = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['dict_account_statuses'],
     queryFn: async () => {
@@ -241,7 +340,7 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
       if (error) throw error
       return data ?? []
     },
-    staleTime: 5 * 60_000,
+    staleTime: 300_000,
   })
 
   const { data: accountTypes = [] } = useQuery<{ id: number; name: string }[]>({
@@ -251,85 +350,75 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
       if (error) throw error
       return data ?? []
     },
-    staleTime: 5 * 60_000,
+    staleTime: 300_000,
   })
 
-  const { data: systemsOptions = [] } = useQuery<{ id: number; name: string }[]>({
-    queryKey: ['dict_systems'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('dict_systems').select('id,name').order('name')
-      if (error) throw error
-      return data ?? []
-    },
-    staleTime: 5 * 60_000,
-  })
+  const accountStatusName = (id: number | null | undefined) => accountStatuses.find((item) => item.id === id)?.name ?? '—'
+  const accountTypeName = (id: number | null | undefined) => accountTypes.find((item) => item.id === id)?.name ?? '—'
+  const regionName = (id: number | null | undefined) => regions.find((item) => item.id === id)?.name ?? '—'
+  const cityName = (id: number | null | undefined) => cities.find((item) => item.id === id)?.name ?? '—'
 
-  const { data: proceduresOptions = [] } = useQuery<{ id: number; name: string }[]>({
-    queryKey: ['dict_procedures'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('dict_procedures').select('id,name').order('name')
-      if (error) throw error
-      return data ?? []
-    },
-    staleTime: 5 * 60_000,
-  })
+  const jobsByAccount = useMemo(() => {
+    const map = new Map<number, JobLite[]>()
+    jobs.forEach((job) => {
+      if (!job.account_link) return
+      const accountId = Number(job.account_link)
+      const current = map.get(accountId) ?? []
+      current.push(job)
+      map.set(accountId, current)
+    })
+    return map
+  }, [jobs])
 
-  const regions = regionOptions
-  const cities = cityOptions
-  const roles = DICT_ROLES
+  const contactsByAccount = useMemo(() => {
+    const map = new Map<number, Contact[]>()
+    contacts.forEach((contact) => {
+      if (!contact.account_link) return
+      const accountId = Number(contact.account_link)
+      const current = map.get(accountId) ?? []
+      current.push(contact)
+      map.set(accountId, current)
+    })
+    return map
+  }, [contacts])
 
-
-  const accountStatusName = (id: number | null | undefined) =>
-    accountStatuses.find((item) => item.id === id)?.name ?? '—'
-
-
-  const accountTypeName = (id: number | null | undefined) =>
-    accountTypes.find((item) => item.id === id)?.name ?? '—'
-
-
-  const regionName = (id: number | null | undefined) =>
-    regions.find((item) => item.id === id)?.name ?? '—'
-
-
-  const cityName = (id: number | null | undefined) =>
-    cities.find((item) => item.id === id)?.name ?? '—'
-
-
-  const enrichedEmployers = useMemo(() => {
-    return rawEmployers.map((employer) => {
-      const linkedContacts = contacts.filter((contact) => contact.account_link === employer.account_id)
-      const relatedJobs: never[] = []
-      const hasActiveJobs = Number(employer.active_job_count_auto ?? 0) > 0
-      const overdueFollowUp = isDue(employer.next_follow_up)
-      const isVip = Number(employer.account_status) === 8 || String(employer.notes ?? '').includes('VIP')
-      const hiringRoles = employer.hiring_roles ?? []
+  const enrichedAccounts = useMemo<EnrichedAccount[]>(() => {
+    return rawAccounts.map((account: any) => {
+      const relatedJobs = jobsByAccount.get(Number(account.account_id)) ?? []
+      const linkedContacts = contactsByAccount.get(Number(account.account_id)) ?? []
+      const totalJobsCount = relatedJobs.length
+      const activeJobsCount = relatedJobs.filter((job) => Number(job.job_status) === ACTIVE_JOB_STATUS_ID).length
       const linkedContactSummary = linkedContacts
         .slice(0, 3)
-        .map((item) => item.full_name || item.display_name || item.email || item.phone_norm)
+        .map((item) => item.full_name || item.display_name || item.email || item.phone_norm || item.phone)
         .filter(Boolean)
         .join(' · ')
-      const missingPhone = !normalizeDigits(employer.phone)
-      const missingLocation = !employer.region_id || !employer.city_id
+      const missingPhone = !normalizeDigits(account.phone)
+      const missingLocation = !account.region_id || !account.city_id
+      const isActiveRecruiter = Number(account.account_status) === ACTIVE_RECRUITER_STATUS_ID
+      const isOldRecruiter = Number(account.account_status) === OLD_RECRUITER_STATUS_ID
+      const hasJobs = totalJobsCount > 0
+      const hasActiveJobs = activeJobsCount > 0
       const signals = [
-        overdueFollowUp ? 'פולו־אפ פתוח' : null,
         !linkedContacts.length ? 'ללא איש קשר' : null,
-        !hasActiveJobs ? 'ללא משרות פעילות' : null,
+        hasJobs ? null : 'ללא משרות',
+        hasJobs && !hasActiveJobs ? 'מעסיק ישן' : null,
         missingPhone ? 'ללא טלפון' : null,
         missingLocation ? 'מיקום חסר' : null,
-        isVip ? 'VIP' : null,
       ].filter(Boolean) as string[]
 
-
       return {
-        ...employer,
+        ...account,
         linkedContacts,
         relatedJobs,
-        hiringRoles,
+        totalJobsCount,
+        activeJobsCount,
         linkedContactSummary,
         derived: {
+          hasJobs,
           hasActiveJobs,
-          overdueFollowUp,
-          isVip,
+          isActiveRecruiter,
+          isOldRecruiter,
           missingPhone,
           missingLocation,
           linkedContactsCount: linkedContacts.length,
@@ -337,401 +426,205 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
         },
       }
     })
-  }, [contacts, rawEmployers])
+  }, [contactsByAccount, jobsByAccount, rawAccounts])
 
+  const baseRows = useMemo(() => {
+    if (!isEmployersBoard) return enrichedAccounts
+    return enrichedAccounts.filter((item) => item.derived.hasJobs && EMPLOYER_STATUS_IDS.includes(Number(item.account_status)))
+  }, [enrichedAccounts, isEmployersBoard])
 
-  const hiringRoleOptions = useMemo(() => {
-    const set = new Set<string>()
-    roles.forEach((item) => set.add(item.name))
-    enrichedEmployers.forEach((item) => {
-      ;(item.hiring_roles ?? []).forEach((role) => {
-        const value = String(role ?? '').trim()
-        if (value) set.add(value)
-      })
-      const relRole = String(item.rel_role ?? '').trim()
-      if (relRole) set.add(relRole)
-    })
-    return Array.from(set)
-  }, [enrichedEmployers, roles])
-
-
-  // Cascading region→city מבוסס על cities.region_id (לא hardcoded)
   const activeCityOptions = useMemo(() => {
     if (!filters.region_id) return cities
-    return cities.filter((item) => item.region_id === Number(filters.region_id))
+    return cities.filter((item) => Number(item.region_id) === Number(filters.region_id))
   }, [cities, filters.region_id])
 
+  const filteredRows = useMemo(() => {
+    const search = String(filters.search ?? '').trim().toLowerCase()
+    const searchDigits = normalizeDigits(filters.search)
 
-  // עזרים לפילטרי טווח תאריכים
-  const inDateRange = (value: string | null | undefined, from?: string, to?: string) => {
-    if (!from && !to) return true
-    if (!value) return false
-    const ts = new Date(value).getTime()
-    if (Number.isNaN(ts)) return false
-    if (from && ts < new Date(from).getTime()) return false
-    if (to && ts > new Date(to + 'T23:59:59').getTime()) return false
-    return true
-  }
+    const rows = baseRows.filter((item: any) => {
+      if (tab === 'active' && isEmployersBoard && Number(item.account_status) !== ACTIVE_RECRUITER_STATUS_ID) return false
 
-
-  const filteredEmployers = useMemo(() => {
-    const base =
-      tab === 'active'
-        ? enrichedEmployers.filter((item) => ACTIVE_EMPLOYER_STATUSES.includes(Number(item.account_status)))
-        : enrichedEmployers
-
-
-    const searchLower = (filters.search ?? '').trim().toLowerCase()
-    const addressLower = (filters.address ?? '').trim().toLowerCase()
-    const busIdLower = (filters.bus_id ?? '').trim().toLowerCase()
-
-
-    return base.filter((employer) => {
-      // === חיפוש טקסט חופשי על כל השדות הרלוונטיים ===
-      if (searchLower) {
+      if (search) {
         const haystack = [
-          employer.account_name,
-          employer.bus_id,
-          employer.phone,
-          employer.second_phone,
-          employer.email,
-          employer.second_email,
-          employer.billing_email,
-          employer.address,
-          employer.website_url,
-          employer.facebook_url,
-          employer.notes,
-          accountTypeName(employer.account_type),
-          accountStatusName(employer.account_status),
-          regionName(employer.region_id),
-          cityName(employer.city_id),
-          employer.linkedContactSummary,
+          item.account_name,
+          item.bus_id,
+          item.phone,
+          item.second_phone,
+          item.email,
+          item.second_email,
+          item.billing_email,
+          item.address,
+          item.website_url,
+          item.notes,
+          accountTypeName(item.account_type),
+          accountStatusName(item.account_status),
+          regionName(item.region_id),
+          cityName(item.city_id),
+          item.linkedContactSummary,
         ]
           .filter(Boolean)
-          .map((v) => String(v).toLowerCase())
-          .join(' | ')
-        if (!haystack.includes(searchLower)) return false
+          .join(' ')
+          .toLowerCase()
+        const phoneHit = searchDigits && [item.phone, item.second_phone].some((value) => normalizeDigits(value).includes(searchDigits))
+        if (!haystack.includes(search) && !phoneHit) return false
       }
 
-
-      // === dropdown filters בסיסיים ===
-      if (filters.account_status && Number(employer.account_status) !== filters.account_status) return false
-      if (filters.account_type && Number(employer.account_type) !== filters.account_type) return false
-      if (filters.region_id && Number(employer.region_id) !== filters.region_id) return false
-      if (filters.city_id && Number(employer.city_id) !== filters.city_id) return false
-      if (filters.clinic_type && String(employer.clinic_type ?? '') !== filters.clinic_type) return false
-
-
-      // === hiring_role: בודק גם hiring_roles[] וגם rel_role ===
-      if (
-        filters.hiring_role &&
-        ![...(employer.hiring_roles ?? []), String(employer.rel_role ?? '')].filter(Boolean).includes(filters.hiring_role)
-      ) {
-        return false
-      }
-
-
-      // === specialties[] (multi-value field) ===
-      if (filters.specialty && !(employer.specialties ?? []).includes(filters.specialty)) return false
-
-
-      // === systems_used[] (multi-value field) ===
-      if (filters.system_used && !(employer.systems_used ?? []).includes(filters.system_used)) return false
-
-
-      // === toggles נגזרים ===
-      if (filters.active_jobs_only === 'yes' && !employer.derived.hasActiveJobs) return false
-      if (filters.vip_only === 'yes' && !employer.derived.isVip) return false
-      if (filters.overdue_follow_up === 'yes' && !employer.derived.overdueFollowUp) return false
-      if (filters.linked_contact_state === 'linked' && employer.derived.linkedContactsCount === 0) return false
-      if (filters.linked_contact_state === 'unlinked' && employer.derived.linkedContactsCount > 0) return false
-
-
-      // === has_email / has_phone / has_website ===
-      if (filters.has_email === 'yes' && !employer.email) return false
-      if (filters.has_email === 'no' && employer.email) return false
-      if (filters.has_phone === 'yes' && !employer.phone) return false
-      if (filters.has_phone === 'no' && employer.phone) return false
-      if (filters.has_website === 'yes' && !employer.website_url) return false
-      if (filters.has_website === 'no' && employer.website_url) return false
-
-
-      // === טווחי מספרים ===
-      const teamSize = Number(employer.team_size ?? 0)
-      if (filters.team_size_min !== undefined && teamSize < filters.team_size_min) return false
-      if (filters.team_size_max !== undefined && teamSize > filters.team_size_max) return false
-      const chairs = Number(employer.chairs_count ?? 0)
-      if (filters.chairs_count_min !== undefined && chairs < filters.chairs_count_min) return false
-      if (filters.chairs_count_max !== undefined && chairs > filters.chairs_count_max) return false
-
-
-      // === חיפוש טקסט בכתובת / bus_id ===
-      if (addressLower && !String(employer.address ?? '').toLowerCase().includes(addressLower)) return false
-      if (busIdLower && !String(employer.bus_id ?? '').toLowerCase().includes(busIdLower)) return false
-
-
-      // === טווחי תאריכים ===
-      if (!inDateRange(employer.created_timestamp, filters.created_from, filters.created_to)) return false
-      if (!inDateRange(employer.updated_timestamp, filters.updated_from, filters.updated_to)) return false
-      if (!inDateRange(employer.last_contact_date, filters.last_contact_from, filters.last_contact_to)) return false
-      if (!inDateRange(employer.next_follow_up, filters.next_follow_up_from, filters.next_follow_up_to)) return false
-
-
+      if (filters.account_status && Number(item.account_status) !== Number(filters.account_status)) return false
+      if (filters.account_type && Number(item.account_type) !== Number(filters.account_type)) return false
+      if (filters.region_id && Number(item.region_id) !== Number(filters.region_id)) return false
+      if (filters.city_id && Number(item.city_id) !== Number(filters.city_id)) return false
+      if (filters.has_jobs === 'yes' && !item.derived.hasJobs) return false
+      if (filters.has_jobs === 'no' && item.derived.hasJobs) return false
+      if (filters.active_jobs_only === 'yes' && !item.derived.hasActiveJobs) return false
+      if (filters.has_contact === 'yes' && item.derived.linkedContactsCount === 0) return false
+      if (filters.has_contact === 'no' && item.derived.linkedContactsCount > 0) return false
+      if (filters.has_phone === 'yes' && !item.phone) return false
+      if (filters.has_phone === 'no' && item.phone) return false
+      if (filters.has_email === 'yes' && !item.email) return false
+      if (filters.has_email === 'no' && item.email) return false
+      if (filters.has_website === 'yes' && !item.website_url) return false
+      if (filters.has_website === 'no' && item.website_url) return false
       return true
-    }).sort((a: any, b: any) => {
-      if (!sortBy) return 0
-      const av = String(a[sortBy] ?? ''), bv = String(b[sortBy] ?? '')
-      return sortDir === 'asc' ? av.localeCompare(bv, 'he') : bv.localeCompare(av, 'he')
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enrichedEmployers, filters, tab, accountStatuses, accountTypes, regions, cities, sortBy, sortDir])
 
+    if (!sortBy) return rows
+    return [...rows].sort((a: any, b: any) => {
+      const av = sortBy === 'activeJobsCount' || sortBy === 'totalJobsCount' ? Number(a[sortBy] ?? 0) : String(a[sortBy] ?? '')
+      const bv = sortBy === 'activeJobsCount' || sortBy === 'totalJobsCount' ? Number(b[sortBy] ?? 0) : String(b[sortBy] ?? '')
+      if (typeof av === 'number' && typeof bv === 'number') return sortDir === 'asc' ? av - bv : bv - av
+      return sortDir === 'asc' ? String(av).localeCompare(String(bv), 'he') : String(bv).localeCompare(String(av), 'he')
+    })
+  }, [accountStatuses, accountTypes, baseRows, cities, filters, isEmployersBoard, regions, sortBy, sortDir, tab])
 
-  const totalVisible = filteredEmployers.length
-  const totalPages = Math.max(1, Math.ceil(totalVisible / pageSize))
-  const pageData = filteredEmployers.slice(page * pageSize, (page + 1) * pageSize)
-  const selectedEmployer = filteredEmployers.find((item) => item.account_id === selectedId) ?? null
-
+  const totalPages = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
+  const pageData = filteredRows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const selectedAccount = enrichedAccounts.find((item) => Number(item.account_id) === Number(sheet.accountId)) ?? null
 
   const kpis = useMemo(() => {
-    const currentList = filteredEmployers
-    return {
-      totalEmployers: currentList.length,
-      activeEmployers: currentList.filter((item) => ACTIVE_EMPLOYER_STATUSES.includes(Number(item.account_status))).length,
-      vipEmployers: currentList.filter((item) => item.derived.isVip).length,
-      withActiveJobs: currentList.filter((item) => item.derived.hasActiveJobs).length,
-      overdueFollowUps: currentList.filter((item) => item.derived.overdueFollowUp).length,
-    }
-  }, [filteredEmployers])
+    const rows = filteredRows
+    const activeEmployers = rows.filter((item) => item.derived.isActiveRecruiter).length
+    const oldEmployers = rows.filter((item) => item.derived.isOldRecruiter).length
+    const totalJobs = rows.reduce((sum, item) => sum + item.totalJobsCount, 0)
+    const activeJobs = rows.reduce((sum, item) => sum + item.activeJobsCount, 0)
+    const withContacts = rows.filter((item) => item.derived.linkedContactsCount > 0).length
+    return { total: rows.length, activeEmployers, oldEmployers, totalJobs, activeJobs, withContacts }
+  }, [filteredRows])
 
-
-  const initialDraft = useMemo<EmployerDraft>(() => {
-    if (!selectedEmployer) {
-      return {
-        account_name: '',
-        account_status: null,
-        account_type: null,
-        bus_id: '',
-        phone: '',
-        second_phone: '',
-        email: '',
-        billing_email: '',
-        address: '',
-        website_url: '',
-        region_id: null,
-        city_id: null,
-        clinic_type: '',
-        team_size: '',
-        chairs_count: '',
-        notes: '',
-        next_follow_up: '',
-        specialties: [],
-        hiring_roles: [],
-      }
-    }
-
-
-    return {
-      account_name: selectedEmployer.account_name ?? '',
-      account_status: selectedEmployer.account_status ?? null,
-      account_type: selectedEmployer.account_type ?? null,
-      bus_id: selectedEmployer.bus_id ?? '',
-      phone: selectedEmployer.phone ?? '',
-      second_phone: selectedEmployer.second_phone ?? '',
-      email: selectedEmployer.email ?? '',
-      billing_email: selectedEmployer.billing_email ?? '',
-      address: selectedEmployer.address ?? '',
-      website_url: selectedEmployer.website_url ?? '',
-      region_id: selectedEmployer.region_id ?? null,
-      city_id: selectedEmployer.city_id ?? null,
-      clinic_type: selectedEmployer.clinic_type ?? '',
-      team_size:
-        selectedEmployer.team_size === null || selectedEmployer.team_size === undefined
-          ? ''
-          : String(selectedEmployer.team_size),
-      chairs_count:
-        selectedEmployer.chairs_count === null || selectedEmployer.chairs_count === undefined
-          ? ''
-          : String(selectedEmployer.chairs_count),
-      notes: selectedEmployer.notes ?? '',
-      next_follow_up: toDateInputValue(selectedEmployer.next_follow_up),
-      specialties: selectedEmployer.specialties ?? [],
-      hiring_roles: selectedEmployer.hiring_roles ?? [],
-    }
-  }, [selectedEmployer])
-
-
-  const [draft, setDraft] = useState<EmployerDraft>(initialDraft)
-
-
-  useEffect(() => {
-    setPage(0)
-  }, [filters, tab])
-
-
-  useEffect(() => {
-    setDraft(initialDraft)
-  }, [initialDraft])
-
+  useEffect(() => setPage(0), [filters, tab, viewMode])
 
   useEffect(() => {
     if (!toast.open) return
-    const timer = window.setTimeout(() => {
-      setToast((prev) => ({ ...prev, open: false }))
-    }, 2600)
+    const timer = window.setTimeout(() => setToast((prev) => ({ ...prev, open: false })), 2600)
     return () => window.clearTimeout(timer)
   }, [toast.open])
 
+  useEffect(() => {
+    if (sheet.mode === 'create') {
+      setDraft({ ...EMPTY_DRAFT, account_status: isEmployersBoard ? ACTIVE_RECRUITER_STATUS_ID : null })
+      return
+    }
+    if (!selectedAccount) return
+    setDraft({
+      account_name: selectedAccount.account_name ?? '',
+      account_status: selectedAccount.account_status ?? null,
+      account_type: selectedAccount.account_type ?? null,
+      bus_id: (selectedAccount as any).bus_id ?? '',
+      phone: selectedAccount.phone ?? '',
+      second_phone: (selectedAccount as any).second_phone ?? '',
+      email: selectedAccount.email ?? '',
+      billing_email: (selectedAccount as any).billing_email ?? '',
+      address: selectedAccount.address ?? '',
+      website_url: (selectedAccount as any).website_url ?? '',
+      region_id: selectedAccount.region_id ?? null,
+      city_id: selectedAccount.city_id ?? null,
+      team_size: (selectedAccount as any).team_size == null ? '' : String((selectedAccount as any).team_size),
+      chairs_count: (selectedAccount as any).chairs_count == null ? '' : String((selectedAccount as any).chairs_count),
+      notes: selectedAccount.notes ?? '',
+      next_follow_up: toDateInputValue((selectedAccount as any).next_follow_up),
+    })
+  }, [isEmployersBoard, selectedAccount, sheet.mode])
 
-  const showToast = (message: string, tone: ToastTone = 'info') => {
-    setToast({ open: true, tone, message })
-  }
-
+  const showToast = (message: string, tone: ToastTone = 'info') => setToast({ open: true, tone, message })
 
   const clearFilters = () => {
     setFilters({})
     setSelectedRows([])
   }
 
-
-  const openSheet = (accountId: number) => {
-    setSelectedId(accountId)
-    setSheetOpen(true)
+  const toggleColumn = (key: string) => {
+    setVisibleColumns((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]))
   }
 
-
-  const closeSheet = () => setSheetOpen(false)
-
-  const openNewSheet = () => {
-    setSelectedId(null)
-    setDraft({
-      account_name: '', account_status: 1, account_type: null, bus_id: '', phone: '',
-      second_phone: '', email: '', billing_email: '', address: '', website_url: '',
-      region_id: null, city_id: null, clinic_type: '', team_size: '', chairs_count: '',
-      notes: '', next_follow_up: '', specialties: [], hiring_roles: [],
-    })
-    setSheetOpen(true)
+  const handleSort = (key: string) => {
+    if (sortBy === key) setSortDir((dir) => (dir === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortBy(key)
+      setSortDir('asc')
+    }
   }
 
+  const openSheet = (accountId: number, mode: 'view' | 'edit' = 'view') => {
+    setSheet({ open: true, accountId, mode })
+  }
+
+  const openCreateSheet = () => setSheet({ open: true, accountId: null, mode: 'create' })
+  const closeSheet = () => setSheet({ open: false, accountId: null, mode: 'view' })
 
   const toggleRowSelection = (accountId: number) => {
-    setSelectedRows((prev) =>
-      prev.includes(accountId) ? prev.filter((id) => id !== accountId) : [...prev, accountId],
-    )
+    setSelectedRows((prev) => (prev.includes(accountId) ? prev.filter((id) => id !== accountId) : [...prev, accountId]))
   }
-
 
   const togglePageSelection = () => {
-    const ids = pageData.map((item) => item.account_id)
+    const ids = pageData.map((item) => Number(item.account_id))
     const allSelected = ids.length > 0 && ids.every((id) => selectedRows.includes(id))
-    if (allSelected) {
-      setSelectedRows((prev) => prev.filter((id) => !ids.includes(id)))
-      return
-    }
-    setSelectedRows((prev) => Array.from(new Set([...prev, ...ids])))
+    if (allSelected) setSelectedRows((prev) => prev.filter((id) => !ids.includes(id)))
+    else setSelectedRows((prev) => Array.from(new Set([...prev, ...ids])))
   }
 
-
   const exportCsv = () => {
-    const rows = filteredEmployers.map((item) => ({
-      'שם מעסיק': item.account_name ?? '',
-      bus_id: item.bus_id ?? '',
-      'סטטוס': accountStatusName(item.account_status),
-      'סוג': accountTypeName(item.account_type),
-      'אזור / עיר': `${regionName(item.region_id)} / ${cityName(item.city_id)}`,
-      'משרות פעילות': String(item.active_job_count_auto ?? 0),
-      'סה"כ משרות': String(item.total_jobs_count ?? 0),
-      'גודל צוות': String(item.team_size ?? ''),
-      'איש קשר': item.linkedContactSummary || item.contact_link || '',
-      'פולו־אפ הבא': formatDate(item.next_follow_up),
-      'סוג מרפאה': item.clinic_type ?? '',
-      'תפקידי גיוס': (item.hiring_roles ?? []).join(' | '),
+    const rows = filteredRows.map((item) => ({
+      'שם ארגון': item.account_name ?? '',
+      'סוג ארגון': accountTypeName(item.account_type),
+      סטטוס: accountStatusName(item.account_status),
+      טלפון: item.phone ?? '',
+      מייל: item.email ?? '',
+      עיר: cityName(item.city_id),
+      אזור: regionName(item.region_id),
+      'משרות פעילות': String(item.activeJobsCount),
+      'סה״כ משרות': String(item.totalJobsCount),
+      'אנשי קשר': item.linkedContactSummary,
     }))
-
-
-    const csv = toCsv(rows)
+    const csv = buildCsv(rows)
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = window.URL.createObjectURL(blob)
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = 'admin-employers-export.csv'
-    document.body.appendChild(anchor)
-    anchor.click()
-    document.body.removeChild(anchor)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = isEmployersBoard ? 'admin-employers.csv' : 'admin-accounts.csv'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
     showToast('הייצוא הושלם', 'success')
   }
 
-
-  const handleBulkApply = () => {
-    if (!selectedRows.length) {
-      showToast('יש לבחור לפחות מעסיק אחד', 'error')
-      return
-    }
-    if (!bulkAction) {
-      showToast('יש לבחור פעולת bulk', 'error')
-      return
-    }
-    if (bulkAction !== 'export' && !bulkValue && bulkAction !== 'mark_vip') {
-      showToast('יש לבחור ערך לפעולה', 'error')
-      return
-    }
-
-
-    switch (bulkAction) {
-      case 'status':
-        showToast(`עודכן account_status עבור ${selectedRows.length} רשומות`, 'success')
-        break
-      case 'followup':
-        showToast(`נוצר follow-up עבור ${selectedRows.length} רשומות`, 'success')
-        break
-      case 'mark_vip':
-        showToast('הרשומות סומנו כ־VIP', 'success')
-        break
-      case 'export':
-        exportCsv()
-        break
-      default:
-        showToast('הפעולה בוצעה', 'success')
-        break
-    }
-
-
-    setBulkAction('')
-    setBulkValue('')
-  }
-
-
   const saveSheet = async () => {
     if (!draft.account_name.trim()) {
-      showToast('שם מעסיק הוא שדה חובה', 'error')
+      showToast('שם ארגון הוא שדה חובה', 'error')
       return
     }
-
-
     if (draft.email && !isValidEmail(draft.email)) {
-      showToast('כתובת האימייל אינה תקינה', 'error')
+      showToast('כתובת המייל אינה תקינה', 'error')
       return
     }
-
-
     if (draft.billing_email && !isValidEmail(draft.billing_email)) {
-      showToast('billing_email אינו תקין', 'error')
+      showToast('כתובת מייל לחשבונית אינה תקינה', 'error')
       return
     }
-
-
     if (draft.website_url && !isLikelyUrl(draft.website_url)) {
-      showToast('כתובת האתר אינה תקינה', 'error')
+      showToast('קישור אתר חייב להתחיל ב־http או https', 'error')
       return
     }
-
-
-    if (draft.region_id && !draft.city_id) {
-      showToast('יש לבחור עיר לאחר בחירת אזור', 'error')
-      return
-    }
-
 
     setSavingSheet(true)
     try {
@@ -748,23 +641,20 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
         website_url: draft.website_url.trim() || null,
         region_id: draft.region_id,
         city_id: draft.city_id,
-        clinic_type: draft.clinic_type || null,
         team_size: draft.team_size ? Number(draft.team_size) : null,
         chairs_count: draft.chairs_count ? Number(draft.chairs_count) : null,
         notes: draft.notes.trim() || null,
         next_follow_up: draft.next_follow_up || null,
-        specialties: draft.specialties.length ? draft.specialties : null,
-        hiring_roles: draft.hiring_roles.length ? draft.hiring_roles : null,
+        updated_timestamp: new Date().toISOString(),
       }
 
-      if (selectedId) {
-        const { error } = await supabase.from('accounts').update(payload).eq('account_id', selectedId)
-        if (error) throw error
-      } else {
+      if (sheet.mode === 'create') {
         const { error } = await supabase.from('accounts').insert(payload)
         if (error) throw error
+      } else if (sheet.accountId) {
+        const { error } = await supabase.from('accounts').update(payload).eq('account_id', sheet.accountId)
+        if (error) throw error
       }
-
       await queryClient.invalidateQueries({ queryKey: ['accounts'] })
       showToast('השינויים נשמרו בהצלחה', 'success')
       closeSheet()
@@ -775,660 +665,162 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
     }
   }
 
-
-  const selectedCount = selectedRows.length
-
+  const openWhatsapp = (account: EnrichedAccount) => {
+    const phone = normalizeDigits(account.phone || account.linkedContacts[0]?.phone_norm || account.linkedContacts[0]?.phone)
+    if (!phone) {
+      showToast('אין נייד זמין לפתיחת וואטסאפ', 'error')
+      return
+    }
+    window.open(`https://wa.me/972${phone.replace(/^0/, '')}`, '_blank', 'noopener,noreferrer')
+  }
 
   return (
     <Shell
-      title={pageTitle}
-      subtitle={pageSubtitle ?? `${pageTitle} • ${totalVisible} תוצאות לאחר סינון`}
+      title={title}
+      subtitle={`${subtitle} • ${filteredRows.length} תוצאות`}
       icon={Building2}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <ActionButton variant="ghost" icon={RefreshCw} onClick={() => showToast('הרשימה רועננה', 'success')}>
+          <details className="relative">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-full border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-semibold text-[#2D2D2D] transition hover:bg-[#F3F4F6]">
+              <Columns3 className="h-4 w-4" />
+              בחירת עמודות
+            </summary>
+            <div className="absolute left-0 top-full z-30 mt-2 w-72 rounded-[18px] border border-[#D9D9D9] bg-white p-3 shadow-md">
+              <div className="mb-3 text-[13px] font-bold text-[#2D2D2D]">בחירת עמודות</div>
+              <div className="grid gap-2">
+                {ALL_COLUMNS.map((column) => (
+                  <label key={column.key} className="flex items-center justify-between rounded-xl border border-[#D9D9D9] px-3 py-2 text-[13px]">
+                    <span>{column.label}</span>
+                    <input type="checkbox" checked={visibleColumns.includes(column.key)} onChange={() => toggleColumn(column.key)} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" />
+                  </label>
+                ))}
+              </div>
+            </div>
+          </details>
+          <ActionButton variant="ghost" icon={RefreshCw} onClick={() => queryClient.invalidateQueries()}>
             רענון
           </ActionButton>
           <ActionButton variant="ghost" icon={Download} onClick={exportCsv}>
             ייצוא
           </ActionButton>
-          <ActionButton variant="primary" icon={Plus} onClick={openNewSheet}>
-            מעסיק חדש
+          <ActionButton variant="primary" icon={Plus} onClick={openCreateSheet}>
+            {isEmployersBoard ? 'מעסיק חדש' : 'ארגון חדש'}
           </ActionButton>
         </div>
       }
     >
-      <div dir="rtl" className="min-h-screen bg-[#F8FAFC] font-['Heebo'] text-[#0F172A]">
+      <div dir="rtl" className="min-h-screen bg-[#F3F4F6] font-['Heebo'] text-[#2D2D2D]">
         <div className="space-y-6">
           <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
-            <KpiCard label="סה״כ מעסיקים" value={kpis.totalEmployers} hint="לאחר סינון" tone="default" onClick={clearFilters} />
-            <KpiCard label="מעסיקים פעילים" value={kpis.activeEmployers} hint="active hiring pool" tone="default" onClick={() => setTab('active')} />
-            <KpiCard label="VIP" value={kpis.vipEmployers} hint="VIP / high touch" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, vip_only: 'yes' }))} />
-            <KpiCard label="עם משרות פעילות" value={kpis.withActiveJobs} hint="active_job_count_auto > 0" tone="success" onClick={() => setFilters((prev) => ({ ...prev, active_jobs_only: 'yes' }))} />
-            <KpiCard label="follow-up פתוח" value={kpis.overdueFollowUps} hint="דורש טיפול" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, overdue_follow_up: 'yes' }))} />
+            <KpiCard label={isEmployersBoard ? 'סה״כ מעסיקים' : 'סה״כ ארגונים'} value={kpis.total} hint="לאחר סינון" onClick={clearFilters} />
+            <KpiCard label="מגייסים פעילים" value={kpis.activeEmployers} hint="account_status = 7" tone="success" onClick={() => setFilters((prev) => ({ ...prev, account_status: ACTIVE_RECRUITER_STATUS_ID }))} />
+            <KpiCard label="מגייסים ישנים" value={kpis.oldEmployers} hint="account_status = 8" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, account_status: OLD_RECRUITER_STATUS_ID }))} />
+            <KpiCard label="משרות פעילות" value={kpis.activeJobs} hint="job_status = פעילה" tone="success" onClick={() => setFilters((prev) => ({ ...prev, active_jobs_only: 'yes' }))} />
+            <KpiCard label="סה״כ משרות" value={kpis.totalJobs} hint="לפי job.account_link" />
           </section>
 
-
           <Toolbar>
-            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-slate-100 pb-4">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTab('active')
-                    setPage(0)
-                  }}
-                  className={`rounded-full px-4 py-2 text-[13px] font-semibold transition ${
-                    tab === 'active'
-                      ? 'bg-[#F0FDFC] text-[#008080]'
-                      : 'bg-[#F8FAFC] text-slate-600 hover:text-slate-800'
-                  }`}
-                >
-                  פעילים בלבד
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTab('all')
-                    setPage(0)
-                  }}
-                  className={`rounded-full px-4 py-2 text-[13px] font-semibold transition ${
-                    tab === 'all'
-                      ? 'bg-[#F0FDFC] text-[#008080]'
-                      : 'bg-[#F8FAFC] text-slate-600 hover:text-slate-800'
-                  }`}
-                >
-                  כל הארגונים
-                </button>
-              </div>
-
+            <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-4 shadow-sm">
+              {isEmployersBoard && (
+                <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[#D9D9D9] pb-4">
+                  <button type="button" onClick={() => setTab('all')} className={`rounded-full px-4 py-2 text-[13px] font-semibold ${tab === 'all' ? 'bg-[#E6F3F3] text-[#008080]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>כל המעסיקים</button>
+                  <button type="button" onClick={() => setTab('active')} className={`rounded-full px-4 py-2 text-[13px] font-semibold ${tab === 'active' ? 'bg-[#E6F3F3] text-[#008080]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>מגייסים פעילים בלבד</button>
+                </div>
+              )}
 
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[#008080] shadow-sm">
-                  <Search className="h-4 w-4" />
-                </div>
-                <h2 className="text-[15px] font-bold text-[#0F172A]">חיפוש וסינון מעסיקים</h2>
-                <span className="rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[12px] font-semibold text-slate-500">
-                  employer-admin
-                </span>
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F3F3] text-[#008080]"><Search className="h-4 w-4" /></div>
+                <h2 className="text-[15px] font-bold text-[#2D2D2D]">חיפוש וסינון</h2>
               </div>
-
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
-                <SearchBar
-                  value={filters.search ?? ''}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
-                  placeholder="חיפוש מעסיק, טלפון, bus_id..."
-                />
-
-
-                <SelectFilter
-                  value={String(filters.account_status ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, account_status: value ? Number(value) : undefined }))
-                  }
-                  options={accountStatuses.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="סטטוס"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.account_type ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, account_type: value ? Number(value) : undefined }))
-                  }
-                  options={accountTypes.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="סוג"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.region_id ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, region_id: value ? Number(value) : undefined, city_id: undefined }))
-                  }
-                  options={regions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="אזור"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.city_id ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, city_id: value ? Number(value) : undefined }))
-                  }
-                  options={activeCityOptions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="עיר"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.clinic_type ?? '')}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, clinic_type: value || undefined }))}
-                  options={CLINIC_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
-                  placeholder="סוג מרפאה"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.hiring_role ?? '')}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, hiring_role: value || undefined }))}
-                  options={hiringRoleOptions.map((item) => ({ value: item, label: item }))}
-                  placeholder="תפקיד גיוס"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.active_jobs_only ?? '')}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, active_jobs_only: value ? 'yes' : undefined }))}
-                  options={[{ value: 'yes', label: 'עם משרות פעילות' }]}
-                  placeholder="משרות פעילות"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.vip_only ?? '')}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, vip_only: value ? 'yes' : undefined }))}
-                  options={[{ value: 'yes', label: 'VIP בלבד' }]}
-                  placeholder="VIP"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.overdue_follow_up ?? '')}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, overdue_follow_up: value ? 'yes' : undefined }))}
-                  options={[{ value: 'yes', label: 'follow-up פתוח' }]}
-                  placeholder="follow-up"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.linked_contact_state ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      linked_contact_state: value ? (value as 'linked' | 'unlinked') : undefined,
-                    }))
-                  }
-                  options={[
-                    { value: 'linked', label: 'עם איש קשר מקושר' },
-                    { value: 'unlinked', label: 'ללא איש קשר' },
-                  ]}
-                  placeholder="איש קשר"
-                />
-
-
-                {/* ===== פילטרים חדשים — כל שדה ב-accounts שאפשר לסנן לפיו ===== */}
-                <SelectFilter
-                  value={String(filters.specialty ?? '')}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, specialty: value || undefined }))}
-                  options={proceduresOptions.map((item) => ({ value: item.name, label: item.name }))}
-                  placeholder="התמחות"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.system_used ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, system_used: value ? Number(value) : undefined }))
-                  }
-                  options={systemsOptions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="מערכת בשימוש"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.has_phone ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, has_phone: value ? (value as 'yes' | 'no') : undefined }))
-                  }
-                  options={[
-                    { value: 'yes', label: 'עם טלפון' },
-                    { value: 'no', label: 'ללא טלפון' },
-                  ]}
-                  placeholder="טלפון"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.has_email ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, has_email: value ? (value as 'yes' | 'no') : undefined }))
-                  }
-                  options={[
-                    { value: 'yes', label: 'עם מייל' },
-                    { value: 'no', label: 'ללא מייל' },
-                  ]}
-                  placeholder="מייל"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.has_website ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, has_website: value ? (value as 'yes' | 'no') : undefined }))
-                  }
-                  options={[
-                    { value: 'yes', label: 'עם אתר' },
-                    { value: 'no', label: 'ללא אתר' },
-                  ]}
-                  placeholder="אתר"
-                />
-
-
-                <input
-                  type="text"
-                  dir="rtl"
-                  value={filters.address ?? ''}
-                  onChange={(event) => setFilters((prev) => ({ ...prev, address: event.target.value || undefined }))}
-                  placeholder="כתובת מכילה..."
-                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                />
-
-
-                <input
-                  type="text"
-                  dir="rtl"
-                  value={filters.bus_id ?? ''}
-                  onChange={(event) => setFilters((prev) => ({ ...prev, bus_id: event.target.value || undefined }))}
-                  placeholder="ח.פ. / bus_id..."
-                  className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                />
-
-
-                {/* ===== טווחי מספרים ===== */}
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    dir="ltr"
-                    value={filters.team_size_min ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        team_size_min: event.target.value ? Number(event.target.value) : undefined,
-                      }))
-                    }
-                    placeholder="צוות מ-"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                  <input
-                    type="number"
-                    dir="ltr"
-                    value={filters.team_size_max ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        team_size_max: event.target.value ? Number(event.target.value) : undefined,
-                      }))
-                    }
-                    placeholder="עד"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                </div>
-
-
-                <div className="flex items-center gap-1">
-                  <input
-                    type="number"
-                    dir="ltr"
-                    value={filters.chairs_count_min ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        chairs_count_min: event.target.value ? Number(event.target.value) : undefined,
-                      }))
-                    }
-                    placeholder="כסאות מ-"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                  <input
-                    type="number"
-                    dir="ltr"
-                    value={filters.chairs_count_max ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({
-                        ...prev,
-                        chairs_count_max: event.target.value ? Number(event.target.value) : undefined,
-                      }))
-                    }
-                    placeholder="עד"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                </div>
-
-
-                {/* ===== טווחי תאריכים ===== */}
-                <div className="flex items-center gap-1">
-                  <input
-                    type="date"
-                    dir="ltr"
-                    value={filters.created_from ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, created_from: event.target.value || undefined }))
-                    }
-                    title="נוצר מ-"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                  <input
-                    type="date"
-                    dir="ltr"
-                    value={filters.created_to ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, created_to: event.target.value || undefined }))
-                    }
-                    title="נוצר עד"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                </div>
-
-
-                <div className="flex items-center gap-1">
-                  <input
-                    type="date"
-                    dir="ltr"
-                    value={filters.updated_from ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, updated_from: event.target.value || undefined }))
-                    }
-                    title="עודכן מ-"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                  <input
-                    type="date"
-                    dir="ltr"
-                    value={filters.updated_to ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, updated_to: event.target.value || undefined }))
-                    }
-                    title="עודכן עד"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                </div>
-
-
-                <div className="flex items-center gap-1">
-                  <input
-                    type="date"
-                    dir="ltr"
-                    value={filters.last_contact_from ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, last_contact_from: event.target.value || undefined }))
-                    }
-                    title="קשר אחרון מ-"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                  <input
-                    type="date"
-                    dir="ltr"
-                    value={filters.last_contact_to ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, last_contact_to: event.target.value || undefined }))
-                    }
-                    title="קשר אחרון עד"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                </div>
-
-
-                <div className="flex items-center gap-1">
-                  <input
-                    type="date"
-                    dir="ltr"
-                    value={filters.next_follow_up_from ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, next_follow_up_from: event.target.value || undefined }))
-                    }
-                    title="פולו-אפ הבא מ-"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                  <input
-                    type="date"
-                    dir="ltr"
-                    value={filters.next_follow_up_to ?? ''}
-                    onChange={(event) =>
-                      setFilters((prev) => ({ ...prev, next_follow_up_to: event.target.value || undefined }))
-                    }
-                    title="פולו-אפ הבא עד"
-                    className="h-10 w-full min-w-0 rounded-xl border border-slate-200 bg-white px-2 text-[12px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                  />
-                </div>
+                <SearchBar value={filters.search ?? ''} onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))} placeholder="חיפוש שם, טלפון, מייל, עיר..." />
+                <SelectFilter value={String(filters.account_status ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_status: value ? Number(value) : undefined }))} options={(isEmployersBoard ? accountStatuses.filter((item) => EMPLOYER_STATUS_IDS.includes(item.id)) : accountStatuses).map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סטטוס" />
+                <SelectFilter value={String(filters.account_type ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_type: value ? Number(value) : undefined }))} options={accountTypes.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סוג ארגון" />
+                <SelectFilter value={String(filters.region_id ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, region_id: value ? Number(value) : undefined, city_id: undefined }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="אזור" />
+                <SelectFilter value={String(filters.city_id ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, city_id: value ? Number(value) : undefined }))} options={activeCityOptions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="עיר" />
+                {!isEmployersBoard && <SelectFilter value={String(filters.has_jobs ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, has_jobs: value ? (value as 'yes' | 'no') : undefined }))} options={[{ value: 'yes', label: 'עם משרות' }, { value: 'no', label: 'ללא משרות' }]} placeholder="שיוך משרות" />}
+                <SelectFilter value={String(filters.active_jobs_only ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, active_jobs_only: value ? 'yes' : undefined }))} options={[{ value: 'yes', label: 'עם משרה פעילה' }]} placeholder="משרות פעילות" />
+                <SelectFilter value={String(filters.has_contact ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, has_contact: value ? (value as 'yes' | 'no') : undefined }))} options={[{ value: 'yes', label: 'עם איש קשר' }, { value: 'no', label: 'ללא איש קשר' }]} placeholder="אנשי קשר" />
+                <SelectFilter value={String(filters.has_phone ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, has_phone: value ? (value as 'yes' | 'no') : undefined }))} options={[{ value: 'yes', label: 'עם טלפון' }, { value: 'no', label: 'ללא טלפון' }]} placeholder="טלפון" />
+                <SelectFilter value={String(filters.has_email ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, has_email: value ? (value as 'yes' | 'no') : undefined }))} options={[{ value: 'yes', label: 'עם מייל' }, { value: 'no', label: 'ללא מייל' }]} placeholder="מייל" />
+                <SelectFilter value={String(filters.has_website ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, has_website: value ? (value as 'yes' | 'no') : undefined }))} options={[{ value: 'yes', label: 'עם אתר' }, { value: 'no', label: 'ללא אתר' }]} placeholder="אתר" />
               </div>
 
-
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
-                <div className="flex flex-wrap items-center gap-2">
-                  <InfoPill label={`תוצאות: ${totalVisible}`} />
-                  <InfoPill label={`VIP: ${kpis.vipEmployers}`} tone="warning" />
-                  <InfoPill label={`עם משרות פעילות: ${kpis.withActiveJobs}`} tone="success" />
-                </div>
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#D9D9D9] pt-4">
                 <div className="flex flex-wrap gap-2">
-                  {Object.values(filters).some(Boolean) && (
-                    <ActionButton variant="ghost" onClick={clearFilters}>
-                      נקה פילטרים
-                    </ActionButton>
-                  )}
+                  <InfoPill label={`סה״כ: ${filteredRows.length}`} />
+                  <InfoPill label={`משרות פעילות: ${kpis.activeJobs}`} tone="success" />
+                  <InfoPill label={`סה״כ משרות: ${kpis.totalJobs}`} />
                 </div>
+                {Object.values(filters).some(Boolean) && <ActionButton variant="ghost" onClick={clearFilters}>נקה פילטרים</ActionButton>}
               </div>
             </div>
           </Toolbar>
 
-
-          {selectedCount > 0 && (
+          {selectedRows.length > 0 && (
             <Toolbar>
-              <div className="rounded-2xl border border-[#008080]/20 bg-[#F0FDFC] p-4 shadow-sm">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-white px-3 py-1 text-[13px] font-bold text-[#008080] shadow-sm">
-                      נבחרו {selectedCount} רשומות
-                    </span>
-                    <span className="text-[13px] font-medium text-slate-600">bulk actions זמינות לאחר בחירה</span>
-                  </div>
-
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <select
-                      dir="rtl"
-                      value={bulkAction}
-                      onChange={(event) => {
-                        setBulkAction(event.target.value as BulkActionType)
-                        setBulkValue('')
-                      }}
-                      className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                    >
-                      <option value="">בחר פעולת bulk</option>
-                      <option value="status">שינוי סטטוס</option>
-                      <option value="followup">יצירת follow-up</option>
-                      <option value="mark_vip">סימון VIP</option>
-                      <option value="export">ייצוא</option>
-                    </select>
-
-
-                    {bulkAction === 'status' && (
-                      <select
-                        dir="rtl"
-                        value={bulkValue}
-                        onChange={(event) => setBulkValue(event.target.value)}
-                        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                      >
-                        <option value="">בחר סטטוס</option>
-                        {accountStatuses.map((item) => (
-                          <option key={item.id} value={String(item.id)}>
-                            {item.name}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-
-
-                    {bulkAction === 'followup' && (
-                      <input
-                        type="date"
-                        dir="rtl"
-                        value={bulkValue}
-                        onChange={(event) => setBulkValue(event.target.value)}
-                        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-                      />
-                    )}
-
-
-                    <ActionButton variant="primary" onClick={handleBulkApply}>
-                      אשר
-                    </ActionButton>
-                    <ActionButton variant="ghost" onClick={() => { setBulkAction(''); setBulkValue('') }}>
-                      ביטול
-                    </ActionButton>
-                  </div>
+              <div className="rounded-[18px] border border-[#D97706]/20 bg-[#FFFBEB] p-4 shadow-sm">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="rounded-full bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">נבחרו {selectedRows.length} רשומות</span>
+                  <ActionButton variant="ghost" onClick={exportCsv}>ייצוא נבחרים / מסוננים</ActionButton>
                 </div>
               </div>
             </Toolbar>
           )}
 
-
           <Toolbar>
             {pageData.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-                <EmptyState
-                  icon={Building2}
-                  title={rawEmployers.length === 0 ? 'אין מעסיקים במערכת' : 'לא נמצאו תוצאות'}
-                  description={
-                    rawEmployers.length === 0
-                      ? 'עדיין לא קיימים מעסיקים במערכת.'
-                      : 'שנו את תנאי הסינון כדי לקבל תוצאות.'
-                  }
-                />
+              <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8 shadow-sm">
+                <EmptyState icon={Building2} title="לא נמצאו תוצאות" description="שנו את תנאי הסינון או בדקו שהדאטה משויך נכון ב־Supabase." />
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="overflow-hidden rounded-[18px] border border-[#D9D9D9] bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1680px] w-full text-right">
-                    <thead className="bg-[#F8FAFC]">
-                      <tr className="border-b border-slate-200 text-[13px] font-semibold text-slate-500">
-                        <th className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={pageData.length > 0 && pageData.every((row) => selectedRows.includes(row.account_id))}
-                            onChange={togglePageSelection}
-                            className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
-                          />
-                        </th>
-                        <EmployerSortableTh label="שם מעסיק" sortKey="account_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                        <EmployerSortableTh label="סוג" sortKey="account_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                        <EmployerSortableTh label="סטטוס" sortKey="account_status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                        <th className="px-4 py-3">טלפון</th>
-                        <th className="px-4 py-3">מייל</th>
-                        <EmployerSortableTh label="אזור / עיר" sortKey="region_id" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
-                        <th className="px-4 py-3">משרות פעילות</th>
-                        <th className="px-4 py-3">סה"כ משרות</th>
-                        <th className="px-4 py-3">גודל צוות</th>
-                        <EmployerSortableTh label="follow-up" sortKey="next_follow_up" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />
+                  <table className="min-w-[1600px] w-full border-collapse text-right text-[14px]">
+                    <thead className="bg-[#F3F4F6]">
+                      <tr className="border-b border-[#D9D9D9] text-[12px] font-bold text-[#6B6B6B]">
+                        <th className="px-4 py-3"><input type="checkbox" checked={pageData.length > 0 && pageData.every((row) => selectedRows.includes(Number(row.account_id)))} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
+                        {visibleColumns.includes('account_name') && <SortableTh label="שם ארגון" sortKey="account_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
+                        {visibleColumns.includes('account_type') && <SortableTh label="סוג" sortKey="account_type" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
+                        {visibleColumns.includes('account_status') && <SortableTh label="סטטוס" sortKey="account_status" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
+                        {visibleColumns.includes('phone') && <th className="px-4 py-3">טלפון</th>}
+                        {visibleColumns.includes('email') && <th className="px-4 py-3">מייל</th>}
+                        {visibleColumns.includes('region') && <th className="px-4 py-3">אזור</th>}
+                        {visibleColumns.includes('city') && <th className="px-4 py-3">עיר</th>}
+                        {visibleColumns.includes('active_jobs') && <SortableTh label="משרות פעילות" sortKey="activeJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
+                        {visibleColumns.includes('total_jobs') && <SortableTh label="סה״כ משרות" sortKey="totalJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
+                        {visibleColumns.includes('contacts') && <th className="px-4 py-3">אנשי קשר</th>}
+                        {visibleColumns.includes('follow_up') && <th className="px-4 py-3">פולו־אפ</th>}
                         <th className="px-4 py-3">פעולות</th>
                       </tr>
                     </thead>
-
-
-                    <tbody className="divide-y divide-slate-100">
-                      {pageData.map((employer) => {
-                        const status = getStatusBadge(accountStatusColors, employer.account_status)
-                        const selected = selectedRows.includes(employer.account_id)
-
-
+                    <tbody className="divide-y divide-[#F3F4F6] bg-white">
+                      {pageData.map((account) => {
+                        const selected = selectedRows.includes(Number(account.account_id))
+                        const status = getEmployerStatusBadge(account.account_status, accountStatusName(account.account_status))
                         return (
-                          <tr
-                            key={employer.account_id}
-                            className={`text-[13px] font-medium text-[#0F172A] transition ${selected ? 'bg-[#F0FDFC]' : 'hover:bg-slate-50'}`}
-                            onClick={() => openSheet(employer.account_id)}
-                          >
+                          <tr key={account.account_id} onClick={() => openSheet(Number(account.account_id), 'view')} className={`text-[14px] font-medium transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#F9FAFB]'}`}>
+                            <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleRowSelection(Number(account.account_id))} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></td>
+                            {visibleColumns.includes('account_name') && <td className="px-4 py-3"><div className="flex items-center gap-3"><div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#E6F3F3] text-[15px] font-bold text-[#008080]">{(account.account_name ?? '?').charAt(0)}</div><div><div className="font-bold text-[#2D2D2D]">{account.account_name ?? '—'}</div></div></div></td>}
+                            {visibleColumns.includes('account_type') && <td className="px-4 py-3">{accountTypeName(account.account_type)}</td>}
+                            {visibleColumns.includes('account_status') && <td className="px-4 py-3"><span className={`rounded-full border px-2.5 py-1 text-[12px] font-semibold ${status.bg} ${status.text} ${status.border}`}>{status.label}</span></td>}
+                            {visibleColumns.includes('phone') && <td dir="ltr" className="px-4 py-3 font-mono text-[12px]">{formatPhone(account.phone)}</td>}
+                            {visibleColumns.includes('email') && <td dir="ltr" className="px-4 py-3 text-[12px]">{account.email ?? '—'}</td>}
+                            {visibleColumns.includes('region') && <td className="px-4 py-3">{regionName(account.region_id)}</td>}
+                            {visibleColumns.includes('city') && <td className="px-4 py-3">{cityName(account.city_id)}</td>}
+                            {visibleColumns.includes('active_jobs') && <td className="px-4 py-3"><span className="rounded-full bg-[#F0FDF4] px-2.5 py-1 text-[12px] font-bold text-[#16A34A]">{account.activeJobsCount}</span></td>}
+                            {visibleColumns.includes('total_jobs') && <td className="px-4 py-3"><span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{account.totalJobsCount}</span></td>}
+                            {visibleColumns.includes('contacts') && <td className="px-4 py-3"><div className="max-w-[220px] truncate">{account.linkedContactSummary || '—'}</div></td>}
+                            {visibleColumns.includes('follow_up') && <td className="px-4 py-3">{formatDate((account as any).next_follow_up)}</td>}
                             <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={() => toggleRowSelection(employer.account_id)}
-                                className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
-                              />
-                            </td>
-
-
-                            <td className="px-4 py-3">
-                              <div className="min-w-[250px]">
-                                <div className="flex items-start gap-3">
-                                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[15px] font-bold text-[#008080] shadow-sm">
-                                    {(employer.account_name ?? '?').charAt(0)}
-                                  </div>
-                                  <div className="space-y-1">
-                                    <Link
-                                      to={`/admin/employers/${employer.account_id}`}
-                                      onClick={(event) => event.stopPropagation()}
-                                      className="text-[14px] font-bold text-[#0F172A] hover:text-[#008080]"
-                                    >
-                                      {employer.account_name ?? '—'}
-                                    </Link>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {employer.derived.signals.slice(0, 2).map((signal) => (
-                                        <InlineSignal
-                                          key={`${employer.account_id}-${signal}`}
-                                          tone={
-                                            signal.includes('VIP')
-                                              ? 'warning'
-                                              : signal.includes('ללא') || signal.includes('חסר')
-                                                ? 'danger'
-                                                : signal.includes('פולו')
-                                                  ? 'warning'
-                                                  : 'muted'
-                                          }
-                                        >
-                                          {signal}
-                                        </InlineSignal>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-
-
-                            <td className="px-4 py-3">{accountTypeName(employer.account_type)}</td>
-                            <td className="px-4 py-3">
-                              <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${status.bg} ${status.text}`}>
-                                {status.label}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 font-mono text-[12px]" dir="ltr">{employer.phone ?? '—'}</td>
-                            <td className="px-4 py-3 text-[12px]" dir="ltr">{employer.email ?? '—'}</td>
-                            <td className="px-4 py-3">{`${regionName(employer.region_id)} / ${cityName(employer.city_id)}`}</td>
-                            <td className="px-4 py-3">
-                              <span className="rounded-full bg-[#F0FDF4] px-2.5 py-1 text-[12px] font-bold text-[#16A34A]">
-                                {employer.active_job_count_auto ?? 0}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className="rounded-full bg-[#F8FAFC] px-2.5 py-1 text-[12px] font-bold text-slate-700">
-                                {employer.total_jobs_count ?? 0}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">{employer.team_size ?? '—'}</td>
-                            <td className="px-4 py-3">
-                              <div className="space-y-1">
-                                <div>{formatDate(employer.next_follow_up)}</div>
-                                {employer.derived.overdueFollowUp && <InlineSignal tone="warning">פתוח</InlineSignal>}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-1">
-                                <IconAction title="Employer 360" asLink={`/admin/employers/${employer.account_id}`} icon={<Eye className="h-4 w-4" />} />
-                                <IconAction title="Edit" onClick={() => openSheet(employer.account_id)} icon={<Edit2 className="h-4 w-4" />} />
-                                <IconAction title="Create Job" asLink={`/jobs/new?account=${employer.account_id}`} icon={<Briefcase className="h-4 w-4" />} />
-                                <IconAction
-                                  title="טלפון"
-                                  onClick={() => {
-                                    if (!employer.phone) {
-                                      showToast('אין טלפון זמין', 'error')
-                                      return
-                                    }
-                                    window.location.href = `tel:${employer.phone}`
-                                  }}
-                                  icon={<Phone className="h-4 w-4" />}
-                                  disabled={!employer.phone}
-                                />
+                              <div className="flex items-center justify-center gap-1.5">
+                                <IconAction title="צפייה" onClick={() => openSheet(Number(account.account_id), 'view')} icon={<Eye className="h-4 w-4" />} />
+                                <IconAction title="עריכה" onClick={() => openSheet(Number(account.account_id), 'edit')} icon={<Edit2 className="h-4 w-4" />} />
+                                <IconAction title="משרות" onClick={() => openSheet(Number(account.account_id), 'view')} icon={<Briefcase className="h-4 w-4" />} disabled={account.totalJobsCount === 0} />
+                                <IconAction title="וואטסאפ" onClick={() => openWhatsapp(account)} icon={<MessageCircle className="h-4 w-4" />} disabled={!account.phone && !account.linkedContacts[0]?.phone_norm} />
+                                <IconAction title="טלפון" onClick={() => account.phone ? (window.location.href = `tel:${account.phone}`) : showToast('אין טלפון זמין', 'error')} icon={<Phone className="h-4 w-4" />} disabled={!account.phone} />
                               </div>
                             </td>
                           </tr>
@@ -1437,178 +829,98 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
                     </tbody>
                   </table>
                 </div>
-
-
-                <div className="border-t border-slate-200 bg-white px-4 py-3">
-                  <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={totalVisible} />
-                </div>
+                <div className="border-t border-[#D9D9D9] bg-white px-4 py-3"><Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filteredRows.length} /></div>
               </div>
             )}
           </Toolbar>
         </div>
 
-
-        {sheetOpen && (selectedEmployer || selectedId === null) && (
+        {sheet.open && (selectedAccount || sheet.mode === 'create') && (
           <div className="fixed inset-0 z-50 flex justify-start">
             <div className="absolute inset-0 bg-slate-900/30" onClick={closeSheet} />
-            <aside className="relative z-10 h-full w-full max-w-[620px] overflow-y-auto border-l border-slate-200 bg-white shadow-xl">
-              <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
+            <aside className="relative z-10 h-full w-full max-w-[620px] overflow-y-auto border-l border-[#D9D9D9] bg-white shadow-xl">
+              <div className="sticky top-0 z-20 border-b border-[#D9D9D9] bg-white/95 backdrop-blur-sm">
                 <div className="flex items-start justify-between gap-3 px-5 py-5">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[22px] font-bold text-[#008080] shadow-sm">
-                      {selectedId === null ? '+' : (selectedEmployer?.account_name ?? '?').charAt(0)}
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-[#E6F3F3] px-2.5 py-1 text-[12px] font-bold text-[#008080]">{sheet.mode === 'create' ? 'חדש' : `#${selectedAccount?.account_id}`}</span>
+                      {selectedAccount && <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{accountStatusName(selectedAccount.account_status)}</span>}
                     </div>
-                    <div className="space-y-2">
-                      <div>
-                        <h2 className="text-[24px] font-bold text-[#0F172A]">{selectedId === null ? 'מעסיק חדש' : selectedEmployer?.account_name}</h2>
-                        {selectedEmployer && (
-                          <div className="mt-1 flex flex-wrap gap-2">
-                            <Badge tone="default">{accountTypeName(selectedEmployer.account_type)}</Badge>
-                            <Badge tone="muted">{accountStatusName(selectedEmployer.account_status)}</Badge>
-                            <Badge tone="muted">{`${cityName(selectedEmployer.city_id)} / ${regionName(selectedEmployer.region_id)}`}</Badge>
-                          </div>
-                        )}
-                      </div>
-
-
-                      {selectedEmployer && (
-                        <div className="flex flex-wrap gap-2">
-                          <PrimaryLinkAction to={`/admin/employers/${selectedEmployer.account_id}`} icon={<Eye className="h-4 w-4" />} label="Employer 360" />
-                          <QuickSheetButton icon={<Briefcase className="h-4 w-4" />} label="Create Job" onClick={() => window.open(`/jobs/new?account=${selectedEmployer.account_id}`, '_self')} />
-                          <QuickLinkButton href={selectedEmployer.phone ? `tel:${selectedEmployer.phone}` : undefined} icon={<Phone className="h-4 w-4" />} label="טלפון" disabled={!selectedEmployer.phone} />
-                          <QuickLinkButton href={selectedEmployer.email ? `mailto:${selectedEmployer.email}` : undefined} icon={<Mail className="h-4 w-4" />} label="אימייל" disabled={!selectedEmployer.email} />
-                          <QuickLinkButton href={selectedEmployer.website_url ?? undefined} icon={<Globe className="h-4 w-4" />} label="אתר" disabled={!selectedEmployer.website_url} />
-                        </div>
-                      )}
-                    </div>
+                    <h2 className="mt-2 text-[24px] font-bold text-[#2D2D2D]">{sheet.mode === 'create' ? (isEmployersBoard ? 'מעסיק חדש' : 'ארגון חדש') : selectedAccount?.account_name}</h2>
+                    {selectedAccount && <div className="mt-2 text-[13px] text-[#6B6B6B]">{selectedAccount.activeJobsCount} משרות פעילות · {selectedAccount.totalJobsCount} משרות סה״כ</div>}
                   </div>
-
-
-                  <button
-                    type="button"
-                    onClick={closeSheet}
-                    className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
-                    aria-label="סגור"
-                    title="סגור"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {sheet.mode === 'view' && <ActionButton variant="ghost" icon={Edit2} onClick={() => setSheet((prev) => ({ ...prev, mode: 'edit' }))}>עריכה</ActionButton>}
+                    <button type="button" onClick={closeSheet} className="rounded-xl border border-[#D9D9D9] p-2 text-[#6B6B6B] hover:bg-[#F3F4F6]"><X className="h-5 w-5" /></button>
+                  </div>
                 </div>
               </div>
 
-
               <div className="space-y-4 p-5">
-                <SectionCard title="פרטי מעסיק">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <TextField label="account_name" value={draft.account_name} onChange={(value) => setDraft((prev) => ({ ...prev, account_name: value }))} />
-                    <SelectLikeField
-                      label="account_status"
-                      value={String(draft.account_status ?? '')}
-                      onChange={(value) => setDraft((prev) => ({ ...prev, account_status: value ? Number(value) : null }))}
-                      options={accountStatuses.map((item) => ({ value: String(item.id), label: item.name }))}
-                    />
-                    <SelectLikeField
-                      label="account_type"
-                      value={String(draft.account_type ?? '')}
-                      onChange={(value) => setDraft((prev) => ({ ...prev, account_type: value ? Number(value) : null }))}
-                      options={accountTypes.map((item) => ({ value: String(item.id), label: item.name }))}
-                    />
-                    <TextField label="bus_id" value={draft.bus_id} onChange={(value) => setDraft((prev) => ({ ...prev, bus_id: value }))} />
-                  </div>
-                </SectionCard>
-
-
-                <SectionCard title="תקשורת">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <TextField label="phone" value={draft.phone} onChange={(value) => setDraft((prev) => ({ ...prev, phone: value }))} />
-                    <TextField label="second_phone" value={draft.second_phone} onChange={(value) => setDraft((prev) => ({ ...prev, second_phone: value }))} />
-                    <TextField label="email" value={draft.email} onChange={(value) => setDraft((prev) => ({ ...prev, email: value }))} />
-                    <TextField label="billing_email" value={draft.billing_email} onChange={(value) => setDraft((prev) => ({ ...prev, billing_email: value }))} />
-                    <TextField label="address" value={draft.address} onChange={(value) => setDraft((prev) => ({ ...prev, address: value }))} />
-                    <TextField label="website_url" value={draft.website_url} onChange={(value) => setDraft((prev) => ({ ...prev, website_url: value }))} />
-                  </div>
-                </SectionCard>
-
-
-                <SectionCard title="מיקום ותפעול">
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <SelectLikeField
-                      label="region_id"
-                      value={String(draft.region_id ?? '')}
-                      onChange={(value) => setDraft((prev) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))}
-                      options={regions.map((item) => ({ value: String(item.id), label: item.name }))}
-                    />
-                    <SelectLikeField
-                      label="city_id"
-                      value={String(draft.city_id ?? '')}
-                      onChange={(value) => setDraft((prev) => ({ ...prev, city_id: value ? Number(value) : null }))}
-                      options={(draft.region_id ? cities.filter((item) => item.region_id === draft.region_id) : cities).map((item) => ({ value: String(item.id), label: item.name }))}
-                    />
-                    <SelectLikeField
-                      label="clinic_type"
-                      value={draft.clinic_type}
-                      onChange={(value) => setDraft((prev) => ({ ...prev, clinic_type: value }))}
-                      options={CLINIC_TYPE_OPTIONS.map((item) => ({ value: item, label: item }))}
-                    />
-                    <TextField label="team_size" value={draft.team_size} onChange={(value) => setDraft((prev) => ({ ...prev, team_size: value }))} type="number" />
-                    <TextField label="chairs_count" value={draft.chairs_count} onChange={(value) => setDraft((prev) => ({ ...prev, chairs_count: value }))} type="number" />
-                    <DateField label="next_follow_up" value={draft.next_follow_up} onChange={(value) => setDraft((prev) => ({ ...prev, next_follow_up: value }))} />
-                  </div>
-                </SectionCard>
-
-
-                <SectionCard title="DNA גיוסי">
-                  <TagEditor label="specialties" values={draft.specialties} onChange={(values) => setDraft((prev) => ({ ...prev, specialties: values }))} placeholder="הוסף התמחות" />
-                  <div className="mt-4" />
-                  <TagEditor label="hiring_roles" values={draft.hiring_roles} onChange={(values) => setDraft((prev) => ({ ...prev, hiring_roles: values }))} options={hiringRoleOptions} placeholder="הוסף תפקיד גיוס" />
-                </SectionCard>
-
-
-                <SectionCard title="הערות וסיגנלים">
-                  <TextareaField label="notes" value={draft.notes} onChange={(value) => setDraft((prev) => ({ ...prev, notes: value }))} />
-                  <div className="mt-4 flex flex-wrap gap-2">
-                    {selectedEmployer?.derived.signals.length ? (
-                      selectedEmployer.derived.signals.map((signal) => (
-                        <InlineSignal key={`${selectedEmployer?.account_id}-${signal}`} tone={signal.includes('VIP') ? 'warning' : signal.includes('ללא') || signal.includes('חסר') ? 'danger' : 'muted'}>
-                          {signal}
-                        </InlineSignal>
-                      ))
-                    ) : (
-                      <InlineSignal tone="success">ללא חריגות</InlineSignal>
-                    )}
-                  </div>
-                </SectionCard>
-
-
-                <div className="sticky bottom-0 bg-white/95 pt-2 backdrop-blur-sm">
-                  <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
-                    <ActionButton variant="ghost" onClick={closeSheet}>ביטול</ActionButton>
-                    <ActionButton variant="primary" onClick={saveSheet} disabled={savingSheet}>
-                      {savingSheet ? 'שומר...' : 'שמור שינויים'}
-                    </ActionButton>
-                  </div>
-                </div>
+                {sheet.mode === 'view' && selectedAccount ? (
+                  <>
+                    <SectionCard title="פרטי ארגון">
+                      <LabelValue label="שם" value={selectedAccount.account_name ?? '—'} />
+                      <LabelValue label="סוג" value={accountTypeName(selectedAccount.account_type)} />
+                      <LabelValue label="סטטוס" value={accountStatusName(selectedAccount.account_status)} />
+                      <LabelValue label="אזור" value={regionName(selectedAccount.region_id)} />
+                      <LabelValue label="עיר" value={cityName(selectedAccount.city_id)} />
+                    </SectionCard>
+                    <SectionCard title="משרות">
+                      <LabelValue label="משרות פעילות" value={String(selectedAccount.activeJobsCount)} />
+                      <LabelValue label="סה״כ משרות" value={String(selectedAccount.totalJobsCount)} />
+                      <div className="mt-3 flex flex-wrap gap-2">{selectedAccount.relatedJobs.slice(0, 12).map((job) => <span key={job.job_code} className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold">{job.job_code}</span>)}</div>
+                    </SectionCard>
+                    <SectionCard title="תקשורת ואנשי קשר">
+                      <LabelValue label="טלפון" value={formatPhone(selectedAccount.phone)} />
+                      <LabelValue label="מייל" value={selectedAccount.email ?? '—'} />
+                      <LabelValue label="אתר" value={(selectedAccount as any).website_url ?? '—'} />
+                      <LabelValue label="אנשי קשר" value={selectedAccount.linkedContactSummary || '—'} />
+                    </SectionCard>
+                  </>
+                ) : (
+                  <>
+                    <SectionCard title="פרטי בסיס">
+                      <TextField label="שם ארגון" value={draft.account_name} onChange={(value) => setDraft((prev) => ({ ...prev, account_name: value }))} />
+                      <SelectLikeField label="סטטוס" value={String(draft.account_status ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, account_status: value ? Number(value) : null }))} options={accountStatuses.map((item) => ({ value: String(item.id), label: item.name }))} />
+                      <SelectLikeField label="סוג ארגון" value={String(draft.account_type ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, account_type: value ? Number(value) : null }))} options={accountTypes.map((item) => ({ value: String(item.id), label: item.name }))} />
+                      <TextField label="ח.פ / מזהה" value={draft.bus_id} onChange={(value) => setDraft((prev) => ({ ...prev, bus_id: value }))} />
+                    </SectionCard>
+                    <SectionCard title="תקשורת">
+                      <TextField label="טלפון" value={draft.phone} onChange={(value) => setDraft((prev) => ({ ...prev, phone: value }))} />
+                      <TextField label="טלפון נוסף" value={draft.second_phone} onChange={(value) => setDraft((prev) => ({ ...prev, second_phone: value }))} />
+                      <TextField label="מייל" value={draft.email} onChange={(value) => setDraft((prev) => ({ ...prev, email: value }))} />
+                      <TextField label="מייל לחשבונית" value={draft.billing_email} onChange={(value) => setDraft((prev) => ({ ...prev, billing_email: value }))} />
+                      <TextField label="אתר" value={draft.website_url} onChange={(value) => setDraft((prev) => ({ ...prev, website_url: value }))} />
+                    </SectionCard>
+                    <SectionCard title="מיקום ותפעול">
+                      <SelectLikeField label="אזור" value={String(draft.region_id ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} />
+                      <SelectLikeField label="עיר" value={String(draft.city_id ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, city_id: value ? Number(value) : null }))} options={(draft.region_id ? cities.filter((item) => Number(item.region_id) === Number(draft.region_id)) : cities).map((item) => ({ value: String(item.id), label: item.name }))} />
+                      <TextField label="כתובת" value={draft.address} onChange={(value) => setDraft((prev) => ({ ...prev, address: value }))} />
+                      <TextField label="גודל צוות" value={draft.team_size} onChange={(value) => setDraft((prev) => ({ ...prev, team_size: value }))} type="number" />
+                      <TextField label="מספר כיסאות" value={draft.chairs_count} onChange={(value) => setDraft((prev) => ({ ...prev, chairs_count: value }))} type="number" />
+                      <DateField label="פולו־אפ הבא" value={draft.next_follow_up} onChange={(value) => setDraft((prev) => ({ ...prev, next_follow_up: value }))} />
+                    </SectionCard>
+                    <SectionCard title="הערות">
+                      <TextareaField label="הערות" value={draft.notes} onChange={(value) => setDraft((prev) => ({ ...prev, notes: value }))} />
+                    </SectionCard>
+                    <div className="sticky bottom-0 bg-white/95 pt-2 backdrop-blur-sm">
+                      <div className="flex justify-end gap-2 border-t border-[#D9D9D9] pt-4">
+                        <ActionButton variant="ghost" onClick={closeSheet}>ביטול</ActionButton>
+                        <ActionButton variant="primary" onClick={saveSheet} disabled={savingSheet}>{savingSheet ? 'שומר...' : 'שמור שינויים'}</ActionButton>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             </aside>
           </div>
         )}
 
-
         {toast.open && (
           <div className="fixed bottom-5 left-5 z-[70]">
-            <div
-              className={`rounded-2xl border px-4 py-3 shadow-md ${
-                toast.tone === 'success'
-                  ? 'border-green-200 bg-green-50 text-green-700'
-                  : toast.tone === 'error'
-                    ? 'border-red-200 bg-red-50 text-red-700'
-                    : 'border-sky-200 bg-sky-50 text-sky-700'
-              }`}
-            >
-              <div className="flex items-center gap-2 text-[14px] font-bold">
-                {toast.tone === 'success' ? <CheckCircle2 className="h-4 w-4" /> : toast.tone === 'error' ? <AlertTriangle className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                {toast.message}
-              </div>
+            <div className={`rounded-[18px] border px-4 py-3 shadow-md ${toast.tone === 'success' ? 'border-green-200 bg-green-50 text-green-700' : toast.tone === 'error' ? 'border-red-200 bg-red-50 text-red-700' : 'border-sky-200 bg-sky-50 text-sky-700'}`}>
+              <div className="flex items-center gap-2 text-[14px] font-bold">{toast.tone === 'success' ? <CheckCircle2 className="h-4 w-4" /> : toast.tone === 'error' ? <AlertTriangle className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}{toast.message}</div>
             </div>
           </div>
         )}
@@ -1617,476 +929,49 @@ export default function AdminEmployersPage({ initialTab = 'all', pageTitle = 'מ
   )
 }
 
-
-function KpiCard({
-  label,
-  value,
-  hint,
-  tone,
-  onClick,
-}: {
-  label: string
-  value: number
-  hint?: string
-  tone: 'default' | 'success' | 'warning'
-  onClick?: () => void
-}) {
-  const toneClasses =
-    tone === 'success'
-      ? 'border-[#BBF7D0] bg-[#F0FDF4]'
-      : tone === 'warning'
-        ? 'border-[#FDE68A] bg-[#FFFBEB]'
-        : 'border-slate-200 bg-white'
-
-
-  const valueClasses =
-    tone === 'success'
-      ? 'text-[#16A34A]'
-      : tone === 'warning'
-        ? 'text-[#D97706]'
-        : 'text-[#0F172A]'
-
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-2xl border p-4 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}
-    >
-      <div className="text-[13px] font-semibold text-slate-500">{label}</div>
-      <div className={`mt-2 text-[24px] font-bold ${valueClasses}`}>{value}</div>
-      {hint ? <div className="mt-1 text-[12px] font-medium text-slate-500">{hint}</div> : null}
-    </button>
-  )
+function KpiCard({ label, value, hint, tone = 'default', onClick }: { label: string; value: number; hint?: string; tone?: 'default' | 'success' | 'warning'; onClick?: () => void }) {
+  const toneClasses = tone === 'success' ? 'border-[#BBF7D0] bg-[#F0FDF4]' : tone === 'warning' ? 'border-[#FDE68A] bg-[#FFFBEB]' : 'border-[#D9D9D9] bg-white'
+  const valueClasses = tone === 'success' ? 'text-[#16A34A]' : tone === 'warning' ? 'text-[#D97706]' : 'text-[#008080]'
+  return <button type="button" onClick={onClick} className={`rounded-[18px] border p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}><div className="text-[13px] font-semibold text-[#6B6B6B]">{label}</div><div className={`mt-2 text-[24px] font-bold ${valueClasses}`}>{value}</div>{hint && <div className="mt-1 text-[12px] font-medium text-[#6B6B6B]">{hint}</div>}</button>
 }
 
-
-function InfoPill({
-  label,
-  tone = 'default',
-}: {
-  label: string
-  tone?: 'default' | 'success' | 'warning'
-}) {
-  const classes =
-    tone === 'success'
-      ? 'bg-[#F0FDF4] text-[#16A34A]'
-      : tone === 'warning'
-        ? 'bg-[#FFFBEB] text-[#D97706]'
-        : 'bg-[#F8FAFC] text-slate-600'
-
-
-  return <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${classes}`}>{label}</span>
+function InfoPill({ label, tone = 'default' }: { label: string; tone?: 'default' | 'success' }) {
+  return <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${tone === 'success' ? 'bg-[#F0FDF4] text-[#16A34A]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>{label}</span>
 }
 
-
-function InlineSignal({
-  children,
-  tone,
-}: {
-  children: React.ReactNode
-  tone: 'warning' | 'danger' | 'success' | 'muted'
-}) {
-  const classes =
-    tone === 'warning'
-      ? 'bg-[#FFFBEB] text-[#D97706]'
-      : tone === 'danger'
-        ? 'bg-[#FEF2F2] text-[#DC2626]'
-        : tone === 'success'
-          ? 'bg-[#F0FDF4] text-[#16A34A]'
-          : 'bg-[#F8FAFC] text-slate-500'
-
-
-  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${classes}`}>{children}</span>
+function MiniSignal({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'warning' }) {
+  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>{children}</span>
 }
 
-
-function Badge({
-  children,
-  tone,
-}: {
-  children: React.ReactNode
-  tone: 'default' | 'muted'
-}) {
-  const classes =
-    tone === 'muted'
-      ? 'bg-[#F8FAFC] text-slate-600 border-slate-200'
-      : 'bg-[#F0FDFC] text-[#008080] border-[#99F6E4]'
-
-
-  return <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-[12px] font-semibold ${classes}`}>{children}</span>
-}
-
-
-function IconAction({
-  title,
-  icon,
-  onClick,
-  asLink,
-  disabled,
-}: {
-  title: string
-  icon: React.ReactNode
-  onClick?: () => void
-  asLink?: string
-  disabled?: boolean
-}) {
-  const className =
-    'rounded-xl border border-slate-200 bg-white p-2 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
-
-
-  if (asLink) {
-    return (
-      <Link to={asLink} title={title} aria-label={title} className={className}>
-        {icon}
-      </Link>
-    )
-  }
-
-
-  return (
-    <button type="button" title={title} aria-label={title} disabled={disabled} onClick={onClick} className={className}>
-      {icon}
-    </button>
-  )
-}
-
-
-function SectionCard({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <h3 className="mb-4 text-[16px] font-bold text-[#0F172A]">{title}</h3>
-      {children}
-    </section>
-  )
-}
-
-
-function TextField({
-  label,
-  value,
-  onChange,
-  type = 'text',
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  type?: string
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-slate-500">{label}</span>
-      <input
-        dir="rtl"
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-      />
-    </label>
-  )
-}
-
-
-function SelectLikeField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: { value: string; label: string }[]
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-slate-500">{label}</span>
-      <select
-        dir="rtl"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-      >
-        <option value="">בחר</option>
-        {options.map((item) => (
-          <option key={`${label}-${item.value}`} value={item.value}>
-            {item.label}
-          </option>
-        ))}
-      </select>
-    </label>
-  )
-}
-
-
-function DateField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-slate-500">{label}</span>
-      <input
-        type="date"
-        dir="rtl"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-      />
-    </label>
-  )
-}
-
-
-function TextareaField({
-  label,
-  value,
-  onChange,
-}: {
-  label: string
-  value: string
-  onChange: (value: string) => void
-}) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-slate-500">{label}</span>
-      <textarea
-        dir="rtl"
-        rows={4}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-      />
-    </label>
-  )
-}
-
-
-function EmployerSortableTh({ label, sortKey, sortBy, sortDir, onSort }: {
-  label: string; sortKey: string; sortBy: string | null; sortDir: 'asc' | 'desc'; onSort: (k: string) => void
-}) {
+function SortableTh({ label, sortKey, sortBy, sortDir, onSort }: { label: string; sortKey: string; sortBy: string | null; sortDir: 'asc' | 'desc'; onSort: (key: string) => void }) {
   const active = sortBy === sortKey
-  return (
-    <th className="relative cursor-pointer select-none px-4 py-4 hover:bg-slate-100" onClick={() => onSort(sortKey)}>
-      <span className="flex items-center gap-1.5">
-        {label}
-        <span className={`flex flex-col ${active ? 'text-[#008080]' : 'text-slate-400'}`}>
-          <ChevronUp className={`h-3 w-3 -mb-1 ${active && sortDir === 'asc' ? 'text-[#008080]' : 'text-slate-300'}`} />
-          <ChevronDown className={`h-3 w-3 ${active && sortDir === 'desc' ? 'text-[#008080]' : 'text-slate-300'}`} />
-        </span>
-      </span>
-    </th>
-  )
+  return <th className="px-4 py-3"><button type="button" onClick={() => onSort(sortKey)} className="inline-flex items-center gap-1 font-bold hover:text-[#008080]"><span>{label}</span>{active && <ChevronDown className={`h-3.5 w-3.5 ${sortDir === 'asc' ? 'rotate-180' : ''}`} />}</button></th>
 }
 
-
-function TagEditor({
-  label,
-  values,
-  onChange,
-  options = [],
-  placeholder,
-}: {
-  label: string
-  values: string[]
-  onChange: (value: string[]) => void
-  options?: string[]
-  placeholder?: string
-}) {
-  const [input, setInput] = useState('')
-
-
-  const addTag = (rawValue: string) => {
-    const next = rawValue.trim()
-    if (!next) return
-    if (values.includes(next)) {
-      setInput('')
-      return
-    }
-    onChange([...values, next])
-    setInput('')
-  }
-
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-slate-500">{label}</span>
-
-
-      {options.length > 0 && (
-        <select
-          dir="rtl"
-          value=""
-          onChange={(event) => addTag(event.target.value)}
-          className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-        >
-          <option value="">בחר ערך קיים</option>
-          {options.filter((item) => !values.includes(item)).map((item) => (
-            <option key={`${label}-${item}`} value={item}>{item}</option>
-          ))}
-        </select>
-      )}
-
-
-      <div className="flex gap-2">
-        <input
-          dir="rtl"
-          value={input}
-          placeholder={placeholder}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') {
-              event.preventDefault()
-              addTag(input)
-            }
-          }}
-          className="h-10 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10"
-        />
-        <button
-          type="button"
-          onClick={() => addTag(input)}
-          className="rounded-xl bg-[#008080] px-3 py-2 text-[13px] font-bold text-white shadow-sm transition hover:opacity-95"
-        >
-          הוסף
-        </button>
-      </div>
-
-
-      <div className="flex flex-wrap gap-2">
-        {values.length ? values.map((item) => (
-          <button
-            key={`${label}-${item}`}
-            type="button"
-            onClick={() => onChange(values.filter((value) => value !== item))}
-            className="inline-flex items-center gap-1 rounded-full border border-[#99F6E4] bg-[#F0FDFC] px-3 py-1.5 text-[12px] font-semibold text-[#008080] transition hover:border-[#0EA5A4]"
-          >
-            {item}
-            <X className="h-3 w-3" />
-          </button>
-        )) : <span className="text-[12px] text-slate-400">ללא ערכים</span>}
-      </div>
-    </div>
-  )
+function IconAction({ title, icon, onClick, disabled }: { title: string; icon: React.ReactNode; onClick?: () => void; disabled?: boolean }) {
+  return <button type="button" title={title} onClick={onClick} disabled={disabled} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D9D9D9] bg-white text-[#6B6B6B] transition hover:bg-[#F3F4F6] hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-40">{icon}</button>
 }
 
-
-function PrimaryLinkAction({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
-  return (
-    <Link to={to} className="inline-flex items-center gap-2 rounded-xl bg-[#008080] px-3 py-2 text-[13px] font-bold text-white shadow-sm transition hover:opacity-95">
-      {icon}
-      {label}
-    </Link>
-  )
+function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="rounded-[18px] border border-[#D9D9D9] bg-white p-4 shadow-sm"><h3 className="mb-3 text-[14px] font-bold text-[#2D2D2D]">{title}</h3><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div></section>
 }
 
-
-function QuickSheetButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-    >
-      {icon}
-      {label}
-    </button>
-  )
+function LabelValue({ label, value }: { label: string; value: React.ReactNode }) {
+  return <div className="rounded-xl bg-[#F3F4F6] p-3"><div className="text-[12px] font-semibold text-[#6B6B6B]">{label}</div><div className="mt-1 text-[14px] font-bold text-[#2D2D2D]">{value}</div></div>
 }
 
-
-function QuickLinkButton({ href, icon, label, disabled }: { href?: string; icon: React.ReactNode; label: string; disabled?: boolean }) {
-  if (disabled || !href) {
-    return (
-      <button type="button" disabled className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[13px] font-semibold text-slate-400">
-        {icon}
-        {label}
-      </button>
-    )
-  }
-
-
-  return (
-    <a
-      href={href}
-      target={href.startsWith('http') ? '_blank' : undefined}
-      rel={href.startsWith('http') ? 'noreferrer' : undefined}
-      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50"
-    >
-      {icon}
-      {label}
-    </a>
-  )
+function TextField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+  return <label className="grid gap-1 text-[13px] font-semibold text-[#2D2D2D]"><span>{label}</span><input dir="rtl" type={type} value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] outline-none focus:border-[#008080]" /></label>
 }
 
-
-function normalizeDigits(value?: string | null) {
-  return String(value ?? '').replace(/\D/g, '')
+function TextareaField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="grid gap-1 text-[13px] font-semibold text-[#2D2D2D] sm:col-span-2"><span>{label}</span><textarea dir="rtl" value={value} onChange={(event) => onChange(event.target.value)} rows={4} className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] outline-none focus:border-[#008080]" /></label>
 }
 
-
-function isDue(value?: string | null) {
-  if (!value) return false
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return false
-  return date.getTime() <= Date.now()
+function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="grid gap-1 text-[13px] font-semibold text-[#2D2D2D]"><span>{label}</span><input type="date" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] outline-none focus:border-[#008080]" /></label>
 }
 
-
-function formatDate(value?: string | null) {
-  if (!value) return '—'
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '—'
-  return new Intl.DateTimeFormat('he-IL', { year: 'numeric', month: '2-digit', day: '2-digit' }).format(date)
+function SelectLikeField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: Array<{ value: string; label: string }> }) {
+  return <label className="grid gap-1 text-[13px] font-semibold text-[#2D2D2D]"><span>{label}</span><select dir="rtl" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] outline-none focus:border-[#008080]"><option value="">בחרו...</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
 }
-
-
-function toDateInputValue(value?: string | null) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 10)
-}
-
-
-function isValidEmail(value: string) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
-}
-
-
-function isLikelyUrl(value: string) {
-  return /^(https?:\/\/)/i.test(value)
-}
-
-
-function toCsv(rows: Record<string, string>[]) {
-  if (!rows.length) return ''
-  const headers = Object.keys(rows[0])
-  const escapeValue = (value: string) => {
-    if (value.includes('"') || value.includes(',') || value.includes('\n')) {
-      return `"${value.replace(/"/g, '""')}"`
-    }
-    return value
-  }
-  const lines = [
-    headers.join(','),
-    ...rows.map((row) => headers.map((header) => escapeValue(String(row[header] ?? ''))).join(',')),
-  ]
-  return lines.join('\n')
-}
-
-
-
-
-

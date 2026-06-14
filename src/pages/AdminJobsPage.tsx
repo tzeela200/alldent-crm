@@ -12,18 +12,16 @@ import {
   Archive,
   Sparkles,
   Send,
-  ChevronLeft,
-  ChevronUp,
-  ChevronDown,
   X,
   MapPin,
   Building2,
   Users,
-  CalendarDays,
   Clock3,
   CheckCircle2,
   AlertTriangle,
   MessageCircle,
+  Image as ImageIcon,
+  ChevronDown,
 } from 'lucide-react'
 import {
   Shell,
@@ -36,167 +34,148 @@ import {
 } from '@/components/layout/Shell'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { jobStatusColors, getAdminBadgeVariant } from '@/lib/statusColors'
-import { AdminBadge } from '@/components/admin/AdminBadge'
 import { formatDate } from '@/lib/timeAgo'
-import type { Job, JobFilters, DictItem } from '@/types'
-
-
-const ALL_JOB_COLUMNS = [
-  { key: 'job_code',           label: 'קוד משרה' },
-  { key: 'job_title',          label: 'כותרת' },
-  { key: 'job_role',           label: 'תפקיד' },
-  { key: 'job_sub_role',       label: 'תת־תפקיד' },
-  { key: 'account_name',       label: 'ארגון' },
-  { key: 'region_id',          label: 'אזור' },
-  { key: 'city_id',            label: 'עיר' },
-  { key: 'scope',              label: 'היקף' },
-  { key: 'job_status',         label: 'סטטוס' },
-  { key: 'total_applicants',   label: 'מועמדים' },
-  { key: 'last_publish_date',  label: 'פרסום אחרון' },
-  { key: 'created_time',       label: 'נוצרה' },
-  { key: 'days_live',          label: 'ימים באוויר' },
-] as const
-
-const DEFAULT_JOB_COLUMNS = [
-  'job_code', 'job_title', 'job_role', 'account_name',
-  'region_id', 'city_id', 'scope', 'job_status',
-  'total_applicants', 'last_publish_date', 'created_time', 'days_live',
-] as const
-
-
-type ExtendedJobFilters = JobFilters & {
-  account_link?: number
-  city_id?: number
-  scope?: string
-  required_experience?: number
-  applicants_state?: 'with' | 'without'
-  publish_state?: 'published' | 'not_published'
-  job_sub_role?: string
-}
-
-
-type ToastTone = 'success' | 'error' | 'info'
-
-
-type ToastState = {
-  open: boolean
-  message: string
-  tone: ToastTone
-}
-
-
-type QuickSheetState = {
-  open: boolean
-  jobCode: string | null
-}
-
-
-type JobDraft = {
-  job_title: string
-  job_status: number | null
-  job_role: number | null
-  job_sub_role: number | null
-  scope: number | null
-  required_experience: number | null
-  region_id: number | null
-  city_id: number | null
-  address: string
-  salary_range: string
-  job_description: string
-  job_requirements: string
-  job_url: string
-  notes: string
-  account_link: number | null
-}
-
-const EMPTY_JOB_DRAFT: JobDraft = {
-  job_title: '', job_status: null, job_role: null, job_sub_role: null,
-  scope: null, required_experience: null, region_id: null, city_id: null,
-  address: '', salary_range: '', job_description: '', job_requirements: '',
-  job_url: '', notes: '', account_link: null,
-}
-
+import type { Job, DictItem } from '@/types'
 
 const PAGE_SIZE = 20
 
-
-const STATUS_IDS = {
-  draft: 1,
-  waitingApproval: 2,
+const JOB_STATUS_IDS = {
+  new: 1,
+  draft: 2,
   active: 3,
   hold: 4,
-  closed: 5,
-  filled: 6,
-  published: 7,
+  filled: 5,
+  closedSuccess: 6,
+  closedOther: 7,
   cancelled: 8,
   archived: 9,
 }
 
+const PUBLIC_STATUS_IDS = {
+  draft: 1,
+  waitingApproval: 2,
+  published: 3,
+  hidden: 4,
+  archived: 5,
+}
 
-const ACTIVE_STATUS_IDS = [STATUS_IDS.active, STATUS_IDS.published]
-const CLOSED_OR_FILLED_STATUS_IDS = [STATUS_IDS.closed, STATUS_IDS.filled]
-const STALE_DAYS_THRESHOLD = 45
-const MANY_APPLICANTS_THRESHOLD = 10
+const ALL_JOB_COLUMNS = [
+  { key: 'job_code', label: 'קוד' },
+  { key: 'job_title', label: 'כותרת' },
+  { key: 'job_role', label: 'תפקיד' },
+  { key: 'job_sub_role', label: 'תתי־תפקידים' },
+  { key: 'account_name', label: 'ארגון' },
+  { key: 'region_id', label: 'אזור' },
+  { key: 'city_id', label: 'עיר' },
+  { key: 'scope', label: 'היקף' },
+  { key: 'job_status', label: 'סטטוס משרה' },
+  { key: 'public_status', label: 'סטטוס פרסום' },
+  { key: 'total_applicants', label: 'מועמדים' },
+  { key: 'last_publish_date', label: 'פרסום אחרון' },
+  { key: 'updated_timestamp', label: 'עודכן' },
+] as const
 
+const DEFAULT_JOB_COLUMNS = [
+  'job_code',
+  'job_title',
+  'job_role',
+  'job_sub_role',
+  'account_name',
+  'region_id',
+  'city_id',
+  'scope',
+  'job_status',
+  'public_status',
+  'total_applicants',
+] as const
+
+type FilterState = {
+  search?: string
+  job_status?: number
+  public_status?: number
+  job_role?: number
+  job_sub_role?: number[]
+  account_link?: number
+  region_id?: number
+  city_id?: number
+  scope?: number[]
+  required_experience?: number
+  applicants_state?: 'with' | 'without'
+}
+
+type ToastTone = 'success' | 'error' | 'info'
+type ToastState = { open: boolean; message: string; tone: ToastTone }
+type PanelMode = 'view' | 'edit'
+type PanelState = { open: boolean; mode: PanelMode; jobCode: string | null }
+
+type JobDraft = {
+  job_title: string
+  job_status: number | null
+  public_status: number | null
+  job_role: number | null
+  job_sub_role: number[]
+  account_link: number | null
+  region_id: number | null
+  city_id: number | null
+  scope: number[]
+  required_experience: number | null
+  address: string
+  salary_expectation_hourly: string
+  salary_expectation_monthly: string
+  show_salary_public: boolean
+  public_image_url: string
+  job_url: string
+  job_description: string
+  job_requirements: string
+  notes: string
+}
+
+const EMPTY_JOB_DRAFT: JobDraft = {
+  job_title: '',
+  job_status: null,
+  public_status: null,
+  job_role: null,
+  job_sub_role: [],
+  account_link: null,
+  region_id: null,
+  city_id: null,
+  scope: [],
+  required_experience: null,
+  address: '',
+  salary_expectation_hourly: '',
+  salary_expectation_monthly: '',
+  show_salary_public: false,
+  public_image_url: '',
+  job_url: '',
+  job_description: '',
+  job_requirements: '',
+  notes: '',
+}
+
+const EMPTY_JOBS: Job[] = []
 
 export default function AdminJobsPage() {
-  const [filters, setFilters] = useState<ExtendedJobFilters>({})
+  const [filters, setFilters] = useState<FilterState>({})
   const [page, setPage] = useState(0)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
-  const [quickSheet, setQuickSheet] = useState<QuickSheetState>({ open: false, jobCode: null })
-  const [toast, setToast] = useState<ToastState>({ open: false, message: '', tone: 'info' })
-  const [rowActionPending, setRowActionPending] = useState<string | null>(null)
-  const [bulkPending, setBulkPending] = useState(false)
-  const [localJobs, setLocalJobs] = useState<any[]>([])
+  const [visibleColumns, setVisibleColumns] = useState<string[]>([...DEFAULT_JOB_COLUMNS])
   const [sortField, setSortField] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [visibleColumns, setVisibleColumns] = useState<string[]>([...DEFAULT_JOB_COLUMNS])
-  const [colWidths, setColWidths] = useState<Record<string, number>>({})
-  const [editOpen, setEditOpen] = useState(false)
-  const [editJobCode, setEditJobCode] = useState<string | null>(null)
+  const [toast, setToast] = useState<ToastState>({ open: false, message: '', tone: 'info' })
+  const [rowActionPending, setRowActionPending] = useState<string | null>(null)
+  const [panel, setPanel] = useState<PanelState>({ open: false, mode: 'view', jobCode: null })
   const [jobDraft, setJobDraft] = useState<JobDraft>(EMPTY_JOB_DRAFT)
   const [savingEdit, setSavingEdit] = useState(false)
+  const [localJobs, setLocalJobs] = useState<any[]>([])
 
-  const toggleSort = (field: string) => {
-    if (sortField === field) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    } else {
-      setSortField(field)
-      setSortDir('asc')
-    }
-  }
-
-  const toggleColumn = (key: string) => {
-    setVisibleColumns((prev) =>
-      prev.includes(key) ? prev.filter((c) => c !== key) : [...prev, key]
-    )
-  }
-
-  const handleResizeStart = (e: React.MouseEvent, key: string) => {
-    const startX = e.clientX
-    const startWidth = colWidths[key] ?? (e.currentTarget.parentElement as HTMLElement)?.offsetWidth ?? 150
-    const onMove = (me: MouseEvent) => {
-      const newWidth = Math.max(80, startWidth + (me.clientX - startX))
-      setColWidths((prev) => ({ ...prev, [key]: newWidth }))
-    }
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }
-
-  // ── Supabase queries ────────────────────────────────────────────────
   const fetchDict = async (table: string): Promise<DictItem[]> => {
     const { data, error } = await supabase.from(table).select('id,name').order('id')
     if (error) throw error
     return (data ?? []) as DictItem[]
   }
 
-  const { data: allJobs = [] } = useQuery<Job[]>({
-    queryKey: ['jobs'],
+  const { data: allJobs = EMPTY_JOBS, refetch: refetchJobs } = useQuery<Job[]>({
+    queryKey: ['jobs-admin-v4'],
     queryFn: async () => {
       const PAGE = 1000
       const all: Job[] = []
@@ -219,139 +198,179 @@ export default function AdminJobsPage() {
     staleTime: 60_000,
   })
 
-  const { data: accountsMap = new Map<number, string>() } = useQuery<Map<number, string>>({
-    queryKey: ['accounts-name-map'],
+  const { data: accountsList = [] } = useQuery<Array<{ account_id: number; account_name: string | null; phone: string | null; second_phone: string | null }>>({
+    queryKey: ['accounts-for-admin-jobs-v4'],
     queryFn: async () => {
-      const { data } = await supabase.from('accounts').select('account_id,account_name')
-      const map = new Map<number, string>()
-      ;(data ?? []).forEach((a: any) => map.set(Number(a.account_id), String(a.account_name ?? '')))
-      return map
+      const { data, error } = await supabase
+        .from('accounts')
+        .select('account_id,account_name,phone,second_phone')
+        .order('account_name')
+      if (error) throw error
+      return (data ?? []) as Array<{ account_id: number; account_name: string | null; phone: string | null; second_phone: string | null }>
+    },
+    staleTime: 300_000,
+  })
+
+  const { data: contactsList = [] } = useQuery<Array<{ contact_id: number; full_name: string | null; phone: string | null; phone_norm: string | null }>>({
+    queryKey: ['contacts-for-admin-jobs-v4'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('contact').select('contact_id,full_name,phone,phone_norm')
+      if (error) throw error
+      return (data ?? []) as Array<{ contact_id: number; full_name: string | null; phone: string | null; phone_norm: string | null }>
     },
     staleTime: 300_000,
   })
 
   const { data: jobStatuses = [] } = useQuery<DictItem[]>({ queryKey: ['dict_job_statuses'], queryFn: () => fetchDict('dict_job_statuses'), staleTime: 600_000 })
+  const { data: publicStatuses = [] } = useQuery<DictItem[]>({ queryKey: ['dict_public_statuses'], queryFn: () => fetchDict('dict_public_statuses'), staleTime: 600_000 })
   const { data: roles = [] } = useQuery<DictItem[]>({ queryKey: ['dict_roles'], queryFn: () => fetchDict('dict_roles'), staleTime: 600_000 })
+  const { data: subRoles = [] } = useQuery<Array<DictItem & { role_id: number | null }>>({
+    queryKey: ['dict_sub_roles'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_sub_roles').select('id,name,role_id').order('id')
+      if (error) throw error
+      return (data ?? []) as Array<DictItem & { role_id: number | null }>
+    },
+    staleTime: 600_000,
+  })
   const { data: scopes = [] } = useQuery<DictItem[]>({ queryKey: ['dict_scopes'], queryFn: () => fetchDict('dict_scopes'), staleTime: 600_000 })
-  const { data: subRoles = [] } = useQuery<DictItem[]>({ queryKey: ['dict_sub_roles'], queryFn: () => fetchDict('dict_sub_roles'), staleTime: 600_000 })
   const { data: regions = [] } = useQuery<DictItem[]>({ queryKey: ['dict_regions'], queryFn: () => fetchDict('dict_regions'), staleTime: 600_000 })
   const { data: cities = [] } = useQuery<Array<DictItem & { region_id: number | null }>>({
     queryKey: ['dict_cities'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('id')
+      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
       if (error) throw error
       return (data ?? []) as Array<DictItem & { region_id: number | null }>
     },
     staleTime: 600_000,
   })
   const { data: experienceOptions = [] } = useQuery<DictItem[]>({ queryKey: ['dict_experience'], queryFn: () => fetchDict('dict_experience'), staleTime: 600_000 })
-  const { data: accountsList = [] } = useQuery<Array<{ account_id: number; account_name: string | null }>>({
-    queryKey: ['accounts-list-for-jobs'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('accounts').select('account_id,account_name').order('account_name')
-      if (error) throw error
-      return (data ?? []) as Array<{ account_id: number; account_name: string | null }>
-    },
-    staleTime: 300_000,
-  })
-  // ────────────────────────────────────────────────────────────────────
 
-  // Join account_name from accounts map
-  const allJobsWithAccount = useMemo(
-    () => allJobs.map(j => ({
-      ...j,
-      account_name: j.account_link ? accountsMap.get(j.account_link) ?? null : null,
-    })),
-    [allJobs, accountsMap],
-  )
+  const accountsMap = useMemo(() => {
+    const map = new Map<number, { name: string; phone: string | null; second_phone: string | null }>()
+    accountsList.forEach((account) => {
+      map.set(Number(account.account_id), {
+        name: String(account.account_name ?? ''),
+        phone: account.phone ?? null,
+        second_phone: account.second_phone ?? null,
+      })
+    })
+    return map
+  }, [accountsList])
 
-  useEffect(() => {
-    setLocalJobs(allJobsWithAccount)
-  }, [allJobsWithAccount])
+  const contactsMap = useMemo(() => {
+    const map = new Map<number, { name: string; phone: string | null }>()
+    contactsList.forEach((contact) => {
+      map.set(Number(contact.contact_id), {
+        name: String(contact.full_name ?? ''),
+        phone: contact.phone_norm || contact.phone || null,
+      })
+    })
+    return map
+  }, [contactsList])
 
+  const allJobsWithLookups = useMemo(() => {
+    return allJobs.map((job: any) => {
+      const account = job.account_link ? accountsMap.get(Number(job.account_link)) : null
+      const employerContact = job.rel_employer_contact ? contactsMap.get(Number(job.rel_employer_contact)) : null
+      return {
+        ...job,
+        account_name: account?.name ?? null,
+        account_phone: account?.phone ?? account?.second_phone ?? null,
+        employer_contact_name: employerContact?.name ?? null,
+        employer_contact_phone: employerContact?.phone ?? null,
+      }
+    })
+  }, [allJobs, accountsMap, contactsMap])
 
-  useEffect(() => {
-    setPage(0)
-  }, [filters])
-
-
+  useEffect(() => setLocalJobs(allJobsWithLookups), [allJobsWithLookups])
+  useEffect(() => setPage(0), [filters])
   useEffect(() => {
     if (!toast.open) return
-    const timer = window.setTimeout(() => {
-      setToast((prev) => ({ ...prev, open: false }))
-    }, 2600)
+    const timer = window.setTimeout(() => setToast((prev) => ({ ...prev, open: false })), 2600)
     return () => window.clearTimeout(timer)
   }, [toast.open])
 
+  const roleName = (id: number | null | undefined) => roles.find((item) => Number(item.id) === Number(id))?.name ?? '—'
+  const statusName = (id: number | null | undefined) => jobStatuses.find((item) => Number(item.id) === Number(id))?.name ?? '—'
+  const publicStatusName = (id: number | null | undefined) => publicStatuses.find((item) => Number(item.id) === Number(id))?.name ?? '—'
+  const regionName = (id: number | null | undefined) => regions.find((item) => Number(item.id) === Number(id))?.name ?? '—'
+  const cityName = (id: number | null | undefined) => cities.find((item) => Number(item.id) === Number(id))?.name ?? '—'
+  const experienceName = (id: number | null | undefined) => experienceOptions.find((item) => Number(item.id) === Number(id))?.name ?? '—'
+  const scopeName = (id: number | null | undefined) => scopes.find((item) => Number(item.id) === Number(id))?.name ?? '—'
+  const subRoleName = (id: number | null | undefined) => subRoles.find((item) => Number(item.id) === Number(id))?.name ?? '—'
 
-  const roleName = (id: number | null | undefined) => roles.find((item) => item.id === id)?.name ?? '—'
-  const regionName = (id: number | null | undefined) => regions.find((item) => item.id === id)?.name ?? '—'
-  const cityName = (id: number | null | undefined) => cities.find((item) => item.id === id)?.name ?? '—'
-  const experienceName = (id: number | null | undefined) => experienceOptions.find((item) => item.id === id)?.name ?? '—'
-  const statusName = (id: number | null | undefined) => jobStatuses.find((item) => item.id === id)?.name ?? '—'
-  const scopeName = (id: number | null | undefined) => scopes.find((item) => item.id === id)?.name ?? '—'
-  const subRoleName = (id: number | null | undefined) => subRoles.find((item) => item.id === id)?.name ?? '—'
-
+  const normalizeIds = (value: unknown): number[] => {
+    if (Array.isArray(value)) return value.map(Number).filter((id) => Number.isFinite(id) && id > 0)
+    if (value === null || value === undefined || value === '') return []
+    const numeric = Number(value)
+    return Number.isFinite(numeric) && numeric > 0 ? [numeric] : []
+  }
 
   const accountOptions = useMemo(() => {
-    const map = new Map<number, string>()
+    const map = new Map<number, { label: string; count: number }>()
     localJobs.forEach((job) => {
-      if (job.account_link && job.account_name) {
-        map.set(Number(job.account_link), String(job.account_name))
-      }
+      const accountId = Number(job.account_link)
+      if (!accountId || !job.account_name) return
+      const current = map.get(accountId)
+      map.set(accountId, { label: String(job.account_name), count: (current?.count ?? 0) + 1 })
     })
-    return Array.from(map.entries()).map(([value, label]) => ({ value: String(value), label }))
+    return Array.from(map.entries())
+      .sort((a, b) => a[1].label.localeCompare(b[1].label, 'he'))
+      .map(([value, meta]) => ({ value: String(value), label: `${meta.label} (${meta.count})` }))
   }, [localJobs])
 
+  const subRoleOptions = useMemo(() => {
+    if (!filters.job_role) return []
+    return subRoles
+      .filter((subRole) => Number(subRole.role_id) === Number(filters.job_role))
+      .map((subRole) => ({ value: String(subRole.id), label: subRole.name }))
+  }, [subRoles, filters.job_role])
 
-  const subRoleOptions = useMemo(
-    () => subRoles.map((s) => ({ value: String(s.id), label: s.name })),
-    [subRoles],
-  )
-
+  const editSubRoleOptions = useMemo(() => {
+    if (!jobDraft.job_role) return []
+    return subRoles
+      .filter((subRole) => Number(subRole.role_id) === Number(jobDraft.job_role))
+      .map((subRole) => ({ value: String(subRole.id), label: subRole.name }))
+  }, [subRoles, jobDraft.job_role])
 
   const activeCityOptions = useMemo(() => {
-    if (!filters.region_id) return cities.map((city) => ({ value: String(city.id), label: city.name }))
-    return cities
-      .filter((city) => Number(city.region_id) === Number(filters.region_id))
-      .map((city) => ({ value: String(city.id), label: city.name }))
+    const list = filters.region_id ? cities.filter((city) => Number(city.region_id) === Number(filters.region_id)) : cities
+    return list.map((city) => ({ value: String(city.id), label: city.name }))
   }, [cities, filters.region_id])
 
+  const editCityOptions = useMemo(() => {
+    const list = jobDraft.region_id ? cities.filter((city) => Number(city.region_id) === Number(jobDraft.region_id)) : cities
+    return list.map((city) => ({ value: String(city.id), label: city.name }))
+  }, [cities, jobDraft.region_id])
 
   const filteredJobs = useMemo(() => {
     const result = localJobs.filter((job) => {
       const search = String(filters.search ?? '').trim().toLowerCase()
-      const jobCode = String(job.job_code ?? '').toLowerCase()
-      const jobTitle = String(job.job_title ?? '').toLowerCase()
-      const accountName = String(job.account_name ?? '').toLowerCase()
-
-
-      if (search && !jobCode.includes(search) && !jobTitle.includes(search) && !accountName.includes(search)) {
-        return false
-      }
-
-
+      const haystack = [job.job_code, job.job_title, job.account_name, cityName(job.city_id), roleName(job.job_role)]
+        .map((item) => String(item ?? '').toLowerCase())
+        .join(' ')
+      if (search && !haystack.includes(search)) return false
       if (filters.job_status && Number(job.job_status) !== Number(filters.job_status)) return false
+      if (filters.public_status && Number(job.public_status) !== Number(filters.public_status)) return false
       if (filters.job_role && Number(job.job_role) !== Number(filters.job_role)) return false
       if (filters.region_id && Number(job.region_id) !== Number(filters.region_id)) return false
-      if (filters.account_link && Number(job.account_link) !== Number(filters.account_link)) return false
       if (filters.city_id && Number(job.city_id) !== Number(filters.city_id)) return false
-      if (filters.scope && Number(job.scope ?? 0) !== Number(filters.scope)) return false
+      if (filters.account_link && Number(job.account_link) !== Number(filters.account_link)) return false
       if (filters.required_experience && Number(job.required_experience) !== Number(filters.required_experience)) return false
-      if (filters.job_sub_role && Number(job.job_sub_role ?? 0) !== Number(filters.job_sub_role)) return false
-
-
+      if (filters.scope?.length) {
+        const jobScopeIds = normalizeIds(job.scope)
+        if (!filters.scope.some((id) => jobScopeIds.includes(Number(id)))) return false
+      }
+      if (filters.job_sub_role?.length) {
+        const jobSubRoleIds = normalizeIds(job.job_sub_role)
+        if (!filters.job_sub_role.some((id) => jobSubRoleIds.includes(Number(id)))) return false
+      }
       if (filters.applicants_state === 'with' && Number(job.total_applicants ?? 0) <= 0) return false
       if (filters.applicants_state === 'without' && Number(job.total_applicants ?? 0) > 0) return false
-
-
-      const published = isPublished(job)
-      if (filters.publish_state === 'published' && !published) return false
-      if (filters.publish_state === 'not_published' && published) return false
-
-
       return true
     })
+
     if (sortField) {
       result.sort((a, b) => {
         const av = String(a[sortField] ?? '')
@@ -360,376 +379,221 @@ export default function AdminJobsPage() {
       })
     }
     return result
-  }, [filters, localJobs, sortField, sortDir])
-
+  }, [localJobs, filters, sortField, sortDir, cities, roles])
 
   const totalPages = Math.max(1, Math.ceil(filteredJobs.length / PAGE_SIZE))
   const pageData = filteredJobs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
-
-
-  const selectedJobs = filteredJobs.filter((job) => selectedRows.includes(String(job.job_code)))
-  const selectedJob = localJobs.find((job) => String(job.job_code) === quickSheet.jobCode) ?? null
-
+  const selectedJob = localJobs.find((job) => String(job.job_code) === String(panel.jobCode)) ?? null
 
   const kpis = useMemo(() => {
-    const active = filteredJobs.filter((job) => ACTIVE_STATUS_IDS.includes(Number(job.job_status))).length
-    const recent = filteredJobs.filter((job) => isWithinLastDays(job.created_time, 30)).length
-    const withoutApplicants = filteredJobs.filter((job) => Number(job.total_applicants ?? 0) === 0).length
-    const closedOrFilled = filteredJobs.filter((job) => CLOSED_OR_FILLED_STATUS_IDS.includes(Number(job.job_status))).length
-    const stale = filteredJobs.filter((job) => getDaysLive(job) >= STALE_DAYS_THRESHOLD).length
-    const manyApplicants = filteredJobs.filter((job) => Number(job.total_applicants ?? 0) >= MANY_APPLICANTS_THRESHOLD).length
-    const notPublished = filteredJobs.filter((job) => !isPublished(job)).length
+    const activeJobs = filteredJobs.filter((job) => Number(job.job_status) === JOB_STATUS_IDS.active)
+    const publishedJobs = filteredJobs.filter((job) => Number(job.public_status) === PUBLIC_STATUS_IDS.published)
+    const withoutApplicants = filteredJobs.filter((job) => Number(job.total_applicants ?? 0) === 0)
 
+    const byRole = roles
+      .map((role) => ({ id: role.id, name: role.name, count: activeJobs.filter((job) => Number(job.job_role) === Number(role.id)).length }))
+      .filter((item) => item.count > 0)
+      .sort((a, b) => b.count - a.count)
+
+    const byRegion = regions
+      .map((region) => ({ id: region.id, name: region.name, count: activeJobs.filter((job) => Number(job.region_id) === Number(region.id)).length }))
+      .filter((item) => item.count > 0)
+      .sort((a, b) => b.count - a.count)
 
     return {
-      active,
-      recent,
-      withoutApplicants,
-      closedOrFilled,
-      stale,
-      manyApplicants,
-      notPublished,
+      total: filteredJobs.length,
+      active: activeJobs.length,
+      published: publishedJobs.length,
+      withoutApplicants: withoutApplicants.length,
+      byRole,
+      byRegion,
     }
-  }, [filteredJobs])
+  }, [filteredJobs, roles, regions])
 
+  const showToast = (message: string, tone: ToastTone = 'info') => setToast({ open: true, message, tone })
 
-  const showToast = (message: string, tone: ToastTone = 'info') => {
-    setToast({ open: true, message, tone })
+  const toggleSort = (field: string) => {
+    if (sortField === field) setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'))
+    else {
+      setSortField(field)
+      setSortDir('asc')
+    }
   }
 
+  const toggleColumn = (key: string) => {
+    setVisibleColumns((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]))
+  }
 
   const clearFilters = () => {
     setFilters({})
     setSelectedRows([])
   }
 
-
   const toggleRowSelection = (jobCode: string) => {
-    setSelectedRows((prev) =>
-      prev.includes(jobCode) ? prev.filter((item) => item !== jobCode) : [...prev, jobCode],
-    )
+    setSelectedRows((prev) => (prev.includes(jobCode) ? prev.filter((item) => item !== jobCode) : [...prev, jobCode]))
   }
-
 
   const togglePageSelection = () => {
-    const currentPageIds = pageData.map((job) => String(job.job_code))
-    const allSelected = currentPageIds.length > 0 && currentPageIds.every((id) => selectedRows.includes(id))
-
-
-    if (allSelected) {
-      setSelectedRows((prev) => prev.filter((item) => !currentPageIds.includes(item)))
-      return
-    }
-
-
-    setSelectedRows((prev) => Array.from(new Set([...prev, ...currentPageIds])))
+    const ids = pageData.map((job) => String(job.job_code))
+    const allSelected = ids.length > 0 && ids.every((id) => selectedRows.includes(id))
+    setSelectedRows((prev) => (allSelected ? prev.filter((id) => !ids.includes(id)) : Array.from(new Set([...prev, ...ids]))))
   }
 
-
-  const openEditSheet = (job: any) => {
-    setEditJobCode(String(job.job_code))
+  const openPanel = (job: any, mode: PanelMode) => {
+    setPanel({ open: true, mode, jobCode: String(job.job_code) })
     setJobDraft({
       job_title: job.job_title ?? '',
       job_status: job.job_status ?? null,
+      public_status: job.public_status ?? null,
       job_role: job.job_role ?? null,
-      job_sub_role: job.job_sub_role ?? null,
-      scope: job.scope ?? null,
-      required_experience: job.required_experience ?? null,
+      job_sub_role: normalizeIds(job.job_sub_role),
+      account_link: job.account_link ?? null,
       region_id: job.region_id ?? null,
       city_id: job.city_id ?? null,
+      scope: normalizeIds(job.scope),
+      required_experience: job.required_experience ?? null,
       address: job.address ?? '',
-      salary_range: job.salary_range ?? '',
+      salary_expectation_hourly: job.salary_expectation_hourly != null ? String(job.salary_expectation_hourly) : '',
+      salary_expectation_monthly: job.salary_expectation_monthly != null ? String(job.salary_expectation_monthly) : '',
+      show_salary_public: Boolean(job.show_salary_public),
+      public_image_url: job.public_image_url ?? '',
+      job_url: job.job_url ?? '',
       job_description: job.job_description ?? '',
       job_requirements: job.job_requirements ?? '',
-      job_url: job.job_url ?? '',
       notes: job.notes ?? '',
-      account_link: job.account_link ?? null,
     })
-    setEditOpen(true)
   }
 
-  const handleSaveEdit = async () => {
-    if (!editJobCode) return
+  const replaceJob = (jobCode: string, updater: (job: any) => any) => {
+    setLocalJobs((prev) => prev.map((job) => (String(job.job_code) === String(jobCode) ? updater(job) : job)))
+  }
+
+  const saveEdit = async () => {
+    if (!panel.jobCode) return
     setSavingEdit(true)
     try {
       const patch = {
-        job_title: jobDraft.job_title.trim() || null,
+        job_title: cleanText(jobDraft.job_title),
         job_status: jobDraft.job_status,
+        public_status: jobDraft.public_status,
         job_role: jobDraft.job_role,
-        job_sub_role: jobDraft.job_sub_role,
-        scope: jobDraft.scope,
-        required_experience: jobDraft.required_experience,
+        job_sub_role: jobDraft.job_sub_role.length ? jobDraft.job_sub_role : null,
+        account_link: jobDraft.account_link,
         region_id: jobDraft.region_id,
         city_id: jobDraft.city_id,
-        address: jobDraft.address.trim() || null,
-        salary_range: jobDraft.salary_range.trim() || null,
-        job_description: jobDraft.job_description.trim() || null,
-        job_requirements: jobDraft.job_requirements.trim() || null,
-        job_url: jobDraft.job_url.trim() || null,
-        notes: jobDraft.notes.trim() || null,
-        account_link: jobDraft.account_link,
+        scope: jobDraft.scope.length ? jobDraft.scope : null,
+        required_experience: jobDraft.required_experience,
+        address: cleanText(jobDraft.address),
+        salary_expectation_hourly: toNullableNumber(jobDraft.salary_expectation_hourly),
+        salary_expectation_monthly: toNullableNumber(jobDraft.salary_expectation_monthly),
+        show_salary_public: jobDraft.show_salary_public,
+        public_image_url: cleanText(jobDraft.public_image_url),
+        job_url: cleanText(jobDraft.job_url),
+        job_description: cleanText(jobDraft.job_description),
+        job_requirements: cleanText(jobDraft.job_requirements),
+        notes: cleanText(jobDraft.notes),
         updated_timestamp: new Date().toISOString(),
       }
-      const { error } = await supabase.from('job').update(patch).eq('job_code', editJobCode)
+      const { error } = await supabase.from('job').update(patch).eq('job_code', panel.jobCode)
       if (error) throw error
-      replaceJob(editJobCode, (cur: any) => ({ ...cur, ...patch }))
-      setEditOpen(false)
-      showToast('המשרה עודכנה בהצלחה', 'success')
-    } catch {
-      showToast('שגיאה בשמירה', 'error')
+      replaceJob(panel.jobCode, (cur) => ({ ...cur, ...patch }))
+      showToast('המשרה נשמרה בהצלחה', 'success')
+      setPanel((prev) => ({ ...prev, mode: 'view' }))
+    } catch (error) {
+      console.error(error)
+      showToast('שגיאה בשמירה. בדקי שתתי־התפקידים תואמים לתפקיד הראשי', 'error')
     } finally {
       setSavingEdit(false)
     }
   }
 
-  const replaceJob = (jobCode: string, updater: (job: any) => any) => {
-    setLocalJobs((prev) =>
-      prev.map((job) => (String(job.job_code) === String(jobCode) ? updater(job) : job)),
+  const updateJobPatch = async (jobCode: string, patch: Record<string, unknown>, successMessage: string) => {
+    setRowActionPending(jobCode)
+    try {
+      const finalPatch = { ...patch, updated_timestamp: new Date().toISOString() }
+      const { error } = await supabase.from('job').update(finalPatch).eq('job_code', jobCode)
+      if (error) throw error
+      replaceJob(jobCode, (cur) => ({ ...cur, ...finalPatch }))
+      showToast(successMessage, 'success')
+    } catch (error) {
+      console.error(error)
+      showToast('שגיאה בעדכון המשרה', 'error')
+    } finally {
+      setRowActionPending(null)
+    }
+  }
+
+  const publishJob = (job: any) => {
+    updateJobPatch(
+      String(job.job_code),
+      {
+        public_status: PUBLIC_STATUS_IDS.published,
+        last_publish_date: todayIsoDate(),
+        date_website: job.date_website ?? todayIsoDate(),
+        published_at: job.published_at ?? new Date().toISOString(),
+      },
+      'סטטוס הפרסום עודכן למפורסמת',
     )
   }
 
-
-  const performRowAction = async (jobCode: string, callback: () => void) => {
-    try {
-      setRowActionPending(jobCode)
-      callback()
-    } finally {
-      setRowActionPending(null)
-    }
-  }
-
-
-  const handlePublish = async (jobCode: string) => {
-    const job = localJobs.find((item) => String(item.job_code) === String(jobCode))
-    if (!job) return
-    if (!canPublish(job)) {
-      showToast('לא ניתן לפרסם משרה ללא שדות החובה המינימליים', 'error')
-      return
-    }
-    setRowActionPending(jobCode)
-    try {
-      const patch = {
-        job_status: STATUS_IDS.published,
-        last_publish_date: todayIsoDate(),
-        date_website: job.date_website ?? todayIsoDate(),
-        updated_timestamp: new Date().toISOString(),
-      }
-      const { error } = await supabase.from('job').update(patch).eq('job_code', jobCode)
-      if (error) throw error
-      replaceJob(jobCode, (cur) => ({ ...cur, ...patch }))
-      showToast('המשרה פורסמה בהצלחה', 'success')
-    } catch {
-      showToast('שגיאה בשמירה', 'error')
-    } finally {
-      setRowActionPending(null)
-    }
-  }
-
-  const handleClose = async (jobCode: string) => {
-    setRowActionPending(jobCode)
-    try {
-      const patch = { job_status: STATUS_IDS.closed, updated_timestamp: new Date().toISOString() }
-      const { error } = await supabase.from('job').update(patch).eq('job_code', jobCode)
-      if (error) throw error
-      replaceJob(jobCode, (cur) => ({ ...cur, ...patch }))
-      showToast('המשרה נסגרה', 'success')
-    } catch {
-      showToast('שגיאה בשמירה', 'error')
-    } finally {
-      setRowActionPending(null)
-    }
-  }
-
-  const handleFill = async (jobCode: string) => {
-    setRowActionPending(jobCode)
-    try {
-      const patch = { job_status: STATUS_IDS.filled, updated_timestamp: new Date().toISOString() }
-      const { error } = await supabase.from('job').update(patch).eq('job_code', jobCode)
-      if (error) throw error
-      replaceJob(jobCode, (cur) => ({ ...cur, ...patch }))
-      showToast('המשרה סומנה כמאוישת', 'success')
-    } catch {
-      showToast('שגיאה בשמירה', 'error')
-    } finally {
-      setRowActionPending(null)
-    }
-  }
-
-  const handleArchive = async (jobCode: string) => {
-    setRowActionPending(jobCode)
-    try {
-      const patch = { job_status: STATUS_IDS.archived, updated_timestamp: new Date().toISOString() }
-      const { error } = await supabase.from('job').update(patch).eq('job_code', jobCode)
-      if (error) throw error
-      replaceJob(jobCode, (cur) => ({ ...cur, ...patch }))
-      showToast('המשרה הועברה לארכיון', 'success')
-    } catch {
-      showToast('שגיאה בשמירה', 'error')
-    } finally {
-      setRowActionPending(null)
-    }
-  }
-
-  const handleDuplicate = async (jobCode: string) => {
-    const sourceJob = localJobs.find((item) => String(item.job_code) === String(jobCode))
-    if (!sourceJob) return
-    const nextCode = generateDuplicateCode(sourceJob.job_code, localJobs.map((item) => String(item.job_code)))
+  const duplicateJob = async (job: any) => {
+    const jobCode = String(job.job_code)
+    const nextCode = generateDuplicateCode(jobCode, localJobs.map((item) => String(item.job_code)))
     setRowActionPending(jobCode)
     try {
       const newJob = {
-        ...sourceJob,
+        ...job,
         job_code: nextCode,
-        job_status: STATUS_IDS.draft,
+        job_status: JOB_STATUS_IDS.draft,
+        public_status: PUBLIC_STATUS_IDS.draft,
         total_applicants: 0,
         last_publish_date: null,
         date_facebook: null,
         date_website: null,
         date_whatsapp: null,
+        published_at: null,
+        unpublished_at: null,
         created_time: new Date().toISOString(),
         updated_timestamp: new Date().toISOString(),
       }
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { account_name: _an, ...dbJob } = newJob
+      const { account_name, account_phone, employer_contact_name, employer_contact_phone, ...dbJob } = newJob
       const { error } = await supabase.from('job').insert(dbJob)
       if (error) throw error
       setLocalJobs((prev) => [newJob, ...prev])
-      showToast('המשרה שוכפלה בהצלחה', 'success')
-    } catch {
+      showToast(`המשרה שוכפלה: ${nextCode}`, 'success')
+    } catch (error) {
+      console.error(error)
       showToast('שגיאה בשכפול', 'error')
     } finally {
       setRowActionPending(null)
     }
   }
 
-
-  const handleQuickStatusChange = (jobCode: string, nextStatus: number) => {
-    const current = localJobs.find((job) => String(job.job_code) === String(jobCode))
-    if (!current) return
-
-
-    const allowed = getAllowedStatusTransitions(current.job_status).includes(Number(nextStatus))
-    if (!allowed) {
-      showToast('המעבר בין הסטטוסים אינו חוקי', 'error')
+  const openWhatsApp = (job: any) => {
+    const phone = normalizePhoneForWhatsapp(job.employer_contact_phone || job.account_phone)
+    if (!phone) {
+      showToast('אין נייד מגייס/ארגון לפתיחת וואטסאפ', 'error')
       return
     }
-
-
-    replaceJob(jobCode, (job) => ({
-      ...job,
-      job_status: nextStatus,
-      updated_timestamp: new Date().toISOString(),
-    }))
-
-
-    showToast(`הסטטוס עודכן ל־${statusName(nextStatus)}`, 'success')
+    const text = encodeURIComponent(`שלום, לגבי משרה ${job.job_code} - ${job.job_title ?? ''}`)
+    window.open(`https://wa.me/${phone}?text=${text}`, '_blank', 'noopener,noreferrer')
   }
 
-
-  const handleBulkArchive = async () => {
-    if (!selectedRows.length) {
-      showToast('יש לבחור לפחות משרה אחת', 'error')
-      return
-    }
-
-
-    try {
-      setBulkPending(true)
-      setLocalJobs((prev) =>
-        prev.map((job) =>
-          selectedRows.includes(String(job.job_code))
-            ? { ...job, job_status: STATUS_IDS.archived, updated_timestamp: new Date().toISOString() }
-            : job,
-        ),
-      )
-      showToast(`הועברו לארכיון ${selectedRows.length} משרות`, 'success')
-      setSelectedRows([])
-    } finally {
-      setBulkPending(false)
-    }
-  }
-
-
-  const handleBulkPublish = async () => {
-    if (!selectedRows.length) {
-      showToast('יש לבחור לפחות משרה אחת', 'error')
-      return
-    }
-
-
-    const publishable = selectedJobs.filter((job) => canPublish(job))
-    if (!publishable.length) {
-      showToast('לא נמצאו משרות תקינות לפרסום', 'error')
-      return
-    }
-
-
-    try {
-      setBulkPending(true)
-      setLocalJobs((prev) =>
-        prev.map((job) =>
-          selectedRows.includes(String(job.job_code)) && canPublish(job)
-            ? {
-                ...job,
-                job_status: STATUS_IDS.published,
-                last_publish_date: todayIsoDate(),
-                date_website: job.date_website ?? todayIsoDate(),
-                updated_timestamp: new Date().toISOString(),
-              }
-            : job,
-        ),
-      )
-      showToast(`פורסמו ${publishable.length} משרות`, 'success')
-      setSelectedRows([])
-    } finally {
-      setBulkPending(false)
-    }
-  }
-
-
-  const handleBulkStatusChange = async (nextStatus: number) => {
-    if (!selectedRows.length) {
-      showToast('יש לבחור לפחות משרה אחת', 'error')
-      return
-    }
-
-
-    try {
-      setBulkPending(true)
-      setLocalJobs((prev) =>
-        prev.map((job) =>
-          selectedRows.includes(String(job.job_code)) &&
-          getAllowedStatusTransitions(job.job_status).includes(Number(nextStatus))
-            ? { ...job, job_status: Number(nextStatus), updated_timestamp: new Date().toISOString() }
-            : job,
-        ),
-      )
-      showToast(`עודכן סטטוס עבור משרות נבחרות`, 'success')
-      setSelectedRows([])
-    } finally {
-      setBulkPending(false)
-    }
-  }
-
-
-  const handleExportCsv = () => {
+  const exportCsv = () => {
     const rows = filteredJobs.map((job) => ({
       'קוד משרה': job.job_code ?? '',
       כותרת: job.job_title ?? '',
       תפקיד: roleName(job.job_role),
-      'תת־תפקיד': subRoleName(job.job_sub_role),
+      'תתי־תפקידים': namesFromIds(normalizeIds(job.job_sub_role), subRoleName),
       ארגון: job.account_name ?? '',
-      'אזור / עיר': `${regionName(job.region_id)} / ${cityName(job.city_id)}`,
-      היקף: scopeName(job.scope),
-      סטטוס: statusName(job.job_status),
+      אזור: regionName(job.region_id),
+      עיר: cityName(job.city_id),
+      היקף: namesFromIds(normalizeIds(job.scope), scopeName),
+      'סטטוס משרה': statusName(job.job_status),
+      'סטטוס פרסום': publicStatusName(job.public_status),
       מועמדים: Number(job.total_applicants ?? 0),
       'פרסום אחרון': job.last_publish_date ?? '',
-      'תאריך יצירה': job.created_time ? formatDate(job.created_time) : '',
-      'ימים באוויר': getDaysLive(job),
-      שכר: job.salary_range ?? '',
-      'ניסיון נדרש': experienceName(job.required_experience),
     }))
-
-
     const csv = buildCsv(rows)
     const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = window.URL.createObjectURL(blob)
@@ -740,14 +604,16 @@ export default function AdminJobsPage() {
     link.click()
     document.body.removeChild(link)
     window.URL.revokeObjectURL(url)
-    showToast('הייצוא הושלם בהצלחה', 'success')
+    showToast('הייצוא הושלם', 'success')
   }
 
+  const selectedPageIds = pageData.map((job) => String(job.job_code))
+  const pageFullySelected = selectedPageIds.length > 0 && selectedPageIds.every((id) => selectedRows.includes(id))
 
   return (
     <Shell
       title="משרות"
-      subtitle={`ניהול כלל המשרות והסטטוסים במערכת • ${filteredJobs.length} תוצאות`}
+      subtitle={`ניהול כלל המשרות במערכת • ${filteredJobs.length} תוצאות`}
       icon={Briefcase}
       actions={
         <div className="flex flex-wrap items-center gap-2">
@@ -762,517 +628,128 @@ export default function AdminJobsPage() {
                 {ALL_JOB_COLUMNS.map((col) => (
                   <label key={col.key} className="flex items-center justify-between rounded-xl border border-[#D9D9D9] px-3 py-2 text-[13px]">
                     <span>{col.label}</span>
-                    <input
-                      type="checkbox"
-                      checked={visibleColumns.includes(col.key)}
-                      onChange={() => toggleColumn(col.key)}
-                      className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]"
-                    />
+                    <input type="checkbox" checked={visibleColumns.includes(col.key)} onChange={() => toggleColumn(col.key)} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" />
                   </label>
                 ))}
               </div>
             </div>
           </details>
-          <ActionButton variant="ghost" icon={RefreshCw} onClick={() => showToast('הרשימה רועננה', 'success')}>
+
+          <ActionButton variant="ghost" icon={RefreshCw} onClick={() => { refetchJobs(); showToast('הרשימה רועננה', 'success') }}>
             רענון
           </ActionButton>
-          <ActionButton variant="ghost" icon={Download} onClick={handleExportCsv}>
-            ייצוא
-          </ActionButton>
+          <ActionButton variant="ghost" icon={Download} onClick={exportCsv}>ייצוא</ActionButton>
           <Link to="/admin/jobs/new">
-            <ActionButton variant="primary" icon={Plus}>
-              משרה חדשה
-            </ActionButton>
+            <ActionButton variant="primary" icon={Plus}>משרה חדשה</ActionButton>
           </Link>
         </div>
       }
     >
       <div dir="rtl" className="min-h-screen bg-[#F3F4F6] font-['Heebo'] text-[#2D2D2D]">
         <div className="space-y-6">
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-7">
-            <KpiCard
-              label="משרות פעילות"
-              value={kpis.active}
-              hint="פעילה או פורסמה"
-              onClick={() => setFilters((prev) => ({ ...prev, job_status: STATUS_IDS.active }))}
-            />
-            <KpiCard
-              label="משרות חדשות"
-              value={kpis.recent}
-              hint="נפתחו ב־30 יום"
-              onClick={() => showToast('המונה מחושב לפי 30 הימים האחרונים', 'info')}
-            />
-            <KpiCard
-              label="ללא מועמדים"
-              value={kpis.withoutApplicants}
-              hint="דורש פעולה"
-              tone="warning"
-              onClick={() => setFilters((prev) => ({ ...prev, applicants_state: 'without' }))}
-            />
-            <KpiCard
-              label="סגורות / מאוישות"
-              value={kpis.closedOrFilled}
-              hint="סטטוס סופי"
-              tone="success"
-              onClick={() => showToast('מונה משרות בסטטוס סגור או אויש', 'info')}
-            />
-            <KpiCard
-              label="משרות ותיקות"
-              value={kpis.stale}
-              hint={`מעל ${STALE_DAYS_THRESHOLD} ימים`}
-              tone="warning"
-              onClick={() => showToast('משרות ותיקות מסומנות גם בטבלה', 'info')}
-            />
-            <KpiCard
-              label="עם הרבה מועמדים"
-              value={kpis.manyApplicants}
-              hint={`מעל ${MANY_APPLICANTS_THRESHOLD} מועמדים`}
-              tone="default"
-              onClick={() => setFilters((prev) => ({ ...prev, applicants_state: 'with' }))}
-            />
-            <KpiCard
-              label="לא מפורסמות"
-              value={kpis.notPublished}
-              hint="ללא תאריך הפצה"
-              tone="warning"
-              onClick={() => setFilters((prev) => ({ ...prev, publish_state: 'not_published' }))}
-            />
+          <section className="grid grid-cols-1 gap-4 xl:grid-cols-6">
+            <KpiCard label="סה״כ משרות" value={kpis.total} hint="לפי הסינון הנוכחי" />
+            <KpiCard label="משרות פעילות" value={kpis.active} hint="job_status = פעילה" tone="success" onClick={() => setFilters((prev) => ({ ...prev, job_status: JOB_STATUS_IDS.active }))} />
+            <KpiCard label="מפורסמות" value={kpis.published} hint="public_status = מפורסמת" onClick={() => setFilters((prev) => ({ ...prev, public_status: PUBLIC_STATUS_IDS.published }))} />
+            <KpiCard label="ללא מועמדים" value={kpis.withoutApplicants} hint="דורש בדיקה" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, applicants_state: 'without' }))} />
+            <ListKpiCard title="משרות פעילות לפי תפקיד" items={kpis.byRole.slice(0, 6)} empty="אין פעילות" onItemClick={(id) => setFilters((prev) => ({ ...prev, job_role: Number(id), job_sub_role: undefined }))} />
+            <ListKpiCard title="משרות פעילות לפי אזור" items={kpis.byRegion.slice(0, 6)} empty="אין פעילות" onItemClick={(id) => setFilters((prev) => ({ ...prev, region_id: Number(id), city_id: undefined }))} />
           </section>
 
-
           <Toolbar>
-            <div>
-              <div className="mb-4 flex flex-wrap items-center gap-2">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F3F3] text-[#008080]">
-                  <Briefcase className="h-4 w-4" />
-                </div>
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F3F3] text-[#008080]"><Briefcase className="h-4 w-4" /></div>
                 <h2 className="text-[15px] font-bold text-[#2D2D2D]">חיפוש וסינון</h2>
               </div>
 
-
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
-                <SearchBar
-                  value={filters.search ?? ''}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
-                  placeholder="חיפוש לפי קוד משרה או כותרת"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.job_status ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      job_status: value ? Number(value) : undefined,
-                    }))
-                  }
-                  options={jobStatuses.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="סטטוס"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.job_role ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      job_role: value ? Number(value) : undefined,
-                    }))
-                  }
-                  options={roles.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="תפקיד"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.job_sub_role ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      job_sub_role: value || undefined,
-                    }))
-                  }
-                  options={subRoleOptions}
-                  placeholder="תת־תפקיד"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.region_id ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      region_id: value ? Number(value) : undefined,
-                      city_id: undefined,
-                    }))
-                  }
-                  options={regions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="אזור"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.city_id ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      city_id: value ? Number(value) : undefined,
-                    }))
-                  }
-                  options={activeCityOptions}
-                  placeholder="עיר"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.account_link ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      account_link: value ? Number(value) : undefined,
-                    }))
-                  }
-                  options={accountOptions}
-                  placeholder="ארגון"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.scope ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      scope: value || undefined,
-                    }))
-                  }
-                  options={scopes.map((item) => ({ value: item.name, label: item.name }))}
-                  placeholder="היקף משרה"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.required_experience ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      required_experience: value ? Number(value) : undefined,
-                    }))
-                  }
-                  options={experienceOptions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="ניסיון נדרש"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.applicants_state ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      applicants_state: (value as 'with' | 'without') || undefined,
-                    }))
-                  }
-                  options={[
-                    { value: 'with', label: 'עם מועמדים' },
-                    { value: 'without', label: 'ללא מועמדים' },
-                  ]}
-                  placeholder="מצב מועמדים"
-                />
-
-
-                <SelectFilter
-                  value={String(filters.publish_state ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      publish_state: (value as 'published' | 'not_published') || undefined,
-                    }))
-                  }
-                  options={[
-                    { value: 'published', label: 'מפורסמות' },
-                    { value: 'not_published', label: 'לא מפורסמות' },
-                  ]}
-                  placeholder="מצב פרסום"
-                />
+                <SearchBar value={filters.search ?? ''} onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))} placeholder="חיפוש לפי קוד, כותרת, ארגון או עיר" />
+                <SelectFilter value={String(filters.job_status ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, job_status: value ? Number(value) : undefined }))} options={jobStatuses.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סטטוס משרה" />
+                <SelectFilter value={String(filters.public_status ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, public_status: value ? Number(value) : undefined }))} options={publicStatuses.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סטטוס פרסום" />
+                <SelectFilter value={String(filters.job_role ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, job_role: value ? Number(value) : undefined, job_sub_role: undefined }))} options={roles.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="תפקיד" />
+                <MultiSelectFilter values={filters.job_sub_role ?? []} onChange={(values) => setFilters((prev) => ({ ...prev, job_sub_role: values.length ? values : undefined }))} options={subRoleOptions} placeholder={filters.job_role ? 'תתי־תפקידים' : 'בחרי קודם תפקיד'} disabled={!filters.job_role} />
+                <SelectFilter value={String(filters.account_link ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_link: value ? Number(value) : undefined }))} options={accountOptions} placeholder="ארגון" />
+                <SelectFilter value={String(filters.region_id ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, region_id: value ? Number(value) : undefined, city_id: undefined }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="אזור" />
+                <SelectFilter value={String(filters.city_id ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, city_id: value ? Number(value) : undefined }))} options={activeCityOptions} placeholder="עיר" />
+                <MultiSelectFilter values={filters.scope ?? []} onChange={(values) => setFilters((prev) => ({ ...prev, scope: values.length ? values : undefined }))} options={scopes.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="היקף משרה" />
+                <SelectFilter value={String(filters.required_experience ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, required_experience: value ? Number(value) : undefined }))} options={experienceOptions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="ניסיון נדרש" />
+                <SelectFilter value={String(filters.applicants_state ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, applicants_state: (value as 'with' | 'without') || undefined }))} options={[{ value: 'with', label: 'עם מועמדים' }, { value: 'without', label: 'ללא מועמדים' }]} placeholder="מצב מועמדים" />
               </div>
 
-
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#D9D9D9] pt-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#D9D9D9] pt-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <InfoPill label={`סה״כ תוצאות: ${filteredJobs.length}`} />
+                  <InfoPill label={`פעילות: ${kpis.active}`} tone="success" />
+                  <InfoPill label={`מפורסמות: ${kpis.published}`} />
                   <InfoPill label={`ללא מועמדים: ${kpis.withoutApplicants}`} tone="warning" />
-                  <InfoPill label={`לא מפורסמות: ${kpis.notPublished}`} tone="warning" />
                 </div>
-
-
-                <div className="flex flex-wrap gap-2">
-                  {Object.values(filters).some(Boolean) && (
-                    <ActionButton variant="ghost" onClick={clearFilters}>
-                      נקה פילטרים
-                    </ActionButton>
-                  )}
-                </div>
+                {Object.values(filters).some(Boolean) && <ActionButton variant="ghost" onClick={clearFilters}>נקה פילטרים</ActionButton>}
               </div>
             </div>
           </Toolbar>
 
-
-          {selectedRows.length > 0 && (
-            <Toolbar>
-              <div className="rounded-[18px] border border-[#D97706]/20 bg-[#FFFBEB] p-4 shadow-sm">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="rounded-full bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">
-                      נבחרו {selectedRows.length} משרות
-                    </span>
-                    <span className="text-[13px] font-medium text-[#6B6B6B]">
-                      פעולות מרובות על הרשומות המסומנות
-                    </span>
-                  </div>
-
-
-                  <div className="flex flex-wrap gap-2">
-                    <SmallActionButton onClick={handleBulkArchive} disabled={bulkPending}>
-                      {bulkPending ? 'מעדכן...' : 'ארכוב'}
-                    </SmallActionButton>
-
-
-                    <SmallActionButton onClick={() => handleBulkPublish()} disabled={bulkPending}>
-                      פרסום מרובה
-                    </SmallActionButton>
-
-
-                    <select
-                      dir="rtl"
-                      defaultValue=""
-                      onChange={(event) => {
-                        const nextStatus = Number(event.target.value)
-                        if (!nextStatus) return
-                        handleBulkStatusChange(nextStatus)
-                        event.currentTarget.value = ''
-                      }}
-                      className="h-10 rounded-full border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none focus:border-[#008080]"
-                    >
-                      <option value="">שינוי סטטוס מרובה</option>
-                      {jobStatuses.map((item) => (
-                        <option key={item.id} value={item.id}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
-
-
-                    <SmallActionButton onClick={handleExportCsv}>ייצוא</SmallActionButton>
-                  </div>
-                </div>
-              </div>
-            </Toolbar>
-          )}
-
-
           <Toolbar>
             {localJobs.length === 0 ? (
-              <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8 shadow-sm">
-                <EmptyState
-                  icon={Briefcase}
-                  title="אין משרות במערכת"
-                  description="כאשר ייווצרו משרות הן יוצגו כאן במסך הניהול."
-                />
-              </div>
+              <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8"><EmptyState icon={Briefcase} title="אין משרות במערכת" description="כאשר ייווצרו משרות הן יוצגו כאן." /></div>
             ) : pageData.length === 0 ? (
-              <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8 shadow-sm">
-                <EmptyState
-                  icon={Briefcase}
-                  title="לא נמצאו תוצאות"
-                  description="שנו את תנאי הסינון כדי לראות משרות רלוונטיות."
-                />
-              </div>
+              <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8"><EmptyState icon={Briefcase} title="לא נמצאו תוצאות" description="שני את תנאי הסינון." /></div>
             ) : (
-              <div className="overflow-hidden rounded-[18px] border border-[#D9D9D9] bg-white">
+              <div className="overflow-hidden rounded-[18px] border border-[#D9D9D9] bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="min-w-[1900px] w-full border-collapse text-right text-[14px]">
-                    <thead className="bg-[#F3F4F6]">
-                      <tr className="border-b border-[#D9D9D9] text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B]">
-                        <th className="px-4 py-3">
-                          <input
-                            type="checkbox"
-                            checked={pageData.length > 0 && pageData.every((job) => selectedRows.includes(String(job.job_code)))}
-                            onChange={togglePageSelection}
-                            className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]"
-                          />
-                        </th>
-                        {visibleColumns.includes('job_code') && <SortableTh label="קוד משרה" sortKey="job_code" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} width={colWidths['job_code']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('job_title') && <SortableTh label="כותרת" sortKey="job_title" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} width={colWidths['job_title']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('job_role') && <PlainJobTh label="תפקיד" colKey="job_role" width={colWidths['job_role']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('job_sub_role') && <PlainJobTh label="תת־תפקיד" colKey="job_sub_role" width={colWidths['job_sub_role']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('account_name') && <PlainJobTh label="ארגון" colKey="account_name" width={colWidths['account_name']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('region_id') && <SortableTh label="אזור" sortKey="region_id" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} width={colWidths['region_id']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('city_id') && <PlainJobTh label="עיר" colKey="city_id" width={colWidths['city_id']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('scope') && <PlainJobTh label="היקף" colKey="scope" width={colWidths['scope']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('job_status') && <SortableTh label="סטטוס" sortKey="job_status" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} width={colWidths['job_status']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('total_applicants') && <PlainJobTh label="מועמדים" colKey="total_applicants" width={colWidths['total_applicants']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('last_publish_date') && <PlainJobTh label="פרסום אחרון" colKey="last_publish_date" width={colWidths['last_publish_date']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('created_time') && <SortableTh label="נוצרה" sortKey="created_time" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} width={colWidths['created_time']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('days_live') && <PlainJobTh label="ימים באוויר" colKey="days_live" width={colWidths['days_live']} onResizeStart={handleResizeStart} />}
-                        <th className="px-3 py-3">פעולות</th>
+                  <table className="w-full min-w-[1680px] border-collapse text-right text-[13px]">
+                    <thead className="bg-[#F9FAFB]">
+                      <tr className="border-b border-[#D9D9D9] text-[12px] font-bold text-[#6B6B6B]">
+                        <th className="w-10 px-3 py-3"><input type="checkbox" checked={pageFullySelected} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
+                        {visibleColumns.includes('job_code') && <SortableTh label="קוד" sortKey="job_code" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('job_title') && <SortableTh label="כותרת" sortKey="job_title" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('job_role') && <PlainTh label="תפקיד" />}
+                        {visibleColumns.includes('job_sub_role') && <PlainTh label="תתי־תפקידים" />}
+                        {visibleColumns.includes('account_name') && <PlainTh label="ארגון" />}
+                        {visibleColumns.includes('region_id') && <PlainTh label="אזור" />}
+                        {visibleColumns.includes('city_id') && <PlainTh label="עיר" />}
+                        {visibleColumns.includes('scope') && <PlainTh label="היקף" />}
+                        {visibleColumns.includes('job_status') && <PlainTh label="סטטוס משרה" />}
+                        {visibleColumns.includes('public_status') && <PlainTh label="סטטוס פרסום" />}
+                        {visibleColumns.includes('total_applicants') && <PlainTh label="מועמדים" />}
+                        {visibleColumns.includes('last_publish_date') && <PlainTh label="פרסום אחרון" />}
+                        {visibleColumns.includes('updated_timestamp') && <PlainTh label="עודכן" />}
+                        <th className="w-[250px] px-3 py-3">פעולות</th>
                       </tr>
                     </thead>
-
-
-                    <tbody className="divide-y divide-[#F3F4F6] bg-white">
+                    <tbody className="divide-y divide-[#F3F4F6]">
                       {pageData.map((job) => {
                         const jobCode = String(job.job_code)
                         const selected = selectedRows.includes(jobCode)
-                        const publishDisabled = !canPublish(job) || isPublished(job)
-                        const fillDisabled = CLOSED_OR_FILLED_STATUS_IDS.includes(Number(job.job_status))
-                        const stale = getDaysLive(job) >= STALE_DAYS_THRESHOLD
-                        const noApplicants = Number(job.total_applicants ?? 0) === 0
-
-
                         return (
-                          <tr
-                            key={jobCode}
-                            className={`text-[14px] font-medium text-[#2D2D2D] transition ${
-                              selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#F9FAFB]'
-                            }`}
-                          >
-                            <td className="px-4 py-3">
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={() => toggleRowSelection(jobCode)}
-                                className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]"
-                              />
-                            </td>
-
-
-                            {visibleColumns.includes('job_code') && (
-                              <td className="px-4 py-3">
-                                <div className="space-y-1">
-                                  <Link
-                                    to={`/jobs/${jobCode}`}
-                                    className="font-mono text-[14px] font-bold text-[#008080] hover:underline"
-                                  >
-                                    {job.job_code}
-                                  </Link>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {noApplicants && <MiniSignal tone="warning">ללא מועמדים</MiniSignal>}
-                                    {stale && <MiniSignal tone="warning">משרה ותיקה</MiniSignal>}
-                                    {!isPublished(job) && <MiniSignal tone="muted">לא פורסמה</MiniSignal>}
-                                  </div>
-                                </div>
-                              </td>
-                            )}
-                            {visibleColumns.includes('job_title') && (
-                              <td className="px-4 py-3">
-                                <div className="max-w-[240px]">
-                                  <div className="font-semibold text-[#2D2D2D]">{job.job_title ?? '—'}</div>
-                                </div>
-                              </td>
-                            )}
-                            {visibleColumns.includes('job_role') && <td className="px-4 py-3">{roleName(job.job_role)}</td>}
-                            {visibleColumns.includes('job_sub_role') && (
-                              <td className="px-4 py-3">
-                                {job.job_sub_role ? (
-                                  <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#2D2D2D]">
-                                    {subRoleName(job.job_sub_role)}
-                                  </span>
-                                ) : (
-                                  <span className="text-slate-400">—</span>
-                                )}
-                              </td>
-                            )}
-                            {visibleColumns.includes('account_name') && (
-                              <td className="px-4 py-3">
-                                {job.account_link ? (
-                                  <Link
-                                    to={`/employers/${job.account_link}`}
-                                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#008080] hover:bg-[#F3F4F6]"
-                                  >
-                                    <Building2 className="h-3.5 w-3.5" />
-                                    {job.account_name ?? '—'}
-                                  </Link>
-                                ) : (
-                                  <span className="text-slate-400">—</span>
-                                )}
-                              </td>
-                            )}
-                            {visibleColumns.includes('region_id') && <td className="px-4 py-3">{regionName(job.region_id)}</td>}
-                            {visibleColumns.includes('city_id') && <td className="px-4 py-3">{cityName(job.city_id)}</td>}
-                            {visibleColumns.includes('scope') && <td className="px-4 py-3">{scopeName(job.scope)}</td>}
-                            {visibleColumns.includes('job_status') && (
-                              <td className="px-3">
-                                <AdminBadge {...getAdminBadgeVariant(jobStatusColors, job.job_status)} />
-                              </td>
-                            )}
-                            {visibleColumns.includes('total_applicants') && (
-                              <td className="px-4 py-3">
-                                <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">
-                                  {Number(job.total_applicants ?? 0)}
-                                </span>
-                              </td>
-                            )}
-                            {visibleColumns.includes('last_publish_date') && (
-                              <td className="px-4 py-3">
-                                {job.last_publish_date ? (
-                                  <div className="space-y-1">
-                                    <div>{formatDate(job.last_publish_date)}</div>
-                                    <div className="text-[12px] text-[#6B6B6B]">{distributionLabel(job)}</div>
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400">לא פורסמה</span>
-                                )}
-                              </td>
-                            )}
-                            {visibleColumns.includes('created_time') && (
-                              <td className="px-4 py-3">
-                                {job.created_time ? formatDate(job.created_time) : '—'}
-                              </td>
-                            )}
-                            {visibleColumns.includes('days_live') && (
-                              <td className="px-4 py-3">
-                                <div className="inline-flex items-center gap-1.5 rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#2D2D2D]">
-                                  <Clock3 className="h-3.5 w-3.5" />
-                                  {getDaysLive(job)}
-                                </div>
-                              </td>
-                            )}
-
-
-                            <td className="px-4 py-3">
+                          <tr key={jobCode} className={`transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#FAFAF7]'}`}>
+                            <td className="px-3 py-3"><input type="checkbox" checked={selected} onChange={() => toggleRowSelection(jobCode)} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></td>
+                            {visibleColumns.includes('job_code') && <td className="px-3 py-3"><button type="button" onClick={() => openPanel(job, 'view')} className="font-mono font-bold text-[#008080] hover:underline">{job.job_code}</button></td>}
+                            {visibleColumns.includes('job_title') && <td className="max-w-[230px] px-3 py-3 font-semibold text-[#2D2D2D]">{job.job_title ?? '—'}</td>}
+                            {visibleColumns.includes('job_role') && <td className="px-3 py-3"><RoleBadge roleId={Number(job.job_role)} label={roleName(job.job_role)} /></td>}
+                            {visibleColumns.includes('job_sub_role') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.job_sub_role)} labelById={subRoleName} empty="—" /></td>}
+                            {visibleColumns.includes('account_name') && <td className="max-w-[220px] px-3 py-3"><span className="inline-flex items-center gap-1.5 rounded-xl bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"><Building2 className="h-3.5 w-3.5" />{job.account_name ?? '—'}</span></td>}
+                            {visibleColumns.includes('region_id') && <td className="px-3 py-3">{regionName(job.region_id)}</td>}
+                            {visibleColumns.includes('city_id') && <td className="px-3 py-3">{cityName(job.city_id)}</td>}
+                            {visibleColumns.includes('scope') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.scope)} labelById={scopeName} empty="—" /></td>}
+                            {visibleColumns.includes('job_status') && <td className="px-3 py-3"><StatusPill label={statusName(job.job_status)} tone={jobStatusTone(Number(job.job_status))} /></td>}
+                            {visibleColumns.includes('public_status') && <td className="px-3 py-3"><StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} /></td>}
+                            {visibleColumns.includes('total_applicants') && <td className="px-3 py-3"><span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold">{Number(job.total_applicants ?? 0)}</span></td>}
+                            {visibleColumns.includes('last_publish_date') && <td className="px-3 py-3 text-[#6B6B6B]">{job.last_publish_date ? formatDate(job.last_publish_date) : '—'}</td>}
+                            {visibleColumns.includes('updated_timestamp') && <td className="px-3 py-3 text-[#6B6B6B]">{job.updated_timestamp ? formatDate(job.updated_timestamp) : '—'}</td>}
+                            <td className="px-3 py-3">
                               <div className="flex flex-wrap items-center gap-1.5">
-                                <LinkIconButton to={`/jobs/${jobCode}`} title="פרטי משרה" icon={<Eye className="h-4 w-4" />} />
-                                <IconButton title="עריכה" icon={<Edit2 className="h-4 w-4" />} onClick={() => openEditSheet(job)} />
-                                <IconButton title="שכפול" icon={<Copy className="h-4 w-4" />} onClick={() => handleDuplicate(jobCode)} pending={rowActionPending === jobCode} />
-                                <LinkIconButton to={`/smart-match?job=${jobCode}`} title="סמארט מאץ׳" icon={<Sparkles className="h-4 w-4" />} />
-                                <LinkIconButton to={`/ats?job=${jobCode}`} title="ATS" icon={<Users className="h-4 w-4" />} />
-                                <IconButton title="פרסום" icon={<Send className="h-4 w-4" />} onClick={() => handlePublish(jobCode)} disabled={publishDisabled} pending={rowActionPending === jobCode} />
-                                <IconButton title="סגירה" icon={<X className="h-4 w-4" />} onClick={() => handleClose(jobCode)} pending={rowActionPending === jobCode} />
-                                <IconButton title="אויש" icon={<CheckCircle2 className="h-4 w-4" />} onClick={() => handleFill(jobCode)} disabled={fillDisabled} pending={rowActionPending === jobCode} />
-                                <select
-                                  dir="rtl"
-                                  value=""
-                                  onChange={(event) => {
-                                    const nextStatus = Number(event.target.value)
-                                    if (!nextStatus) return
-                                    handleQuickStatusChange(jobCode, nextStatus)
-                                  }}
-                                  className="h-9 rounded-full border border-[#D9D9D9] bg-white px-2 text-[12px] font-medium text-[#2D2D2D] outline-none focus:border-[#008080]"
-                                >
-                                  <option value="">סטטוס מהיר</option>
-                                  {getAllowedStatusTransitions(job.job_status).map((statusId) => (
-                                    <option key={statusId} value={statusId}>
-                                      {statusName(statusId)}
-                                    </option>
-                                  ))}
+                                <IconButton title="צפייה בפאנל" icon={<Eye className="h-4 w-4" />} onClick={() => openPanel(job, 'view')} />
+                                <IconButton title="עריכה" icon={<Edit2 className="h-4 w-4" />} onClick={() => openPanel(job, 'edit')} />
+                                <IconButton title="שכפול" icon={<Copy className="h-4 w-4" />} onClick={() => duplicateJob(job)} pending={rowActionPending === jobCode} />
+                                <IconButton title="פרסום" icon={<Send className="h-4 w-4" />} onClick={() => publishJob(job)} pending={rowActionPending === jobCode} />
+                                <IconButton title="Smart Match" icon={<Sparkles className="h-4 w-4" />} onClick={() => showToast('Smart Match לא מחובר למסך הזה עדיין', 'info')} />
+                                <IconButton title="וואטסאפ" icon={<MessageCircle className="h-4 w-4" />} onClick={() => openWhatsApp(job)} />
+                                <select value="" onChange={(event) => { const value = Number(event.target.value); if (value) updateJobPatch(jobCode, { job_status: value }, `סטטוס משרה עודכן ל־${statusName(value)}`); event.currentTarget.value = '' }} className="h-9 max-w-[132px] rounded-xl border border-[#D9D9D9] bg-white px-2 text-[12px] outline-none focus:border-[#008080]">
+                                  <option value="">סטטוס משרה</option>
+                                  {jobStatuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
                                 </select>
-                                <IconButton title="תצוגה מהירה" icon={<ChevronLeft className="h-4 w-4" />} onClick={() => setQuickSheet({ open: true, jobCode })} />
-                                <IconButton
-                                  title="וואטסאפ למעסיק"
-                                  icon={<MessageCircle className="h-4 w-4" />}
-                                  onClick={() => showToast(`פתיחת וואטסאפ עבור ${job.account_name ?? 'המעסיק'}`, 'info')}
-                                  disabled={!job.account_link}
-                                />
-                                <IconButton title="ארכוב" icon={<Archive className="h-4 w-4" />} onClick={() => handleArchive(jobCode)} pending={rowActionPending === jobCode} />
+                                <IconButton title="ארכוב" icon={<Archive className="h-4 w-4" />} onClick={() => updateJobPatch(jobCode, { job_status: JOB_STATUS_IDS.archived, public_status: PUBLIC_STATUS_IDS.archived }, 'המשרה הועברה לארכיון')} pending={rowActionPending === jobCode} />
                               </div>
                             </td>
                           </tr>
@@ -1281,112 +758,43 @@ export default function AdminJobsPage() {
                     </tbody>
                   </table>
                 </div>
-
-
-                <div className="border-t border-[#D9D9D9] bg-white px-4 py-3">
-                  <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filteredJobs.length} />
-                </div>
+                <div className="border-t border-[#D9D9D9] bg-white px-4 py-3"><Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filteredJobs.length} /></div>
               </div>
             )}
           </Toolbar>
         </div>
 
-
-        {quickSheet.open && selectedJob && (
-          <div className="fixed inset-0 z-50 flex justify-start">
-            <div className="absolute inset-0 bg-slate-900/30" onClick={() => setQuickSheet({ open: false, jobCode: null })} />
-            <aside className="relative z-10 h-full w-full max-w-[560px] overflow-y-auto border-s border-[#D9D9D9] bg-white shadow-xl">
-              <div className="sticky top-0 z-20 border-b border-[#D9D9D9] bg-white/95 backdrop-blur-sm">
-                <div className="flex items-start justify-between gap-3 px-5 py-5">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-[#E6F3F3] px-2.5 py-1 text-[12px] font-bold text-[#008080]">
-                        {selectedJob.job_code}
-                      </span>
-                      <AdminBadge {...getAdminBadgeVariant(jobStatusColors, selectedJob.job_status)} />
-                    </div>
-
-
-                    <h2 className="text-[24px] font-bold text-[#2D2D2D]">{selectedJob.job_title ?? '—'}</h2>
-
-
-                    <div className="flex flex-wrap gap-2">
-                      <InfoBadge icon={<Briefcase className="h-3.5 w-3.5" />} label={roleName(selectedJob.job_role)} />
-                      <InfoBadge icon={<MapPin className="h-3.5 w-3.5" />} label={`${cityName(selectedJob.city_id)} / ${regionName(selectedJob.region_id)}`} />
-                      <InfoBadge icon={<Users className="h-3.5 w-3.5" />} label={`${Number(selectedJob.total_applicants ?? 0)} מועמדים`} />
-                    </div>
-                  </div>
-
-
-                  <button
-                    type="button"
-                    onClick={() => setQuickSheet({ open: false, jobCode: null })}
-                    className="rounded-xl p-2 text-[#6B6B6B] hover:bg-[#F3F4F6]"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
-                </div>
-              </div>
-
-
-              <div className="space-y-5 p-5">
-                <SheetCard title="סיכום ארגון">
-                  <LabelValue label="ארגון" value={selectedJob.account_name ?? '—'} />
-                  <LabelValue label="קישור ארגון" value={selectedJob.account_link ? `#${selectedJob.account_link}` : '—'} />
-                </SheetCard>
-
-
-                <SheetCard title="פרטי תפקיד">
-                  <LabelValue label="תפקיד" value={roleName(selectedJob.job_role)} />
-                  <LabelValue label="תת־תפקיד" value={subRoleName(selectedJob.job_sub_role)} />
-                  <LabelValue label="היקף" value={scopeName(selectedJob.scope)} />
-                  <LabelValue label="ניסיון נדרש" value={experienceName(selectedJob.required_experience)} />
-                  <LabelValue label="שכר" value={selectedJob.salary_range ?? '—'} />
-                </SheetCard>
-
-
-                <SheetCard title="מיקום">
-                  <LabelValue label="אזור" value={regionName(selectedJob.region_id)} />
-                  <LabelValue label="עיר" value={cityName(selectedJob.city_id)} />
-                  <LabelValue label="כתובת" value={selectedJob.address ?? '—'} />
-                </SheetCard>
-
-
-                <SheetCard title="תקציר משרה">
-                  <p className="text-[13px] leading-6 text-[#2D2D2D]">
-                    {buildTeaser(selectedJob.job_description || selectedJob.job_requirements || 'אין תקציר זמין')}
-                  </p>
-                </SheetCard>
-
-
-                <SheetCard title="הפצה ותאריכים">
-                  <LabelValue label="מועמדים" value={Number(selectedJob.total_applicants ?? 0)} />
-                  <LabelValue label="פייסבוק" value={selectedJob.date_facebook ? formatDate(selectedJob.date_facebook) : '—'} />
-                  <LabelValue label="אתר" value={selectedJob.date_website ? formatDate(selectedJob.date_website) : '—'} />
-                  <LabelValue label="וואטסאפ" value={selectedJob.date_whatsapp ? formatDate(selectedJob.date_whatsapp) : '—'} />
-                  <LabelValue label="פרסום אחרון" value={selectedJob.last_publish_date ? formatDate(selectedJob.last_publish_date) : '—'} />
-                </SheetCard>
-
-
-                <div className="grid grid-cols-2 gap-3">
-                  <Link className="inline-flex items-center justify-center rounded-full bg-[#D97706] px-4 py-2.5 text-[13px] font-semibold text-white hover:bg-[#B45309]" to={`/jobs/${selectedJob.job_code}`}>
-                    פרטי משרה
-                  </Link>
-                  <Link className="inline-flex items-center justify-center rounded-xl border border-[#D9D9D9] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#2D2D2D] hover:bg-[#F3F4F6]" to={`/employers/${selectedJob.account_link}`}>
-                    Employer 360
-                  </Link>
-                  <Link className="inline-flex items-center justify-center rounded-xl border border-[#D9D9D9] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#2D2D2D] hover:bg-[#F3F4F6]" to={`/smart-match?job=${selectedJob.job_code}`}>
-                    Smart Match
-                  </Link>
-                  <Link className="inline-flex items-center justify-center rounded-xl border border-[#D9D9D9] bg-white px-4 py-2.5 text-[13px] font-semibold text-[#2D2D2D] hover:bg-[#F3F4F6]" to={`/ats?job=${selectedJob.job_code}`}>
-                    ATS
-                  </Link>
-                </div>
-              </div>
-            </aside>
-          </div>
+        {panel.open && selectedJob && (
+          <UnifiedJobPanel
+            mode={panel.mode}
+            job={selectedJob}
+            draft={jobDraft}
+            setDraft={setJobDraft}
+            onClose={() => setPanel({ open: false, mode: 'view', jobCode: null })}
+            onEdit={() => setPanel((prev) => ({ ...prev, mode: 'edit' }))}
+            onView={() => setPanel((prev) => ({ ...prev, mode: 'view' }))}
+            onSave={saveEdit}
+            saving={savingEdit}
+            jobStatuses={jobStatuses}
+            publicStatuses={publicStatuses}
+            roles={roles}
+            editSubRoleOptions={editSubRoleOptions}
+            accountsList={accountsList}
+            regions={regions}
+            cities={editCityOptions}
+            scopes={scopes}
+            experienceOptions={experienceOptions}
+            roleName={roleName}
+            subRoleName={subRoleName}
+            scopeName={scopeName}
+            statusName={statusName}
+            publicStatusName={publicStatusName}
+            regionName={regionName}
+            cityName={cityName}
+            experienceName={experienceName}
+            normalizeIds={normalizeIds}
+          />
         )}
-
 
         {toast.open && (
           <div className="pointer-events-none fixed bottom-4 left-4 z-[60]">
@@ -1394,78 +802,9 @@ export default function AdminJobsPage() {
               <div className="flex items-center gap-2 text-[13px] font-semibold">
                 {toast.tone === 'success' && <CheckCircle2 className="h-4 w-4" />}
                 {toast.tone === 'error' && <AlertTriangle className="h-4 w-4" />}
-                {toast.tone === 'info' && <CalendarDays className="h-4 w-4" />}
                 {toast.message}
               </div>
             </div>
-          </div>
-        )}
-
-
-        {/* ── Edit Job Sheet ──────────────────────────────────────────── */}
-        {editOpen && (
-          <div className="fixed inset-0 z-50 flex justify-end">
-            <div className="absolute inset-0 bg-slate-900/30" onClick={() => setEditOpen(false)} />
-            <aside className="relative z-10 flex h-full w-full max-w-[540px] flex-col border-s border-[#D9D9D9] bg-[#F3F4F6] shadow-xl">
-              {/* Header */}
-              <div className="sticky top-0 z-20 flex items-center justify-between border-b border-[#D9D9D9] bg-white px-5 py-4">
-                <div>
-                  <h2 className="text-[16px] font-bold text-[#2D2D2D]">עריכת משרה</h2>
-                  <p className="text-[12px] text-[#6B6B6B]">{editJobCode}</p>
-                </div>
-                <button type="button" onClick={() => setEditOpen(false)} className="rounded-full p-1.5 text-slate-400 hover:bg-[#F3F4F6]">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              {/* Body */}
-              <div className="flex-1 space-y-4 overflow-y-auto p-5">
-                <EditSectionCard title="פרטי משרה">
-                  <div className="grid grid-cols-1 gap-3">
-                    <EditTextField label="כותרת משרה" value={jobDraft.job_title} onChange={(v) => setJobDraft((p) => ({ ...p, job_title: v }))} />
-                    <EditSelectField label="סטטוס" value={jobDraft.job_status != null ? String(jobDraft.job_status) : ''} onChange={(v) => setJobDraft((p) => ({ ...p, job_status: v ? Number(v) : null }))} options={jobStatuses.map((s) => ({ value: String(s.id), label: s.name }))} />
-                    <EditSelectField label="תפקיד" value={jobDraft.job_role != null ? String(jobDraft.job_role) : ''} onChange={(v) => setJobDraft((p) => ({ ...p, job_role: v ? Number(v) : null, job_sub_role: null }))} options={roles.map((r) => ({ value: String(r.id), label: r.name }))} />
-                    <EditSelectField label="תת-תפקיד" value={jobDraft.job_sub_role != null ? String(jobDraft.job_sub_role) : ''} onChange={(v) => setJobDraft((p) => ({ ...p, job_sub_role: v ? Number(v) : null }))} options={subRoles.map((r) => ({ value: String(r.id), label: r.name }))} />
-                  </div>
-                </EditSectionCard>
-
-                <EditSectionCard title="מיקום">
-                  <div className="grid grid-cols-1 gap-3">
-                    <EditSelectField label="אזור" value={jobDraft.region_id != null ? String(jobDraft.region_id) : ''} onChange={(v) => setJobDraft((p) => ({ ...p, region_id: v ? Number(v) : null, city_id: null }))} options={regions.map((r) => ({ value: String(r.id), label: r.name }))} />
-                    <EditSelectField label="עיר" value={jobDraft.city_id != null ? String(jobDraft.city_id) : ''} onChange={(v) => setJobDraft((p) => ({ ...p, city_id: v ? Number(v) : null }))} options={(jobDraft.region_id ? cities.filter((c) => Number(c.region_id) === jobDraft.region_id) : cities).map((c) => ({ value: String(c.id), label: c.name }))} />
-                    <EditTextField label="כתובת" value={jobDraft.address} onChange={(v) => setJobDraft((p) => ({ ...p, address: v }))} />
-                    <EditSelectField label="היקף משרה" value={jobDraft.scope != null ? String(jobDraft.scope) : ''} onChange={(v) => setJobDraft((p) => ({ ...p, scope: v ? Number(v) : null }))} options={scopes.map((s) => ({ value: String(s.id), label: s.name }))} />
-                    <EditSelectField label="ניסיון נדרש" value={jobDraft.required_experience != null ? String(jobDraft.required_experience) : ''} onChange={(v) => setJobDraft((p) => ({ ...p, required_experience: v ? Number(v) : null }))} options={experienceOptions.map((e) => ({ value: String(e.id), label: e.name }))} />
-                  </div>
-                </EditSectionCard>
-
-                <EditSectionCard title="תגמול ותיאור">
-                  <div className="grid grid-cols-1 gap-3">
-                    <EditTextField label="טווח שכר" value={jobDraft.salary_range} onChange={(v) => setJobDraft((p) => ({ ...p, salary_range: v }))} />
-                    <EditTextareaField label="תיאור המשרה" value={jobDraft.job_description} onChange={(v) => setJobDraft((p) => ({ ...p, job_description: v }))} />
-                    <EditTextareaField label="דרישות המשרה" value={jobDraft.job_requirements} onChange={(v) => setJobDraft((p) => ({ ...p, job_requirements: v }))} />
-                  </div>
-                </EditSectionCard>
-
-                <EditSectionCard title="מידע נוסף">
-                  <div className="grid grid-cols-1 gap-3">
-                    <EditTextField label="קישור למשרה" value={jobDraft.job_url} onChange={(v) => setJobDraft((p) => ({ ...p, job_url: v }))} />
-                    <EditSelectField label="ארגון" value={jobDraft.account_link != null ? String(jobDraft.account_link) : ''} onChange={(v) => setJobDraft((p) => ({ ...p, account_link: v ? Number(v) : null }))} options={accountsList.map((a: any) => ({ value: String(a.account_id), label: a.account_name ?? '' }))} />
-                    <EditTextareaField label="הערות" value={jobDraft.notes} onChange={(v) => setJobDraft((p) => ({ ...p, notes: v }))} />
-                  </div>
-                </EditSectionCard>
-              </div>
-
-              {/* Footer */}
-              <div className="flex justify-end gap-3 border-t border-[#D9D9D9] bg-white px-5 py-4">
-                <button type="button" onClick={() => setEditOpen(false)} className="rounded-full border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">
-                  ביטול
-                </button>
-                <button type="button" onClick={handleSaveEdit} disabled={savingEdit} className="rounded-full bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309] disabled:opacity-60">
-                  {savingEdit ? 'שומר...' : 'שמור'}
-                </button>
-              </div>
-            </aside>
           </div>
         )}
       </div>
@@ -1473,401 +812,363 @@ export default function AdminJobsPage() {
   )
 }
 
-
-function KpiCard({
-  label,
-  value,
-  hint,
-  tone = 'default',
-  onClick,
-}: {
-  label: string
-  value: number
-  hint: string
-  tone?: 'default' | 'warning' | 'success'
-  onClick?: () => void
-}) {
-  const toneClasses =
-    tone === 'warning'
-      ? 'border-[#FDE68A] bg-[#FFFBEB]'
-      : tone === 'success'
-        ? 'border-[#BBF7D0] bg-[#F0FDF4]'
-        : 'border-[#D9D9D9] bg-white'
-
-
-  const valueClasses =
-    tone === 'warning'
-      ? 'text-[#D97706]'
-      : tone === 'success'
-        ? 'text-[#16A34A]'
-        : 'text-[#008080]'
-
-
+function UnifiedJobPanel({
+  mode,
+  job,
+  draft,
+  setDraft,
+  onClose,
+  onEdit,
+  onView,
+  onSave,
+  saving,
+  jobStatuses,
+  publicStatuses,
+  roles,
+  editSubRoleOptions,
+  accountsList,
+  regions,
+  cities,
+  scopes,
+  experienceOptions,
+  roleName,
+  subRoleName,
+  scopeName,
+  statusName,
+  publicStatusName,
+  regionName,
+  cityName,
+  experienceName,
+  normalizeIds,
+}: any) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-[18px] border p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}
-    >
+    <div className="fixed inset-0 z-50 flex justify-start">
+      <div className="absolute inset-0 bg-slate-900/30" onClick={onClose} />
+      <aside className="relative z-10 flex h-full w-full max-w-[620px] flex-col overflow-hidden border-s border-[#D9D9D9] bg-[#F3F4F6] shadow-xl">
+        <header className="flex items-start justify-between gap-3 border-b border-[#D9D9D9] bg-white px-5 py-4">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-full bg-[#E6F3F3] px-2.5 py-1 font-mono text-[12px] font-bold text-[#008080]">{job.job_code}</span>
+              <StatusPill label={statusName(job.job_status)} tone={jobStatusTone(Number(job.job_status))} />
+              <StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} />
+            </div>
+            <h2 className="text-[20px] font-bold text-[#2D2D2D]">{mode === 'edit' ? 'עריכת משרה' : job.job_title ?? 'פרטי משרה'}</h2>
+            <p className="text-[12px] text-[#6B6B6B]">פאנל אחד לצפייה ועריכה — בלי יציאה מהמסך</p>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-xl p-2 text-[#6B6B6B] hover:bg-[#F3F4F6]"><X className="h-5 w-5" /></button>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-5">
+          {mode === 'view' ? (
+            <div className="space-y-4">
+              {job.public_image_url && <img src={job.public_image_url} alt="תמונת משרה" className="h-48 w-full rounded-[18px] object-cover" />}
+              <PanelCard title="פרטי משרה">
+                <LabelValue label="כותרת" value={job.job_title ?? '—'} />
+                <LabelValue label="תפקיד" value={roleName(job.job_role)} />
+                <LabelValue label="תתי־תפקידים" value={namesFromIds(normalizeIds(job.job_sub_role), subRoleName)} />
+                <LabelValue label="ארגון" value={job.account_name ?? '—'} />
+                <LabelValue label="מעסיק / מגייס" value={job.employer_contact_name ?? '—'} />
+              </PanelCard>
+              <PanelCard title="מיקום והיקף">
+                <LabelValue label="אזור" value={regionName(job.region_id)} />
+                <LabelValue label="עיר" value={cityName(job.city_id)} />
+                <LabelValue label="כתובת" value={job.address ?? '—'} />
+                <LabelValue label="היקף" value={namesFromIds(normalizeIds(job.scope), scopeName)} />
+                <LabelValue label="ניסיון" value={experienceName(job.required_experience)} />
+              </PanelCard>
+              <PanelCard title="שכר ותמונה">
+                <LabelValue label="שכר שעתי" value={job.salary_expectation_hourly != null ? `${job.salary_expectation_hourly} ₪` : '—'} />
+                <LabelValue label="שכר גלובלי" value={job.salary_expectation_monthly != null ? `${job.salary_expectation_monthly} ₪` : '—'} />
+                <LabelValue label="הצגת שכר לציבור" value={job.show_salary_public ? 'כן' : 'לא'} />
+                <LabelValue label="תמונה ציבורית" value={job.public_image_url ? 'קיימת' : 'לא קיימת'} />
+              </PanelCard>
+              <PanelCard title="תיאור ודרישות">
+                <p className="whitespace-pre-wrap text-[13px] leading-6 text-[#2D2D2D]">{job.job_description || 'אין תיאור'}</p>
+                <div className="my-3 h-px bg-[#D9D9D9]" />
+                <p className="whitespace-pre-wrap text-[13px] leading-6 text-[#2D2D2D]">{job.job_requirements || 'אין דרישות'}</p>
+              </PanelCard>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <PanelCard title="פרטי משרה">
+                <EditTextField label="כותרת משרה" value={draft.job_title} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_title: value }))} />
+                <EditSelectField label="סטטוס משרה" value={draft.job_status != null ? String(draft.job_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_status: value ? Number(value) : null }))} options={jobStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+                <EditSelectField label="סטטוס פרסום" value={draft.public_status != null ? String(draft.public_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, public_status: value ? Number(value) : null }))} options={publicStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+                <EditSelectField label="תפקיד ראשי" value={draft.job_role != null ? String(draft.job_role) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_role: value ? Number(value) : null, job_sub_role: [] }))} options={roles.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+                <EditMultiSelectField label="תתי־תפקידים" values={draft.job_sub_role} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, job_sub_role: values }))} options={editSubRoleOptions} disabled={!draft.job_role} placeholder={draft.job_role ? 'בחרי תתי־תפקידים' : 'בחרי קודם תפקיד ראשי'} />
+                <EditSelectField label="ארגון" value={draft.account_link != null ? String(draft.account_link) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, account_link: value ? Number(value) : null }))} options={accountsList.map((item: any) => ({ value: String(item.account_id), label: item.account_name ?? '' }))} />
+              </PanelCard>
+
+              <PanelCard title="מיקום והיקף">
+                <EditSelectField label="אזור" value={draft.region_id != null ? String(draft.region_id) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+                <EditSelectField label="עיר" value={draft.city_id != null ? String(draft.city_id) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, city_id: value ? Number(value) : null }))} options={cities.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+                <EditTextField label="כתובת" value={draft.address} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, address: value }))} />
+                <EditMultiSelectField label="היקף משרה" values={draft.scope} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, scope: values }))} options={scopes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+                <EditSelectField label="ניסיון נדרש" value={draft.required_experience != null ? String(draft.required_experience) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, required_experience: value ? Number(value) : null }))} options={experienceOptions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+              </PanelCard>
+
+              <PanelCard title="שכר ותמונה ציבורית">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  <EditTextField label="שכר שעתי" value={draft.salary_expectation_hourly} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, salary_expectation_hourly: value }))} type="number" />
+                  <EditTextField label="שכר גלובלי / חודשי" value={draft.salary_expectation_monthly} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, salary_expectation_monthly: value }))} type="number" />
+                </div>
+                <label className="mt-3 flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-semibold text-[#2D2D2D]">
+                  <span>להציג שכר לציבור</span>
+                  <input type="checkbox" checked={draft.show_salary_public} onChange={(event) => setDraft((prev: JobDraft) => ({ ...prev, show_salary_public: event.target.checked }))} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" />
+                </label>
+                <EditTextField label="קישור תמונה ציבורית" value={draft.public_image_url} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, public_image_url: value }))} />
+                {draft.public_image_url && <div className="mt-3 flex items-center gap-2 text-[12px] text-[#6B6B6B]"><ImageIcon className="h-4 w-4" />התמונה תוצג בכרטיס המשרה הציבורי</div>}
+              </PanelCard>
+
+              <PanelCard title="תוכן וקישורים">
+                <EditTextField label="קישור משרה ציבורי" value={draft.job_url} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_url: value }))} />
+                <EditTextareaField label="תיאור המשרה" value={draft.job_description} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_description: value }))} />
+                <EditTextareaField label="דרישות המשרה" value={draft.job_requirements} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_requirements: value }))} />
+                <EditTextareaField label="הערות פנימיות" value={draft.notes} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, notes: value }))} />
+              </PanelCard>
+            </div>
+          )}
+        </main>
+
+        <footer className="flex items-center justify-between gap-3 border-t border-[#D9D9D9] bg-white px-5 py-4">
+          <button type="button" onClick={onClose} className="rounded-full border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">סגור</button>
+          {mode === 'view' ? (
+            <button type="button" onClick={onEdit} className="rounded-full bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]">ערוך משרה</button>
+          ) : (
+            <div className="flex gap-2">
+              <button type="button" onClick={onView} className="rounded-full border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">חזרה לצפייה</button>
+              <button type="button" onClick={onSave} disabled={saving} className="rounded-full bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309] disabled:opacity-60">{saving ? 'שומר...' : 'שמור'}</button>
+            </div>
+          )}
+        </footer>
+      </aside>
+    </div>
+  )
+}
+
+function KpiCard({ label, value, hint, tone = 'default', onClick }: { label: string; value: number; hint: string; tone?: 'default' | 'warning' | 'success'; onClick?: () => void }) {
+  const cls = tone === 'success' ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#16A34A]' : tone === 'warning' ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#D97706]' : 'border-[#D9D9D9] bg-white text-[#008080]'
+  return (
+    <button type="button" onClick={onClick} className={`rounded-[18px] border p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${cls}`}>
       <div className="text-[13px] font-semibold text-[#6B6B6B]">{label}</div>
-      <div className={`mt-2 text-[24px] font-bold ${valueClasses}`}>{value}</div>
+      <div className="mt-2 text-[28px] font-bold">{value}</div>
       <div className="mt-1 text-[12px] font-medium text-[#6B6B6B]">{hint}</div>
     </button>
   )
 }
 
-
-function InfoPill({ label, tone = 'default' }: { label: string; tone?: 'default' | 'warning' }) {
+function ListKpiCard({ title, items, empty, onItemClick }: { title: string; items: Array<{ id: number; name: string; count: number }>; empty: string; onItemClick: (id: number) => void }) {
   return (
-    <span
-      className={`rounded-full px-3 py-1 text-[12px] font-semibold ${
-        tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'
-      }`}
-    >
-      {label}
-    </span>
-  )
-}
-
-
-function SmallActionButton({
-  children,
-  onClick,
-  disabled,
-}: {
-  children: React.ReactNode
-  onClick?: () => void
-  disabled?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-semibold text-[#2D2D2D] transition hover:bg-[#F3F4F6] disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {children}
-    </button>
-  )
-}
-
-
-function LinkIconButton({
-  to,
-  title,
-  icon,
-}: {
-  to: string
-  title: string
-  icon: React.ReactNode
-}) {
-  return (
-    <Link
-      to={to}
-      title={title}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D9D9D9] bg-white text-[#6B6B6B] transition hover:bg-[#F3F4F6] hover:text-[#008080]"
-    >
-      {icon}
-    </Link>
-  )
-}
-
-
-function IconButton({
-  title,
-  icon,
-  onClick,
-  disabled,
-  pending,
-}: {
-  title: string
-  icon: React.ReactNode
-  onClick?: () => void
-  disabled?: boolean
-  pending?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      disabled={disabled || pending}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D9D9D9] bg-white text-[#6B6B6B] transition hover:bg-[#F3F4F6] hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      {icon}
-    </button>
-  )
-}
-
-
-function MiniSignal({
-  children,
-  tone,
-}: {
-  children: React.ReactNode
-  tone: 'warning' | 'muted'
-}) {
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-        tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'
-      }`}
-    >
-      {children}
-    </span>
-  )
-}
-
-
-function SheetCard({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <section className="rounded-[18px] border border-[#D9D9D9] bg-white p-4 shadow-sm">
-      <h3 className="mb-3 text-[15px] font-bold text-[#2D2D2D]">{title}</h3>
-      <div className="space-y-2">{children}</div>
-    </section>
-  )
-}
-
-
-function LabelValue({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b border-[#F3F4F6] pb-2 text-[13px] last:border-b-0 last:pb-0">
-      <span className="font-medium text-[#6B6B6B]">{label}</span>
-      <span className="text-left font-semibold text-[#2D2D2D]">{value}</span>
+    <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-4 shadow-sm">
+      <div className="mb-3 text-[13px] font-bold text-[#2D2D2D]">{title}</div>
+      <div className="space-y-1.5">
+        {items.length ? items.map((item) => (
+          <button key={item.id} type="button" onClick={() => onItemClick(item.id)} className="flex w-full items-center justify-between rounded-xl px-2 py-1.5 text-[12px] hover:bg-[#F3F4F6]">
+            <span className="truncate text-[#2D2D2D]">{item.name}</span>
+            <span className="rounded-full bg-[#E6F3F3] px-2 py-0.5 font-bold text-[#008080]">{item.count}</span>
+          </button>
+        )) : <div className="text-[12px] text-[#6B6B6B]">{empty}</div>}
+      </div>
     </div>
   )
 }
 
+function InfoPill({ label, tone = 'default' }: { label: string; tone?: 'default' | 'warning' | 'success' }) {
+  const cls = tone === 'success' ? 'bg-[#F0FDF4] text-[#16A34A]' : tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'
+  return <span className={`rounded-full px-3 py-1 text-[12px] font-semibold ${cls}`}>{label}</span>
+}
 
-function InfoBadge({ icon, label }: { icon: React.ReactNode; label: string }) {
+function SortableTh({ label, sortKey, sortBy, sortDir, onSort }: { label: string; sortKey: string; sortBy: string | null; sortDir: 'asc' | 'desc'; onSort: (key: string) => void }) {
+  const active = sortBy === sortKey
   return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#2D2D2D]">
-      {icon}
-      {label}
-    </span>
+    <th onClick={() => onSort(sortKey)} className="cursor-pointer select-none whitespace-nowrap px-3 py-3">
+      <span className="inline-flex items-center gap-1.5">{label}<span className={active ? 'text-[#008080]' : 'text-slate-300'}>{active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</span></span>
+    </th>
   )
 }
 
-
-function canPublish(job: any) {
-  const hasAccount = Boolean(job.account_link)
-  const hasRole = Boolean(job.job_role)
-  const hasTitle = Boolean(String(job.job_title ?? '').trim())
-  const hasScope = Boolean(job.scope)
-  const hasDescription = Boolean(String(job.job_description ?? '').trim())
-  const hasRequirements = Boolean(String(job.job_requirements ?? '').trim())
-  const regionOk = !job.region_id || Boolean(job.city_id)
-
-
-  return hasAccount && hasRole && hasTitle && hasScope && hasDescription && hasRequirements && regionOk
+function PlainTh({ label }: { label: string }) {
+  return <th className="whitespace-nowrap px-3 py-3">{label}</th>
 }
 
-
-function isPublished(job: any) {
-  return Boolean(job.last_publish_date || job.date_facebook || job.date_website || job.date_whatsapp)
+function IconButton({ title, icon, onClick, disabled, pending }: { title: string; icon: React.ReactNode; onClick?: () => void; disabled?: boolean; pending?: boolean }) {
+  return (
+    <button type="button" title={title} onClick={onClick} disabled={disabled || pending} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-[#D9D9D9] bg-white text-[#6B6B6B] transition hover:bg-[#F3F4F6] hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-50">
+      {pending ? <Clock3 className="h-4 w-4 animate-spin" /> : icon}
+    </button>
+  )
 }
 
-
-function getDaysLive(job: any) {
-  const sourceDate = job.created_time || job.updated_timestamp || null
-  if (!sourceDate) return 0
-  const created = new Date(sourceDate).getTime()
-  const now = Date.now()
-  const diff = now - created
-  return Math.max(0, Math.floor(diff / (1000 * 60 * 60 * 24)))
+function RoleBadge({ roleId, label }: { roleId: number; label: string }) {
+  const classes = [
+    'bg-[#E6F3F3] text-[#006D6D]',
+    'bg-[#FEF3C7] text-[#B45309]',
+    'bg-[#EEF2FF] text-[#4338CA]',
+    'bg-[#FCE7F3] text-[#BE185D]',
+    'bg-[#ECFDF5] text-[#047857]',
+    'bg-[#F3F4F6] text-[#374151]',
+  ]
+  const cls = classes[Math.abs(roleId || 0) % classes.length]
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[12px] font-bold ${cls}`}>{label}</span>
 }
 
-
-function isWithinLastDays(dateValue: string | null | undefined, days: number) {
-  if (!dateValue) return false
-  const target = new Date(dateValue).getTime()
-  const now = Date.now()
-  return now - target <= days * 24 * 60 * 60 * 1000
+function StatusPill({ label, tone }: { label: string; tone: 'default' | 'success' | 'warning' | 'danger' | 'muted' }) {
+  const cls = {
+    default: 'bg-[#E6F3F3] text-[#006D6D]',
+    success: 'bg-[#DCFCE7] text-[#166534]',
+    warning: 'bg-[#FEF3C7] text-[#B45309]',
+    danger: 'bg-[#FEE2E2] text-[#991B1B]',
+    muted: 'bg-[#F3F4F6] text-[#6B6B6B]',
+  }[tone]
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-[12px] font-bold ${cls}`}>{label}</span>
 }
 
-
-function distributionLabel(job: any) {
-  const channels: string[] = []
-  if (job.date_facebook) channels.push('פייסבוק')
-  if (job.date_website) channels.push('אתר')
-  if (job.date_whatsapp) channels.push('וואטסאפ')
-  return channels.length ? channels.join(' • ') : 'ללא ערוצים'
+function BadgeList({ ids, labelById, empty }: { ids: number[]; labelById: (id: number) => string; empty: string }) {
+  if (!ids.length) return <span className="text-slate-400">{empty}</span>
+  return (
+    <div className="flex max-w-[260px] flex-wrap gap-1">
+      {ids.slice(0, 4).map((id) => <span key={id} className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[11px] font-semibold text-[#2D2D2D]">{labelById(id)}</span>)}
+      {ids.length > 4 && <span className="rounded-full bg-[#E6F3F3] px-2 py-0.5 text-[11px] font-bold text-[#008080]">+{ids.length - 4}</span>}
+    </div>
+  )
 }
 
+function MultiSelectFilter({ values, onChange, options, placeholder, disabled }: { values: number[]; onChange: (values: number[]) => void; options: { value: string; label: string }[]; placeholder: string; disabled?: boolean }) {
+  const selectedLabels = options.filter((opt) => values.includes(Number(opt.value))).map((opt) => opt.label)
+  const toggle = (rawValue: string) => {
+    const value = Number(rawValue)
+    onChange(values.includes(value) ? values.filter((id) => id !== value) : [...values, value])
+  }
+  return (
+    <details className="relative">
+      <summary className={`flex h-10 cursor-pointer list-none items-center justify-between rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium outline-none ${disabled ? 'pointer-events-none opacity-50' : 'hover:bg-[#F9FAFB]'}`}>
+        <span className={selectedLabels.length ? 'truncate text-[#2D2D2D]' : 'truncate text-[#6B6B6B]'}>{selectedLabels.length ? selectedLabels.join(', ') : placeholder}</span>
+        <ChevronDown className="h-4 w-4 text-[#6B6B6B]" />
+      </summary>
+      {!disabled && (
+        <div className="absolute right-0 top-full z-40 mt-2 max-h-72 w-full min-w-[240px] overflow-y-auto rounded-[18px] border border-[#D9D9D9] bg-white p-2 shadow-md">
+          {options.length ? options.map((opt) => (
+            <label key={opt.value} className="flex cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-[13px] hover:bg-[#F3F4F6]">
+              <span>{opt.label}</span>
+              <input type="checkbox" checked={values.includes(Number(opt.value))} onChange={() => toggle(opt.value)} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" />
+            </label>
+          )) : <div className="px-3 py-2 text-[13px] text-[#6B6B6B]">אין אפשרויות</div>}
+        </div>
+      )}
+    </details>
+  )
+}
+
+function EditMultiSelectField({ label, values, onChange, options, disabled, placeholder = 'בחר' }: { label: string; values: number[]; onChange: (values: number[]) => void; options: { value: string; label: string }[]; disabled?: boolean; placeholder?: string }) {
+  return (
+    <label className="flex flex-col gap-1.5">
+      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
+      <div className={`rounded-xl border border-[#D9D9D9] bg-white p-2 ${disabled ? 'opacity-50' : ''}`}>
+        {disabled ? <div className="px-2 py-1 text-[13px] text-[#6B6B6B]">{placeholder}</div> : options.length ? (
+          <div className="grid gap-1">
+            {options.map((opt) => {
+              const numericValue = Number(opt.value)
+              const checked = values.includes(numericValue)
+              return (
+                <label key={opt.value} className="flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 text-[13px] hover:bg-[#F3F4F6]">
+                  <span>{opt.label}</span>
+                  <input type="checkbox" checked={checked} onChange={() => onChange(checked ? values.filter((id) => id !== numericValue) : [...values, numericValue])} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" />
+                </label>
+              )
+            })}
+          </div>
+        ) : <div className="px-2 py-1 text-[13px] text-[#6B6B6B]">אין אפשרויות</div>}
+      </div>
+    </label>
+  )
+}
+
+function PanelCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return <section className="rounded-[18px] border border-[#D9D9D9] bg-white p-5 shadow-sm"><h3 className="mb-4 text-[15px] font-bold text-[#2D2D2D]">{title}</h3>{children}</section>
+}
+
+function LabelValue({ label, value }: { label: string; value: React.ReactNode }) {
+  return <div className="mb-2 grid grid-cols-[120px_1fr] gap-3 text-[13px]"><span className="font-semibold text-[#6B6B6B]">{label}</span><span className="font-medium text-[#2D2D2D]">{value}</span></div>
+}
+
+function EditTextField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
+  return <label className="flex flex-col gap-1.5"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><input dir="rtl" type={type} value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none focus:border-[#008080]" /></label>
+}
+
+function EditSelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[] }) {
+  return <label className="flex flex-col gap-1.5"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><select dir="rtl" value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none focus:border-[#008080]"><option value="">בחר</option>{options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}</select></label>
+}
+
+function EditTextareaField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+  return <label className="flex flex-col gap-1.5"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><textarea dir="rtl" rows={4} value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-medium text-[#2D2D2D] outline-none focus:border-[#008080]" /></label>
+}
+
+function cleanText(value: string) {
+  const trimmed = String(value ?? '').trim()
+  return trimmed || null
+}
+
+function toNullableNumber(value: string) {
+  if (String(value ?? '').trim() === '') return null
+  const numeric = Number(value)
+  return Number.isFinite(numeric) ? numeric : null
+}
+
+function namesFromIds(ids: number[], labelById: (id: number) => string) {
+  const names = ids.map(labelById).filter((name) => name && name !== '—')
+  return names.length ? names.join(', ') : '—'
+}
+
+function jobStatusTone(status: number): 'default' | 'success' | 'warning' | 'danger' | 'muted' {
+  if (status === JOB_STATUS_IDS.active) return 'success'
+  if (status === JOB_STATUS_IDS.hold || status === JOB_STATUS_IDS.draft || status === JOB_STATUS_IDS.new) return 'warning'
+  if (status === JOB_STATUS_IDS.filled || status === JOB_STATUS_IDS.closedSuccess) return 'default'
+  if (status === JOB_STATUS_IDS.closedOther || status === JOB_STATUS_IDS.cancelled) return 'danger'
+  return 'muted'
+}
+
+function publicStatusTone(status: number): 'default' | 'success' | 'warning' | 'danger' | 'muted' {
+  if (status === PUBLIC_STATUS_IDS.published) return 'success'
+  if (status === PUBLIC_STATUS_IDS.waitingApproval || status === PUBLIC_STATUS_IDS.draft) return 'warning'
+  if (status === PUBLIC_STATUS_IDS.hidden) return 'muted'
+  return 'muted'
+}
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10)
 }
 
-
-function buildTeaser(text: string) {
-  const normalized = String(text ?? '').replace(/\s+/g, ' ').trim()
-  if (!normalized) return 'אין תקציר זמין'
-  return normalized.length > 180 ? `${normalized.slice(0, 180)}...` : normalized
+function generateDuplicateCode(baseCode: string, existingCodes: string[]) {
+  const safeBase = String(baseCode ?? 'JOB').trim() || 'JOB'
+  let counter = 1
+  let nextCode = `${safeBase}-C${counter}`
+  while (existingCodes.includes(nextCode)) {
+    counter += 1
+    nextCode = `${safeBase}-C${counter}`
+  }
+  return nextCode
 }
 
+function normalizePhoneForWhatsapp(value: string | null | undefined) {
+  const digits = String(value ?? '').replace(/\D/g, '')
+  if (!digits) return null
+  if (digits.startsWith('972')) return digits
+  if (digits.startsWith('0')) return `972${digits.slice(1)}`
+  if (digits.length === 9) return `972${digits}`
+  return digits
+}
+
+function buildCsv(rows: Array<Record<string, string | number>>) {
+  if (!rows.length) return ''
+  const headers = Object.keys(rows[0])
+  return [
+    headers.join(','),
+    ...rows.map((row) => headers.map((header) => `"${String(row[header] ?? '').replace(/"/g, '""')}"`).join(',')),
+  ].join('\n')
+}
 
 function toastClassName(tone: ToastTone) {
   if (tone === 'success') return 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]'
   if (tone === 'error') return 'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]'
   return 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]'
 }
-
-
-function getAllowedStatusTransitions(currentStatus: number | null | undefined) {
-  const status = Number(currentStatus ?? 0)
-
-
-  const map: Record<number, number[]> = {
-    [STATUS_IDS.draft]: [STATUS_IDS.waitingApproval, STATUS_IDS.active, STATUS_IDS.published, STATUS_IDS.archived],
-    [STATUS_IDS.waitingApproval]: [STATUS_IDS.active, STATUS_IDS.published, STATUS_IDS.hold, STATUS_IDS.archived],
-    [STATUS_IDS.active]: [STATUS_IDS.published, STATUS_IDS.hold, STATUS_IDS.closed, STATUS_IDS.filled, STATUS_IDS.archived],
-    [STATUS_IDS.published]: [STATUS_IDS.active, STATUS_IDS.hold, STATUS_IDS.closed, STATUS_IDS.filled, STATUS_IDS.archived],
-    [STATUS_IDS.hold]: [STATUS_IDS.active, STATUS_IDS.published, STATUS_IDS.closed, STATUS_IDS.archived],
-    [STATUS_IDS.closed]: [STATUS_IDS.archived],
-    [STATUS_IDS.filled]: [STATUS_IDS.archived],
-    [STATUS_IDS.cancelled]: [STATUS_IDS.archived],
-    [STATUS_IDS.archived]: [],
-  }
-
-
-  return map[status] ?? []
-}
-
-
-function generateDuplicateCode(baseCode: string, existingCodes: string[]) {
-  const safeBase = String(baseCode ?? 'JOB').trim() || 'JOB'
-  let counter = 1
-  let nextCode = `${safeBase}-C${counter}`
-
-
-  while (existingCodes.includes(nextCode)) {
-    counter += 1
-    nextCode = `${safeBase}-C${counter}`
-  }
-
-
-  return nextCode
-}
-
-
-function buildCsv(rows: Array<Record<string, string | number>>) {
-  if (!rows.length) return ''
-  const headers = Object.keys(rows[0])
-  const lines = [
-    headers.join(','),
-    ...rows.map((row) =>
-      headers
-        .map((header) => {
-          const cell = String(row[header] ?? '')
-          const escaped = cell.replace(/"/g, '""')
-          return `"${escaped}"`
-        })
-        .join(','),
-    ),
-  ]
-  return lines.join('\n')
-}
-
-
-// ─── Edit sheet helpers ─────────────────────────────────────────────────────
-
-function EditSectionCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-[18px] border border-[#D9D9D9] bg-white p-5 shadow-sm">
-      <h3 className="mb-4 text-[16px] font-bold text-[#2D2D2D]">{title}</h3>
-      {children}
-    </section>
-  )
-}
-
-function EditTextField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (v: string) => void; type?: string }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
-      <input dir="rtl" type={type} value={value} onChange={(e) => onChange(e.target.value)}
-        className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-1 focus:ring-[#008080]/20" />
-    </label>
-  )
-}
-
-function EditSelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: { value: string; label: string }[] }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
-      <select dir="rtl" value={value} onChange={(e) => onChange(e.target.value)}
-        className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-1 focus:ring-[#008080]/20">
-        <option value="">בחר</option>
-        {options.map((opt) => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-      </select>
-    </label>
-  )
-}
-
-function EditTextareaField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
-      <textarea dir="rtl" rows={4} value={value} onChange={(e) => onChange(e.target.value)}
-        className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-1 focus:ring-[#008080]/20" />
-    </label>
-  )
-}
-
-function SortableTh({ label, sortKey, sortBy, sortDir, onSort, width, onResizeStart }: {
-  label: string; sortKey: string; sortBy: string | null; sortDir: 'asc' | 'desc'; onSort: (k: string) => void
-  width?: number; onResizeStart?: (e: React.MouseEvent, key: string) => void
-}) {
-  const active = sortBy === sortKey
-  return (
-    <th
-      className="relative cursor-pointer select-none px-4 py-4 hover:bg-[#F3F4F6]"
-      style={width ? { width, minWidth: 80 } : { minWidth: 80 }}
-      onClick={() => onSort(sortKey)}
-    >
-      <span className="flex items-center gap-1.5">
-        {label}
-        <span className={`flex flex-col ${active ? 'text-[#008080]' : 'text-slate-400'}`}>
-          <ChevronUp className={`h-3 w-3 -mb-1 ${active && sortDir === 'asc' ? 'text-[#008080]' : 'text-slate-300'}`} />
-          <ChevronDown className={`h-3 w-3 ${active && sortDir === 'desc' ? 'text-[#008080]' : 'text-slate-300'}`} />
-        </span>
-      </span>
-      {onResizeStart && (
-        <div
-          className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-[#008080]/40"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => { e.stopPropagation(); onResizeStart(e, sortKey) }}
-        />
-      )}
-    </th>
-  )
-}
-
-
-function PlainJobTh({ label, colKey, width, onResizeStart }: {
-  label: string; colKey: string; width?: number; onResizeStart?: (e: React.MouseEvent, key: string) => void
-}) {
-  return (
-    <th
-      className="relative px-4 py-4"
-      style={width ? { width, minWidth: 80 } : { minWidth: 80 }}
-    >
-      {label}
-      {onResizeStart && (
-        <div
-          className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-[#008080]/40"
-          onMouseDown={(e) => { e.stopPropagation(); onResizeStart(e, colKey) }}
-        />
-      )}
-    </th>
-  )
-}
-
-
-

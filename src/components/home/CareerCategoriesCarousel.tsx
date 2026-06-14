@@ -103,10 +103,11 @@ export function CareerCategoriesCarousel() {
         </div>
 
         <div className="mx-auto mt-8 flex max-w-7xl items-center justify-center gap-3 px-5 md:px-8">
+          {/* RTL: ימין = הקודם, שמאל = הבא */}
           <button
             type="button"
-            onClick={goPrev}
-            aria-label="הקודם"
+            onClick={goNext}
+            aria-label="הבא"
             className="grid h-12 w-12 place-items-center rounded-full border border-black/10 bg-white text-[#2D2D2D] shadow-sm transition-all hover:bg-[#2D2D2D] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#008080]"
           >
             <ArrowRight className="h-5 w-5" />
@@ -126,8 +127,8 @@ export function CareerCategoriesCarousel() {
           </div>
           <button
             type="button"
-            onClick={goNext}
-            aria-label="הבא"
+            onClick={goPrev}
+            aria-label="הקודם"
             className="grid h-12 w-12 place-items-center rounded-full border border-black/10 bg-white text-[#2D2D2D] shadow-sm transition-all hover:bg-[#2D2D2D] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#008080]"
           >
             <ArrowLeft className="h-5 w-5" />

@@ -30,7 +30,8 @@ export default function PublicJobsPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="חיפוש לפי תפקיד, עיר..."
-          className="px-5 py-3 rounded-full text-[#0F0F10] border border-[#D9D9D9] bg-white outline-none focus:border-[#008080] transition-colors text-[14px] w-full sm:max-w-xs min-h-[44px]"
+          dir="rtl"
+          className="px-5 py-3 rounded-full text-[#0F0F10] border border-[#D9D9D9] bg-white outline-none focus:border-[#008080] transition-colors text-[14px] w-full sm:max-w-xs min-h-[44px] text-right"
           aria-label="חיפוש משרות"
         />
       </PageMediaHero>

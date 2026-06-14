@@ -11,7 +11,10 @@
       "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__execute_sql",
       "Bash(python create_missing_employer_accounts.py --dry-run)",
       "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__list_tables",
-      "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__apply_migration"
+      "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__apply_migration",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git commit *)"
     ]
   }
 }

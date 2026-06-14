@@ -36,6 +36,14 @@
     color: #111827;
     direction: rtl;
   }
+
+  /* כל שדות הטופס יירשו RTL אוטומטית, אלא אם סומנו dir="ltr" */
+  input:not([dir="ltr"]),
+  textarea:not([dir="ltr"]),
+  select:not([dir="ltr"]) {
+    direction: rtl;
+    text-align: right;
+  }
 }
 
 /* ───────────────────────────────────────

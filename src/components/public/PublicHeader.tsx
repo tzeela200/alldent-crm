@@ -232,7 +232,7 @@ export function SiteHeader() {
           <div className="flex items-center gap-2">
             <Link
               to="/jobs"
-              className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-[#D97706] text-white text-[13.5px] font-bold rounded-xl hover:bg-[#B45309] transition-colors"
+              className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-[#D97706] text-white text-[13.5px] font-bold rounded-[16px] shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#B45309] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200"
             >
               <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
               חפש משרה
@@ -270,7 +270,7 @@ export function SiteHeader() {
             <Link
               to="/jobs"
               onClick={() => setMobileOpen(false)}
-              className="flex items-center justify-center gap-2 w-full py-4 bg-[#D97706] text-white text-[15px] font-bold rounded-2xl hover:bg-[#B45309] transition-colors min-h-[44px]"
+              className="flex items-center justify-center gap-2 w-full py-4 bg-[#D97706] text-white text-[15px] font-bold rounded-[20px] shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#B45309] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200 min-h-[44px]"
             >
               <Briefcase className="h-4 w-4" aria-hidden="true" />
               חפש משרה עכשיו

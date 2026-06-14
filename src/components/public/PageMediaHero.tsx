@@ -53,7 +53,7 @@ export function PageMediaHero({
           </h1>
 
           {subtitle && (
-            <p className="text-[15px] md:text-[17px] text-[#6B6B6B] leading-relaxed max-w-2xl mr-auto">
+            <p className="text-[15px] md:text-[17px] text-[#6B6B6B] leading-relaxed max-w-2xl">
               {subtitle}
             </p>
           )}
