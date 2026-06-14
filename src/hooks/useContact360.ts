@@ -117,6 +117,8 @@ export interface ApplicationRow {
   job_city: string | null;
   job_region: string | null;
   candidate_name: string | null;
+  has_cv: boolean | null;
+  cv_link: string | null;
 }
 
 export interface ContactTagRow {

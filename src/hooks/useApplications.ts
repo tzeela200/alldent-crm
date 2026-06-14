@@ -100,7 +100,7 @@ export function useApplicationKPIs() {
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })
-            .is('cv_link', null),
+            .or('has_cv.is.null,has_cv.eq.false'),
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })

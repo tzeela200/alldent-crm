@@ -6,6 +6,8 @@ import type { ApplicationRow } from '@/types/applications'
 /** Status 12 = "השמה (התקבל)" — triggers job.job_status = 5 ("מאוישת"). */
 const HIRE_STATUS = 12
 const HIRED_JOB_STATUS = 5
+/** Status 15 = "לא דנטלי - ארכיון" */
+const ARCHIVE_STATUS = 15
 
 async function triggerHireIfNeeded(status: number, jobCode: string | null | undefined) {
   if (status !== HIRE_STATUS || !jobCode) return
@@ -165,6 +167,84 @@ export function useApplicationMutations() {
     onError: (err: Error) => toast.error(err.message),
   })
 
+  /** Create a contact record from application data and link it back. */
+  const createContactFromApplication = useMutation({
+    mutationFn: async (app: ApplicationRow) => {
+      const { data: contact, error: contactError } = await supabase
+        .from('contact')
+        .insert({
+          display_name: app.candidate_name,
+          phone: app.candidate_phone,
+          phone_norm: app.phone_norm,
+          email: app.candidate_email,
+          cv_link: app.cv_link,
+          has_cv: app.has_cv ?? false,
+          cv_received_date: app.cv_received_date,
+          source: app.source,
+        })
+        .select('contact_id')
+        .single()
+      if (contactError) throw contactError
+
+      const { error: updateError } = await supabase
+        .from('applications')
+        .update({ candidate_link: contact.contact_id, is_new_candidate: false })
+        .eq('application_id', app.application_id)
+      if (updateError) throw updateError
+    },
+    onSuccess: () => {
+      invalidate()
+      toast.success('פרופיל נוצר בהצלחה')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  /** Send application data as a new lead to inbox_v2 (application stays in applications). */
+  const sendToLeadsV2 = useMutation({
+    mutationFn: async (app: ApplicationRow) => {
+      const { error } = await supabase.from('inbox_v2').insert({
+        display_name: app.candidate_name,
+        phone: app.candidate_phone,
+        phone_norm: app.phone_norm,
+        email: app.candidate_email,
+        source_name: 'הגשת מועמדות באתר',
+        source_unique_key: `application_${app.application_id}_${app.job_code}`,
+        notes: `הגשה ממשרה ${app.job_code ?? ''}${app.candidate_notes ? ' — ' + app.candidate_notes : ''}`,
+        raw_payload: {
+          application_id: app.application_id,
+          job_code: app.job_code,
+          candidate_name: app.candidate_name,
+          candidate_phone: app.candidate_phone,
+          candidate_email: app.candidate_email,
+          submission_date: app.submission_date,
+          source: app.source,
+        },
+        temp_role: null,
+        temp_region_id: app.job_region_id ?? null,
+        temp_city_id: app.job_city_id ?? null,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => toast.success('נשלח ללידים בהצלחה'),
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  /** Set application status to 15 = "לא דנטלי - ארכיון". */
+  const archiveApplication = useMutation({
+    mutationFn: async (applicationId: number) => {
+      const { error } = await supabase
+        .from('applications')
+        .update({ application_status: ARCHIVE_STATUS, updated_timestamp: new Date().toISOString() })
+        .eq('application_id', applicationId)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidate()
+      toast.success('הועבר לארכיון')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
   return {
     updateApplication,
     bulkUpdateStatus,
@@ -172,5 +252,8 @@ export function useApplicationMutations() {
     bulkAssign,
     bulkSetFollowUp,
     createApplication,
+    createContactFromApplication,
+    sendToLeadsV2,
+    archiveApplication,
   }
 }

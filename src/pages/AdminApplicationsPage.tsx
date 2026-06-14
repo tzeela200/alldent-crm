@@ -52,8 +52,15 @@ export default function AdminApplicationsPage() {
   const { data, isLoading } = useApplicationRows(filters, page)
   const { data: kpis } = useApplicationKPIs()
   const { data: dicts } = useApplicationDicts()
-  const { bulkUpdateStatus, bulkUpdateCheckStatus, bulkAssign, bulkSetFollowUp } =
-    useApplicationMutations()
+  const {
+    bulkUpdateStatus,
+    bulkUpdateCheckStatus,
+    bulkAssign,
+    bulkSetFollowUp,
+    createContactFromApplication,
+    sendToLeadsV2,
+    archiveApplication,
+  } = useApplicationMutations()
 
   const rows = data?.rows ?? []
   const total = data?.total ?? 0
@@ -392,8 +399,12 @@ export default function AdminApplicationsPage() {
         ) : rows.length === 0 ? (
           <EmptyState
             icon={ClipboardList}
-            title="אין הגשות"
-            description="נסו לשנות את הסינון"
+            title={Object.keys(filters).length === 0 ? 'אין עדיין הגשות' : 'אין הגשות התואמות את הסינון'}
+            description={
+              Object.keys(filters).length === 0
+                ? 'ברגע שמועמדים יגישו מועמדות מהאתר הציבורי, ההגשות יופיעו כאן.'
+                : 'נסו לשנות את הסינון'
+            }
           />
         ) : viewMode === 'table' ? (
           <ApplicationsTable
@@ -404,6 +415,9 @@ export default function AdminApplicationsPage() {
             onToggleRow={toggleRow}
             onRowClick={setDetailAppId}
             dicts={dicts}
+            onCreateContact={(app) => createContactFromApplication.mutate(app)}
+            onSendToLeads={(app) => sendToLeadsV2.mutate(app)}
+            onArchive={(id) => archiveApplication.mutate(id)}
           />
         ) : (
           <ApplicationsGrid rows={rows} onRowClick={setDetailAppId} dicts={dicts} />
@@ -478,6 +492,9 @@ function ApplicationsTable({
   onToggleRow,
   onRowClick,
   dicts,
+  onCreateContact,
+  onSendToLeads,
+  onArchive,
 }: {
   rows: ApplicationRow[]
   selectedIds: number[]
@@ -486,10 +503,13 @@ function ApplicationsTable({
   onToggleRow: (id: number) => void
   onRowClick: (id: number) => void
   dicts: ReturnType<typeof useApplicationDicts>['data']
+  onCreateContact: (app: ApplicationRow) => void
+  onSendToLeads: (app: ApplicationRow) => void
+  onArchive: (id: number) => void
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1300px] text-sm">
+      <table className="w-full min-w-[1400px] text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-right text-xs font-medium text-slate-500">
             <th className="w-10 px-3 py-2">
@@ -500,17 +520,17 @@ function ApplicationsTable({
                 className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
               />
             </th>
-            <th className="px-3 py-2">שם מועמד</th>
-            <th className="px-3 py-2">טלפון</th>
+            <th className="px-3 py-2">שם</th>
+            <th className="px-3 py-2">נייד</th>
+            <th className="px-3 py-2">מצב פרופיל</th>
             <th className="px-3 py-2">קוד משרה</th>
             <th className="px-3 py-2">תפקיד</th>
             <th className="px-3 py-2">אזור</th>
-            <th className="px-3 py-2">מעסיק</th>
+            <th className="px-3 py-2">שם מעסיק</th>
             <th className="px-3 py-2">סטטוס הגשה</th>
-            <th className="px-3 py-2">סטטוס בדיקה</th>
             <th className="px-3 py-2">קו"ח</th>
+            <th className="px-3 py-2">מקור</th>
             <th className="px-3 py-2">תאריך הגשה</th>
-            <th className="px-3 py-2">מוקצה ל</th>
             <th className="px-3 py-2">הערות</th>
             <th className="px-3 py-2">פעולות</th>
           </tr>
@@ -520,8 +540,9 @@ function ApplicationsTable({
             const appBadge = getStatusBadge(applicationStatusColors, row.application_status)
             const checkBadge = getStatusBadge(checkStatusColors, row.check_status)
             const appLabel = getDictLabel(dicts?.applicationStatuses, row.application_status) || appBadge.label
-            const checkLabel = getDictLabel(dicts?.checkStatuses, row.check_status) || checkBadge.label
+            const sourceLabel = getDictLabel(dicts?.sources, row.source)
             const isSelected = selectedIds.includes(row.application_id)
+            const isNewWithNoProfile = row.is_new_candidate && !row.candidate_link
             return (
               <tr
                 key={row.application_id}
@@ -535,19 +556,22 @@ function ApplicationsTable({
                     className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                   />
                 </td>
+                {/* שם — contact name if linked, otherwise candidate_name */}
                 <td
                   className="cursor-pointer px-3 py-2 font-medium text-slate-900 hover:text-teal-700"
                   onClick={() => onRowClick(row.application_id)}
                 >
                   {row.candidate_name ?? '—'}
-                  {row.is_new_candidate && (
-                    <span className="mr-1 inline-block rounded-full bg-blue-100 px-1.5 py-0.5 text-[9px] font-bold text-blue-600">
-                      חדש
-                    </span>
-                  )}
                 </td>
                 <td className="px-3 py-2 font-mono text-xs text-slate-600" dir="ltr">
                   {row.candidate_phone ?? '—'}
+                </td>
+                {/* מצב פרופיל */}
+                <td className="px-3 py-2">
+                  {row.is_new_candidate
+                    ? <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">לא קיים פרופיל</span>
+                    : <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[10px] text-teal-700">קיים פרופיל</span>
+                  }
                 </td>
                 <td className="px-3 py-2 font-mono text-xs font-semibold text-slate-700">
                   {row.job_code ?? '—'}
@@ -556,67 +580,78 @@ function ApplicationsTable({
                 <td className="px-3 py-2 text-xs text-slate-500">{row.job_region ?? '—'}</td>
                 <td className="px-3 py-2 text-xs text-slate-600">{row.account_name ?? '—'}</td>
                 <td className="px-3 py-2">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-medium ${appBadge.bg} ${appBadge.text}`}
-                  >
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${appBadge.bg} ${appBadge.text}`}>
                     {appLabel}
                   </span>
                 </td>
+                {/* קו"ח */}
                 <td className="px-3 py-2">
-                  {row.check_status != null ? (
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs ${checkBadge.bg} ${checkBadge.text}`}
-                    >
-                      {checkLabel}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-slate-300">—</span>
-                  )}
-                </td>
-                <td className="px-3 py-2">
-                  {row.cv_link ? (
+                  {row.has_cv && row.cv_link ? (
                     <a
                       href={row.cv_link}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={(e) => e.stopPropagation()}
-                      className="text-xs text-blue-600 hover:underline"
+                      className="text-xs text-blue-600 hover:underline whitespace-nowrap"
                     >
-                      קו"ח ↗
+                      צפייה / הורדה ↗
                     </a>
                   ) : (
-                    <span className="text-xs text-slate-300">—</span>
+                    <span className="text-xs text-slate-300">אין קו"ח</span>
                   )}
                 </td>
+                {/* מקור */}
+                <td className="px-3 py-2 text-xs text-slate-500">{sourceLabel || '—'}</td>
                 <td className="px-3 py-2 text-xs text-slate-400">
                   {formatDate(row.submission_date)}
                 </td>
-                <td className="px-3 py-2 text-xs text-slate-500">{row.assigned_to ?? '—'}</td>
                 <td className="max-w-[120px] truncate px-3 py-2 text-xs text-slate-400">
                   {row.internal_notes ?? '—'}
                 </td>
-                <td
-                  className="px-3 py-2"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <div className="flex items-center gap-2">
-                    {row.candidate_phone && (
-                      <a
-                        href={whatsappLink(row.candidate_phone)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-green-600 hover:text-green-800"
-                        title="WhatsApp"
+                <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-col gap-1">
+                    <div className="flex items-center gap-2">
+                      {row.candidate_phone && (
+                        <a
+                          href={whatsappLink(row.candidate_phone)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-600 hover:text-green-800"
+                          title="WhatsApp"
+                        >
+                          💬
+                        </a>
+                      )}
+                      <button
+                        onClick={() => onRowClick(row.application_id)}
+                        className="text-xs font-medium text-teal-600 hover:text-teal-800 whitespace-nowrap"
                       >
-                        💬
-                      </a>
+                        פרטים
+                      </button>
+                    </div>
+                    {/* פעולות למועמד ללא פרופיל */}
+                    {isNewWithNoProfile && (
+                      <div className="flex flex-col gap-0.5">
+                        <button
+                          onClick={() => onCreateContact(row)}
+                          className="text-[10px] font-medium text-blue-600 hover:text-blue-800 text-right whitespace-nowrap"
+                        >
+                          הקם פרופיל
+                        </button>
+                        <button
+                          onClick={() => onSendToLeads(row)}
+                          className="text-[10px] font-medium text-amber-600 hover:text-amber-800 text-right whitespace-nowrap"
+                        >
+                          שלח ללידים
+                        </button>
+                        <button
+                          onClick={() => onArchive(row.application_id)}
+                          className="text-[10px] font-medium text-slate-400 hover:text-slate-600 text-right whitespace-nowrap"
+                        >
+                          ארכיון
+                        </button>
+                      </div>
                     )}
-                    <button
-                      onClick={() => onRowClick(row.application_id)}
-                      className="text-xs font-medium text-teal-600 hover:text-teal-800"
-                    >
-                      פרטים
-                    </button>
                   </div>
                 </td>
               </tr>

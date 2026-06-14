@@ -849,6 +849,7 @@ export default function Candidate360Page() {
                           <TableHead className="text-right text-xs font-semibold text-slate-500">סטטוס</TableHead>
                           <TableHead className="text-right text-xs font-semibold text-slate-500">תאריך</TableHead>
                           <TableHead className="text-right text-xs font-semibold text-slate-500">אזור</TableHead>
+                          <TableHead className="text-right text-xs font-semibold text-slate-500">קו"ח</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -867,6 +868,20 @@ export default function Candidate360Page() {
                             <TableCell className="text-sm text-slate-500">{formatDate(app.submission_date)}</TableCell>
                             <TableCell className="text-sm text-slate-500">
                               {[app.job_region, app.job_city].filter(Boolean).join(" · ") || "—"}
+                            </TableCell>
+                            <TableCell className="text-sm">
+                              {app.has_cv && app.cv_link ? (
+                                <a
+                                  href={app.cv_link}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-blue-600 hover:underline"
+                                >
+                                  צפייה
+                                </a>
+                              ) : (
+                                <span className="text-slate-300">—</span>
+                              )}
                             </TableCell>
                           </TableRow>
                         ))}

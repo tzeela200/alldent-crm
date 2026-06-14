@@ -137,6 +137,9 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
         is_new_candidate: false,
         follow_up_date: null,
         assigned_to: null,
+        has_cv: selectedContact.has_cv ?? null,
+        cv_storage_path: null,
+        cv_received_date: null,
       })
       toast.success('הגשה ידנית נוצרה בהצלחה')
       onCreated(id)

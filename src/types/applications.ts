@@ -33,6 +33,9 @@ export interface ApplicationRow {
   account_link: number | null
   follow_up_date: string | null
   assigned_to: string | null
+  has_cv: boolean | null
+  cv_storage_path: string | null
+  cv_received_date: string | null
 }
 
 export type CvFilter = 'all' | 'with' | 'without'
