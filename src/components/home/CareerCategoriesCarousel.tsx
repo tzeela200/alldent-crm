@@ -76,15 +76,16 @@ export function CareerCategoriesCarousel() {
             return (
               <Link
                 key={role.slug}
-                to={`/jobs?role=${role.slug}`}
-                aria-label={`משרות ל${role.label}`}
-                className="group absolute left-1/2 top-0 block w-[72vw] max-w-[330px] -translate-x-1/2 transition-[transform,opacity,filter] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] sm:w-[46vw] md:max-w-[380px]"
+                to={`/jobs/role/${role.slug}`}
+                aria-label={role.longTitle}
+                className="absolute left-1/2 top-0 block w-[72vw] max-w-[330px] -translate-x-1/2 transition-[transform,opacity,filter] duration-700 sm:w-[46vw] md:max-w-[380px]"
                 style={{
                   transform: `translateX(calc(-50% + ${x}px)) scale(${scale})`,
                   opacity,
                   filter: blur ? `blur(${blur}px)` : 'none',
                   zIndex,
                   pointerEvents: abs > 2 ? 'none' : 'auto',
+                  transitionTimingFunction: 'cubic-bezier(0.22,1,0.36,1)',
                 }}
               >
                 <article className="relative h-[390px] overflow-hidden rounded-[32px] bg-[#111] shadow-[0_32px_90px_-42px_rgba(0,0,0,0.75)] md:h-[520px]">
@@ -93,20 +94,8 @@ export function CareerCategoriesCarousel() {
                     alt={role.label}
                     loading="lazy"
                     decoding="async"
-                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 hover:scale-[1.04]"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/78 via-black/22 to-black/10" />
-                  <div className="absolute inset-x-0 bottom-0 p-7 text-white md:p-8">
-                    <p className="mb-3 inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[12px] font-bold text-white/80 backdrop-blur">
-                      {role.longTitle}
-                    </p>
-                    <h3 className="text-[31px] font-black leading-[1.05] tracking-[-0.02em] md:text-[44px]">
-                      {role.label}
-                    </h3>
-                    <p className="mt-3 line-clamp-2 text-[14px] leading-relaxed text-white/72 md:text-[15px]">
-                      {role.description}
-                    </p>
-                  </div>
                 </article>
               </Link>
             )

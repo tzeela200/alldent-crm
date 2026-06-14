@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route } from 'react-router-dom'
 
 // Layouts
 import AdminLayout from '@/components/layout/AdminLayout'
@@ -22,9 +22,19 @@ import SmartMatchPage from '@/pages/SmartMatchPage'
 import InboxV2Page from '@/pages/InboxV2Page'
 import CandidateProfilePage from '@/pages/CandidateProfilePage'
 import EmployerProfilePage from '@/pages/EmployerProfilePage'
+
+// Public pages
 import PublicHomePage from '@/pages/PublicHomePage'
 import PublicJobsPage from '@/pages/PublicJobsPage'
 import PublicJobPage from '@/pages/PublicJobPage'
+import PublicRoleJobsPage from '@/pages/PublicRoleJobsPage'
+import EmployersPage from '@/pages/EmployersPage'
+import EmployersDiscreetPage from '@/pages/EmployersDiscreetPage'
+import EmployersBrandingPage from '@/pages/EmployersBrandingPage'
+import DentalShopPage from '@/pages/DentalShopPage'
+import DentalAssetsPage from '@/pages/DentalAssetsPage'
+import ClassDentalPage from '@/pages/ClassDentalPage'
+import ContactPage from '@/pages/ContactPage'
 
 export default function App() {
   return (
@@ -32,14 +42,32 @@ export default function App() {
       {/* ─── Public routes (with PublicLayout) ─── */}
       <Route element={<PublicLayout />}>
         <Route path="/" element={<PublicHomePage />} />
+
+        {/* Jobs — /jobs/role/:role must come before /jobs/:jobCode */}
         <Route path="/jobs" element={<PublicJobsPage />} />
+        <Route path="/jobs/role/:role" element={<PublicRoleJobsPage />} />
         <Route path="/jobs/:jobCode" element={<PublicJobPage />} />
+
+        {/* Employers */}
+        <Route path="/employers" element={<EmployersPage />} />
+        <Route path="/employers/discreet" element={<EmployersDiscreetPage />} />
+        <Route path="/employers/branding" element={<EmployersBrandingPage />} />
+
+        {/* Dental services */}
+        <Route path="/dental-shop" element={<DentalShopPage />} />
+        <Route path="/dental-assets" element={<DentalAssetsPage />} />
+        <Route path="/class-dental" element={<ClassDentalPage />} />
+
+        {/* Contact */}
+        <Route path="/contact" element={<ContactPage />} />
       </Route>
+
+      {/* ─── Profile routes (no layout) ─── */}
       <Route path="/candidate/:contactId" element={<CandidateProfilePage />} />
       <Route path="/profile/:token" element={<CandidateProfilePage />} />
       <Route path="/employer-profile/:id" element={<EmployerProfilePage />} />
 
-      {/* ─── Admin routes (with AppSidebar) ─── */}
+      {/* ─── Admin routes (with AdminLayout) ─── */}
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<DashboardPage />} />
         <Route path="dashboard" element={<DashboardPage />} />

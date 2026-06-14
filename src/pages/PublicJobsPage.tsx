@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { JobCard } from '@/components/JobCard'
-import { SiteHeader } from '@/components/public/PublicHeader'
-import { SiteFooter } from '@/components/public/SiteFooter'
 import { usePublicJobs, usePublicJobFilters } from '@/hooks/usePublicJobs'
 import type { PublicJobFilters } from '@/services/publicJobsService'
+import { PageMediaHero } from '@/components/public/PageMediaHero'
 
 export default function PublicJobsPage() {
   const [search, setSearch] = useState('')
@@ -18,40 +17,35 @@ export default function PublicJobsPage() {
   const { roles } = usePublicJobFilters(jobs)
 
   return (
-    <div className="bg-[#FAFAF6] min-h-screen">
+    <div className="bg-[#FAFAF7] min-h-screen" dir="rtl">
 
-      <SiteHeader />
+      <PageMediaHero
+        badge="לוח משרות דנטלי"
+        title="לוח משרות דנטלי"
+        subtitle="כל המשרות בעולם הדנטל במקום אחד — רופאים, מומחים, שינניות, סייעות, מזכירות, ניהול וטכנאים."
+        image="/images/page-heroes/jobs-board.jpg"
+        imageAlt="לוח משרות דנטלי AllDent"
+      >
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="חיפוש לפי תפקיד, עיר..."
+          className="px-5 py-3 rounded-full text-[#0F0F10] border border-[#D9D9D9] bg-white outline-none focus:border-[#008080] transition-colors text-[14px] w-full sm:max-w-xs min-h-[44px]"
+          aria-label="חיפוש משרות"
+        />
+      </PageMediaHero>
 
-      {/* HERO */}
-      <section className="bg-[#2D2D2D] text-white py-14">
-        <div className="max-w-6xl mx-auto px-6 text-right">
-          <h1 className="text-[32px] md:text-[40px] font-semibold mb-4">
-            לוח משרות דנטלי
-          </h1>
-          <p className="text-white/70 mb-6">
-            חפשו הזדמנויות בתחום הדנטלי בצורה פשוטה ונוחה
-          </p>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="חיפוש לפי תפקיד, עיר..."
-            className="px-5 py-3 rounded-full text-black w-full max-w-md outline-none"
-          />
-        </div>
-      </section>
+      <section className="max-w-6xl mx-auto px-4 md:px-8 pb-16">
 
-      {/* CONTENT */}
-      <section className="max-w-6xl mx-auto px-6 py-16">
-
-        {/* FILTERS */}
+        {/* ROLE FILTERS */}
         {roles.length > 0 && (
-          <div className="flex flex-wrap gap-3 mb-10 justify-end">
+          <div className="flex flex-wrap gap-2 mb-8 justify-end">
             <button
               onClick={() => setActiveRole(null)}
-              className={`px-4 py-2 text-[14px] rounded-full border transition ${
+              className={`px-4 py-2 text-[13px] font-medium rounded-full border transition min-h-[44px] ${
                 activeRole === null
-                  ? 'bg-[#2D2D2D] text-white border-transparent'
-                  : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                  ? 'bg-[#0F0F10] text-white border-transparent'
+                  : 'bg-white text-[#6B6B6B] border-[#D9D9D9] hover:bg-[#F4F5F4]'
               }`}
             >
               הכל
@@ -60,10 +54,10 @@ export default function PublicJobsPage() {
               <button
                 key={role}
                 onClick={() => setActiveRole(role)}
-                className={`px-4 py-2 text-[14px] rounded-full border transition ${
+                className={`px-4 py-2 text-[13px] font-medium rounded-full border transition min-h-[44px] ${
                   activeRole === role
-                    ? 'bg-[#2D2D2D] text-white border-transparent'
-                    : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50'
+                    ? 'bg-[#0F0F10] text-white border-transparent'
+                    : 'bg-white text-[#6B6B6B] border-[#D9D9D9] hover:bg-[#F4F5F4]'
                 }`}
               >
                 {role}
@@ -72,16 +66,16 @@ export default function PublicJobsPage() {
           </div>
         )}
 
-        {/* GRID */}
-        <div className="bg-white rounded-3xl p-8 shadow-sm">
+        {/* JOB GRID */}
+        <div className="bg-white rounded-[24px] p-5 md:p-8 shadow-sm border border-[#E0E0E0]">
           {isLoading ? (
             <div className="flex justify-center py-12">
               <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#008080]" />
             </div>
           ) : !jobs?.length ? (
-            <p className="py-12 text-center text-slate-400">לא נמצאו משרות</p>
+            <p className="py-12 text-center text-[#6B6B6B]">לא נמצאו משרות</p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {jobs.map((job) => (
                 <JobCard
                   key={job.job_code}
@@ -99,9 +93,6 @@ export default function PublicJobsPage() {
         </div>
 
       </section>
-
-      <SiteFooter />
-
     </div>
   )
 }
