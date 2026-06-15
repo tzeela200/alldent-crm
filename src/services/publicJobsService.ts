@@ -199,7 +199,7 @@ export async function getPublicJobs(filters: PublicJobFilters = {}): Promise<Pub
     )
   }
 
-  if (filters.role) query = query.eq('job_role_name', filters.role)
+  if (filters.role) query = query.ilike('job_role_name', `%${filters.role}%`)
   if (filters.region) query = query.eq('region_name', filters.region)
   if (filters.city) query = query.eq('city_name', filters.city)
   if (filters.experience) query = query.eq('required_experience_name', filters.experience)

@@ -1,4 +1,25 @@
 {
+  "redirects": [
+    { "source": "/dental-assistant-job", "destination": "/jobs/role/assistants", "permanent": true },
+    { "source": "/job.dentists",          "destination": "/jobs/role/dentists",   "permanent": true },
+    { "source": "/Dental-secretary",      "destination": "/jobs/role/secretaries","permanent": true },
+    { "source": "/Dental-techniques",     "destination": "/jobs/role/technicians","permanent": true },
+    { "source": "/hygiene-job",           "destination": "/jobs/role/hygienists", "permanent": true },
+    { "source": "/clinic-manager-job",    "destination": "/jobs/role/managers",   "permanent": true },
+    { "source": "/arc-ortho",             "destination": "/jobs/role/specialists","permanent": true },
+    { "source": "/dentjob",               "destination": "/jobs",                 "permanent": true },
+    { "source": "/Dental-job-Employers",  "destination": "/employers",            "permanent": true },
+    { "source": "/Employer-Branding",     "destination": "/employers",            "permanent": true },
+    { "source": "/home",                  "destination": "/",                     "permanent": true },
+    { "source": "/home-dent",             "destination": "/",                     "permanent": true },
+    { "source": "/home-dent-point",       "destination": "/",                     "permanent": true },
+    { "source": "/north",                 "destination": "/jobs",                 "permanent": true },
+    { "source": "/south",                 "destination": "/jobs",                 "permanent": true },
+    { "source": "/centeral",              "destination": "/jobs",                 "permanent": true },
+    { "source": "/Jerusalem",             "destination": "/jobs",                 "permanent": true },
+    { "source": "/Sharon",                "destination": "/jobs",                 "permanent": true },
+    { "source": "/Sharon-clinic",         "destination": "/jobs",                 "permanent": true }
+  ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

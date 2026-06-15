@@ -1,5 +1,10 @@
 import { Routes, Route } from 'react-router-dom'
 
+// Auth
+import { AuthProvider } from '@/contexts/AuthContext'
+import AuthGuard from '@/components/auth/AuthGuard'
+import LoginPage from '@/pages/LoginPage'
+
 // Layouts
 import AdminLayout from '@/components/layout/AdminLayout'
 import PublicLayout from '@/components/layout/PublicLayout'
@@ -39,6 +44,7 @@ import ContactPage from '@/pages/ContactPage'
 
 export default function App() {
   return (
+    <AuthProvider>
     <PublicLaunchGate>
     <Routes>
       {/* ─── Public routes (with PublicLayout) ─── */}
@@ -64,13 +70,16 @@ export default function App() {
         <Route path="/contact" element={<ContactPage />} />
       </Route>
 
+      {/* ─── Login ─── */}
+      <Route path="/login" element={<LoginPage />} />
+
       {/* ─── Profile routes (no layout) ─── */}
       <Route path="/candidate/:contactId" element={<CandidateProfilePage />} />
       <Route path="/profile/:token" element={<CandidateProfilePage />} />
       <Route path="/employer-profile/:id" element={<EmployerProfilePage />} />
 
-      {/* ─── Admin routes (with AdminLayout) ─── */}
-      <Route path="/admin" element={<AdminLayout />}>
+      {/* ─── Admin routes (with AdminLayout, auth-protected) ─── */}
+      <Route path="/admin" element={<AuthGuard><AdminLayout /></AuthGuard>}>
         <Route index element={<DashboardPage />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="inbox" element={<InboxPage />} />
@@ -103,5 +112,6 @@ export default function App() {
       </Route>
     </Routes>
     </PublicLaunchGate>
+    </AuthProvider>
   )
 }

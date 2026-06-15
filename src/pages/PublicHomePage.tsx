@@ -151,11 +151,11 @@ export default function PublicHomePage() {
           </RevealOnScroll>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {Array.from({ length: 4 }).map((_, i) => <PublicJobSkeleton key={i} />)}
             </div>
           ) : featuredJobs.length > 0 ? (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {featuredJobs.map((job, i) => (
                 <RevealOnScroll key={job.job_code} delay={i * 80}>
                   <PublicJobCard job={job} />
