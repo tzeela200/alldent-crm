@@ -6,7 +6,7 @@ export default function AdminAccountsPage() {
       viewMode="accounts"
       initialTab="all"
       pageTitle="ארגונים"
-      pageSubtitle="כל הארגונים במערכת — כולל ארגונים ללא משרות"
+      pageSubtitle="כל הארגונים במערכת — כולל ארגונים בלי משרות"
     />
   )
 }

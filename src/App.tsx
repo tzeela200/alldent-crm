@@ -25,6 +25,7 @@ import EmployerProfilePage from '@/pages/EmployerProfilePage'
 
 // Public pages
 import PublicHomePage from '@/pages/PublicHomePage'
+import { PublicLaunchGate } from '@/components/public/PublicLaunchGate'
 import PublicJobsPage from '@/pages/PublicJobsPage'
 import PublicJobPage from '@/pages/PublicJobPage'
 import PublicRoleJobsPage from '@/pages/PublicRoleJobsPage'
@@ -38,6 +39,7 @@ import ContactPage from '@/pages/ContactPage'
 
 export default function App() {
   return (
+    <PublicLaunchGate>
     <Routes>
       {/* ─── Public routes (with PublicLayout) ─── */}
       <Route element={<PublicLayout />}>
@@ -100,5 +102,6 @@ export default function App() {
         <Route path="smart-match" element={<SmartMatchPage />} />
       </Route>
     </Routes>
+    </PublicLaunchGate>
   )
 }

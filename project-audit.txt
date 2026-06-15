@@ -1,0 +1,1430 @@
+﻿=== PROJECT ROOT ===
+C:\Users\Allbi\alldent-crm
+
+=== PROJECT TREE ===
+
+FullName                                                                  
+--------                                                                  
+C:\Users\Allbi\alldent-crm\.claude                                        
+C:\Users\Allbi\alldent-crm\.cursor                                        
+C:\Users\Allbi\alldent-crm\.git                                           
+C:\Users\Allbi\alldent-crm\dist                                           
+C:\Users\Allbi\alldent-crm\docs                                           
+C:\Users\Allbi\alldent-crm\node_modules                                   
+C:\Users\Allbi\alldent-crm\public                                         
+C:\Users\Allbi\alldent-crm\sql_chunks                                     
+C:\Users\Allbi\alldent-crm\src                                            
+C:\Users\Allbi\alldent-crm\.cursorrules                                   
+C:\Users\Allbi\alldent-crm\.env.local                                     
+C:\Users\Allbi\alldent-crm\.gitattributes                                 
+C:\Users\Allbi\alldent-crm\.gitignore                                     
+C:\Users\Allbi\alldent-crm\build_cities_sql.py                            
+C:\Users\Allbi\alldent-crm\create_missing_employer_accounts.py            
+C:\Users\Allbi\alldent-crm\CUsersAllbialldent-crmsql_chunksall_chunks.txt
+C:\Users\Allbi\alldent-crm\identify_org_contacts.py                       
+C:\Users\Allbi\alldent-crm\import_contacts.py                             
+C:\Users\Allbi\alldent-crm\import_employers_csv.py                        
+C:\Users\Allbi\alldent-crm\import_errors.xlsx                             
+C:\Users\Allbi\alldent-crm\import_jobs_from_csv.py                        
+C:\Users\Allbi\alldent-crm\import_leads_only.py                           
+C:\Users\Allbi\alldent-crm\index.html                                     
+C:\Users\Allbi\alldent-crm\jobs_batch_1.sql                               
+C:\Users\Allbi\alldent-crm\jobs_batch_2.sql                               
+C:\Users\Allbi\alldent-crm\jobs_batch_3.sql                               
+C:\Users\Allbi\alldent-crm\jobs_batch_4.sql                               
+C:\Users\Allbi\alldent-crm\link_jobs_to_accounts.py                       
+C:\Users\Allbi\alldent-crm\link_jobs_unmatched.json                       
+C:\Users\Allbi\alldent-crm\package-lock.json                              
+C:\Users\Allbi\alldent-crm\package.json                                   
+C:\Users\Allbi\alldent-crm\postcss.config.js                              
+C:\Users\Allbi\alldent-crm\project-audit.txt                              
+C:\Users\Allbi\alldent-crm\tailwind.config.ts                             
+C:\Users\Allbi\alldent-crm\tsconfig.json                                  
+C:\Users\Allbi\alldent-crm\tsconfig.tsbuildinfo                           
+C:\Users\Allbi\alldent-crm\vite.config.ts                                 
+C:\Users\Allbi\alldent-crm\.claude\launch.json                            
+C:\Users\Allbi\alldent-crm\.claude\settings.local.json                    
+C:\Users\Allbi\alldent-crm\.cursor\settings.json                          
+C:\Users\Allbi\alldent-crm\docs\plans                                     
+C:\Users\Allbi\alldent-crm\docs\public-jobs-api.md                        
+C:\Users\Allbi\alldent-crm\docs\plans\candidate-profile-system.md         
+C:\Users\Allbi\alldent-crm\public\images                                  
+C:\Users\Allbi\alldent-crm\public\PublicHomePage.tsx                      
+C:\Users\Allbi\alldent-crm\public\PublicJobPage.tsx                       
+C:\Users\Allbi\alldent-crm\public\PublicJobsPage.tsx                      
+C:\Users\Allbi\alldent-crm\public\images\fallback                         
+C:\Users\Allbi\alldent-crm\public\images\jobs                             
+C:\Users\Allbi\alldent-crm\public\images\page-heroes                      
+C:\Users\Allbi\alldent-crm\public\images\professions                      
+C:\Users\Allbi\alldent-crm\public\images\logo-teal.png                    
+C:\Users\Allbi\alldent-crm\public\images\logo.png                         
+C:\Users\Allbi\alldent-crm\public\images\fallback\clinic-manager.svg      
+C:\Users\Allbi\alldent-crm\public\images\fallback\default-dental.svg      
+C:\Users\Allbi\alldent-crm\public\images\fallback\dental-assistant.svg    
+C:\Users\Allbi\alldent-crm\public\images\fallback\dental-tech.svg         
+C:\Users\Allbi\alldent-crm\public\images\fallback\dentist.svg             
+C:\Users\Allbi\alldent-crm\public\images\fallback\hygienist.svg           
+C:\Users\Allbi\alldent-crm\public\images\fallback\receptionist.svg        
+C:\Users\Allbi\alldent-crm\public\images\fallback\sales.svg               
+C:\Users\Allbi\alldent-crm\public\images\jobs\jobs-board-cover.jpg        
+C:\Users\Allbi\alldent-crm\public\images\page-heroes\assistants.jpg       
+C:\Users\Allbi\alldent-crm\public\images\page-heroes\dentists.jpg         
+C:\Users\Allbi\alldent-crm\public\images\page-heroes\hygienists.jpg       
+C:\Users\Allbi\alldent-crm\public\images\page-heroes\jobs-board.jpg       
+C:\Users\Allbi\alldent-crm\public\images\page-heroes\managers.jpg         
+C:\Users\Allbi\alldent-crm\public\images\page-heroes\secretaries.jpg      
+C:\Users\Allbi\alldent-crm\public\images\page-heroes\specialists.jpg      
+C:\Users\Allbi\alldent-crm\public\images\page-heroes\technicians.jpg      
+C:\Users\Allbi\alldent-crm\public\images\professions\assistants.jpg       
+C:\Users\Allbi\alldent-crm\public\images\professions\dentists.jpg         
+C:\Users\Allbi\alldent-crm\public\images\professions\hygienists.jpg       
+C:\Users\Allbi\alldent-crm\public\images\professions\managers.jpg         
+C:\Users\Allbi\alldent-crm\public\images\professions\secretaries.jpg      
+C:\Users\Allbi\alldent-crm\public\images\professions\specialists.jpg      
+C:\Users\Allbi\alldent-crm\public\images\professions\technicians.jpg      
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_01.sql                       
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_01_v.sql                     
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_02.sql                       
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_02_v.sql                     
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_03.sql                       
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_03_v.sql                     
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_04.sql                       
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_04_v.sql                     
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_05.sql                       
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_05_v.sql                     
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_06.sql                       
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_06_v.sql                     
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_07.sql                       
+C:\Users\Allbi\alldent-crm\sql_chunks\cities_07_v.sql                     
+C:\Users\Allbi\alldent-crm\src\assets                                     
+C:\Users\Allbi\alldent-crm\src\components                                 
+C:\Users\Allbi\alldent-crm\src\hooks                                      
+C:\Users\Allbi\alldent-crm\src\lib                                        
+C:\Users\Allbi\alldent-crm\src\mocks                                      
+C:\Users\Allbi\alldent-crm\src\pages                                      
+C:\Users\Allbi\alldent-crm\src\services                                   
+C:\Users\Allbi\alldent-crm\src\types                                      
+C:\Users\Allbi\alldent-crm\src\App.tsx                                    
+C:\Users\Allbi\alldent-crm\src\index.css                                  
+C:\Users\Allbi\alldent-crm\src\main.tsx                                   
+C:\Users\Allbi\alldent-crm\src\vite-env.d.ts                              
+C:\Users\Allbi\alldent-crm\src\assets\professions                         
+C:\Users\Allbi\alldent-crm\src\assets\professions\1.jpg.asset.json        
+C:\Users\Allbi\alldent-crm\src\assets\professions\2.jpg.asset.json        
+C:\Users\Allbi\alldent-crm\src\assets\professions\3.jpg.asset.json        
+C:\Users\Allbi\alldent-crm\src\assets\professions\6.jpg.asset.json        
+C:\Users\Allbi\alldent-crm\src\assets\professions\7.jpg.asset.json        
+C:\Users\Allbi\alldent-crm\src\assets\professions\8.jpg.asset.json        
+C:\Users\Allbi\alldent-crm\src\assets\professions\technicians.jpg.asset...
+C:\Users\Allbi\alldent-crm\src\components\admin                           
+C:\Users\Allbi\alldent-crm\src\components\applications                    
+C:\Users\Allbi\alldent-crm\src\components\candidate                       
+C:\Users\Allbi\alldent-crm\src\components\contact                         
+C:\Users\Allbi\alldent-crm\src\components\home                            
+C:\Users\Allbi\alldent-crm\src\components\inbox-v2                        
+C:\Users\Allbi\alldent-crm\src\components\layout                          
+C:\Users\Allbi\alldent-crm\src\components\public                          
+C:\Users\Allbi\alldent-crm\src\components\ui                              
+C:\Users\Allbi\alldent-crm\src\components\JobCard.tsx                     
+C:\Users\Allbi\alldent-crm\src\components\admin\AdminBadge.tsx            
+C:\Users\Allbi\alldent-crm\src\components\admin\AdminTable.tsx            
+C:\Users\Allbi\alldent-crm\src\components\applications\ApplicationDetai...
+C:\Users\Allbi\alldent-crm\src\components\applications\ApplicationFilte...
+C:\Users\Allbi\alldent-crm\src\components\applications\ManualCreateDial...
+C:\Users\Allbi\alldent-crm\src\components\candidate\AIDocumentScanner.tsx 
+C:\Users\Allbi\alldent-crm\src\components\candidate\AIProfileWriter.tsx   
+C:\Users\Allbi\alldent-crm\src\components\candidate\ProfileEditForm.tsx   
+C:\Users\Allbi\alldent-crm\src\components\contact\BlockConditions.tsx     
+C:\Users\Allbi\alldent-crm\src\components\contact\BlockIdentity.tsx       
+C:\Users\Allbi\alldent-crm\src\components\contact\BlockProfessional.tsx   
+C:\Users\Allbi\alldent-crm\src\components\contact\BlockSocial.tsx         
+C:\Users\Allbi\alldent-crm\src\components\home\CareerCategoriesCarousel...
+C:\Users\Allbi\alldent-crm\src\components\inbox-v2\AIChatPanel.tsx        
+C:\Users\Allbi\alldent-crm\src\components\inbox-v2\CreateFromLeadDialog...
+C:\Users\Allbi\alldent-crm\src\components\inbox-v2\InboxV2Filters.tsx     
+C:\Users\Allbi\alldent-crm\src\components\inbox-v2\InboxV2QuickActions.tsx
+C:\Users\Allbi\alldent-crm\src\components\inbox-v2\InboxV2RowDetail.tsx   
+C:\Users\Allbi\alldent-crm\src\components\inbox-v2\InboxV2Table.tsx       
+C:\Users\Allbi\alldent-crm\src\components\inbox-v2\MergePanel.tsx         
+C:\Users\Allbi\alldent-crm\src\components\inbox-v2\UploadZone.tsx         
+C:\Users\Allbi\alldent-crm\src\components\layout\AdminLayout.tsx          
+C:\Users\Allbi\alldent-crm\src\components\layout\AppSidebar.tsx           
+C:\Users\Allbi\alldent-crm\src\components\layout\PublicLayout.tsx         
+C:\Users\Allbi\alldent-crm\src\components\layout\Shell.tsx                
+C:\Users\Allbi\alldent-crm\src\components\public\AnimatedCounter.tsx      
+C:\Users\Allbi\alldent-crm\src\components\public\ApplyModal.tsx           
+C:\Users\Allbi\alldent-crm\src\components\public\MagneticButton.tsx       
+C:\Users\Allbi\alldent-crm\src\components\public\Marquee.tsx              
+C:\Users\Allbi\alldent-crm\src\components\public\PageMediaHero.tsx        
+C:\Users\Allbi\alldent-crm\src\components\public\PublicHeader.tsx         
+C:\Users\Allbi\alldent-crm\src\components\public\PublicJobCard.tsx        
+C:\Users\Allbi\alldent-crm\src\components\public\PublicJobSkeleton.tsx    
+C:\Users\Allbi\alldent-crm\src\components\public\RevealOnScroll.tsx       
+C:\Users\Allbi\alldent-crm\src\components\public\SiteFooter.tsx           
+C:\Users\Allbi\alldent-crm\src\components\ui\badge.tsx                    
+C:\Users\Allbi\alldent-crm\src\components\ui\button.tsx                   
+C:\Users\Allbi\alldent-crm\src\components\ui\card.tsx                     
+C:\Users\Allbi\alldent-crm\src\components\ui\dialog.tsx                   
+C:\Users\Allbi\alldent-crm\src\components\ui\input.tsx                    
+C:\Users\Allbi\alldent-crm\src\components\ui\table.tsx                    
+C:\Users\Allbi\alldent-crm\src\components\ui\tabs.tsx                     
+C:\Users\Allbi\alldent-crm\src\components\ui\textarea.tsx                 
+C:\Users\Allbi\alldent-crm\src\hooks\useApplicationDicts.ts               
+C:\Users\Allbi\alldent-crm\src\hooks\useApplicationMutations.ts           
+C:\Users\Allbi\alldent-crm\src\hooks\useApplications.ts                   
+C:\Users\Allbi\alldent-crm\src\hooks\useCandidateProfile.ts               
+C:\Users\Allbi\alldent-crm\src\hooks\useContact360.ts                     
+C:\Users\Allbi\alldent-crm\src\hooks\useInboxV2.ts                        
+C:\Users\Allbi\alldent-crm\src\hooks\useInboxV2Matching.ts                
+C:\Users\Allbi\alldent-crm\src\hooks\useInboxV2Upload.ts                  
+C:\Users\Allbi\alldent-crm\src\hooks\useMockData.ts                       
+C:\Users\Allbi\alldent-crm\src\hooks\usePublicJobs.ts                     
+C:\Users\Allbi\alldent-crm\src\hooks\useSupabaseData.ts                   
+C:\Users\Allbi\alldent-crm\src\lib\dicts.ts                               
+C:\Users\Allbi\alldent-crm\src\lib\inbox-v2-dicts.ts                      
+C:\Users\Allbi\alldent-crm\src\lib\inbox-v2-parser.ts                     
+C:\Users\Allbi\alldent-crm\src\lib\normalizePhone.ts                      
+C:\Users\Allbi\alldent-crm\src\lib\publicJobUtils.ts                      
+C:\Users\Allbi\alldent-crm\src\lib\publicRolePages.ts                     
+C:\Users\Allbi\alldent-crm\src\lib\roles.ts                               
+C:\Users\Allbi\alldent-crm\src\lib\statusColors.ts                        
+C:\Users\Allbi\alldent-crm\src\lib\supabase.ts                            
+C:\Users\Allbi\alldent-crm\src\lib\timeAgo.ts                             
+C:\Users\Allbi\alldent-crm\src\lib\utils.ts                               
+C:\Users\Allbi\alldent-crm\src\mocks\data.ts                              
+C:\Users\Allbi\alldent-crm\src\mocks\dicts.ts                             
+C:\Users\Allbi\alldent-crm\src\mocks\joinMockData.ts                      
+C:\Users\Allbi\alldent-crm\src\mocks\validateMockData.ts                  
+C:\Users\Allbi\alldent-crm\src\pages\AdminAccountsPage.tsx                
+C:\Users\Allbi\alldent-crm\src\pages\AdminApplicationsPage.tsx            
+C:\Users\Allbi\alldent-crm\src\pages\AdminCandidatesPage.tsx              
+C:\Users\Allbi\alldent-crm\src\pages\AdminContactsPage.tsx                
+C:\Users\Allbi\alldent-crm\src\pages\AdminEmployersPage.tsx               
+C:\Users\Allbi\alldent-crm\src\pages\AdminJobsPage.tsx                    
+C:\Users\Allbi\alldent-crm\src\pages\ATSPipelinePage.tsx                  
+C:\Users\Allbi\alldent-crm\src\pages\Candidate360Page.tsx                 
+C:\Users\Allbi\alldent-crm\src\pages\CandidateProfilePage.tsx             
+C:\Users\Allbi\alldent-crm\src\pages\ClassDentalPage.tsx                  
+C:\Users\Allbi\alldent-crm\src\pages\ContactPage.tsx                      
+C:\Users\Allbi\alldent-crm\src\pages\CreateJobWizardPage.tsx              
+C:\Users\Allbi\alldent-crm\src\pages\DashboardPage.tsx                    
+C:\Users\Allbi\alldent-crm\src\pages\DentalAssetsPage.tsx                 
+C:\Users\Allbi\alldent-crm\src\pages\DentalShopPage.tsx                   
+C:\Users\Allbi\alldent-crm\src\pages\Employer360Page.tsx                  
+C:\Users\Allbi\alldent-crm\src\pages\EmployerProfilePage.tsx              
+C:\Users\Allbi\alldent-crm\src\pages\EmployersBrandingPage.tsx            
+C:\Users\Allbi\alldent-crm\src\pages\EmployersDiscreetPage.tsx            
+C:\Users\Allbi\alldent-crm\src\pages\EmployersPage.tsx                    
+C:\Users\Allbi\alldent-crm\src\pages\InboxPage.tsx                        
+C:\Users\Allbi\alldent-crm\src\pages\InboxV2Page.tsx                      
+C:\Users\Allbi\alldent-crm\src\pages\JobDetailsPage.tsx                   
+C:\Users\Allbi\alldent-crm\src\pages\PublicHomePage.tsx                   
+C:\Users\Allbi\alldent-crm\src\pages\PublicJobPage.tsx                    
+C:\Users\Allbi\alldent-crm\src\pages\PublicJobsPage.tsx                   
+C:\Users\Allbi\alldent-crm\src\pages\PublicRoleJobsPage.tsx               
+C:\Users\Allbi\alldent-crm\src\pages\SmartMatchPage.tsx                   
+C:\Users\Allbi\alldent-crm\src\services\publicJobsService.ts              
+C:\Users\Allbi\alldent-crm\src\types\applications.ts                      
+C:\Users\Allbi\alldent-crm\src\types\inbox-v2.ts                          
+C:\Users\Allbi\alldent-crm\src\types\index.ts                             
+
+
+
+=== IMPORTANT FILES CONTENT ===
+
+--- FILE: package.json ---
+{
+  "name": "alldent-crm",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@hello-pangea/dnd": "^17.0.0",
+    "@hookform/resolvers": "^3.9.0",
+    "@radix-ui/react-accordion": "^1.2.0",
+    "@radix-ui/react-alert-dialog": "^1.1.0",
+    "@radix-ui/react-avatar": "^1.1.0",
+    "@radix-ui/react-checkbox": "^1.1.0",
+    "@radix-ui/react-dialog": "^1.1.0",
+    "@radix-ui/react-dropdown-menu": "^2.1.0",
+    "@radix-ui/react-label": "^2.1.0",
+    "@radix-ui/react-popover": "^1.1.0",
+    "@radix-ui/react-progress": "^1.1.0",
+    "@radix-ui/react-scroll-area": "^1.1.0",
+    "@radix-ui/react-select": "^2.1.0",
+    "@radix-ui/react-separator": "^1.1.0",
+    "@radix-ui/react-slot": "^1.1.0",
+    "@radix-ui/react-switch": "^1.1.0",
+    "@radix-ui/react-tabs": "^1.1.0",
+    "@radix-ui/react-toast": "^1.2.0",
+    "@radix-ui/react-tooltip": "^1.1.0",
+    "@supabase/supabase-js": "^2.106.2",
+    "@tanstack/react-query": "^5.56.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
+    "framer-motion": "^11.5.0",
+    "lucide-react": "^0.441.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-hook-form": "^7.53.0",
+    "react-router-dom": "^6.26.0",
+    "recharts": "^2.12.7",
+    "sonner": "^1.5.0",
+    "tailwind-merge": "^2.5.0",
+    "tailwindcss-animate": "^1.0.7",
+    "xlsx": "^0.18.5",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.45",
+    "tailwindcss": "^3.4.10",
+    "typescript": "^5.5.3",
+    "vite": "^5.4.3"
+  }
+}
+
+
+--- FILE: vite.config.ts ---
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+import path from 'path'
+
+export default defineConfig({
+  plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
+})
+
+
+--- FILE: tsconfig.json ---
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "include": ["src"]
+}
+
+
+--- FILE: tailwind.config.ts ---
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  darkMode: ['class'],
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      fontFamily: {
+        heebo: ['Heebo', 'sans-serif'],
+        sans: ['Heebo', 'sans-serif'],
+        display: ['"Frank Ruhl Libre"', 'serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
+      },
+      transitionTimingFunction: {
+        'out-expo': 'cubic-bezier(0.16, 1, 0.3, 1)',
+        'out-quart': 'cubic-bezier(0.25, 1, 0.5, 1)',
+        'in-out-expo': 'cubic-bezier(0.87, 0, 0.13, 1)',
+      },
+      colors: {
+        border: 'hsl(var(--border))',
+        input: 'hsl(var(--input))',
+        ring: 'hsl(var(--ring))',
+        background: 'hsl(var(--background))',
+        foreground: 'hsl(var(--foreground))',
+        primary: {
+          DEFAULT: '#008080',
+          foreground: '#ffffff',
+          50: '#e6f3f3',
+          100: '#b3dada',
+          200: '#80c2c2',
+          300: '#4da9a9',
+          400: '#269191',
+          500: '#008080',
+          600: '#006b6b',
+          700: '#005757',
+          800: '#004242',
+          900: '#002e2e',
+        },
+        secondary: {
+          DEFAULT: 'hsl(var(--secondary))',
+          foreground: 'hsl(var(--secondary-foreground))',
+        },
+        destructive: {
+          DEFAULT: 'hsl(var(--destructive))',
+          foreground: 'hsl(var(--destructive-foreground))',
+        },
+        muted: {
+          DEFAULT: 'hsl(var(--muted))',
+          foreground: 'hsl(var(--muted-foreground))',
+        },
+        accent: {
+          DEFAULT: 'hsl(var(--accent))',
+          foreground: 'hsl(var(--accent-foreground))',
+        },
+        popover: {
+          DEFAULT: 'hsl(var(--popover))',
+          foreground: 'hsl(var(--popover-foreground))',
+        },
+        card: {
+          DEFAULT: 'hsl(var(--card))',
+          foreground: 'hsl(var(--card-foreground))',
+        },
+        sidebar: {
+          DEFAULT: '#008080',
+          foreground: '#ffffff',
+          hover: '#006b6b',
+          active: '#005757',
+        },
+        // AllDent brand tokens
+        ink: {
+          DEFAULT: '#0F0F10',
+          2: '#1A1A1C',
+          3: '#242427',
+        },
+        paper: {
+          DEFAULT: '#FAFAF7',
+          mist: '#F2F4F3',
+        },
+        mist: '#F2F4F3',
+        rule: 'rgba(15,15,16,0.08)',
+        teal: {
+          DEFAULT: '#008080',
+          deep: '#006D6D',
+          mist: '#E6F7F7',
+        },
+        gold: {
+          DEFAULT: '#D9A928',
+          warm: '#F4B400',
+        },
+        status: {
+          new: '#3b82f6',
+          active: '#10b981',
+          pending: '#f59e0b',
+          closed: '#6b7280',
+          rejected: '#ef4444',
+          hired: '#8b5cf6',
+          draft: '#9ca3af',
+          frozen: '#06b6d4',
+        },
+      },
+      borderRadius: {
+        lg: 'var(--radius)',
+        md: 'calc(var(--radius) - 2px)',
+        sm: 'calc(var(--radius) - 4px)',
+      },
+      keyframes: {
+        'accordion-down': {
+          from: { height: '0' },
+          to: { height: 'var(--radix-accordion-content-height)' },
+        },
+        'accordion-up': {
+          from: { height: 'var(--radix-accordion-content-height)' },
+          to: { height: '0' },
+        },
+        'marquee': {
+          from: { transform: 'translateX(0)' },
+          to: { transform: 'translateX(-50%)' },
+        },
+        'marquee-rtl': {
+          from: { transform: 'translateX(-50%)' },
+          to: { transform: 'translateX(0)' },
+        },
+        'reveal-up': {
+          from: { opacity: '0', transform: 'translateY(28px)' },
+          to: { opacity: '1', transform: 'translateY(0)' },
+        },
+        'shimmer': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.5' },
+        },
+      },
+      animation: {
+        'accordion-down': 'accordion-down 0.2s ease-out',
+        'accordion-up': 'accordion-up 0.2s ease-out',
+        'marquee': 'marquee 40s linear infinite',
+        'marquee-rtl': 'marquee-rtl 40s linear infinite',
+        'reveal-up': 'reveal-up 0.9s cubic-bezier(0.16, 1, 0.3, 1) both',
+        'shimmer': 'shimmer 1.6s ease-in-out infinite',
+      },
+    },
+  },
+  plugins: [require('tailwindcss-animate')],
+}
+
+export default config
+
+
+--- FILE: src\App.tsx ---
+import { Routes, Route } from 'react-router-dom'
+
+// Layouts
+import AdminLayout from '@/components/layout/AdminLayout'
+import PublicLayout from '@/components/layout/PublicLayout'
+
+// Admin pages
+import DashboardPage from '@/pages/DashboardPage'
+import InboxPage from '@/pages/InboxPage'
+import AdminContactsPage from '@/pages/AdminContactsPage'
+import AdminCandidatesPage from '@/pages/AdminCandidatesPage'
+import Candidate360Page from '@/pages/Candidate360Page'
+import AdminAccountsPage from '@/pages/AdminAccountsPage'
+import AdminEmployersPage from '@/pages/AdminEmployersPage'
+import Employer360Page from '@/pages/Employer360Page'
+import AdminJobsPage from '@/pages/AdminJobsPage'
+import CreateJobWizardPage from '@/pages/CreateJobWizardPage'
+import JobDetailsPage from '@/pages/JobDetailsPage'
+import AdminApplicationsPage from '@/pages/AdminApplicationsPage'
+import ATSPipelinePage from '@/pages/ATSPipelinePage'
+import SmartMatchPage from '@/pages/SmartMatchPage'
+import InboxV2Page from '@/pages/InboxV2Page'
+import CandidateProfilePage from '@/pages/CandidateProfilePage'
+import EmployerProfilePage from '@/pages/EmployerProfilePage'
+
+// Public pages
+import PublicHomePage from '@/pages/PublicHomePage'
+import PublicJobsPage from '@/pages/PublicJobsPage'
+import PublicJobPage from '@/pages/PublicJobPage'
+import PublicRoleJobsPage from '@/pages/PublicRoleJobsPage'
+import EmployersPage from '@/pages/EmployersPage'
+import EmployersDiscreetPage from '@/pages/EmployersDiscreetPage'
+import EmployersBrandingPage from '@/pages/EmployersBrandingPage'
+import DentalShopPage from '@/pages/DentalShopPage'
+import DentalAssetsPage from '@/pages/DentalAssetsPage'
+import ClassDentalPage from '@/pages/ClassDentalPage'
+import ContactPage from '@/pages/ContactPage'
+
+export default function App() {
+  return (
+    <Routes>
+      {/* ג”€ג”€ג”€ Public routes (with PublicLayout) ג”€ג”€ג”€ */}
+      <Route element={<PublicLayout />}>
+        <Route path="/" element={<PublicHomePage />} />
+
+        {/* Jobs ג€” /jobs/role/:role must come before /jobs/:jobCode */}
+        <Route path="/jobs" element={<PublicJobsPage />} />
+        <Route path="/jobs/role/:role" element={<PublicRoleJobsPage />} />
+        <Route path="/jobs/:jobCode" element={<PublicJobPage />} />
+
+        {/* Employers */}
+        <Route path="/employers" element={<EmployersPage />} />
+        <Route path="/employers/discreet" element={<EmployersDiscreetPage />} />
+        <Route path="/employers/branding" element={<EmployersBrandingPage />} />
+
+        {/* Dental services */}
+        <Route path="/dental-shop" element={<DentalShopPage />} />
+        <Route path="/dental-assets" element={<DentalAssetsPage />} />
+        <Route path="/class-dental" element={<ClassDentalPage />} />
+
+        {/* Contact */}
+        <Route path="/contact" element={<ContactPage />} />
+      </Route>
+
+      {/* ג”€ג”€ג”€ Profile routes (no layout) ג”€ג”€ג”€ */}
+      <Route path="/candidate/:contactId" element={<CandidateProfilePage />} />
+      <Route path="/profile/:token" element={<CandidateProfilePage />} />
+      <Route path="/employer-profile/:id" element={<EmployerProfilePage />} />
+
+      {/* ג”€ג”€ג”€ Admin routes (with AdminLayout) ג”€ג”€ג”€ */}
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<DashboardPage />} />
+        <Route path="dashboard" element={<DashboardPage />} />
+        <Route path="inbox" element={<InboxPage />} />
+        <Route path="inbox-v2" element={<InboxV2Page />} />
+
+        {/* Contacts & Candidates */}
+        <Route path="contacts" element={<AdminContactsPage />} />
+        <Route path="contacts/:contactId" element={<Candidate360Page />} />
+        <Route path="candidates" element={<AdminCandidatesPage />} />
+        <Route path="candidates/:id" element={<Candidate360Page />} />
+
+        {/* Accounts & Employers */}
+        <Route path="accounts" element={<AdminAccountsPage />} />
+        <Route path="accounts/:id" element={<Employer360Page />} />
+        <Route path="employers" element={<AdminEmployersPage />} />
+        <Route path="employers/:id" element={<Employer360Page />} />
+
+        {/* Jobs */}
+        <Route path="jobs" element={<AdminJobsPage />} />
+        <Route path="jobs/new" element={<CreateJobWizardPage />} />
+        <Route path="jobs/:code" element={<JobDetailsPage />} />
+
+        {/* ATS */}
+        <Route path="applications" element={<AdminApplicationsPage />} />
+        <Route path="pipeline" element={<ATSPipelinePage />} />
+        <Route path="ats" element={<ATSPipelinePage />} />
+
+        {/* Tools */}
+        <Route path="smart-match" element={<SmartMatchPage />} />
+      </Route>
+    </Routes>
+  )
+}
+
+
+--- FILE: src\main.tsx ---
+import React from 'react'
+import ReactDOM from 'react-dom/client'
+import { BrowserRouter } from 'react-router-dom'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { Toaster } from 'sonner'
+import App from './App'
+import './index.css'
+import { validateMockData } from './mocks/validateMockData'
+
+if (import.meta.env.DEV) {
+  const result = validateMockData()
+  if (!result.ok) {
+    console.error('[validateMockData] mock integrity failed:', result.errors)
+  }
+}
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
+    },
+  },
+})
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>
+        <App />
+        <Toaster
+          position="top-center"
+          dir="rtl"
+          toastOptions={{
+            style: { fontFamily: 'Heebo, sans-serif' },
+          }}
+        />
+      </BrowserRouter>
+    </QueryClientProvider>
+  </React.StrictMode>
+)
+
+
+--- FILE: src\lib\supabase.ts ---
+import { createClient } from "@supabase/supabase-js";
+
+export const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL as string,
+  import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+);
+
+
+=== ROUTES / SUPABASE USAGE SUMMARY ===
+
+--- C:\Users\Allbi\alldent-crm\src\components\admin\AdminBadge.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\admin\AdminTable.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\applications\ApplicationDetailPanel.tsx ---
+
+src\components\applications\ApplicationDetailPanel.tsx:46:        .from('contact')
+src\components\applications\ApplicationDetailPanel.tsx:61:        .from('job')
+src\components\applications\ApplicationDetailPanel.tsx:77:        .from('accounts')
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\applications\ApplicationFiltersBar.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\applications\ManualCreateDialog.tsx ---
+
+src\components\applications\ManualCreateDialog.tsx:47:        .from('contact')
+src\components\applications\ManualCreateDialog.tsx:65:        .from('job')
+src\components\applications\ManualCreateDialog.tsx:97:      .from('applications')
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\candidate\AIDocumentScanner.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\candidate\AIProfileWriter.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\candidate\ProfileEditForm.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\contact\BlockConditions.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\contact\BlockIdentity.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\contact\BlockProfessional.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\contact\BlockSocial.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\home\CareerCategoriesCarousel.tsx ---
+
+src\components\home\CareerCategoriesCarousel.tsx:2:import { Link } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\inbox-v2\AIChatPanel.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\inbox-v2\CreateFromLeadDialog.tsx ---
+
+src\components\inbox-v2\CreateFromLeadDialog.tsx:57:        .from('contact')
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\inbox-v2\InboxV2Filters.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\inbox-v2\InboxV2QuickActions.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\inbox-v2\InboxV2RowDetail.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\inbox-v2\InboxV2Table.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\inbox-v2\MergePanel.tsx ---
+
+src\components\inbox-v2\MergePanel.tsx:48:      .from('contact')
+src\components\inbox-v2\MergePanel.tsx:116:          .from('contact')
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\inbox-v2\UploadZone.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\layout\AdminLayout.tsx ---
+
+src\components\layout\AdminLayout.tsx:1:import { Outlet } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\layout\AppSidebar.tsx ---
+
+src\components\layout\AppSidebar.tsx:2:import { NavLink } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\layout\PublicLayout.tsx ---
+
+src\components\layout\PublicLayout.tsx:1:import { Outlet, useLocation } from 'react-router-dom'
+src\components\layout\PublicLayout.tsx:9:  // Scroll to top on route change
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\layout\Shell.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\AnimatedCounter.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\ApplyModal.tsx ---
+
+src\components\public\ApplyModal.tsx:51:          .from('candidate-cvs')
+src\components\public\ApplyModal.tsx:57:          .from('candidate-cvs')
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\MagneticButton.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\Marquee.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\PageMediaHero.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\PublicHeader.tsx ---
+
+src\components\public\PublicHeader.tsx:2:import { Link, useLocation } from 'react-router-dom'
+src\components\public\PublicHeader.tsx:216:          <Link to="/" className="flex items-center 
+flex-shrink-0" aria-label="AllDent — דף הבית">
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\PublicJobCard.tsx ---
+
+src\components\public\PublicJobCard.tsx:1:import { Link } from 'react-router-dom'
+src\components\public\PublicJobCard.tsx:79:  return <Link to={`/jobs/${job.job_code}`} 
+className="block h-full">{inner}</Link>
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\PublicJobSkeleton.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\RevealOnScroll.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\public\SiteFooter.tsx ---
+
+src\components\public\SiteFooter.tsx:1:import { Link } from 'react-router-dom'
+src\components\public\SiteFooter.tsx:20:          <Link to="/" className="inline-flex 
+items-center" aria-label="AllDent — דף הבית">
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\components\ui\badge.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\ui\button.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\ui\card.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\ui\dialog.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\ui\input.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\ui\table.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\ui\tabs.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\ui\textarea.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\components\JobCard.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useApplicationDicts.ts ---
+
+src\hooks\useApplicationDicts.ts:18:        supabase.from('dict_application_statuses').select('id, 
+name').order('id'),
+src\hooks\useApplicationDicts.ts:19:        supabase.from('dict_check_statuses').select('id, 
+name').order('id'),
+src\hooks\useApplicationDicts.ts:20:        supabase.from('dict_sources').select('id, 
+name').order('id'),
+src\hooks\useApplicationDicts.ts:21:        supabase.from('dict_regions').select('id, 
+name').order('name'),
+src\hooks\useApplicationDicts.ts:22:        supabase.from('dict_roles').select('id, 
+name').order('name'),
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useApplicationMutations.ts ---
+
+src\hooks\useApplicationMutations.ts:15:    .from('job')
+src\hooks\useApplicationMutations.ts:47:        .from('applications')
+src\hooks\useApplicationMutations.ts:70:        .from('applications')
+src\hooks\useApplicationMutations.ts:77:          .from('applications')
+src\hooks\useApplicationMutations.ts:83:            supabase.from('job').update({ job_status: 
+HIRED_JOB_STATUS }).eq('job_code', code)
+src\hooks\useApplicationMutations.ts:102:        .from('applications')
+src\hooks\useApplicationMutations.ts:121:        .from('applications')
+src\hooks\useApplicationMutations.ts:140:        .from('applications')
+src\hooks\useApplicationMutations.ts:159:        .from('applications')
+src\hooks\useApplicationMutations.ts:174:        .from('contact')
+src\hooks\useApplicationMutations.ts:190:        .from('applications')
+src\hooks\useApplicationMutations.ts:205:      const { error } = await 
+supabase.from('inbox_v2').insert({
+src\hooks\useApplicationMutations.ts:236:        .from('applications')
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useApplications.ts ---
+
+src\hooks\useApplications.ts:12:        .from('applications')
+src\hooks\useApplications.ts:64:        .from('applications')
+src\hooks\useApplications.ts:83:          supabase.from('applications').select('application_id', { 
+count: 'exact', head: true }),
+src\hooks\useApplications.ts:85:            .from('applications')
+src\hooks\useApplications.ts:89:            .from('applications')
+src\hooks\useApplications.ts:93:            .from('applications')
+src\hooks\useApplications.ts:97:            .from('applications')
+src\hooks\useApplications.ts:101:            .from('applications')
+src\hooks\useApplications.ts:105:            .from('applications')
+src\hooks\useApplications.ts:109:            .from('applications')
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useCandidateProfile.ts ---
+
+src\hooks\useCandidateProfile.ts:41:    .from("contact")
+src\hooks\useCandidateProfile.ts:61:    .from("contact")
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useContact360.ts ---
+
+src\hooks\useContact360.ts:159:    supabase.from("contact").select("*").eq("contact_id", 
+contactId).single(),
+src\hooks\useContact360.ts:168:      .from("applications")
+src\hooks\useContact360.ts:173:      .from("contact_tags")
+src\hooks\useContact360.ts:179:          .from("accounts")
+src\hooks\useContact360.ts:185:      .from("job")
+src\hooks\useContact360.ts:229:    supabase.from("dict_roles").select("id, name").order("id"),
+src\hooks\useContact360.ts:230:    supabase.from("dict_sub_roles").select("id, name, 
+role_id").order("id"),
+src\hooks\useContact360.ts:231:    supabase.from("dict_availability").select("id, 
+name").order("id"),
+src\hooks\useContact360.ts:232:    supabase.from("dict_cities").select("id, name, 
+region_id").order("name"),
+src\hooks\useContact360.ts:233:    supabase.from("dict_regions").select("id, name").order("id"),
+src\hooks\useContact360.ts:234:    supabase.from("dict_sources").select("id, name").order("id"),
+src\hooks\useContact360.ts:235:    supabase.from("dict_check_statuses").select("id, 
+name").order("id"),
+src\hooks\useContact360.ts:236:    supabase.from("dict_social_statuses").select("id, 
+name").order("id"),
+src\hooks\useContact360.ts:237:    supabase.from("dict_profile_types").select("id, 
+name").order("id"),
+src\hooks\useContact360.ts:238:    supabase.from("dict_experience").select("id, name").order("id"),
+src\hooks\useContact360.ts:239:    supabase.from("dict_application_statuses").select("id, 
+name").order("id"),
+src\hooks\useContact360.ts:240:    supabase.from("dict_scopes").select("id, name").order("id"),
+src\hooks\useContact360.ts:241:    supabase.from("dict_genders").select("id, name").order("id"),
+src\hooks\useContact360.ts:242:    supabase.from("dict_languages").select("id, 
+name").order("name"),
+src\hooks\useContact360.ts:243:    supabase.from("dict_tax_types").select("id, name").order("id"),
+src\hooks\useContact360.ts:244:    supabase.from("dict_mobility").select("id, name").order("id"),
+src\hooks\useContact360.ts:245:    supabase.from("dict_systems").select("id, name").order("name"),
+src\hooks\useContact360.ts:246:    supabase.from("dict_procedures").select("id, 
+name").order("name"),
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useInboxV2.ts ---
+
+src\hooks\useInboxV2.ts:12:        .from('inbox_v2')
+src\hooks\useInboxV2.ts:46:        .from('inbox_v2')
+src\hooks\useInboxV2.ts:62:        .from('inbox_import_batches')
+src\hooks\useInboxV2.ts:77:      const { error } = await 
+supabase.from('inbox_v2').update(updates).eq('lead_id', leadId)
+src\hooks\useInboxV2.ts:89:        .from('inbox_v2')
+src\hooks\useInboxV2.ts:101:          .from('inbox_v2')
+src\hooks\useInboxV2.ts:108:            .from('inbox_v2')
+src\hooks\useInboxV2.ts:119:      const { error } = await 
+supabase.from('inbox_merge_actions').insert(action)
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useInboxV2Matching.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useInboxV2Upload.ts ---
+
+src\hooks\useInboxV2Upload.ts:41:          .from('inbox_import_batches')
+src\hooks\useInboxV2Upload.ts:87:          const { error: insertErr } = await 
+supabase.from('inbox_v2').insert(rows)
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useMockData.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\usePublicJobs.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\hooks\useSupabaseData.ts ---
+
+src\hooks\useSupabaseData.ts:35:          .from('contact')
+src\hooks\useSupabaseData.ts:103:      .from('contact')
+src\hooks\useSupabaseData.ts:149:          .from('accounts')
+src\hooks\useSupabaseData.ts:196:      .from('accounts')
+src\hooks\useSupabaseData.ts:235:      .from('contact_tags')
+src\hooks\useSupabaseData.ts:267:      supabase.from('contact').select('contact_id', { count: 
+'exact', head: true }),
+src\hooks\useSupabaseData.ts:268:      supabase.from('accounts').select('account_id', { count: 
+'exact', head: true }),
+src\hooks\useSupabaseData.ts:286:    const { error } = await 
+supabase.from('contact').update(updates).eq('contact_id', id)
+src\hooks\useSupabaseData.ts:291:    const { data: row, error } = await 
+supabase.from('contact').insert(data).select().single()
+src\hooks\useSupabaseData.ts:297:    const { error } = await 
+supabase.from('accounts').update(updates).eq('account_id', id)
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\lib\dicts.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\inbox-v2-dicts.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\inbox-v2-parser.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\normalizePhone.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\publicJobUtils.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\publicRolePages.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\roles.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\statusColors.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\supabase.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\timeAgo.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\lib\utils.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\mocks\data.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\mocks\dicts.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\mocks\joinMockData.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\mocks\validateMockData.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\pages\AdminAccountsPage.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\pages\AdminApplicationsPage.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\pages\AdminCandidatesPage.tsx ---
+
+src\pages\AdminCandidatesPage.tsx:2:import { Link } from 'react-router-dom'
+src\pages\AdminCandidatesPage.tsx:282:        .from('rel_contact_profiles')
+src\pages\AdminCandidatesPage.tsx:296:        .from('contact')
+src\pages\AdminCandidatesPage.tsx:309:      const { data, error } = await 
+supabase.from('dict_regions').select('id,name').order('name')
+src\pages\AdminCandidatesPage.tsx:319:      const { data, error } = await 
+supabase.from('dict_cities').select('id,name,region_id').order('name')
+src\pages\AdminCandidatesPage.tsx:329:      const { data, error } = await 
+supabase.from('contact_tags').select('contact_id,tag')
+src\pages\AdminCandidatesPage.tsx:404:    return Array.from(set)
+src\pages\AdminCandidatesPage.tsx:413:    return Array.from(set)
+src\pages\AdminCandidatesPage.tsx:548:    setSelectedRows((prev) => Array.from(new Set([...prev, 
+...ids])))
+src\pages\AdminCandidatesPage.tsx:1568:      <Link to={asLink} className={className} title={title} 
+aria-label={title}>
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\AdminContactsPage.tsx ---
+
+src\pages\AdminContactsPage.tsx:3:import { Link, useNavigate } from 'react-router-dom'
+src\pages\AdminContactsPage.tsx:149:  const navigate = useNavigate()
+src\pages\AdminContactsPage.tsx:190:          .from('contact')
+src\pages\AdminContactsPage.tsx:209:      const { data, error } = await 
+supabase.from('dict_regions').select('id,name').order('name')
+src\pages\AdminContactsPage.tsx:219:      const { data, error } = await 
+supabase.from('dict_cities').select('id,name,region_id').order('name')
+src\pages\AdminContactsPage.tsx:229:      const { data, error } = await 
+supabase.from('accounts').select('account_id,account_name')
+src\pages\AdminContactsPage.tsx:250:      const { data, error } = await 
+supabase.from('contact_tags').select('contact_id,tag').eq('contact_id', selectedId)
+src\pages\AdminContactsPage.tsx:493:    setSelectedRows((prev) => Array.from(new Set([...prev, 
+...pageIds])))
+src\pages\AdminContactsPage.tsx:554:        .from('contact')
+src\pages\AdminContactsPage.tsx:591:      const { data: secTags } = await 
+supabase.from('contact_tags').select('tag').eq('contact_id', secondaryId)
+src\pages\AdminContactsPage.tsx:593:        const { data: primTags } = await 
+supabase.from('contact_tags').select('tag').eq('contact_id', mergePrimaryId)
+src\pages\AdminContactsPage.tsx:596:        if (newTags.length) await 
+supabase.from('contact_tags').insert(newTags)
+src\pages\AdminContactsPage.tsx:601:        await 
+supabase.from('contact').update(patch).eq('contact_id', mergePrimaryId)
+src\pages\AdminContactsPage.tsx:604:      await supabase.from('contact').delete().eq('contact_id', 
+secondaryId)
+src\pages\AdminContactsPage.tsx:632:        .from('rel_contact_profiles')
+src\pages\AdminContactsPage.tsx:661:        .from('contact')
+src\pages\AdminContactsPage.tsx:677:    const { error } = await 
+supabase.from('contact_tags').insert({ contact_id: selectedId, tag })
+src\pages\AdminContactsPage.tsx:687:    const { error } = await 
+supabase.from('contact_tags').delete().eq('contact_id', selectedId).eq('tag', tag)
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\AdminEmployersPage.tsx ---
+
+src\pages\AdminEmployersPage.tsx:2:import { Link } from 'react-router-dom'
+src\pages\AdminEmployersPage.tsx:176:          .from('accounts')
+src\pages\AdminEmployersPage.tsx:200:          .from('contact')
+src\pages\AdminEmployersPage.tsx:219:      const { data, error } = await 
+supabase.from('dict_regions').select('id,name').order('name')
+src\pages\AdminEmployersPage.tsx:229:      const { data, error } = await 
+supabase.from('dict_cities').select('id,name,region_id').order('name')
+src\pages\AdminEmployersPage.tsx:240:      const { data, error } = await 
+supabase.from('dict_account_statuses').select('id,name').order('id')
+src\pages\AdminEmployersPage.tsx:250:      const { data, error } = await 
+supabase.from('dict_account_types').select('id,name').order('id')
+src\pages\AdminEmployersPage.tsx:260:      const { data, error } = await 
+supabase.from('dict_systems').select('id,name').order('name')
+src\pages\AdminEmployersPage.tsx:270:      const { data, error } = await 
+supabase.from('dict_procedures').select('id,name').order('name')
+src\pages\AdminEmployersPage.tsx:354:    return Array.from(set)
+src\pages\AdminEmployersPage.tsx:631:    setSelectedRows((prev) => Array.from(new Set([...prev, 
+...ids])))
+src\pages\AdminEmployersPage.tsx:761:        const { error } = await 
+supabase.from('accounts').update(payload).eq('account_id', selectedId)
+src\pages\AdminEmployersPage.tsx:764:        const { error } = await 
+supabase.from('accounts').insert(payload)
+src\pages\AdminEmployersPage.tsx:1740:      <Link to={asLink} title={title} aria-label={title} 
+className={className}>
+src\pages\AdminEmployersPage.tsx:1987:    <Link to={to} className="inline-flex items-center gap-2 
+rounded-xl bg-[#008080] px-3 py-2 text-[13px] font-bold text-white shadow-sm transition 
+hover:opacity-95">
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\AdminJobsPage.tsx ---
+
+src\pages\AdminJobsPage.tsx:2:import { Link } from 'react-router-dom'
+src\pages\AdminJobsPage.tsx:196:    const { data, error } = await 
+supabase.from(table).select('id,name').order('id')
+src\pages\AdminJobsPage.tsx:209:          .from('job')
+src\pages\AdminJobsPage.tsx:228:      const { data } = await 
+supabase.from('accounts').select('account_id,account_name')
+src\pages\AdminJobsPage.tsx:244:      const { data, error } = await 
+supabase.from('dict_cities').select('id,name,region_id').order('id')
+src\pages\AdminJobsPage.tsx:254:      const { data, error } = await 
+supabase.from('accounts').select('account_id,account_name').order('account_name')
+src\pages\AdminJobsPage.tsx:306:    return Array.from(map.entries()).map(([value, label]) => ({ 
+value: String(value), label }))
+src\pages\AdminJobsPage.tsx:428:    setSelectedRows((prev) => Array.from(new Set([...prev, 
+...currentPageIds])))
+src\pages\AdminJobsPage.tsx:476:      const { error } = await 
+supabase.from('job').update(patch).eq('job_code', editJobCode)
+src\pages\AdminJobsPage.tsx:520:      const { error } = await 
+supabase.from('job').update(patch).eq('job_code', jobCode)
+src\pages\AdminJobsPage.tsx:535:      const { error } = await 
+supabase.from('job').update(patch).eq('job_code', jobCode)
+src\pages\AdminJobsPage.tsx:550:      const { error } = await 
+supabase.from('job').update(patch).eq('job_code', jobCode)
+src\pages\AdminJobsPage.tsx:565:      const { error } = await 
+supabase.from('job').update(patch).eq('job_code', jobCode)
+src\pages\AdminJobsPage.tsx:596:      const { error } = await supabase.from('job').insert(dbJob)
+src\pages\AdminJobsPage.tsx:785:          <Link to="/admin/jobs/new">
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\ATSPipelinePage.tsx ---
+
+src\pages\ATSPipelinePage.tsx:2:import { Link } from 'react-router-dom'
+src\pages\ATSPipelinePage.tsx:186:    return Array.from(
+src\pages\ATSPipelinePage.tsx:193:    return Array.from(
+src\pages\ATSPipelinePage.tsx:200:    return Array.from(
+src\pages\ATSPipelinePage.tsx:406:          <Link to="/applications">
+src\pages\ATSPipelinePage.tsx:541:                    {Array.from({ length: 3 }).map((_, index) => 
+(
+src\pages\ATSPipelinePage.tsx:789:        <QuickRouteLink
+src\pages\ATSPipelinePage.tsx:1030:              <QuickSheetRouteButton
+src\pages\ATSPipelinePage.tsx:1035:              <QuickSheetRouteButton
+src\pages\ATSPipelinePage.tsx:1137:function QuickRouteLink({
+src\pages\ATSPipelinePage.tsx:1205:function QuickSheetRouteButton({
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\Candidate360Page.tsx ---
+
+src\pages\Candidate360Page.tsx:3:import { Link, useParams, useNavigate } from "react-router-dom";
+src\pages\Candidate360Page.tsx:187:  const navigate = useNavigate();
+src\pages\Candidate360Page.tsx:218:      .from("contact")
+src\pages\Candidate360Page.tsx:358:      .from("contact")
+src\pages\Candidate360Page.tsx:373:    const { error: err } = await 
+supabase.from("contact_tags").insert({ contact_id: contact.contact_id, tag: value });
+src\pages\Candidate360Page.tsx:379:    const { error: err } = await 
+supabase.from("contact_tags").delete().eq("id", tagId);
+src\pages\Candidate360Page.tsx:389:      .from("applications").select("*", { count: "exact", head: 
+true })
+src\pages\Candidate360Page.tsx:395:    const { error: err } = await 
+supabase.from("applications").insert({
+src\pages\Candidate360Page.tsx:565:          <Link to="/contacts" className="mt-6">
+src\pages\Candidate360Page.tsx:679:                const { data: tokenData } = await 
+supabase.from("contact").select("profile_token").eq("contact_id", resolvedId).single();
+src\pages\Candidate360Page.tsx:771:                  await supabase.from("contact").update({ 
+check_status: s.id }).eq("contact_id", resolvedId);
+src\pages\Candidate360Page.tsx:973:                      <Link 
+to={`/accounts/${account.account_id}`} className="flex items-center justify-between rounded-2xl 
+border border-slate-200 p-3.5 transition hover:bg-slate-50">
+src\pages\Candidate360Page.tsx:1366:                    .from("contact")
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\CandidateProfilePage.tsx ---
+
+src\pages\CandidateProfilePage.tsx:2:import { useParams } from "react-router-dom";
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\ClassDentalPage.tsx ---
+
+src\pages\ClassDentalPage.tsx:1:import { Link } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\ContactPage.tsx ---
+
+src\pages\ContactPage.tsx:1:import { Link } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\CreateJobWizardPage.tsx ---
+
+src\pages\CreateJobWizardPage.tsx:2:import { useNavigate } from 'react-router-dom'
+src\pages\CreateJobWizardPage.tsx:147:  const navigate = useNavigate()
+src\pages\CreateJobWizardPage.tsx:151:    const { data, error } = await 
+supabase.from(table).select('id,name').order('id')
+src\pages\CreateJobWizardPage.tsx:163:      const { data, error } = await 
+supabase.from('dict_cities').select('id,name,region_id').order('id')
+src\pages\CreateJobWizardPage.tsx:173:      const { data, error } = await supabase.from('accounts')
+.select('account_id,account_name,bus_id,phone,region_id,city_id,address').order('account_name')
+src\pages\CreateJobWizardPage.tsx:503:      const { error } = await supabase.from('job').insert({ 
+...payload, job_status: 1 })
+src\pages\CreateJobWizardPage.tsx:543:        const { data: newAcc, error: accError } = await 
+supabase.from('accounts').insert(accountPayload).select('account_id').single()
+src\pages\CreateJobWizardPage.tsx:557:      const { error } = await 
+supabase.from('job').insert(payload)
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\DashboardPage.tsx ---
+
+src\pages\DashboardPage.tsx:2:import { Link } from 'react-router-dom'
+src\pages\DashboardPage.tsx:309:    return Array.from(counts.entries())
+src\pages\DashboardPage.tsx:490:          <Link to="/jobs?status=active" className="block 
+rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:493:          <Link to="/applications?date=current" className="block 
+rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:496:          <Link to="/applications?pending=true" className="block 
+rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:499:          <Link to="/contacts?availability=active" 
+className="block rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:502:          <Link to="/accounts?active=true" className="block 
+rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:505:          <Link to="/inbox?state=open" className="block 
+rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:508:          <Link to="/jobs?applicants=0&status=open" 
+className="block rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:511:          <Link to="/accounts?follow_up=overdue" className="block 
+rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:514:          <Link to="/applications?status=12&period=month" 
+className="block rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:517:          <Link to="/inbox?duplicates=true" className="block 
+rounded-2xl transition hover:shadow-md">
+src\pages\DashboardPage.tsx:529:            <Link to="/jobs/new">
+src\pages\DashboardPage.tsx:532:            <Link to="/contacts">
+src\pages\DashboardPage.tsx:535:            <Link to="/inbox">
+src\pages\DashboardPage.tsx:538:            <Link to="/pipeline">
+src\pages\DashboardPage.tsx:541:            <Link to="/smart-match">
+src\pages\DashboardPage.tsx:544:            <Link to="/applications">
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\DentalAssetsPage.tsx ---
+
+src\pages\DentalAssetsPage.tsx:1:import { Link } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\DentalShopPage.tsx ---
+
+src\pages\DentalShopPage.tsx:1:import { Link } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\Employer360Page.tsx ---
+
+src\pages\Employer360Page.tsx:2:import { Link, useParams, useSearchParams } from 
+"react-router-dom";
+src\pages\Employer360Page.tsx:686:      const { data, error } = await (supabase as 
+any).from(table).select("id, name").order("id", { ascending: true });
+src\pages\Employer360Page.tsx:741:      const { data, error } = await 
+supabase.from("accounts").select(ACCOUNT_SELECT).eq("account_id", accountId).maybeSingle();
+src\pages\Employer360Page.tsx:758:        .from("job")
+src\pages\Employer360Page.tsx:778:        .from("contact")
+src\pages\Employer360Page.tsx:798:        .from("applications")
+src\pages\Employer360Page.tsx:910:        .from("accounts")
+src\pages\Employer360Page.tsx:929:  const statusOptions = 
+Array.from(dicts.accountStatuses.entries()).map(([id, name]) => ({ id, name }));
+src\pages\Employer360Page.tsx:930:  const typeOptions = 
+Array.from(dicts.accountTypes.entries()).map(([id, name]) => ({ id, name }));
+src\pages\Employer360Page.tsx:1170:                <Link 
+to={`/employer-profile/${account.account_id}`}>
+src\pages\Employer360Page.tsx:1176:                <Link 
+to={`/jobs/new?account_id=${account.account_id}`}>
+src\pages\Employer360Page.tsx:1400:          <Link to={`/jobs/new?account_id=${accountId}`}>
+src\pages\Employer360Page.tsx:1413:              <Link 
+to={`/jobs/new?account_id=${accountId}`}>יצירת משרה</Link>
+src\pages\Employer360Page.tsx:1435:                    <Link to={`/jobs/${job.job_code}`} 
+className="hover:underline">
+src\pages\Employer360Page.tsx:1485:          <Link to="/contacts">
+src\pages\Employer360Page.tsx:1502:                    <Link 
+to={`/contacts/${contact.contact_id}`} className="font-bold text-slate-900 hover:text-[#008080] 
+hover:underline">
+src\pages\Employer360Page.tsx:1574:          <Link to="/applications">
+src\pages\Employer360Page.tsx:1601:                      <Link 
+to={`/contacts/${application.candidate_link}`} className="hover:text-[#008080] hover:underline">
+src\pages\Employer360Page.tsx:1613:                      <Link 
+to={`/jobs/${application.job_code}`} className="hover:underline">
+src\pages\Employer360Page.tsx:1679:    return Array.from(map.entries()).sort((a, b) => b[1] - 
+a[1]);
+src\pages\Employer360Page.tsx:1922:            <Link to="/accounts">
+src\pages\Employer360Page.tsx:1958:            <Link to="/accounts">
+src\pages\Employer360Page.tsx:1978:            <Link to="/accounts">
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\EmployerProfilePage.tsx ---
+
+src\pages\EmployerProfilePage.tsx:2:import { Link, useParams } from "react-router-dom";
+src\pages\EmployerProfilePage.tsx:264:      const { error } = await 
+supabase.from("accounts").update({
+src\pages\EmployerProfilePage.tsx:390:      const { data, error } = await 
+supabase.from("accounts").select(ACCOUNT_SELECT).eq("account_id", accountId).maybeSingle();
+src\pages\EmployerProfilePage.tsx:401:      const { data } = await (supabase as 
+any).from("dict_account_statuses").select("id, name").order("id");
+src\pages\EmployerProfilePage.tsx:410:      const { data } = await (supabase as 
+any).from("dict_account_types").select("id, name").order("id");
+src\pages\EmployerProfilePage.tsx:419:      const { data } = await (supabase as 
+any).from("dict_regions").select("id, name").order("id");
+src\pages\EmployerProfilePage.tsx:428:      const { data } = await (supabase as 
+any).from("dict_cities").select("id, name").order("id");
+src\pages\EmployerProfilePage.tsx:437:      const { data } = await (supabase as 
+any).from("dict_systems").select("id, name").order("id");
+src\pages\EmployerProfilePage.tsx:487:            <Link to="/admin/accounts"><ArrowRight 
+className="h-4 w-4" />חזרה למאגר</Link>
+src\pages\EmployerProfilePage.tsx:601:                <Link 
+to={`/admin/accounts/${account.account_id}`}>
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\EmployersBrandingPage.tsx ---
+
+src\pages\EmployersBrandingPage.tsx:1:import { Link } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\EmployersDiscreetPage.tsx ---
+
+src\pages\EmployersDiscreetPage.tsx:1:import { Link } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\EmployersPage.tsx ---
+
+src\pages\EmployersPage.tsx:1:import { Link } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\InboxPage.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\pages\InboxV2Page.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\pages\JobDetailsPage.tsx ---
+
+src\pages\JobDetailsPage.tsx:2:import { useParams, Link } from 'react-router-dom'
+src\pages\JobDetailsPage.tsx:251:          <Link to={`/smart-match?job=${localJob.job_code}`}>
+src\pages\JobDetailsPage.tsx:258:          <Link to={`/ats?job=${localJob.job_code}`}>
+src\pages\JobDetailsPage.tsx:270:              <Link to="/jobs" className="hover:text-[#008080]">
+src\pages\JobDetailsPage.tsx:583:                      <Link to={`/ats?job=${localJob.job_code}`}>
+src\pages\JobDetailsPage.tsx:588:                      <Link 
+to={`/applications?job=${localJob.job_code}`}>
+src\pages\JobDetailsPage.tsx:716:                  <ActionRailLink 
+to={`/smart-match?job=${localJob.job_code}`} icon={<Sparkles className="h-4 w-4" />} label="פתח 
+Smart Match" />
+src\pages\JobDetailsPage.tsx:717:                  <ActionRailLink 
+to={`/ats?job=${localJob.job_code}`} icon={<Users className="h-4 w-4" />} label="פתח ATS" />
+src\pages\JobDetailsPage.tsx:718:                  <ActionRailLink 
+to={`/applications?job=${localJob.job_code}`} icon={<FileText className="h-4 w-4" />} label="פתח 
+Applications" />
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\PublicHomePage.tsx ---
+
+src\pages\PublicHomePage.tsx:2:import { Link } from 'react-router-dom'
+src\pages\PublicHomePage.tsx:155:              {Array.from({ length: 4 }).map((_, i) => 
+<PublicJobSkeleton key={i} />)}
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\PublicJobPage.tsx ---
+
+src\pages\PublicJobPage.tsx:2:import { useParams } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\PublicJobsPage.tsx ---
+
+--- C:\Users\Allbi\alldent-crm\src\pages\PublicRoleJobsPage.tsx ---
+
+src\pages\PublicRoleJobsPage.tsx:1:import { useParams, Navigate } from 'react-router-dom'
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\pages\SmartMatchPage.tsx ---
+
+src\pages\SmartMatchPage.tsx:2:import { Link, useSearchParams } from 'react-router-dom'
+src\pages\SmartMatchPage.tsx:217:    return Array.from(set).sort((a, b) => a.localeCompare(b, 
+'he'))
+src\pages\SmartMatchPage.tsx:572:            <Link to={`/jobs/${selectedJob.job_code}`}>
+src\pages\SmartMatchPage.tsx:1920:      <Link to={asLink} className={className} title={title} 
+aria-label={title}>
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\services\publicJobsService.ts ---
+
+src\services\publicJobsService.ts:192:    .from('v_job_public')
+src\services\publicJobsService.ts:224:    .from('v_job_public')
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\types\applications.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\types\inbox-v2.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\types\index.ts ---
+
+--- C:\Users\Allbi\alldent-crm\src\App.tsx ---
+
+src\App.tsx:1:import { Routes, Route } from 'react-router-dom'
+src\App.tsx:41:    <Routes>
+src\App.tsx:42:      {/* ─── Public routes (with PublicLayout) ─── */}
+src\App.tsx:43:      <Route element={<PublicLayout />}>
+src\App.tsx:44:        <Route path="/" element={<PublicHomePage />} />
+src\App.tsx:47:        <Route path="/jobs" element={<PublicJobsPage />} />
+src\App.tsx:48:        <Route path="/jobs/role/:role" element={<PublicRoleJobsPage />} />
+src\App.tsx:49:        <Route path="/jobs/:jobCode" element={<PublicJobPage />} />
+src\App.tsx:52:        <Route path="/employers" element={<EmployersPage />} />
+src\App.tsx:53:        <Route path="/employers/discreet" element={<EmployersDiscreetPage />} />
+src\App.tsx:54:        <Route path="/employers/branding" element={<EmployersBrandingPage />} />
+src\App.tsx:57:        <Route path="/dental-shop" element={<DentalShopPage />} />
+src\App.tsx:58:        <Route path="/dental-assets" element={<DentalAssetsPage />} />
+src\App.tsx:59:        <Route path="/class-dental" element={<ClassDentalPage />} />
+src\App.tsx:62:        <Route path="/contact" element={<ContactPage />} />
+src\App.tsx:63:      </Route>
+src\App.tsx:65:      {/* ─── Profile routes (no layout) ─── */}
+src\App.tsx:66:      <Route path="/candidate/:contactId" element={<CandidateProfilePage />} />
+src\App.tsx:67:      <Route path="/profile/:token" element={<CandidateProfilePage />} />
+src\App.tsx:68:      <Route path="/employer-profile/:id" element={<EmployerProfilePage />} />
+src\App.tsx:70:      {/* ─── Admin routes (with AdminLayout) ─── */}
+src\App.tsx:71:      <Route path="/admin" element={<AdminLayout />}>
+src\App.tsx:72:        <Route index element={<DashboardPage />} />
+src\App.tsx:73:        <Route path="dashboard" element={<DashboardPage />} />
+src\App.tsx:74:        <Route path="inbox" element={<InboxPage />} />
+src\App.tsx:75:        <Route path="inbox-v2" element={<InboxV2Page />} />
+src\App.tsx:78:        <Route path="contacts" element={<AdminContactsPage />} />
+src\App.tsx:79:        <Route path="contacts/:contactId" element={<Candidate360Page />} />
+src\App.tsx:80:        <Route path="candidates" element={<AdminCandidatesPage />} />
+src\App.tsx:81:        <Route path="candidates/:id" element={<Candidate360Page />} />
+src\App.tsx:84:        <Route path="accounts" element={<AdminAccountsPage />} />
+src\App.tsx:85:        <Route path="accounts/:id" element={<Employer360Page />} />
+src\App.tsx:86:        <Route path="employers" element={<AdminEmployersPage />} />
+src\App.tsx:87:        <Route path="employers/:id" element={<Employer360Page />} />
+src\App.tsx:90:        <Route path="jobs" element={<AdminJobsPage />} />
+src\App.tsx:91:        <Route path="jobs/new" element={<CreateJobWizardPage />} />
+src\App.tsx:92:        <Route path="jobs/:code" element={<JobDetailsPage />} />
+src\App.tsx:95:        <Route path="applications" element={<AdminApplicationsPage />} />
+src\App.tsx:96:        <Route path="pipeline" element={<ATSPipelinePage />} />
+src\App.tsx:97:        <Route path="ats" element={<ATSPipelinePage />} />
+src\App.tsx:100:        <Route path="smart-match" element={<SmartMatchPage />} />
+src\App.tsx:101:      </Route>
+src\App.tsx:102:    </Routes>
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\main.tsx ---
+
+src\main.tsx:3:import { BrowserRouter } from 'react-router-dom'
+src\main.tsx:29:      <BrowserRouter>
+src\main.tsx:38:      </BrowserRouter>
+
+
+
+--- C:\Users\Allbi\alldent-crm\src\vite-env.d.ts ---
