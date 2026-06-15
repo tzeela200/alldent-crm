@@ -1,5 +1,5 @@
 import { useParams, Navigate } from 'react-router-dom'
-import { JobCard } from '@/components/JobCard'
+import PublicJobCard from '@/components/public/PublicJobCard'
 import { usePublicJobs } from '@/hooks/usePublicJobs'
 import { PageMediaHero } from '@/components/public/PageMediaHero'
 import { getRolePage, getJobRoleName, type RolePageSlug } from '@/lib/publicRolePages'
@@ -37,16 +37,7 @@ export default function PublicRoleJobsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {jobs.map((job) => (
-                <JobCard
-                  key={job.job_code}
-                  public_image_url={job.public_image_url ?? ''}
-                  job_code={job.job_code}
-                  job_title={job.job_title}
-                  public_excerpt={job.public_excerpt ?? ''}
-                  job_role_name={job.job_role_name ?? ''}
-                  city_name={job.city_name ?? ''}
-                  job_url={job.job_url ?? `/jobs/${job.job_code}`}
-                />
+                <PublicJobCard key={job.job_code} job={job} />
               ))}
             </div>
           )}

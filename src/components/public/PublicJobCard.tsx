@@ -1,7 +1,7 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ArrowUpLeft, MapPin } from 'lucide-react'
 import type { PublicJob } from '@/services/publicJobsService'
-import { getJobImage, formatPublishDate } from '@/lib/publicJobUtils'
+import { getJobImage } from '@/lib/publicJobUtils'
 
 interface Props {
   job: PublicJob
@@ -9,72 +9,115 @@ interface Props {
 }
 
 export default function PublicJobCard({ job, onClick }: Props) {
+  const [expanded, setExpanded] = useState(false)
   const image = getJobImage(job)
-  const date = formatPublishDate(job.last_publish_date)
+
+  const tags = [
+    job.city_name,
+    job.region_name,
+    ...(Array.isArray(job.scope_names)
+      ? job.scope_names
+      : job.scope_names ? [job.scope_names] : []),
+    job.required_experience_name,
+  ].filter(Boolean) as string[]
+
+  const hasLongExcerpt = (job.public_excerpt?.length ?? 0) > 120
 
   const inner = (
-    <article
-      className="group relative aspect-[3/4] rounded-[28px] overflow-hidden cursor-pointer shadow-md hover:shadow-2xl transition-all duration-500 ease-out-expo hover:-translate-y-1"
-      onClick={onClick}
+    <div
+      className="w-full rounded-[24px] overflow-hidden bg-white shadow-[0_8px_40px_rgba(0,0,0,0.18)]"
+      dir="rtl"
+      style={{ fontFamily: 'Heebo, sans-serif' }}
     >
-      {/* Background image — clean, no overlay */}
-      <img
-        src={image}
-        alt={job.job_title}
-        className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out-expo group-hover:scale-[1.08]"
-        loading="lazy"
-        onError={(e) => { e.currentTarget.src = '/images/fallback/default-dental.svg' }}
-      />
-
-      {/* Subtle gradient — only at bottom for readability */}
-      <div className="absolute inset-0 bg-gradient-to-t from-ink/85 via-ink/40 to-transparent" />
-
-      {/* Top-right: job code badge */}
-      <div className="absolute top-4 right-4 bg-white/95 backdrop-blur-sm text-ink text-[10.5px] font-mono font-bold tracking-[0.1em] px-3 py-1.5 rounded-full shadow-md">
-        {job.job_code}
-      </div>
-
-      {/* Top-left: date (subtle) */}
-      {date && (
-        <div className="absolute top-4 left-4 bg-ink/40 backdrop-blur-md text-white/90 text-[10px] font-mono font-bold tracking-[0.15em] uppercase px-3 py-1.5 rounded-full">
-          {date}
-        </div>
-      )}
-
-      {/* Bottom content */}
-      <div className="absolute inset-x-0 bottom-0 p-5 md:p-6 text-white">
-        {/* Categories (small caps) */}
-        <p className="text-[10px] md:text-[11px] font-bold tracking-[0.2em] uppercase text-gold mb-2.5">
-          {[job.job_role_name, job.scope_names].filter(Boolean).join(' · ')}
-        </p>
-
-        {/* Title */}
-        <h3 className="font-display text-[18px] md:text-[22px] leading-[1.2] mb-3 line-clamp-2 drop-shadow-md">
-          {job.job_title}
-        </h3>
-
-        {/* Location */}
-        {(job.city_name || job.region_name) && (
-          <div className="flex items-center gap-1.5 text-[12px] text-white/80 mb-4">
-            <MapPin className="h-3.5 w-3.5 text-gold" />
-            <span>{[job.city_name, job.region_name].filter(Boolean).join(' · ')}</span>
+      {/* ── Image section ── */}
+      <div className="relative w-full h-[260px] overflow-hidden">
+        <img
+          src={image}
+          alt={job.job_title}
+          className="w-full h-full object-cover block"
+          loading="lazy"
+          onError={(e) => {
+            e.currentTarget.src = '/images/fallback/default-dental.svg'
+          }}
+        />
+        <div className="absolute inset-x-0 bottom-0 p-4 flex items-end justify-between bg-gradient-to-t from-black/55 to-transparent">
+          <div className="flex flex-col gap-0.5 text-right">
+            <span className="text-white text-[18px] font-bold leading-tight">
+              {job.job_title}
+            </span>
+            {job.job_role_name && (
+              <span className="text-[#4DD9D9] text-[13px] font-medium">
+                {job.job_role_name}
+              </span>
+            )}
           </div>
-        )}
-
-        {/* CTA */}
-        <div className="pt-4 border-t border-white/20 flex items-center justify-between">
-          {job.salary_expectation_hourly && (
-            <span className="text-gold font-mono font-bold text-[12px]">₪{job.salary_expectation_hourly}/שעה</span>
-          )}
-          <span className="flex items-center gap-1.5 text-[11.5px] font-bold tracking-[0.18em] uppercase text-white group-hover:gap-3 transition-all duration-300 mr-auto">
+          <span className="bg-white/15 backdrop-blur-md text-white border border-white/35 rounded-full px-4 py-2 text-[13px] font-semibold whitespace-nowrap shrink-0 mr-3">
             לפרטים
-            <ArrowUpLeft className="h-3.5 w-3.5" />
           </span>
         </div>
       </div>
-    </article>
+
+      {/* ── Content section ── */}
+      <div className="px-5 pt-5 pb-4 bg-white">
+        {/* Job code + city */}
+        <h3 className="text-[15px] font-bold text-[#111] mb-3 leading-snug text-right">
+          {[job.job_code, job.city_name].filter(Boolean).join(' · ')}
+        </h3>
+
+        {/* Tags */}
+        {tags.length > 0 && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {tags.map((tag, i) => (
+              <span
+                key={i}
+                className="bg-[#f3f3f3] border border-[#e5e5e5] rounded-full px-3.5 py-1 text-[12px] text-[#444] font-medium"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Excerpt */}
+        {job.public_excerpt && (
+          <p
+            className={`text-[13.5px] text-[#555] leading-relaxed mb-3 text-right transition-all ${
+              expanded ? '' : 'line-clamp-3'
+            }`}
+          >
+            {job.public_excerpt}
+          </p>
+        )}
+
+        {/* Toggle button — only if excerpt is long */}
+        {hasLongExcerpt && (
+          <button
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setExpanded((v) => !v)
+            }}
+            className="block mx-auto text-[22px] text-[#888] leading-none transition-transform duration-300"
+            style={{ transform: expanded ? 'rotate(180deg)' : 'none' }}
+            aria-label={expanded ? 'כווץ' : 'הרחב'}
+          >
+            ⌃
+          </button>
+        )}
+      </div>
+    </div>
   )
 
-  if (onClick) return inner
-  return <Link to={`/jobs/${job.job_code}`} className="block h-full">{inner}</Link>
+  if (onClick)
+    return (
+      <div onClick={onClick} className="cursor-pointer">
+        {inner}
+      </div>
+    )
+
+  return (
+    <Link to={`/jobs/${job.job_code}`} className="block no-underline">
+      {inner}
+    </Link>
+  )
 }
