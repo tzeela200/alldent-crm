@@ -46,6 +46,7 @@ export const NAV_ITEMS: NavItem[] = [
 function DropdownItem({ item }: { item: NavItem }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const { pathname } = useLocation()
   const isActive =
     pathname === item.to || item.children?.some((c) => pathname === c.to)
@@ -58,12 +59,21 @@ function DropdownItem({ item }: { item: NavItem }) {
     return () => document.removeEventListener('mousedown', onOutside)
   }, [])
 
+  function handleMouseEnter() {
+    if (closeTimer.current) clearTimeout(closeTimer.current)
+    setOpen(true)
+  }
+
+  function handleMouseLeave() {
+    closeTimer.current = setTimeout(() => setOpen(false), 180)
+  }
+
   return (
     <div
       ref={ref}
       className="relative"
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <button
         onClick={() => setOpen((v) => !v)}
@@ -88,8 +98,11 @@ function DropdownItem({ item }: { item: NavItem }) {
 
       {open && (
         <div
-          className="absolute top-full right-0 mt-1.5 min-w-[180px] bg-white border border-[#E5E7EB] rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1.5 z-50"
+          className="absolute top-full right-0 min-w-[180px] bg-white border border-[#E5E7EB] rounded-2xl shadow-[0_8px_24px_rgba(0,0,0,0.08)] py-1.5 z-50"
+          style={{ paddingTop: '10px', marginTop: '-2px' }}
           role="menu"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
         >
           {item.children?.map((child) => (
             <Link
