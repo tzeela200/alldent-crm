@@ -5,6 +5,7 @@ import { Briefcase, Building2, CheckCircle2, ChevronLeft, FileText, Image as Ima
 import { supabase } from '@/lib/supabase'
 import { Shell, ActionButton } from '@/components/layout/Shell'
 import JobImageUpload from '@/components/admin/JobImageUpload'
+import JobAIWriter from '@/components/admin/JobAIWriter'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 type ToastTone = 'success' | 'error' | 'info'
@@ -310,7 +311,7 @@ export default function CreateJobWizardPage() {
               <SectionTitle icon={<Briefcase className="h-5 w-5" />} title="פרטי משרה" />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <TextField label="קוד משרה" value={form.job_code} onChange={(value) => setField('job_code', value)} dir="ltr" placeholder="אפשר להשאיר ריק ליצירה אוטומטית" />
-                <TextField label="כותרת משרה" value={form.job_title} onChange={(value) => setField('job_title', value)} />
+                <TextField label="כותרת משרה" value={form.job_title} onChange={(value) => setField('job_title', value)} labelSuffix={<JobAIWriter mode="admin" field="job_title" currentValue={form.job_title} jobContext={{ role: form.job_role }} onApply={(v) => setField('job_title', v)} />} />
                 <SelectField label="תפקיד ראשי" value={form.job_role} onChange={(value) => setForm((prev) => ({ ...prev, job_role: value, job_sub_role: [] }))} options={roles.map(toOption)} />
                 <MultiSelectField label="תתי־תפקידים" values={form.job_sub_role} onChange={(values) => setField('job_sub_role', values)} options={subRoleOptions.map(toOption)} />
                 <SelectField label="אזור" value={form.region_id} onChange={(value) => setForm((prev) => ({ ...prev, region_id: value, city_id: '' }))} options={regions.map(toOption)} />
@@ -318,7 +319,7 @@ export default function CreateJobWizardPage() {
                 <TextField label="כתובת" value={form.address} onChange={(value) => setField('address', value)} />
                 <SelectField label="ניסיון נדרש" value={form.required_experience} onChange={(value) => setField('required_experience', value)} options={experience.map(toOption)} />
                 <MultiSelectField label="היקף משרה" values={form.scope} onChange={(values) => setField('scope', values)} options={scopes.map(toOption)} />
-                <TextField label="ימים ושעות עבודה" value={form.work_schedule_text} onChange={(value) => setField('work_schedule_text', value)} />
+                <TextField label="ימים ושעות עבודה" value={form.work_schedule_text} onChange={(value) => setField('work_schedule_text', value)} labelSuffix={<JobAIWriter mode="admin" field="work_schedule_text" currentValue={form.work_schedule_text} onApply={(v) => setField('work_schedule_text', v)} />} />
                 <MultiSelectField label="שפות" values={form.required_languages} onChange={(values) => setField('required_languages', values)} options={languages.map(toOption)} />
                 <MultiSelectField label="מערכות" values={form.systems_used} onChange={(values) => setField('systems_used', values)} options={systems.map(toOption)} />
                 <SelectField label="מיסוי" value={form.tax_type_id} onChange={(value) => setField('tax_type_id', value)} options={taxTypes.map(toOption)} />
@@ -335,9 +336,9 @@ export default function CreateJobWizardPage() {
                   <span>להציג שכר באתר הציבורי לאחר פרסום</span>
                   <input type="checkbox" checked={form.show_salary_public} onChange={(event) => setField('show_salary_public', event.target.checked)} className="h-4 w-4 accent-[#008080]" />
                 </label>
-                <TextAreaField label="תיאור המשרה" value={form.job_description} onChange={(value) => setField('job_description', value)} />
-                <TextAreaField label="דרישות המשרה" value={form.job_requirements} onChange={(value) => setField('job_requirements', value)} />
-                <TextAreaField label="תקציר ציבורי" value={form.public_excerpt} onChange={(value) => setField('public_excerpt', value)} />
+                <TextAreaField label="תיאור המשרה" value={form.job_description} onChange={(value) => setField('job_description', value)} labelSuffix={<JobAIWriter mode="admin" field="job_description" currentValue={form.job_description} jobContext={{ title: form.job_title, role: form.job_role }} onApply={(v) => setField('job_description', v)} />} />
+                <TextAreaField label="דרישות המשרה" value={form.job_requirements} onChange={(value) => setField('job_requirements', value)} labelSuffix={<JobAIWriter mode="admin" field="job_requirements" currentValue={form.job_requirements} jobContext={{ title: form.job_title, role: form.job_role }} onApply={(v) => setField('job_requirements', v)} />} />
+                <TextAreaField label="תקציר ציבורי" value={form.public_excerpt} onChange={(value) => setField('public_excerpt', value)} labelSuffix={<JobAIWriter mode="admin" field="public_excerpt" currentValue={form.public_excerpt} jobContext={{ title: form.job_title }} onApply={(v) => setField('public_excerpt', v)} />} />
                 <TextAreaField label="הערות פנימיות" value={form.notes} onChange={(value) => setField('notes', value)} />
                 <TextAreaField label="הערות מעסיק" value={form.employer_notes} onChange={(value) => setField('employer_notes', value)} className="lg:col-span-2" />
               </div>
@@ -395,8 +396,8 @@ function ModeButton({ active, onClick, children }: { active: boolean; onClick: (
   return <button type="button" onClick={onClick} className={`rounded-xl px-4 py-2 text-[13px] font-bold transition ${active ? 'bg-[#008080] text-white' : 'border border-[#D9D9D9] bg-white text-[#2D2D2D] hover:bg-[#F3F4F6]'}`}>{children}</button>
 }
 
-function TextField({ label, value, onChange, placeholder, dir = 'rtl', className = '' }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; dir?: 'rtl' | 'ltr'; className?: string }) {
-  return <label className={`flex flex-col gap-1.5 ${className}`}><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><input dir={dir} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]" /></label>
+function TextField({ label, value, onChange, placeholder, dir = 'rtl', className = '', labelSuffix }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string; dir?: 'rtl' | 'ltr'; className?: string; labelSuffix?: React.ReactNode }) {
+  return <div className={`flex flex-col gap-1.5 ${className}`}><div className="flex items-center justify-between"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>{labelSuffix}</div><input dir={dir} value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className="h-11 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]" /></div>
 }
 
 function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[] }) {
@@ -407,8 +408,8 @@ function MultiSelectField({ label, values, onChange, options }: { label: string;
   return <div className="flex flex-col gap-1.5"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><div className="max-h-44 overflow-y-auto rounded-xl border border-[#D9D9D9] bg-white p-2">{options.length ? options.map((option) => { const numeric = Number(option.value); const checked = values.includes(numeric); return <label key={option.value} className="flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 text-[13px] hover:bg-[#F3F4F6]"><span>{option.label}</span><input type="checkbox" checked={checked} onChange={() => onChange(checked ? values.filter((id) => id !== numeric) : [...values, numeric])} className="h-4 w-4 accent-[#008080]" /></label> }) : <div className="px-2 py-2 text-[13px] text-[#6B6B6B]">אין אפשרויות</div>}</div></div>
 }
 
-function TextAreaField({ label, value, onChange, className = '' }: { label: string; value: string; onChange: (value: string) => void; className?: string }) {
-  return <label className={`flex flex-col gap-1.5 ${className}`}><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><textarea dir="rtl" rows={5} value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[14px] leading-7 text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]" /></label>
+function TextAreaField({ label, value, onChange, className = '', labelSuffix }: { label: string; value: string; onChange: (value: string) => void; className?: string; labelSuffix?: React.ReactNode }) {
+  return <div className={`flex flex-col gap-1.5 ${className}`}><div className="flex items-center justify-between"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>{labelSuffix}</div><textarea dir="rtl" rows={5} value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[14px] leading-7 text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]" /></div>
 }
 
 function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
