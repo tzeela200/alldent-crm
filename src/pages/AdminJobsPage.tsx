@@ -22,6 +22,7 @@ import {
   MessageCircle,
   Image as ImageIcon,
   ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import {
   Shell,
@@ -113,6 +114,7 @@ type PanelMode = 'view' | 'edit'
 type PanelState = { open: boolean; mode: PanelMode; jobCode: string | null }
 
 type JobDraft = {
+  job_code: string
   job_title: string
   job_status: number | null
   public_status: number | null
@@ -137,6 +139,7 @@ type JobDraft = {
 }
 
 const EMPTY_JOB_DRAFT: JobDraft = {
+  job_code: '',
   job_title: '',
   job_status: null,
   public_status: null,
@@ -453,6 +456,7 @@ export default function AdminJobsPage() {
   const openPanel = (job: any, mode: PanelMode) => {
     setPanel({ open: true, mode, jobCode: String(job.job_code) })
     setJobDraft({
+      job_code: job.job_code ?? '',
       job_title: job.job_title ?? '',
       job_status: job.job_status ?? null,
       public_status: job.public_status ?? null,
@@ -522,7 +526,9 @@ export default function AdminJobsPage() {
         notes: cleanText(jobDraft.notes),
         updated_timestamp: new Date().toISOString(),
       }
-      const { error } = await supabase.from('job').update(patch).eq('job_code', panel.jobCode)
+      // אם קוד משרה השתנה — עדכן גם אותו
+      const newJobCode = cleanText(jobDraft.job_code)
+      const { error } = await supabase.from('job').update({ ...patch, ...(newJobCode && newJobCode !== panel.jobCode ? { job_code: newJobCode } : {}) }).eq('job_code', panel.jobCode)
       if (error) throw error
       replaceJob(panel.jobCode, (cur) => ({ ...cur, ...patch }))
       const savedMsg = isInactive ? 'המשרה נשמרה — סטטוס פרסום הוסתר אוטומטית' : 'המשרה נשמרה בהצלחה'
@@ -682,13 +688,19 @@ export default function AdminJobsPage() {
     >
       <div dir="rtl" className="min-h-screen bg-[#F3F4F6] font-['Heebo'] text-[#2D2D2D]">
         <div className="space-y-6">
-          <section className="grid grid-cols-1 gap-4 xl:grid-cols-6">
-            <KpiCard label="סה״כ משרות" value={kpis.total} hint="לפי הסינון הנוכחי" />
-            <KpiCard label="משרות פעילות" value={kpis.active} hint="job_status = פעילה" tone="success" onClick={() => setFilters((prev) => ({ ...prev, job_status: JOB_STATUS_IDS.active }))} />
-            <KpiCard label="מפורסמות" value={kpis.published} hint="public_status = מפורסמת" onClick={() => setFilters((prev) => ({ ...prev, public_status: PUBLIC_STATUS_IDS.published }))} />
-            <KpiCard label="ללא מועמדים" value={kpis.withoutApplicants} hint="דורש בדיקה" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, applicants_state: 'without' }))} />
-            <ListKpiCard title="משרות פעילות לפי תפקיד" items={kpis.byRole.slice(0, 6)} empty="אין פעילות" onItemClick={(id) => setFilters((prev) => ({ ...prev, job_role: Number(id), job_sub_role: undefined }))} />
-            <ListKpiCard title="משרות פעילות לפי אזור" items={kpis.byRegion.slice(0, 6)} empty="אין פעילות" onItemClick={(id) => setFilters((prev) => ({ ...prev, region_id: Number(id), city_id: undefined }))} />
+          <section className="space-y-3">
+            {/* שורה עליונה — מספרים גדולים */}
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              <KpiCard label="סה״כ משרות" value={kpis.total} hint="לפי הסינון הנוכחי" />
+              <KpiCard label="משרות פעילות" value={kpis.active} hint="job_status = פעילה" tone="success" onClick={() => setFilters((prev) => ({ ...prev, job_status: JOB_STATUS_IDS.active }))} />
+              <KpiCard label="מפורסמות" value={kpis.published} hint="public_status = מפורסמת" onClick={() => setFilters((prev) => ({ ...prev, public_status: PUBLIC_STATUS_IDS.published }))} />
+              <KpiCard label="ללא מועמדים" value={kpis.withoutApplicants} hint="דורש בדיקה" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, applicants_state: 'without' }))} />
+            </div>
+            {/* שורה תחתונה — חתכים רוחביים */}
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+              <ListKpiCard title="משרות פעילות לפי תפקיד" items={kpis.byRole} empty="אין פעילות" onItemClick={(id) => setFilters((prev) => ({ ...prev, job_role: Number(id), job_sub_role: undefined }))} />
+              <ListKpiCard title="משרות פעילות לפי אזור" items={kpis.byRegion} empty="אין פעילות" onItemClick={(id) => setFilters((prev) => ({ ...prev, region_id: Number(id), city_id: undefined }))} />
+            </div>
           </section>
 
           <Toolbar>
@@ -771,7 +783,21 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('region_id') && <td className="px-3 py-3">{regionName(job.region_id)}</td>}
                             {visibleColumns.includes('city_id') && <td className="px-3 py-3">{cityName(job.city_id)}</td>}
                             {visibleColumns.includes('scope') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.scope)} labelById={scopeName} empty="—" /></td>}
-                            {visibleColumns.includes('job_status') && <td className="px-3 py-3"><StatusPill label={statusName(job.job_status)} tone={jobStatusTone(Number(job.job_status))} /></td>}
+                            {visibleColumns.includes('job_status') && (
+                              <td className="px-3 py-3">
+                                <select
+                                  value={job.job_status ?? ''}
+                                  onChange={(event) => {
+                                    const value = Number(event.target.value)
+                                    if (value) updateJobPatch(String(job.job_code), { job_status: value }, `סטטוס משרה עודכן ל־${statusName(value)}`)
+                                  }}
+                                  className="h-8 rounded-xl border border-[#D9D9D9] bg-white px-2 text-[12px] font-semibold outline-none focus:border-[#008080] cursor-pointer"
+                                  style={{ color: job.job_status === JOB_STATUS_IDS.active ? '#166534' : job.job_status === JOB_STATUS_IDS.hold || job.job_status === JOB_STATUS_IDS.draft ? '#B45309' : '#6B6B6B' }}
+                                >
+                                  {jobStatuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
+                                </select>
+                              </td>
+                            )}
                             {visibleColumns.includes('public_status') && <td className="px-3 py-3"><StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} /></td>}
                             {visibleColumns.includes('total_applicants') && <td className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold">{Number(job.total_applicants ?? 0)}</span></td>}
                             {visibleColumns.includes('last_publish_date') && <td className="px-3 py-3 text-[#6B6B6B]">{job.last_publish_date ? formatDate(job.last_publish_date) : '—'}</td>}
@@ -784,10 +810,6 @@ export default function AdminJobsPage() {
                                 <IconButton title="פרסום" icon={<Send className="h-4 w-4" />} onClick={() => publishJob(job)} pending={rowActionPending === jobCode} />
                                 <IconButton title="Smart Match" icon={<Sparkles className="h-4 w-4" />} onClick={() => showToast('Smart Match לא מחובר למסך הזה עדיין', 'info')} />
                                 <IconButton title="וואטסאפ" icon={<MessageCircle className="h-4 w-4" />} onClick={() => openWhatsApp(job)} />
-                                <select value="" onChange={(event) => { const value = Number(event.target.value); if (value) updateJobPatch(jobCode, { job_status: value }, `סטטוס משרה עודכן ל־${statusName(value)}`); event.currentTarget.value = '' }} className="h-9 max-w-[132px] rounded-xl border border-[#D9D9D9] bg-white px-2 text-[12px] outline-none focus:border-[#008080]">
-                                  <option value="">סטטוס משרה</option>
-                                  {jobStatuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
-                                </select>
                                 <IconButton title="ארכוב" icon={<Archive className="h-4 w-4" />} onClick={() => updateJobPatch(jobCode, { job_status: JOB_STATUS_IDS.archived, public_status: PUBLIC_STATUS_IDS.archived }, 'המשרה הועברה לארכיון')} pending={rowActionPending === jobCode} />
                               </div>
                             </td>
@@ -932,6 +954,7 @@ function UnifiedJobPanel({
           ) : (
             <div className="space-y-4">
               <PanelCard title="פרטי משרה">
+                <EditTextField label="קוד משרה" value={draft.job_code ?? ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_code: value }))} />
                 <EditTextField label="כותרת משרה" value={draft.job_title} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_title: value }))} />
                 <EditSelectField label="סטטוס משרה" value={draft.job_status != null ? String(draft.job_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_status: value ? Number(value) : null }))} options={jobStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
                 <EditSelectField label="סטטוס פרסום" value={draft.public_status != null ? String(draft.public_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, public_status: value ? Number(value) : null }))} options={publicStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
@@ -960,6 +983,11 @@ function UnifiedJobPanel({
                   <input type="checkbox" checked={draft.show_salary_public} onChange={(event) => setDraft((prev: JobDraft) => ({ ...prev, show_salary_public: event.target.checked }))} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" />
                 </label>
                 <EditTextField label="קישור תמונה ציבורית" value={draft.public_image_url} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, public_image_url: value }))} />
+                <ImageUploadField
+                  jobCode={job.job_code}
+                  value={draft.public_image_url}
+                  onChange={(url: string) => setDraft((prev: JobDraft) => ({ ...prev, public_image_url: url }))}
+                />
                 {draft.public_image_url && <div className="mt-3 flex items-center gap-2 text-[12px] text-[#6B6B6B]"><ImageIcon className="h-4 w-4" />התמונה תוצג בכרטיס המשרה הציבורי</div>}
               </PanelCard>
 
@@ -1004,13 +1032,13 @@ function ListKpiCard({ title, items, empty, onItemClick }: { title: string; item
   return (
     <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-4 shadow-sm">
       <div className="mb-3 text-[13px] font-bold text-[#2D2D2D]">{title}</div>
-      <div className="space-y-1.5">
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
         {items.length ? items.map((item) => (
-          <button key={item.id} type="button" onClick={() => onItemClick(item.id)} className="flex w-full items-center justify-between rounded-xl px-2 py-1.5 text-[12px] hover:bg-[#F3F4F6]">
-            <span className="truncate text-[#2D2D2D]">{item.name}</span>
-            <span className="rounded-[6px] bg-[#E6F3F3] px-2 py-0.5 font-bold text-[#008080]">{item.count}</span>
+          <button key={item.id} type="button" onClick={() => onItemClick(item.id)} className="flex items-center justify-between rounded-xl px-3 py-2 text-[12px] hover:bg-[#F3F4F6] border border-[#F3F4F6]">
+            <span className="truncate text-[#2D2D2D] font-medium">{item.name}</span>
+            <span className="mr-2 rounded-[6px] bg-[#E6F3F3] px-2 py-0.5 font-bold text-[#008080]">{item.count}</span>
           </button>
-        )) : <div className="text-[12px] text-[#6B6B6B]">{empty}</div>}
+        )) : <div className="col-span-full text-[12px] text-[#6B6B6B]">{empty}</div>}
       </div>
     </div>
   )
@@ -1024,14 +1052,20 @@ function InfoPill({ label, tone = 'default' }: { label: string; tone?: 'default'
 function SortableTh({ label, sortKey, sortBy, sortDir, onSort }: { label: string; sortKey: string; sortBy: string | null; sortDir: 'asc' | 'desc'; onSort: (key: string) => void }) {
   const active = sortBy === sortKey
   return (
-    <th onClick={() => onSort(sortKey)} className="cursor-pointer select-none whitespace-nowrap px-3 py-3">
-      <span className="inline-flex items-center gap-1.5">{label}<span className={active ? 'text-[#008080]' : 'text-slate-300'}>{active ? (sortDir === 'asc' ? '↑' : '↓') : '↕'}</span></span>
+    <th onClick={() => onSort(sortKey)} className="cursor-pointer select-none whitespace-nowrap px-3 py-3 hover:bg-slate-100">
+      <span className="inline-flex items-center gap-1.5">
+        {label}
+        <span className={`flex flex-col ${active ? 'text-[#008080]' : 'text-slate-400'}`}>
+          <ChevronUp className={`h-3 w-3 -mb-1 ${active && sortDir === 'asc' ? 'text-[#008080]' : 'text-slate-300'}`} />
+          <ChevronDown className={`h-3 w-3 ${active && sortDir === 'desc' ? 'text-[#008080]' : 'text-slate-300'}`} />
+        </span>
+      </span>
     </th>
   )
 }
 
 function PlainTh({ label }: { label: string }) {
-  return <th className="whitespace-nowrap px-3 py-3">{label}</th>
+  return <th className="whitespace-nowrap px-3 py-3 select-none">{label}</th>
 }
 
 function IconButton({ title, icon, onClick, disabled, pending }: { title: string; icon: React.ReactNode; onClick?: () => void; disabled?: boolean; pending?: boolean }) {
@@ -1119,12 +1153,57 @@ function PanelCard({ title, children }: { title: string; children: React.ReactNo
   return <section className="rounded-[18px] border border-[#D9D9D9] bg-white p-5 shadow-sm"><h3 className="mb-4 text-[15px] font-bold text-[#2D2D2D]">{title}</h3>{children}</section>
 }
 
+function ImageUploadField({ jobCode, value, onChange }: { jobCode: string; value: string; onChange: (url: string) => void }) {
+  const [dragging, setDragging] = React.useState(false)
+  const [uploading, setUploading] = React.useState(false)
+
+  const uploadFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) return
+    setUploading(true)
+    try {
+      const ext = file.name.split('.').pop() ?? 'jpg'
+      const path = `${jobCode}/${Date.now()}.${ext}`
+      const { error } = await supabase.storage.from('job-images').upload(path, file, { upsert: true })
+      if (error) throw error
+      const { data } = supabase.storage.from('job-images').getPublicUrl(path)
+      onChange(data.publicUrl)
+    } catch (err) {
+      console.error('שגיאה בהעלאת תמונה:', err)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => { e.preventDefault(); setDragging(false); const file = e.dataTransfer.files[0]; if (file) uploadFile(file) }}
+      className={`mt-2 flex flex-col items-center justify-center rounded-xl border-2 border-dashed p-4 text-[13px] transition ${dragging ? 'border-[#008080] bg-[#E6F3F3]' : 'border-[#D9D9D9] bg-white'}`}
+    >
+      {uploading ? (
+        <span className="text-[#008080]">מעלה תמונה...</span>
+      ) : (
+        <>
+          <ImageIcon className="mb-2 h-6 w-6 text-[#6B6B6B]" />
+          <span className="text-[#6B6B6B]">גרור תמונה לכאן</span>
+          <label className="mt-2 cursor-pointer text-[#008080] underline">
+            או בחר קובץ
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const file = e.target.files?.[0]; if (file) uploadFile(file) }} />
+          </label>
+          {value && <img src={value} alt="תצוגה מקדימה" className="mt-3 h-24 w-full rounded-xl object-cover" />}
+        </>
+      )}
+    </div>
+  )
+}
+
 function LabelValue({ label, value }: { label: string; value: React.ReactNode }) {
   return <div className="mb-2 grid grid-cols-[120px_1fr] gap-3 text-[13px]"><span className="font-semibold text-[#6B6B6B]">{label}</span><span className="font-medium text-[#2D2D2D]">{value}</span></div>
 }
 
-function EditTextField({ label, value, onChange, type = 'text' }: { label: string; value: string; onChange: (value: string) => void; type?: string }) {
-  return <label className="flex flex-col gap-1.5"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><input dir="rtl" type={type} value={value} onChange={(event) => onChange(event.target.value)} className="h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none focus:border-[#008080]" /></label>
+function EditTextField({ label, value, onChange, type = 'text', readOnly }: { label: string; value: string; onChange: (value: string) => void; type?: string; readOnly?: boolean }) {
+  return <label className="flex flex-col gap-1.5"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><input dir="rtl" type={type} value={value} onChange={(event) => onChange(event.target.value)} readOnly={readOnly} className={`h-10 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] font-medium text-[#2D2D2D] outline-none focus:border-[#008080] ${readOnly ? 'opacity-60 cursor-not-allowed' : ''}`} /></label>
 }
 
 function EditSelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[] }) {
