@@ -215,9 +215,9 @@ export default function AdminJobsPage() {
   })
 
   const { data: contactsList = [] } = useQuery<Array<{ contact_id: number; full_name: string | null; phone: string | null; phone_norm: string | null }>>({
-    queryKey: ['contacts-for-admin-jobs-v4'],
+    queryKey: ['contacts-employers-v1'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('contact').select('contact_id,full_name,phone,phone_norm')
+      const { data, error } = await supabase.from('contact').select('contact_id,full_name,phone,phone_norm').eq('profile_type', 2)
       if (error) throw error
       return (data ?? []) as Array<{ contact_id: number; full_name: string | null; phone: string | null; phone_norm: string | null }>
     },
@@ -350,7 +350,7 @@ export default function AdminJobsPage() {
   const filteredJobs = useMemo(() => {
     const result = localJobs.filter((job) => {
       const search = String(filters.search ?? '').trim().toLowerCase()
-      const haystack = [job.job_code, job.job_title, job.account_name, cityName(job.city_id), roleName(job.job_role)]
+      const haystack = [job.job_code, job.job_title, job.account_name, job.employer_contact_name, cityName(job.city_id), roleName(job.job_role)]
         .map((item) => String(item ?? '').toLowerCase())
         .join(' ')
       if (search && !haystack.includes(search)) return false
@@ -589,6 +589,7 @@ export default function AdminJobsPage() {
       תפקיד: roleName(job.job_role),
       'תתי־תפקידים': namesFromIds(normalizeIds(job.job_sub_role), subRoleName),
       ארגון: job.account_name ?? '',
+      מעסיק: job.employer_contact_name ?? '',
       אזור: regionName(job.region_id),
       עיר: cityName(job.city_id),
       היקף: namesFromIds(normalizeIds(job.scope), scopeName),

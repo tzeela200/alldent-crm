@@ -130,6 +130,7 @@ export interface Job {
   job_requirements: string | null
   job_url: string | null
   rel_employer_contact: number | null // → contact.contact_id
+  rel_recruiter_contact: number | null // → contact.contact_id
   total_applicants: number
   channels: string[] | null
   date_facebook: string | null
@@ -255,8 +256,8 @@ export const PREDEFINED_TAGS = [
 // --- Profile Types ---
 export const PROFILE_TYPES = {
   1: 'מועמד',
-  2: 'מגייס',
-  3: 'איש גיוס',
+  2: 'מעסיק',
+  3: 'מגייס',
   4: 'אנשי קשר',
   5: 'עובד ארגון',
 } as const

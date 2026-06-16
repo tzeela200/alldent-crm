@@ -45,7 +45,6 @@ import {
   DICT_SUB_ROLES,
 } from '@/lib/dicts'
 import { supabase } from '@/lib/supabase'
-import { mockContactTags } from '@/mocks/data'
 import type { Contact } from '@/types'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 
@@ -256,8 +255,8 @@ export default function AdminContactsPage() {
   })
 
   const selectedTags = useMemo(
-    () => (contactTagsData.length ? contactTagsData : mockContactTags.filter((item) => item.contact_id === (selectedId ?? -1))),
-    [contactTagsData, selectedId],
+    () => contactTagsData,
+    [contactTagsData],
   )
 
   useEffect(() => {
@@ -298,9 +297,7 @@ export default function AdminContactsPage() {
 
   const enrichedContacts = useMemo(() => {
     return rawContacts.map((contact) => {
-      const localTags = mockContactTags
-        .filter((tag) => tag.contact_id === contact.contact_id)
-        .map((tag) => tag.tag)
+      const localTags: string[] = []
 
       const hasBrokenCv = Boolean(contact.has_cv && (!contact.cv_link || !isValidUrl(contact.cv_link)))
       const hasNoPhoneButEmail = !contact.phone_norm && Boolean(contact.email)
