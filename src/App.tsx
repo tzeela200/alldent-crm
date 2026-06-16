@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 
 // Auth
 import { AuthProvider } from '@/contexts/AuthContext'
@@ -41,6 +41,20 @@ import DentalShopPage from '@/pages/DentalShopPage'
 import DentalAssetsPage from '@/pages/DentalAssetsPage'
 import ClassDentalPage from '@/pages/ClassDentalPage'
 import ContactPage from '@/pages/ContactPage'
+
+
+function LegacyJobRedirect() {
+  const { legacyJobCode } = useParams()
+
+  const normalizedJobCode = legacyJobCode?.trim().toUpperCase()
+  const isLikelyJobCode = /^[A-Z]{2,5}\d{1,5}$/.test(normalizedJobCode ?? '')
+
+  if (!normalizedJobCode || !isLikelyJobCode) {
+    return <Navigate to="/jobs" replace />
+  }
+
+  return <Navigate to={`/jobs/${normalizedJobCode}`} replace />
+}
 
 export default function App() {
   return (
@@ -110,6 +124,9 @@ export default function App() {
         {/* Tools */}
         <Route path="smart-match" element={<SmartMatchPage />} />
       </Route>
+
+      {/* ─── Legacy job URLs from previous site ─── */}
+      <Route path="/:legacyJobCode" element={<LegacyJobRedirect />} />
     </Routes>
     </PublicLaunchGate>
     </AuthProvider>

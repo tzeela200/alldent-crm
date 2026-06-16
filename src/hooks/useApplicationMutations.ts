@@ -3,20 +3,8 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import type { ApplicationRow } from '@/types/applications'
 
-/** Status 12 = "השמה (התקבל)" — triggers job.job_status = 5 ("מאוישת"). */
-const HIRE_STATUS = 12
-const HIRED_JOB_STATUS = 5
 /** Status 15 = "לא דנטלי - ארכיון" */
 const ARCHIVE_STATUS = 15
-
-async function triggerHireIfNeeded(status: number, jobCode: string | null | undefined) {
-  if (status !== HIRE_STATUS || !jobCode) return
-  const { error } = await supabase
-    .from('job')
-    .update({ job_status: HIRED_JOB_STATUS })
-    .eq('job_code', jobCode)
-  if (error) throw error
-}
 
 export function useApplicationMutations() {
   const qc = useQueryClient()
@@ -29,8 +17,7 @@ export function useApplicationMutations() {
 
   /**
    * Update fields on one application.
-   * If application_status is set to 12 (השמה), also updates job.job_status = 5 (מאוישת).
-   * The hire trigger only fires when the admin explicitly saves this status change from the UI.
+   * Business rule: application changes never update job status automatically.
    */
   const updateApplication = useMutation({
     mutationFn: async ({
@@ -49,15 +36,12 @@ export function useApplicationMutations() {
         .eq('application_id', applicationId)
       if (error) throw error
 
-      if (updates.application_status != null) {
-        await triggerHireIfNeeded(updates.application_status, jobCode)
-      }
     },
     onSuccess: () => invalidate(),
     onError: (err: Error) => toast.error(err.message),
   })
 
-  /** Bulk-update application_status. Fires hire trigger per unique job_code if status = 12. */
+  /** Bulk-update application_status. Does not update job status automatically. */
   const bulkUpdateStatus = useMutation({
     mutationFn: async ({
       applicationIds,
@@ -72,18 +56,6 @@ export function useApplicationMutations() {
         .in('application_id', applicationIds)
       if (error) throw error
 
-      if (status === HIRE_STATUS) {
-        const { data } = await supabase
-          .from('applications')
-          .select('job_code')
-          .in('application_id', applicationIds)
-        const jobCodes = [...new Set((data ?? []).map((r) => r.job_code).filter(Boolean))]
-        await Promise.all(
-          jobCodes.map((code) =>
-            supabase.from('job').update({ job_status: HIRED_JOB_STATUS }).eq('job_code', code)
-          )
-        )
-      }
     },
     onSuccess: () => invalidate(),
     onError: (err: Error) => toast.error(err.message),

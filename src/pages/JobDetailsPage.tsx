@@ -1,51 +1,68 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import {
-  Briefcase,
-  MapPin,
-  Building2,
-  Users,
-  Edit2,
-  Copy,
-  ChevronLeft,
-  ExternalLink,
-  Clock3,
-  CalendarDays,
-  CheckCircle2,
-  X,
-  Send,
-  Sparkles,
-  Plus,
-  FileText,
-  Globe,
-} from 'lucide-react'
-import { Shell, ActionButton, EmptyState } from '@/components/layout/Shell'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Archive, Briefcase, Building2, CheckCircle2, ChevronLeft, Copy, FileText, Image as ImageIcon, MapPin, Save, Send, Sparkles, Users, XCircle } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
+import { Shell, ActionButton, EmptyState } from '@/components/layout/Shell'
 import { supabase } from '@/lib/supabase'
-import { jobStatusColors, applicationStatusColors, getStatusBadge } from '@/lib/statusColors'
 import { formatDate } from '@/lib/timeAgo'
+import JobImageUpload from '@/components/admin/JobImageUpload'
 
-const TABS = ['מעסיק', 'מפרט', 'דרישות', 'הפצה', 'מועמדים'] as const
-
-const STATUS_IDS = {
-  draft: 1, waitingApproval: 2, active: 3, hold: 4,
-  filled: 5, closedSuccess: 6, closedOther: 7, cancelled: 8, archived: 9,
-}
-
-const PUBLIC_STATUS_IDS = { published: 3 }
-
-type TabKey = (typeof TABS)[number]
+type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 type ToastTone = 'success' | 'error' | 'info'
 type ToastState = { open: boolean; message: string; tone: ToastTone }
 
+type JobDraft = {
+  job_code: string
+  job_title: string
+  job_status: string
+  public_status: string
+  job_role: string
+  job_sub_role: number[]
+  account_link: string
+  rel_employer_contact: string
+  rel_recruiter_contact: string
+  region_id: string
+  city_id: string
+  address: string
+  scope: number[]
+  required_experience: string
+  required_languages: number[]
+  systems_used: number[]
+  tax_type_id: string
+  mobility_id: string
+  salary_expectation_hourly: string
+  salary_expectation_monthly: string
+  show_salary_public: boolean
+  work_schedule_text: string
+  job_description: string
+  job_requirements: string
+  employer_notes: string
+  notes: string
+  public_excerpt: string
+  public_image_url: string
+  job_url: string
+}
+
+const JOB_STATUS_ACTIVE = 3
+const PUBLIC_STATUS_PUBLISHED = 3
+const PUBLIC_STATUS_HIDDEN = 4
+
 export default function JobDetailsPage() {
   const { code } = useParams<{ code: string }>()
-  const [activeTab, setActiveTab] = useState<TabKey>('מעסיק')
+  const navigate = useNavigate()
   const [localJob, setLocalJob] = useState<any | null>(null)
+  const [draft, setDraft] = useState<JobDraft | null>(null)
+  const [editing, setEditing] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<ToastState>({ open: false, message: '', tone: 'info' })
-  const [actionPending, setActionPending] = useState<string | null>(null)
 
-  const { data: jobData } = useQuery({
+  const fetchDict = async (table: string): Promise<DictItem[]> => {
+    const { data, error } = await supabase.from(table).select('id,name').order('name')
+    if (error) throw error
+    return (data ?? []) as DictItem[]
+  }
+
+  const { data: jobData, refetch } = useQuery({
     queryKey: ['job-detail', code],
     queryFn: async () => {
       const { data, error } = await supabase.from('job').select('*').eq('job_code', code).single()
@@ -56,92 +73,59 @@ export default function JobDetailsPage() {
     staleTime: 30_000,
   })
 
-  const { data: roles = [] } = useQuery({
-    queryKey: ['dict_roles'],
+  const { data: accounts = [] } = useQuery({
+    queryKey: ['accounts-for-job-detail'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_roles').select('id,name').order('id')
+      const { data, error } = await supabase.from('accounts').select('account_id,account_name').order('account_name')
       if (error) throw error
       return data ?? []
     },
-    staleTime: 600_000,
+    staleTime: 300_000,
   })
-
-  const { data: regions = [] } = useQuery({
-    queryKey: ['dict_regions'],
+  const { data: contacts = [] } = useQuery({
+    queryKey: ['contacts-for-job-detail'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_regions').select('id,name').order('id')
+      const { data, error } = await supabase.from('contact').select('contact_id,full_name,phone,phone_norm').limit(1500)
       if (error) throw error
       return data ?? []
     },
+    staleTime: 300_000,
+  })
+  const { data: jobStatuses = [] } = useQuery({ queryKey: ['dict_job_statuses'], queryFn: () => fetchDict('dict_job_statuses'), staleTime: 600_000 })
+  const { data: publicStatuses = [] } = useQuery({ queryKey: ['dict_public_statuses'], queryFn: () => fetchDict('dict_public_statuses'), staleTime: 600_000 })
+  const { data: roles = [] } = useQuery({ queryKey: ['dict_roles'], queryFn: () => fetchDict('dict_roles'), staleTime: 600_000 })
+  const { data: subRoles = [] } = useQuery({
+    queryKey: ['dict_sub_roles'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_sub_roles').select('id,name,role_id').order('name')
+      if (error) throw error
+      return (data ?? []) as DictItem[]
+    },
     staleTime: 600_000,
   })
-
+  const { data: regions = [] } = useQuery({ queryKey: ['dict_regions'], queryFn: () => fetchDict('dict_regions'), staleTime: 600_000 })
   const { data: cities = [] } = useQuery({
     queryKey: ['dict_cities'],
     queryFn: async () => {
       const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
       if (error) throw error
-      return data ?? []
+      return (data ?? []) as DictItem[]
     },
     staleTime: 600_000,
   })
-
-  const { data: experienceOptions = [] } = useQuery({
-    queryKey: ['dict_experience'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('dict_experience').select('id,name').order('id')
-      if (error) throw error
-      return data ?? []
-    },
-    staleTime: 600_000,
-  })
-
-  const { data: scopes = [] } = useQuery({
-    queryKey: ['dict_scopes'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('dict_scopes').select('id,name').order('id')
-      if (error) throw error
-      return data ?? []
-    },
-    staleTime: 600_000,
-  })
-
-  const { data: accountData } = useQuery({
-    queryKey: ['account-for-job', jobData?.account_link],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('account_id,account_name')
-        .eq('account_id', jobData!.account_link)
-        .single()
-      if (error) return null
-      return data
-    },
-    enabled: !!jobData?.account_link,
-    staleTime: 300_000,
-  })
-
-  const { data: employerContact } = useQuery({
-    queryKey: ['employer-contact', jobData?.rel_employer_contact],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('contact')
-        .select('contact_id,full_name,phone_norm')
-        .eq('contact_id', jobData!.rel_employer_contact)
-        .single()
-      if (error) return null
-      return data
-    },
-    enabled: !!jobData?.rel_employer_contact,
-    staleTime: 300_000,
-  })
+  const { data: scopes = [] } = useQuery({ queryKey: ['dict_scopes'], queryFn: () => fetchDict('dict_scopes'), staleTime: 600_000 })
+  const { data: experience = [] } = useQuery({ queryKey: ['dict_experience'], queryFn: () => fetchDict('dict_experience'), staleTime: 600_000 })
+  const { data: languages = [] } = useQuery({ queryKey: ['dict_languages'], queryFn: () => fetchDict('dict_languages'), staleTime: 600_000 })
+  const { data: systems = [] } = useQuery({ queryKey: ['dict_systems'], queryFn: () => fetchDict('dict_systems'), staleTime: 600_000 })
+  const { data: taxTypes = [] } = useQuery({ queryKey: ['dict_tax_types'], queryFn: () => fetchDict('dict_tax_types'), staleTime: 600_000 })
+  const { data: mobility = [] } = useQuery({ queryKey: ['dict_mobility'], queryFn: () => fetchDict('dict_mobility'), staleTime: 600_000 })
 
   const { data: applications = [] } = useQuery({
     queryKey: ['applications-for-job', code],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('applications')
-        .select('application_id,candidate_link,application_status,submission_date,cv_link')
+        .select('application_id,candidate_link,candidate_name,application_status,submission_date,cv_link')
         .eq('job_code', code!)
         .order('submission_date', { ascending: false })
       if (error) throw error
@@ -153,476 +137,240 @@ export default function JobDetailsPage() {
 
   useEffect(() => {
     if (!jobData) return
-    setLocalJob({
-      ...jobData,
-      account_name: accountData?.account_name ?? null,
-    })
-  }, [jobData, accountData])
+    setLocalJob(jobData)
+    setDraft(toDraft(jobData))
+  }, [jobData])
 
-  useEffect(() => {
-    if (!toast.open) return
-    const timer = window.setTimeout(() => setToast((prev) => ({ ...prev, open: false })), 2600)
-    return () => window.clearTimeout(timer)
-  }, [toast.open])
+  const cityOptions = useMemo(() => {
+    const regionId = Number(draft?.region_id || 0)
+    return regionId ? cities.filter((city) => Number(city.region_id) === regionId) : cities
+  }, [cities, draft?.region_id])
 
-  const roleName = (id: number | null | undefined) => (roles as any[]).find((r) => Number(r.id) === Number(id))?.name ?? '—'
-  const regionName = (id: number | null | undefined) => (regions as any[]).find((r) => Number(r.id) === Number(id))?.name ?? '—'
-  const cityName = (id: number | null | undefined) => (cities as any[]).find((r) => Number(r.id) === Number(id))?.name ?? '—'
-  const expName = (id: number | null | undefined) => (experienceOptions as any[]).find((r) => Number(r.id) === Number(id))?.name ?? '—'
-  const scopeNames = (ids: unknown) => {
-    const arr: number[] = Array.isArray(ids) ? ids.map(Number) : []
-    return arr.map((id) => (scopes as any[]).find((s) => Number(s.id) === id)?.name).filter(Boolean).join(', ') || '—'
-  }
+  const subRoleOptions = useMemo(() => {
+    const roleId = Number(draft?.job_role || 0)
+    return roleId ? subRoles.filter((item) => Number(item.role_id) === roleId) : subRoles
+  }, [subRoles, draft?.job_role])
 
-  if (!localJob) {
-    return (
-      <Shell title="משרה" subtitle="" icon={Briefcase}>
-        <div dir="rtl" className="min-h-screen bg-[#F8FAFC] font-['Heebo']">
-          <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <EmptyState icon={Briefcase} title="משרה לא נמצאה" description="הרשומה לא קיימת" />
-          </div>
-        </div>
-      </Shell>
-    )
-  }
-
-  const statusBadge = getStatusBadge(jobStatusColors, localJob.job_status)
-  const daysLive = getDaysLive(localJob)
-  const lastPublishLabel = getLastPublishDate(localJob)
-  const publishReady = canPublish(localJob)
-  const actionsBlockedForApplications =
-    Number(localJob.job_status) === STATUS_IDS.filled ||
-    Number(localJob.job_status) === STATUS_IDS.closedSuccess ||
-    Number(localJob.job_status) === STATUS_IDS.closedOther
-
-  const showToast = (message: string, tone: ToastTone = 'info') =>
+  const showToast = (message: string, tone: ToastTone = 'info') => {
     setToast({ open: true, message, tone })
-
-  const withPending = async (key: string, fn: () => void) => {
-    try { setActionPending(key); fn() } finally { setActionPending(null) }
+    window.setTimeout(() => setToast((prev) => ({ ...prev, open: false })), 2600)
   }
 
-  const handlePublish = async () => {
-    if (!publishReady) { showToast('לא ניתן לפרסם משרה ללא שדות החובה המינימליים', 'error'); return }
+  const setField = <K extends keyof JobDraft>(key: K, value: JobDraft[K]) => {
+    setDraft((prev) => (prev ? { ...prev, [key]: value } : prev))
+  }
+
+  const saveJob = async () => {
+    if (!draft || !localJob) return
+    setSaving(true)
+    try {
+      const nextJobStatus = toNullableNumber(draft.job_status)
+      const mustHide = nextJobStatus !== JOB_STATUS_ACTIVE
+      const nextPublicStatus = mustHide ? PUBLIC_STATUS_HIDDEN : toNullableNumber(draft.public_status)
+      const newJobCode = cleanText(draft.job_code) || localJob.job_code
+      const patch = {
+        job_code: newJobCode,
+        job_title: cleanText(draft.job_title),
+        job_status: nextJobStatus,
+        public_status: nextPublicStatus,
+        job_role: toNullableNumber(draft.job_role),
+        job_sub_role: draft.job_sub_role.length ? draft.job_sub_role : null,
+        account_link: toNullableNumber(draft.account_link),
+        rel_employer_contact: toNullableNumber(draft.rel_employer_contact),
+        rel_recruiter_contact: toNullableNumber(draft.rel_recruiter_contact),
+        region_id: toNullableNumber(draft.region_id),
+        city_id: toNullableNumber(draft.city_id),
+        address: cleanText(draft.address),
+        scope: draft.scope.length ? draft.scope : null,
+        required_experience: toNullableNumber(draft.required_experience),
+        required_languages: draft.required_languages.length ? draft.required_languages : null,
+        systems_used: draft.systems_used.length ? draft.systems_used : null,
+        tax_type_id: toNullableNumber(draft.tax_type_id),
+        mobility_id: toNullableNumber(draft.mobility_id),
+        salary_expectation_hourly: toNullableNumber(draft.salary_expectation_hourly),
+        salary_expectation_monthly: toNullableNumber(draft.salary_expectation_monthly),
+        show_salary_public: draft.show_salary_public,
+        work_schedule_text: cleanText(draft.work_schedule_text),
+        job_description: cleanText(draft.job_description),
+        job_requirements: cleanText(draft.job_requirements),
+        employer_notes: cleanText(draft.employer_notes),
+        notes: cleanText(draft.notes),
+        public_excerpt: cleanText(draft.public_excerpt),
+        public_image_url: cleanText(draft.public_image_url),
+        job_url: cleanText(draft.job_url),
+        unpublished_at: mustHide ? new Date().toISOString() : localJob.unpublished_at,
+        updated_timestamp: new Date().toISOString(),
+      }
+      const { error } = await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
+      if (error) throw error
+      setLocalJob((prev: any) => ({ ...prev, ...patch }))
+      showToast(mustHide ? 'המשרה נשמרה והפרסום הוסתר' : 'המשרה נשמרה', 'success')
+      if (newJobCode !== localJob.job_code) navigate(`/admin/jobs/${encodeURIComponent(String(newJobCode))}`, { replace: true })
+      else void refetch()
+    } catch (err) {
+      console.error(err)
+      showToast(err instanceof Error ? err.message : 'שגיאה בשמירת המשרה', 'error')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const publishJob = async () => {
+    if (!localJob) return
+    if (Number(localJob.job_status) !== JOB_STATUS_ACTIVE) {
+      showToast('לא ניתן לפרסם משרה שאינה בסטטוס פעילה', 'error')
+      return
+    }
     const patch = {
-      public_status: PUBLIC_STATUS_IDS.published,
-      last_publish_date: getTodayIso(),
-      date_website: localJob.date_website ?? getTodayIso(),
+      public_status: PUBLIC_STATUS_PUBLISHED,
+      last_publish_date: todayIsoDate(),
+      date_website: localJob.date_website ?? todayIsoDate(),
+      published_at: localJob.published_at ?? new Date().toISOString(),
+      unpublished_at: null,
       updated_timestamp: new Date().toISOString(),
     }
-    await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
-    await withPending('publish', () => {
-      setLocalJob((prev: any) => ({ ...prev, ...patch }))
-      showToast('המשרה פורסמה בהצלחה', 'success')
-    })
+    const { error } = await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
+    if (error) { showToast(error.message, 'error'); return }
+    setLocalJob((prev: any) => ({ ...prev, ...patch }))
+    setDraft((prev) => prev ? { ...prev, public_status: String(PUBLIC_STATUS_PUBLISHED) } : prev)
+    showToast('המשרה פורסמה', 'success')
   }
 
-  const handleUnpublish = async () => {
-    const patch = { public_status: 4, updated_timestamp: new Date().toISOString() }
-    await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
-    await withPending('unpublish', () => {
-      setLocalJob((prev: any) => ({ ...prev, ...patch }))
-      showToast('הפרסום הוסר', 'success')
-    })
+  const hidePublication = async () => {
+    if (!localJob) return
+    const patch = { public_status: PUBLIC_STATUS_HIDDEN, unpublished_at: new Date().toISOString(), updated_timestamp: new Date().toISOString() }
+    const { error } = await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
+    if (error) { showToast(error.message, 'error'); return }
+    setLocalJob((prev: any) => ({ ...prev, ...patch }))
+    setDraft((prev) => prev ? { ...prev, public_status: String(PUBLIC_STATUS_HIDDEN) } : prev)
+    showToast('המשרה הוסתרה מהציבור', 'success')
   }
 
-  const handleClose = async () => {
-    const patch = { job_status: STATUS_IDS.closedOther, updated_timestamp: new Date().toISOString() }
-    await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
-    await withPending('close', () => {
-      setLocalJob((prev: any) => ({ ...prev, ...patch }))
-      showToast('המשרה נסגרה', 'success')
-    })
+  const archiveJob = async () => {
+    if (!localJob) return
+    const patch = { job_status: 9, public_status: PUBLIC_STATUS_HIDDEN, unpublished_at: new Date().toISOString(), updated_timestamp: new Date().toISOString() }
+    const { error } = await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
+    if (error) { showToast(error.message, 'error'); return }
+    setLocalJob((prev: any) => ({ ...prev, ...patch }))
+    setDraft((prev) => prev ? { ...prev, job_status: '9', public_status: String(PUBLIC_STATUS_HIDDEN) } : prev)
+    showToast('המשרה הועברה לארכיון והוסתרה', 'success')
   }
 
-  const handleFill = async () => {
-    const patch = { job_status: STATUS_IDS.filled, updated_timestamp: new Date().toISOString() }
-    await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
-    await withPending('fill', () => {
-      setLocalJob((prev: any) => ({ ...prev, ...patch }))
-      showToast('המשרה סומנה כמאוישת', 'success')
-    })
+  if (!localJob || !draft) {
+    return <Shell title="משרה" subtitle="" icon={Briefcase}><div className="rounded-2xl border border-[#D9D9D9] bg-white p-8"><EmptyState icon={Briefcase} title="משרה לא נמצאה" description="הרשומה לא קיימת" /></div></Shell>
   }
 
-  const handleDuplicate = async () => {
-    await withPending('duplicate', () => showToast('שכפול משרה — השתמשי בטבלת המשרות', 'info'))
-  }
-
-  const isPublished = Number(localJob.public_status) === PUBLIC_STATUS_IDS.published
+  const accountName = (accounts as any[]).find((a) => Number(a.account_id) === Number(localJob.account_link))?.account_name ?? '—'
+  const regionName = labelById(regions, localJob.region_id)
+  const cityName = labelById(cities, localJob.city_id)
+  const roleName = labelById(roles, localJob.job_role)
+  const statusName = labelById(jobStatuses, localJob.job_status)
+  const publicStatusName = labelById(publicStatuses, localJob.public_status)
+  const isActive = Number(localJob.job_status) === JOB_STATUS_ACTIVE
+  const isPublished = Number(localJob.public_status) === PUBLIC_STATUS_PUBLISHED
 
   return (
     <Shell
       title={`${localJob.job_code} — ${localJob.job_title ?? 'משרה'}`}
-      subtitle={`${localJob.account_name ?? ''} · ${cityName(localJob.city_id)}`}
+      subtitle={`${accountName} · ${cityName}`}
       icon={Briefcase}
-      actions={
-        <div className="flex flex-wrap gap-2">
-          <ActionButton variant="ghost" icon={Copy} onClick={handleDuplicate} disabled={actionPending !== null}>שכפול</ActionButton>
-          <ActionButton variant="ghost" icon={Edit2} onClick={() => showToast('פתיחת עריכת משרה', 'info')}>עריכה</ActionButton>
-          <Link to={`/admin/smart-match?job=${localJob.job_code}`}>
-            <ActionButton variant="ghost" icon={Sparkles}>Smart Match</ActionButton>
-          </Link>
-          <Link to={`/admin/ats?job=${localJob.job_code}`}>
-            <ActionButton variant="primary" icon={Users}>ATS</ActionButton>
-          </Link>
-        </div>
-      }
+      actions={<div className="flex flex-wrap gap-2"><ActionButton variant="ghost" icon={ChevronLeft} onClick={() => navigate('/admin/jobs')}>חזרה ללוח</ActionButton><ActionButton variant="primary" icon={Save} onClick={saveJob} disabled={saving}>{saving ? 'שומרת...' : 'שמירה'}</ActionButton></div>}
     >
-      <div dir="rtl" className="min-h-screen bg-[#F8FAFC] font-['Heebo'] text-[#0F172A]">
-        <div className="space-y-6">
-          <nav className="rounded-2xl border border-slate-200 bg-white px-5 py-3 shadow-sm">
-            <div className="flex flex-wrap items-center gap-2 text-[13px] font-medium text-slate-500">
-              <Link to="/admin/jobs" className="hover:text-[#008080]">משרות</Link>
-              <ChevronLeft className="h-4 w-4" />
-              <span className="text-[#0F172A]">{localJob.job_code}</span>
-            </div>
-          </nav>
-
-          <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
-              <div className="space-y-4">
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-[32px] font-bold leading-tight text-[#0F172A]">{localJob.job_title ?? 'משרה'}</h1>
-                  <span className={`rounded-full px-3 py-1 text-[13px] font-semibold ${statusBadge.bg} ${statusBadge.text}`}>{statusBadge.label}</span>
-                  <span className="rounded-full bg-[#F0FDFC] px-3 py-1 text-[12px] font-bold text-[#008080]">{localJob.job_code}</span>
-                </div>
-                <div className="flex flex-wrap items-center gap-3 text-[14px] font-medium text-slate-600">
-                  <span className="inline-flex items-center gap-1.5">
-                    <Briefcase className="h-4 w-4 text-[#008080]" />
-                    {roleName(localJob.job_role)}
-                  </span>
-                  {localJob.account_link ? (
-                    <Link to={`/admin/accounts/${localJob.account_link}`} className="inline-flex items-center gap-1.5 text-[#008080] hover:underline">
-                      <Building2 className="h-4 w-4" />{localJob.account_name ?? '—'}
-                    </Link>
-                  ) : (
-                    <span className="inline-flex items-center gap-1.5"><Building2 className="h-4 w-4" />{localJob.account_name ?? '—'}</span>
-                  )}
-                  <span className="inline-flex items-center gap-1.5">
-                    <MapPin className="h-4 w-4 text-[#008080]" />
-                    {cityName(localJob.city_id)}, {regionName(localJob.region_id)}
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <MetaPill icon={<Users className="h-3.5 w-3.5" />} label={`${Number(localJob.total_applicants ?? 0)} מועמדים`} />
-                  <MetaPill icon={<Clock3 className="h-3.5 w-3.5" />} label={`${daysLive} ימים באוויר`} />
-                  <MetaPill icon={<CalendarDays className="h-3.5 w-3.5" />} label={lastPublishLabel ? `פרסום אחרון ${formatDate(lastPublishLabel)}` : 'ללא פרסום'} />
-                </div>
+      <div dir="rtl" className="min-h-screen bg-[#F3F4F6] font-['Heebo'] text-[#2D2D2D]">
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_340px]">
+          <main className="space-y-6">
+            <section className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center gap-2"><Pill text={statusName} tone={isActive ? 'success' : 'muted'} /><Pill text={publicStatusName} tone={isPublished ? 'success' : 'muted'} /></div>
+                <div className="flex flex-wrap gap-2"><ActionButton variant="ghost" icon={Send} onClick={publishJob}>פרסום</ActionButton><ActionButton variant="ghost" icon={XCircle} onClick={hidePublication}>הסתרה</ActionButton><ActionButton variant="ghost" icon={Archive} onClick={archiveJob}>ארכוב</ActionButton></div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <ActionButton variant="ghost" icon={isPublished ? X : Send} onClick={isPublished ? handleUnpublish : handlePublish} disabled={actionPending !== null || (!publishReady && !isPublished)}>
-                  {isPublished ? 'הסר פרסום' : 'פרסם'}
-                </ActionButton>
-                <ActionButton variant="ghost" icon={X} onClick={handleClose} disabled={actionPending !== null}>סגור</ActionButton>
-                <ActionButton variant="ghost" icon={CheckCircle2} onClick={handleFill} disabled={actionPending !== null}>אויש</ActionButton>
-                <ActionButton variant="primary" icon={Plus} onClick={() => actionsBlockedForApplications ? showToast('לא ניתן להוסיף מועמדות למשרה סגורה או מאוישת', 'error') : showToast('פתיחת הוספת מועמדות ידנית', 'info')}>הוסף מועמדות</ActionButton>
+              <SectionTitle icon={<Briefcase className="h-5 w-5" />} title="עריכת משרה מלאה" />
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <TextField label="קוד משרה" value={draft.job_code} onChange={(value) => setField('job_code', value)} dir="ltr" />
+                <TextField label="כותרת משרה" value={draft.job_title} onChange={(value) => setField('job_title', value)} />
+                <SelectField label="סטטוס פעילות" value={draft.job_status} onChange={(value) => setField('job_status', value)} options={jobStatuses.map(toOption)} />
+                <SelectField label="סטטוס פרסום" value={draft.public_status} onChange={(value) => setField('public_status', value)} options={publicStatuses.map(toOption)} />
+                <SelectField label="ארגון" value={draft.account_link} onChange={(value) => setField('account_link', value)} options={(accounts as any[]).map((a) => ({ value: String(a.account_id), label: a.account_name ?? '' }))} />
+                <SelectField label="מעסיק / איש קשר" value={draft.rel_employer_contact} onChange={(value) => setField('rel_employer_contact', value)} options={(contacts as any[]).map((c) => ({ value: String(c.contact_id), label: c.full_name ?? `#${c.contact_id}` }))} />
+                <SelectField label="מגייס" value={draft.rel_recruiter_contact} onChange={(value) => setField('rel_recruiter_contact', value)} options={(contacts as any[]).map((c) => ({ value: String(c.contact_id), label: c.full_name ?? `#${c.contact_id}` }))} />
+                <SelectField label="תפקיד" value={draft.job_role} onChange={(value) => setDraft((prev) => prev ? { ...prev, job_role: value, job_sub_role: [] } : prev)} options={roles.map(toOption)} />
+                <MultiSelectField label="תתי־תפקידים" values={draft.job_sub_role} onChange={(values) => setField('job_sub_role', values)} options={subRoleOptions.map(toOption)} />
+                <SelectField label="אזור" value={draft.region_id} onChange={(value) => setDraft((prev) => prev ? { ...prev, region_id: value, city_id: '' } : prev)} options={regions.map(toOption)} />
+                <SelectField label="עיר" value={draft.city_id} onChange={(value) => setField('city_id', value)} options={cityOptions.map(toOption)} />
+                <TextField label="כתובת" value={draft.address} onChange={(value) => setField('address', value)} />
+                <SelectField label="ניסיון" value={draft.required_experience} onChange={(value) => setField('required_experience', value)} options={experience.map(toOption)} />
+                <MultiSelectField label="היקף" values={draft.scope} onChange={(values) => setField('scope', values)} options={scopes.map(toOption)} />
+                <TextField label="ימים ושעות" value={draft.work_schedule_text} onChange={(value) => setField('work_schedule_text', value)} />
+                <MultiSelectField label="שפות" values={draft.required_languages} onChange={(values) => setField('required_languages', values)} options={languages.map(toOption)} />
+                <MultiSelectField label="מערכות" values={draft.systems_used} onChange={(values) => setField('systems_used', values)} options={systems.map(toOption)} />
+                <SelectField label="מיסוי" value={draft.tax_type_id} onChange={(value) => setField('tax_type_id', value)} options={taxTypes.map(toOption)} />
+                <SelectField label="ניידות" value={draft.mobility_id} onChange={(value) => setField('mobility_id', value)} options={mobility.map(toOption)} />
+                <TextField label="שכר שעתי" value={draft.salary_expectation_hourly} onChange={(value) => setField('salary_expectation_hourly', value)} dir="ltr" />
+                <TextField label="שכר חודשי / גלובלי" value={draft.salary_expectation_monthly} onChange={(value) => setField('salary_expectation_monthly', value)} dir="ltr" />
+                <label className="flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-[#FAFAF7] px-4 py-3 text-[13px] font-semibold lg:col-span-2"><span>הצגת שכר לציבור</span><input type="checkbox" checked={draft.show_salary_public} onChange={(event) => setField('show_salary_public', event.target.checked)} className="h-4 w-4 accent-[#008080]" /></label>
+                <TextAreaField label="תיאור המשרה" value={draft.job_description} onChange={(value) => setField('job_description', value)} />
+                <TextAreaField label="דרישות המשרה" value={draft.job_requirements} onChange={(value) => setField('job_requirements', value)} />
+                <TextAreaField label="תקציר ציבורי" value={draft.public_excerpt} onChange={(value) => setField('public_excerpt', value)} />
+                <TextAreaField label="הערות פנימיות" value={draft.notes} onChange={(value) => setField('notes', value)} />
+                <TextAreaField label="הערות מעסיק" value={draft.employer_notes} onChange={(value) => setField('employer_notes', value)} className="lg:col-span-2" />
+                <TextField label="קישור משרה חיצוני" value={draft.job_url} onChange={(value) => setField('job_url', value)} dir="ltr" className="lg:col-span-2" />
               </div>
-            </div>
-          </section>
+            </section>
 
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <KpiCard label="מועמדים" value={String(Number(localJob.total_applicants ?? 0))} subtext="ספירת מועמדויות" />
-            <KpiCard label="ימים באוויר" value={String(daysLive)} subtext="מחושב מתאריך יצירה" />
-            <KpiCard label="פרסום אחרון" value={lastPublishLabel ? formatDate(lastPublishLabel) : '—'} subtext="נגזר מתאריכי הפצה" />
-          </section>
+            <JobImageUpload value={draft.public_image_url} onChange={(url) => setField('public_image_url', url)} jobCode={draft.job_code || localJob.job_code} label="תמונת משרה לאדמין" helperText="גרירה או בחירת תמונה. נשמרת ב־job-images ומעודכנת בשדה public_image_url." />
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-            <div className="flex flex-wrap gap-2">
-              {TABS.map((tab) => (
-                <button key={tab} type="button" onClick={() => setActiveTab(tab)}
-                  className={`rounded-full px-4 py-2 text-[13px] font-semibold transition ${activeTab === tab ? 'bg-[#D97706] text-white' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>
-                  {tab}
-                </button>
-              ))}
-            </div>
-          </section>
+            <section className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
+              <SectionTitle icon={<Users className="h-5 w-5" />} title={`מועמדים למשרה (${applications.length})`} />
+              {applications.length === 0 ? <div className="rounded-xl bg-[#FAFAF7] p-6 text-center text-[14px] text-[#6B6B6B]">אין מועמדים למשרה זו עדיין</div> : <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-right text-[13px]"><thead className="bg-[#FAFAF7] text-[#6B6B6B]"><tr><th className="px-3 py-3">מועמד</th><th className="px-3 py-3">תאריך</th><th className="px-3 py-3">קו״ח</th></tr></thead><tbody className="divide-y divide-[#F3F4F6]">{(applications as any[]).map((app) => <tr key={app.application_id}><td className="px-3 py-3 font-semibold">{app.candidate_link ? <Link to={`/admin/candidates/${app.candidate_link}`} className="text-[#008080] hover:underline">#{app.candidate_link}</Link> : app.candidate_name ?? '—'}</td><td className="px-3 py-3">{app.submission_date ? formatDate(app.submission_date) : '—'}</td><td className="px-3 py-3">{app.cv_link ? <a href={app.cv_link} target="_blank" rel="noreferrer" className="text-[#008080] hover:underline">פתיחה</a> : '—'}</td></tr>)}</tbody></table></div>}
+            </section>
+          </main>
 
-          <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_300px]">
-            <div className="space-y-6">
-              {activeTab === 'מעסיק' && (
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <SectionTitle>מעסיק</SectionTitle>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                    <DetailCard title="סיכום ארגון">
-                      <DetailRow label="שם ארגון" value={localJob.account_name ?? '—'} />
-                      <DetailRow label="קישור ארגון" value={localJob.account_link ? (
-                        <Link to={`/admin/accounts/${localJob.account_link}`} className="text-[#008080] hover:underline">פתח Employer 360</Link>
-                      ) : '—'} />
-                    </DetailCard>
-                    <DetailCard title="איש קשר מעסיק">
-                      <DetailRow label="שם" value={employerContact?.full_name ?? 'לא קיים'} />
-                      <DetailRow label="טלפון" value={employerContact?.phone_norm ?? '—'} />
-                      <DetailRow label="סטטוס קישור" value={localJob.account_link ? 'מקושר' : 'לא מקושר'} />
-                    </DetailCard>
-                  </div>
-                </section>
-              )}
-
-              {activeTab === 'מפרט' && (
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <SectionTitle>מפרט משרה</SectionTitle>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <DetailCard title="תפקיד והיררכיה">
-                      <DetailRow label="תפקיד" value={roleName(localJob.job_role)} />
-                      <DetailRow label="סטטוס" value={statusBadge.label} />
-                    </DetailCard>
-                    <DetailCard title="תנאים">
-                      <DetailRow label="היקף" value={scopeNames(localJob.scope)} />
-                      <DetailRow label="ניסיון נדרש" value={expName(localJob.required_experience)} />
-                    </DetailCard>
-                    <DetailCard title="מיקום">
-                      <DetailRow label="אזור" value={regionName(localJob.region_id)} />
-                      <DetailRow label="עיר" value={cityName(localJob.city_id)} />
-                      <DetailRow label="כתובת" value={localJob.address || '—'} />
-                    </DetailCard>
-                    <DetailCard title="שכר">
-                      <DetailRow label="שעתי" value={localJob.salary_expectation_hourly != null ? `${localJob.salary_expectation_hourly} ₪` : '—'} />
-                      <DetailRow label="חודשי / גלובלי" value={localJob.salary_expectation_monthly != null ? `${localJob.salary_expectation_monthly} ₪` : '—'} />
-                      <DetailRow label="הצגת שכר לציבור" value={localJob.show_salary_public ? 'כן' : 'לא'} />
-                    </DetailCard>
-                  </div>
-                </section>
-              )}
-
-              {activeTab === 'דרישות' && (
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <SectionTitle>דרישות ותוכן</SectionTitle>
-                  <div className="space-y-4">
-                    <ContentBlock title="תיאור המשרה" text={localJob.job_description} />
-                    <ContentBlock title="דרישות המשרה" text={localJob.job_requirements} />
-                    <ContentBlock title="הערות" text={localJob.notes} />
-                  </div>
-                </section>
-              )}
-
-              {activeTab === 'הפצה' && (
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <SectionTitle>הפצה ופרסום</SectionTitle>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-                    <DetailCard title="ערוצי הפצה">
-                      <DistributionIndicator label="פייסבוק" active={Boolean(localJob.date_facebook)} date={localJob.date_facebook} />
-                      <DistributionIndicator label="אתר" active={Boolean(localJob.date_website)} date={localJob.date_website} />
-                      <DistributionIndicator label="וואטסאפ" active={Boolean(localJob.date_whatsapp)} date={localJob.date_whatsapp} />
-                    </DetailCard>
-                    <DetailCard title="תאריכים">
-                      <DetailRow label="פייסבוק" value={localJob.date_facebook ? formatDate(localJob.date_facebook) : '—'} />
-                      <DetailRow label="אתר" value={localJob.date_website ? formatDate(localJob.date_website) : '—'} />
-                      <DetailRow label="וואטסאפ" value={localJob.date_whatsapp ? formatDate(localJob.date_whatsapp) : '—'} />
-                      <DetailRow label="פרסום אחרון" value={lastPublishLabel ? formatDate(lastPublishLabel) : '—'} />
-                    </DetailCard>
-                    <DetailCard title="קישור חיצוני">
-                      {localJob.job_url ? (
-                        <a href={localJob.job_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 text-[13px] font-semibold text-[#008080] hover:underline">
-                          <Globe className="h-4 w-4" />פתח קישור משרה<ExternalLink className="h-4 w-4" />
-                        </a>
-                      ) : <div className="text-[13px] font-medium text-slate-500">אין קישור משרה</div>}
-                    </DetailCard>
-                  </div>
-                </section>
-              )}
-
-              {activeTab === 'מועמדים' && (
-                <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                    <SectionTitle className="mb-0">מועמדים ({applications.length})</SectionTitle>
-                    <div className="flex flex-wrap gap-2">
-                      <Link to={`/admin/ats?job=${localJob.job_code}`}>
-                        <ActionButton variant="ghost" icon={Users}>פתח ATS</ActionButton>
-                      </Link>
-                      <Link to={`/admin/applications?job=${localJob.job_code}`}>
-                        <ActionButton variant="ghost" icon={FileText}>Applications</ActionButton>
-                      </Link>
-                    </div>
-                  </div>
-                  {applications.length === 0 ? (
-                    <div className="rounded-2xl bg-[#F8FAFC] p-8 text-center text-[14px] font-medium text-slate-500">אין מועמדים למשרה זו עדיין</div>
-                  ) : (
-                    <div className="overflow-hidden rounded-2xl border border-slate-200">
-                      <div className="overflow-x-auto">
-                        <table className="min-w-[600px] w-full border-collapse text-right">
-                          <thead className="bg-[#F8FAFC]">
-                            <tr className="border-b border-slate-200 text-[13px] font-semibold text-slate-500">
-                              <th className="px-4 py-3">מועמד</th>
-                              <th className="px-4 py-3">תאריך הגשה</th>
-                              <th className="px-4 py-3">סטטוס</th>
-                              <th className="px-4 py-3">קו״ח</th>
-                              <th className="px-4 py-3">פעולות</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100 bg-white">
-                            {applications.map((applicant: any) => {
-                              const applicantStatus = getStatusBadge(applicationStatusColors, applicant.application_status)
-                              return (
-                                <tr key={applicant.application_id} className="text-[13px] font-medium text-[#0F172A] hover:bg-slate-50">
-                                  <td className="px-4 py-3">
-                                    {applicant.candidate_link ? (
-                                      <Link to={`/admin/candidates/${applicant.candidate_link}`} className="font-semibold text-[#008080] hover:underline">
-                                        #{applicant.candidate_link}
-                                      </Link>
-                                    ) : '—'}
-                                  </td>
-                                  <td className="px-4 py-3 text-slate-600">{applicant.submission_date ? formatDate(applicant.submission_date) : '—'}</td>
-                                  <td className="px-4 py-3">
-                                    <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${applicantStatus.bg} ${applicantStatus.text}`}>{applicantStatus.label}</span>
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    {applicant.cv_link ? (
-                                      <a href={applicant.cv_link} target="_blank" rel="noreferrer" className="text-[#008080] hover:underline">צפייה</a>
-                                    ) : <span className="text-slate-400">—</span>}
-                                  </td>
-                                  <td className="px-4 py-3">
-                                    <Link to={`/admin/ats?job=${localJob.job_code}`} className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50">ATS</Link>
-                                  </td>
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                  )}
-                </section>
-              )}
-            </div>
-
-            <aside className="space-y-6">
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 text-[16px] font-bold text-[#0F172A]">פעולות קשורות</div>
-                <div className="space-y-2">
-                  <ActionRailLink to={`/admin/smart-match?job=${localJob.job_code}`} icon={<Sparkles className="h-4 w-4" />} label="פתח Smart Match" />
-                  <ActionRailLink to={`/admin/ats?job=${localJob.job_code}`} icon={<Users className="h-4 w-4" />} label="פתח ATS" />
-                  <ActionRailLink to={`/admin/applications?job=${localJob.job_code}`} icon={<FileText className="h-4 w-4" />} label="פתח Applications" />
-                  {localJob.account_link && (
-                    <ActionRailLink to={`/admin/accounts/${localJob.account_link}`} icon={<Building2 className="h-4 w-4" />} label="פתח Employer 360" />
-                  )}
-                </div>
-              </section>
-              <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div className="mb-4 text-[16px] font-bold text-[#0F172A]">מטא־דאטה</div>
-                <div className="space-y-3">
-                  <DetailInline label="קוד משרה" value={localJob.job_code} />
-                  <DetailInline label="תאריך יצירה" value={localJob.created_time ? formatDate(localJob.created_time) : '—'} />
-                  <DetailInline label="עדכון אחרון" value={localJob.updated_timestamp ? formatDate(localJob.updated_timestamp) : '—'} />
-                  <DetailInline label="חסימת מועמדויות" value={actionsBlockedForApplications ? 'כן' : 'לא'} />
-                  <DetailInline label="מוכנות לפרסום" value={publishReady ? 'מוכן' : 'חסרים שדות'} />
-                </div>
-              </section>
-            </aside>
-          </div>
+          <aside className="space-y-4">
+            <section className="sticky top-4 rounded-2xl border border-[#D9D9D9] bg-white p-5 shadow-sm">
+              <div className="mb-4 text-[16px] font-bold text-[#008080]">סיכום משרה</div>
+              <SummaryRow label="קוד" value={localJob.job_code} />
+              <SummaryRow label="ארגון" value={accountName} />
+              <SummaryRow label="תפקיד" value={roleName} />
+              <SummaryRow label="אזור" value={regionName} />
+              <SummaryRow label="עיר" value={cityName} />
+              <SummaryRow label="סטטוס פעילות" value={statusName} />
+              <SummaryRow label="סטטוס פרסום" value={publicStatusName} />
+              <SummaryRow label="מועמדים" value={applications.length} />
+              <div className="mt-5 rounded-xl bg-[#E6F3F3] p-4 text-[13px] leading-6 text-[#006D6D]">רק משרה פעילה יכולה להיות מפורסמת. אם סטטוס הפעילות אינו פעילה — הפרסום נשמר כמוסתר.</div>
+              <button type="button" onClick={saveJob} disabled={saving} className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-[#008080] px-5 py-3 text-[14px] font-bold text-white transition hover:bg-[#006D6D] disabled:opacity-60"><Save className="h-4 w-4" />{saving ? 'שומרת...' : 'שמירה'}</button>
+              <div className="mt-3 grid gap-2">
+                <ActionRailLink to={`/admin/ats?job=${localJob.job_code}`} icon={<Users className="h-4 w-4" />} label="פתח ATS" />
+                <ActionRailLink to={`/admin/applications?job=${localJob.job_code}`} icon={<FileText className="h-4 w-4" />} label="פתח הגשות" />
+                <ActionRailLink to={`/admin/smart-match?job=${localJob.job_code}`} icon={<Sparkles className="h-4 w-4" />} label="Smart Match" />
+                {localJob.account_link && <ActionRailLink to={`/admin/accounts/${localJob.account_link}`} icon={<Building2 className="h-4 w-4" />} label="Employer 360" />}
+              </div>
+            </section>
+          </aside>
         </div>
 
-        {toast.open && (
-          <div className="pointer-events-none fixed bottom-4 left-4 z-[60]">
-            <div className={`rounded-2xl border px-4 py-3 shadow-md ${toastClassName(toast.tone)}`}>
-              <div className="flex items-center gap-2 text-[13px] font-semibold">{toast.message}</div>
-            </div>
-          </div>
-        )}
+        {toast.open && <div className="pointer-events-none fixed bottom-4 left-4 z-[60]"><div className={`rounded-2xl border px-4 py-3 shadow-md ${toastClassName(toast.tone)}`}><div className="text-[13px] font-semibold">{toast.message}</div></div></div>}
       </div>
     </Shell>
   )
 }
 
-function SectionTitle({ children, className = '' }: { children: React.ReactNode; className?: string }) {
-  return <h2 className={`text-[20px] font-bold text-[#0F172A] ${className}`}>{children}</h2>
+function toDraft(job: any): JobDraft {
+  return {
+    job_code: String(job.job_code ?? ''), job_title: String(job.job_title ?? ''), job_status: job.job_status != null ? String(job.job_status) : '', public_status: job.public_status != null ? String(job.public_status) : '', job_role: job.job_role != null ? String(job.job_role) : '', job_sub_role: normalizeIds(job.job_sub_role), account_link: job.account_link != null ? String(job.account_link) : '', rel_employer_contact: job.rel_employer_contact != null ? String(job.rel_employer_contact) : '', rel_recruiter_contact: job.rel_recruiter_contact != null ? String(job.rel_recruiter_contact) : '', region_id: job.region_id != null ? String(job.region_id) : '', city_id: job.city_id != null ? String(job.city_id) : '', address: String(job.address ?? ''), scope: normalizeIds(job.scope), required_experience: job.required_experience != null ? String(job.required_experience) : '', required_languages: normalizeIds(job.required_languages), systems_used: normalizeIds(job.systems_used), tax_type_id: job.tax_type_id != null ? String(job.tax_type_id) : '', mobility_id: job.mobility_id != null ? String(job.mobility_id) : '', salary_expectation_hourly: job.salary_expectation_hourly != null ? String(job.salary_expectation_hourly) : '', salary_expectation_monthly: job.salary_expectation_monthly != null ? String(job.salary_expectation_monthly) : '', show_salary_public: Boolean(job.show_salary_public), work_schedule_text: String(job.work_schedule_text ?? ''), job_description: String(job.job_description ?? ''), job_requirements: String(job.job_requirements ?? ''), employer_notes: String(job.employer_notes ?? ''), notes: String(job.notes ?? ''), public_excerpt: String(job.public_excerpt ?? ''), public_image_url: String(job.public_image_url ?? ''), job_url: String(job.job_url ?? '')
+  }
 }
-
-function KpiCard({ label, value, subtext }: { label: string; value: string; subtext: string }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-      <div className="text-[13px] font-semibold text-slate-500">{label}</div>
-      <div className="mt-2 text-[24px] font-bold text-[#008080]">{value}</div>
-      <div className="mt-1 text-[12px] font-medium text-slate-500">{subtext}</div>
-    </div>
-  )
-}
-
-function MetaPill({ icon, label }: { icon: React.ReactNode; label: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 rounded-full bg-[#F8FAFC] px-3 py-1.5 text-[12px] font-semibold text-slate-700">
-      {icon}{label}
-    </span>
-  )
-}
-
-function DetailCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4">
-      <div className="mb-3 text-[15px] font-bold text-[#0F172A]">{title}</div>
-      <div className="space-y-2">{children}</div>
-    </div>
-  )
-}
-
-function DetailRow({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-200/70 pb-2 text-[13px] last:border-b-0 last:pb-0">
-      <span className="font-medium text-slate-500">{label}</span>
-      <span className="text-left font-semibold text-[#0F172A]">{value}</span>
-    </div>
-  )
-}
-
-function ContentBlock({ title, text }: { title: string; text?: string | null }) {
-  return (
-    <div className="rounded-2xl bg-[#F8FAFC] p-4">
-      <div className="mb-2 text-[15px] font-bold text-[#0F172A]">{title}</div>
-      <p className="whitespace-pre-wrap text-[14px] leading-7 text-slate-700">{text?.trim() ? text : 'אין תוכן להצגה'}</p>
-    </div>
-  )
-}
-
-function DistributionIndicator({ label, active, date }: { label: string; active: boolean; date?: string | null }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-xl bg-white px-3 py-2">
-      <span className="text-[13px] font-semibold text-slate-700">{label}</span>
-      <span className={`rounded-full px-2.5 py-1 text-[12px] font-semibold ${active ? 'bg-[#F0FDF4] text-[#16A34A]' : 'bg-slate-100 text-slate-500'}`}>
-        {active ? (date ? formatDate(date) : 'פורסם') : 'לא פורסם'}
-      </span>
-    </div>
-  )
-}
-
-function ActionRailLink({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) {
-  return (
-    <Link to={to} className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-[#008080]">
-      <span className="inline-flex items-center gap-2">{icon}{label}</span>
-      <ChevronLeft className="h-4 w-4" />
-    </Link>
-  )
-}
-
-function DetailInline({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
-      <span className="text-[13px] font-semibold text-slate-500">{label}</span>
-      <span className="text-[13px] font-bold text-[#0F172A]">{value}</span>
-    </div>
-  )
-}
-
-function getDaysLive(job: any) {
-  const sourceDate = job.created_time || job.updated_timestamp || null
-  if (!sourceDate) return 0
-  return Math.max(0, Math.floor((Date.now() - new Date(sourceDate).getTime()) / (1000 * 60 * 60 * 24)))
-}
-
-function getLastPublishDate(job: any) {
-  const dates = [job.last_publish_date, job.date_facebook, job.date_website, job.date_whatsapp].filter(Boolean)
-  if (!dates.length) return null
-  return dates.map((v) => new Date(v).getTime()).sort((a, b) => b - a).map((t) => new Date(t).toISOString().slice(0, 10))[0]
-}
-
-function canPublish(job: any) {
-  return Boolean(job.account_link) && Boolean(job.job_role) && Boolean(String(job.job_title ?? '').trim())
-}
-
-function getTodayIso() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function toastClassName(tone: ToastTone) {
-  if (tone === 'success') return 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]'
-  if (tone === 'error') return 'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]'
-  return 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]'
-}
+function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) { return <div className="mb-5 flex items-center gap-2 text-[18px] font-bold text-[#2D2D2D]"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F3F3] text-[#008080]">{icon}</span>{title}</div> }
+function TextField({ label, value, onChange, dir = 'rtl', className = '' }: { label: string; value: string; onChange: (value: string) => void; dir?: 'rtl' | 'ltr'; className?: string }) { return <label className={`flex flex-col gap-1.5 ${className}`}><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><input dir={dir} value={value} onChange={(event) => onChange(event.target.value)} className="h-11 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]" /></label> }
+function SelectField({ label, value, onChange, options }: { label: string; value: string; onChange: (value: string) => void; options: { value: string; label: string }[] }) { return <label className="flex flex-col gap-1.5"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><select dir="rtl" value={value} onChange={(event) => onChange(event.target.value)} className="h-11 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"><option value="">בחרי</option>{options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label> }
+function MultiSelectField({ label, values, onChange, options }: { label: string; values: number[]; onChange: (values: number[]) => void; options: { value: string; label: string }[] }) { return <div className="flex flex-col gap-1.5"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><div className="max-h-44 overflow-y-auto rounded-xl border border-[#D9D9D9] bg-white p-2">{options.length ? options.map((option) => { const numeric = Number(option.value); const checked = values.includes(numeric); return <label key={option.value} className="flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 text-[13px] hover:bg-[#F3F4F6]"><span>{option.label}</span><input type="checkbox" checked={checked} onChange={() => onChange(checked ? values.filter((id) => id !== numeric) : [...values, numeric])} className="h-4 w-4 accent-[#008080]" /></label> }) : <div className="px-2 py-2 text-[13px] text-[#6B6B6B]">אין אפשרויות</div>}</div></div> }
+function TextAreaField({ label, value, onChange, className = '' }: { label: string; value: string; onChange: (value: string) => void; className?: string }) { return <label className={`flex flex-col gap-1.5 ${className}`}><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><textarea dir="rtl" rows={5} value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[14px] leading-7 outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]" /></label> }
+function Pill({ text, tone }: { text: string; tone: 'success' | 'muted' }) { return <span className={`rounded-full px-3 py-1 text-[12px] font-bold ${tone === 'success' ? 'bg-[#F0FDF4] text-[#166534]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>{text}</span> }
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) { return <div className="flex items-start justify-between gap-3 border-b border-[#F3F4F6] py-2 text-[13px]"><span className="font-semibold text-[#6B6B6B]">{label}</span><span className="text-left font-bold text-[#2D2D2D]">{value}</span></div> }
+function ActionRailLink({ to, icon, label }: { to: string; icon: React.ReactNode; label: string }) { return <Link to={to} className="flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-white px-4 py-3 text-[13px] font-bold text-[#2D2D2D] transition hover:bg-[#E6F3F3] hover:text-[#008080]"><span className="inline-flex items-center gap-2">{icon}{label}</span><ChevronLeft className="h-4 w-4" /></Link> }
+function normalizeIds(value: unknown): number[] { if (Array.isArray(value)) return value.map(Number).filter((id) => Number.isFinite(id) && id > 0); if (value == null || value === '') return []; const n = Number(value); return Number.isFinite(n) && n > 0 ? [n] : [] }
+function toOption(item: DictItem) { return { value: String(item.id), label: item.name } }
+function labelById(items: DictItem[], id: number | string | null | undefined) { return items.find((item) => Number(item.id) === Number(id))?.name ?? '—' }
+function cleanText(value: string) { const clean = String(value ?? '').trim(); return clean || null }
+function toNullableNumber(value: string) { const clean = String(value ?? '').trim(); if (!clean) return null; const numeric = Number(clean); return Number.isFinite(numeric) ? numeric : null }
+function todayIsoDate() { return new Date().toISOString().slice(0, 10) }
+function toastClassName(tone: ToastTone) { if (tone === 'success') return 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]'; if (tone === 'error') return 'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]'; return 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]' }

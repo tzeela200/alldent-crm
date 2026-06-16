@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Briefcase,
   Plus,
@@ -166,6 +166,7 @@ const EMPTY_JOB_DRAFT: JobDraft = {
 const EMPTY_JOBS: Job[] = []
 
 export default function AdminJobsPage() {
+  const navigate = useNavigate()
   const [filters, setFilters] = useState<FilterState>({})
   const [page, setPage] = useState(0)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
@@ -249,7 +250,7 @@ export default function AdminJobsPage() {
   const { data: cities = [] } = useQuery<Array<DictItem & { region_id: number | null }>>({
     queryKey: ['dict_cities'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').limit(2000)
+      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
       if (error) throw error
       return (data ?? []) as Array<DictItem & { region_id: number | null }>
     },
@@ -549,7 +550,15 @@ export default function AdminJobsPage() {
   const updateJobPatch = async (jobCode: string, patch: Record<string, unknown>, successMessage: string) => {
     setRowActionPending(jobCode)
     try {
-      const finalPatch = { ...patch, updated_timestamp: new Date().toISOString() }
+      const finalPatch: Record<string, unknown> = { ...patch, updated_timestamp: new Date().toISOString() }
+
+      // כלל עסקי: רק משרה פעילה יכולה להיות מפורסמת.
+      // כל שינוי סטטוס פעילות לסטטוס שאינו פעילה מסתיר את הפרסום.
+      if ('job_status' in patch && Number(patch.job_status) !== JOB_STATUS_IDS.active) {
+        finalPatch.public_status = PUBLIC_STATUS_IDS.hidden
+        finalPatch.unpublished_at = new Date().toISOString()
+      }
+
       const { error } = await supabase.from('job').update(finalPatch).eq('job_code', jobCode)
       if (error) throw error
       replaceJob(jobCode, (cur) => ({ ...cur, ...finalPatch }))
@@ -563,6 +572,11 @@ export default function AdminJobsPage() {
   }
 
   const publishJob = (job: any) => {
+    if (Number(job.job_status) !== JOB_STATUS_IDS.active) {
+      showToast('לא ניתן לפרסם משרה שאינה בסטטוס פעילה', 'error')
+      return
+    }
+
     updateJobPatch(
       String(job.job_code),
       {
@@ -570,6 +584,7 @@ export default function AdminJobsPage() {
         last_publish_date: todayIsoDate(),
         date_website: job.date_website ?? todayIsoDate(),
         published_at: job.published_at ?? new Date().toISOString(),
+        unpublished_at: null,
       },
       'סטטוס הפרסום עודכן למפורסמת',
     )
@@ -773,7 +788,7 @@ export default function AdminJobsPage() {
                         return (
                           <tr key={jobCode} className={`transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#FAFAF7]'}`}>
                             <td className="px-3 py-3"><input type="checkbox" checked={selected} onChange={() => toggleRowSelection(jobCode)} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></td>
-                            {visibleColumns.includes('job_code') && <td className="px-3 py-3"><button type="button" onClick={() => openPanel(job, 'view')} className="font-mono font-bold text-[#008080] hover:underline">{job.job_code}</button></td>}
+                            {visibleColumns.includes('job_code') && <td className="px-3 py-3"><button type="button" onClick={() => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`)} className="font-mono font-bold text-[#008080] hover:underline">{job.job_code}</button></td>}
                             {visibleColumns.includes('job_title') && <td className="max-w-[230px] px-3 py-3 font-semibold text-[#2D2D2D]">{job.job_title ?? '—'}</td>}
                             {visibleColumns.includes('job_role') && <td className="px-3 py-3"><RoleBadge roleId={Number(job.job_role)} label={roleName(job.job_role)} /></td>}
                             {visibleColumns.includes('job_sub_role') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.job_sub_role)} labelById={subRoleName} empty="—" /></td>}
@@ -805,12 +820,12 @@ export default function AdminJobsPage() {
                             <td className="px-3 py-3">
                               <div className="flex flex-wrap items-center gap-1.5">
                                 <IconButton title="צפייה בפאנל" icon={<Eye className="h-4 w-4" />} onClick={() => openPanel(job, 'view')} />
-                                <IconButton title="עריכה" icon={<Edit2 className="h-4 w-4" />} onClick={() => openPanel(job, 'edit')} />
+                                <IconButton title="עריכה מלאה" icon={<Edit2 className="h-4 w-4" />} onClick={() => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`)} />
                                 <IconButton title="שכפול" icon={<Copy className="h-4 w-4" />} onClick={() => duplicateJob(job)} pending={rowActionPending === jobCode} />
                                 <IconButton title="פרסום" icon={<Send className="h-4 w-4" />} onClick={() => publishJob(job)} pending={rowActionPending === jobCode} />
                                 <IconButton title="Smart Match" icon={<Sparkles className="h-4 w-4" />} onClick={() => showToast('Smart Match לא מחובר למסך הזה עדיין', 'info')} />
                                 <IconButton title="וואטסאפ" icon={<MessageCircle className="h-4 w-4" />} onClick={() => openWhatsApp(job)} />
-                                <IconButton title="ארכוב" icon={<Archive className="h-4 w-4" />} onClick={() => updateJobPatch(jobCode, { job_status: JOB_STATUS_IDS.archived, public_status: PUBLIC_STATUS_IDS.archived }, 'המשרה הועברה לארכיון')} pending={rowActionPending === jobCode} />
+                                <IconButton title="ארכוב" icon={<Archive className="h-4 w-4" />} onClick={() => updateJobPatch(jobCode, { job_status: JOB_STATUS_IDS.archived, public_status: PUBLIC_STATUS_IDS.hidden, unpublished_at: new Date().toISOString() }, 'המשרה הועברה לארכיון')} pending={rowActionPending === jobCode} />
                               </div>
                             </td>
                           </tr>
@@ -889,6 +904,7 @@ function UnifiedJobPanel({
   roles,
   editSubRoleOptions,
   accountsList,
+  contactsList,
   regions,
   cities,
   scopes,

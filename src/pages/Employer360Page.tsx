@@ -1173,7 +1173,7 @@ function HeroSection({
                 </Link>
               </Button>
               <Button asChild className="rounded-xl bg-[#D97706] text-white hover:bg-[#B95F04]">
-                <Link to={`/jobs/new?account_id=${account.account_id}`}>
+                <Link to={`/admin/jobs/new?account_id=${account.account_id}`}>
                   <Plus className="h-4 w-4" />
                   יצירת משרה
                 </Link>
@@ -1397,7 +1397,7 @@ function JobsPanel({ jobs, dicts, isLoading, error, accountId }: { jobs: JobRow[
       icon={<Briefcase className="h-4 w-4" />}
       action={
         <Button asChild size="sm" className="rounded-xl bg-[#008080] text-white hover:bg-[#006B6B]">
-          <Link to={`/jobs/new?account_id=${accountId}`}>
+          <Link to={`/admin/jobs/new?account_id=${accountId}`}>
             <Plus className="h-4 w-4" />
             משרה חדשה
           </Link>
@@ -1410,7 +1410,7 @@ function JobsPanel({ jobs, dicts, isLoading, error, accountId }: { jobs: JobRow[
           description="אפשר לפתוח משרה חדשה מתוך כרטסת הארגון, כשהארגון כבר מקושר להקמת המשרה."
           action={
             <Button asChild className="rounded-xl bg-[#008080] hover:bg-[#006B6B]">
-              <Link to={`/jobs/new?account_id=${accountId}`}>יצירת משרה</Link>
+              <Link to={`/admin/jobs/new?account_id=${accountId}`}>יצירת משרה</Link>
             </Button>
           }
         />
@@ -1432,7 +1432,7 @@ function JobsPanel({ jobs, dicts, isLoading, error, accountId }: { jobs: JobRow[
               {jobs.map((job) => (
                 <tr key={job.job_code} className="group hover:bg-slate-50">
                   <td className="border-b border-slate-100 px-3 py-3 font-mono text-[#008080]" dir="ltr">
-                    <Link to={`/jobs/${job.job_code}`} className="hover:underline">
+                    <Link to={`/admin/jobs/${job.job_code}`} className="hover:underline">
                       {job.job_code}
                     </Link>
                   </td>
@@ -1482,7 +1482,7 @@ function ContactsPanel({ contacts, dicts, isLoading, error }: { contacts: Contac
       icon={<Users className="h-4 w-4" />}
       action={
         <Button asChild variant="outline" size="sm" className="rounded-xl">
-          <Link to="/contacts">
+          <Link to="/admin/contacts">
             <Users className="h-4 w-4" />
             מאגר אנשי קשר
           </Link>
@@ -1499,7 +1499,7 @@ function ContactsPanel({ contacts, dicts, isLoading, error }: { contacts: Contac
               <div key={contact.contact_id} className="rounded-2xl border border-slate-200 p-3 transition hover:border-[#008080]/30 hover:bg-[#F0FDFC]/40">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <Link to={`/contacts/${contact.contact_id}`} className="font-bold text-slate-900 hover:text-[#008080] hover:underline">
+                    <Link to={`/admin/contacts/${contact.contact_id}`} className="font-bold text-slate-900 hover:text-[#008080] hover:underline">
                       {name}
                     </Link>
                     <div className="mt-1 text-xs text-slate-500">{dictName(dicts.roles, contact.role, contact.professional_title ?? "תפקיד לא הוגדר")}</div>
@@ -1571,7 +1571,7 @@ function ApplicationsPanel({
       icon={<FileText className="h-4 w-4" />}
       action={
         <Button asChild variant="outline" size="sm" className="rounded-xl">
-          <Link to="/applications">
+          <Link to="/admin/applications">
             <FileText className="h-4 w-4" />
             כל ההגשות
           </Link>
@@ -1598,7 +1598,7 @@ function ApplicationsPanel({
                 <tr key={application.application_id} className="hover:bg-slate-50">
                   <td className="border-b border-slate-100 px-3 py-3 font-semibold text-slate-900">
                     {application.candidate_link ? (
-                      <Link to={`/contacts/${application.candidate_link}`} className="hover:text-[#008080] hover:underline">
+                      <Link to={`/admin/contacts/${application.candidate_link}`} className="hover:text-[#008080] hover:underline">
                         {application.candidate_name || "מועמד ללא שם"}
                       </Link>
                     ) : (
@@ -1610,7 +1610,7 @@ function ApplicationsPanel({
                   </td>
                   <td className="border-b border-slate-100 px-3 py-3 font-mono text-[#008080]" dir="ltr">
                     {application.job_code ? (
-                      <Link to={`/jobs/${application.job_code}`} className="hover:underline">
+                      <Link to={`/admin/jobs/${application.job_code}`} className="hover:underline">
                         {application.job_code}
                       </Link>
                     ) : (
@@ -1759,7 +1759,7 @@ function buildRecommendedActions(account: AccountRow, jobs: JobRow[], contacts: 
       icon: <Briefcase className="h-4 w-4" />,
       title: "אין משרות פעילות",
       description: "כדאי לפתוח משרה חדשה או לבדוק האם סטטוס המשרות עודכן נכון.",
-      href: `/jobs/new?account_id=${account.account_id}`,
+      href: `/admin/jobs/new?account_id=${account.account_id}`,
       label: "יצירת משרה",
       severity: "warning",
     });
@@ -1771,7 +1771,7 @@ function buildRecommendedActions(account: AccountRow, jobs: JobRow[], contacts: 
       icon: <Users className="h-4 w-4" />,
       title: "אין אנשי קשר משויכים",
       description: "מומלץ לשייך איש קשר כדי לשמור רצף CRM תקין מול הארגון.",
-      href: "/contacts",
+      href: "/admin/contacts",
       label: "פתיחת מאגר אנשי קשר",
       severity: "warning",
     });
@@ -1783,7 +1783,7 @@ function buildRecommendedActions(account: AccountRow, jobs: JobRow[], contacts: 
       icon: <Sparkles className="h-4 w-4" />,
       title: `${jobsWithoutApplicants.length} משרות פעילות ללא הגשות`,
       description: "אפשר לפתוח Smart Match או לבדוק את פרסום המשרות.",
-      href: `/smart-match?account_id=${account.account_id}`,
+      href: `/admin/smart-match?account_id=${account.account_id}`,
       label: "פתיחת Smart Match",
       severity: "info",
     });
@@ -1919,7 +1919,7 @@ export default function Employer360Page() {
         <div className="mx-auto max-w-3xl py-24">
           <ErrorBlock title="חסר מזהה ארגון" description="לא התקבל account_id תקין בכתובת המסך." />
           <Button asChild className="mt-4 rounded-xl bg-[#008080] hover:bg-[#006B6B]">
-            <Link to="/accounts">
+            <Link to="/admin/accounts">
               <ArrowRight className="h-4 w-4" />
               חזרה למאגר ארגונים
             </Link>
@@ -1955,7 +1955,7 @@ export default function Employer360Page() {
         <div className="mx-auto max-w-3xl py-24">
           <ErrorBlock title="שגיאה בטעינת הארגון" description="אירעה שגיאה בעת טעינת כרטסת הארגון מ-Supabase." />
           <Button asChild className="mt-4 rounded-xl bg-[#008080] hover:bg-[#006B6B]">
-            <Link to="/accounts">
+            <Link to="/admin/accounts">
               <ArrowRight className="h-4 w-4" />
               חזרה למאגר ארגונים
             </Link>
@@ -1975,7 +1975,7 @@ export default function Employer360Page() {
           <h1 className="mt-4 text-xl font-black text-slate-900">ארגון לא נמצא</h1>
           <p className="mt-2 text-sm text-slate-500">לא נמצאה רשומת accounts עבור המזהה המבוקש.</p>
           <Button asChild className="mt-5 rounded-xl bg-[#008080] hover:bg-[#006B6B]">
-            <Link to="/accounts">
+            <Link to="/admin/accounts">
               <ArrowRight className="h-4 w-4" />
               חזרה למאגר ארגונים
             </Link>
