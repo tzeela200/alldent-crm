@@ -67,6 +67,7 @@ const ALL_JOB_COLUMNS = [
   { key: 'job_sub_role', label: 'תתי־תפקידים' },
   { key: 'account_name', label: 'ארגון' },
   { key: 'employer_name', label: 'מעסיק' },
+  { key: 'recruiter_name', label: 'מגייס' },
   { key: 'region_id', label: 'אזור' },
   { key: 'city_id', label: 'עיר' },
   { key: 'scope', label: 'היקף' },
@@ -118,6 +119,8 @@ type JobDraft = {
   job_role: number | null
   job_sub_role: number[]
   account_link: number | null
+  rel_employer_contact: number | null
+  rel_recruiter_contact: number | null
   region_id: number | null
   city_id: number | null
   scope: number[]
@@ -140,6 +143,8 @@ const EMPTY_JOB_DRAFT: JobDraft = {
   job_role: null,
   job_sub_role: [],
   account_link: null,
+  rel_employer_contact: null,
+  rel_recruiter_contact: null,
   region_id: null,
   city_id: null,
   scope: [],
@@ -217,7 +222,7 @@ export default function AdminJobsPage() {
   const { data: contactsList = [] } = useQuery<Array<{ contact_id: number; full_name: string | null; phone: string | null; phone_norm: string | null }>>({
     queryKey: ['contacts-employers-v1'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('contact').select('contact_id,full_name,phone,phone_norm').eq('profile_type', 2)
+      const { data, error } = await supabase.from('contact').select('contact_id,full_name,phone,phone_norm').in('profile_type', [2, 3]).limit(1000)
       if (error) throw error
       return (data ?? []) as Array<{ contact_id: number; full_name: string | null; phone: string | null; phone_norm: string | null }>
     },
@@ -241,7 +246,7 @@ export default function AdminJobsPage() {
   const { data: cities = [] } = useQuery<Array<DictItem & { region_id: number | null }>>({
     queryKey: ['dict_cities'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
+      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').limit(2000)
       if (error) throw error
       return (data ?? []) as Array<DictItem & { region_id: number | null }>
     },
@@ -276,12 +281,15 @@ export default function AdminJobsPage() {
     return allJobs.map((job: any) => {
       const account = job.account_link ? accountsMap.get(Number(job.account_link)) : null
       const employerContact = job.rel_employer_contact ? contactsMap.get(Number(job.rel_employer_contact)) : null
+      const recruiterContact = job.rel_recruiter_contact ? contactsMap.get(Number(job.rel_recruiter_contact)) : null
       return {
         ...job,
         account_name: account?.name ?? null,
         account_phone: account?.phone ?? account?.second_phone ?? null,
         employer_contact_name: employerContact?.name ?? null,
         employer_contact_phone: employerContact?.phone ?? null,
+        recruiter_contact_name: recruiterContact?.name ?? null,
+        recruiter_contact_phone: recruiterContact?.phone ?? null,
       }
     })
   }, [allJobs, accountsMap, contactsMap])
@@ -451,6 +459,8 @@ export default function AdminJobsPage() {
       job_role: job.job_role ?? null,
       job_sub_role: normalizeIds(job.job_sub_role),
       account_link: job.account_link ?? null,
+      rel_employer_contact: job.rel_employer_contact ?? null,
+      rel_recruiter_contact: job.rel_recruiter_contact ?? null,
       region_id: job.region_id ?? null,
       city_id: job.city_id ?? null,
       scope: normalizeIds(job.scope),
@@ -475,13 +485,28 @@ export default function AdminJobsPage() {
     if (!panel.jobCode) return
     setSavingEdit(true)
     try {
+      // אם סטטוס משרה לא פעיל — אפס סטטוס פרסום אוטומטית
+      const INACTIVE_JOB_STATUSES = [
+        JOB_STATUS_IDS.draft,
+        JOB_STATUS_IDS.hold,
+        JOB_STATUS_IDS.filled,
+        JOB_STATUS_IDS.closedSuccess,
+        JOB_STATUS_IDS.closedOther,
+        JOB_STATUS_IDS.cancelled,
+        JOB_STATUS_IDS.archived,
+      ]
+      const isInactive = jobDraft.job_status != null && INACTIVE_JOB_STATUSES.includes(jobDraft.job_status)
+      const resolvedPublicStatus = isInactive ? PUBLIC_STATUS_IDS.hidden : jobDraft.public_status
+
       const patch = {
         job_title: cleanText(jobDraft.job_title),
         job_status: jobDraft.job_status,
-        public_status: jobDraft.public_status,
+        public_status: resolvedPublicStatus,
         job_role: jobDraft.job_role,
         job_sub_role: jobDraft.job_sub_role.length ? jobDraft.job_sub_role : null,
         account_link: jobDraft.account_link,
+        rel_employer_contact: jobDraft.rel_employer_contact,
+        rel_recruiter_contact: jobDraft.rel_recruiter_contact,
         region_id: jobDraft.region_id,
         city_id: jobDraft.city_id,
         scope: jobDraft.scope.length ? jobDraft.scope : null,
@@ -500,11 +525,16 @@ export default function AdminJobsPage() {
       const { error } = await supabase.from('job').update(patch).eq('job_code', panel.jobCode)
       if (error) throw error
       replaceJob(panel.jobCode, (cur) => ({ ...cur, ...patch }))
-      showToast('המשרה נשמרה בהצלחה', 'success')
+      const savedMsg = isInactive ? 'המשרה נשמרה — סטטוס פרסום הוסתר אוטומטית' : 'המשרה נשמרה בהצלחה'
+      showToast(savedMsg, 'success')
       setPanel((prev) => ({ ...prev, mode: 'view' }))
-    } catch (error) {
-      console.error(error)
-      showToast('שגיאה בשמירה. בדקי שתתי־התפקידים תואמים לתפקיד הראשי', 'error')
+    } catch (err: any) {
+      console.error(err)
+      const msg = err?.message ?? ''
+      if (msg.includes('job_salary_hourly_chk')) showToast('שכר שעתי חייב להיות בין 40 ל-1000 ₪', 'error')
+      else if (msg.includes('job_salary_monthly_chk')) showToast('שכר חודשי חייב להיות לפחות 1,000 ₪', 'error')
+      else if (msg.includes('job_url_chk') || msg.includes('job_public_image_url_chk')) showToast('כתובת URL חייבת להתחיל ב-https://', 'error')
+      else showToast(`שגיאה בשמירה: ${msg || 'שגיאה לא ידועה'}`, 'error')
     } finally {
       setSavingEdit(false)
     }
@@ -559,7 +589,7 @@ export default function AdminJobsPage() {
         created_time: new Date().toISOString(),
         updated_timestamp: new Date().toISOString(),
       }
-      const { account_name, account_phone, employer_contact_name, employer_contact_phone, ...dbJob } = newJob
+      const { account_name, account_phone, employer_contact_name, employer_contact_phone, recruiter_contact_name, recruiter_contact_phone, ...dbJob } = newJob
       const { error } = await supabase.from('job').insert(dbJob)
       if (error) throw error
       setLocalJobs((prev) => [newJob, ...prev])
@@ -590,6 +620,7 @@ export default function AdminJobsPage() {
       'תתי־תפקידים': namesFromIds(normalizeIds(job.job_sub_role), subRoleName),
       ארגון: job.account_name ?? '',
       מעסיק: job.employer_contact_name ?? '',
+      מגייס: job.recruiter_contact_name ?? '',
       אזור: regionName(job.region_id),
       עיר: cityName(job.city_id),
       היקף: namesFromIds(normalizeIds(job.scope), scopeName),
@@ -711,6 +742,7 @@ export default function AdminJobsPage() {
                         {visibleColumns.includes('job_sub_role') && <PlainTh label="תתי־תפקידים" />}
                         {visibleColumns.includes('account_name') && <PlainTh label="ארגון" />}
                         {visibleColumns.includes('employer_name') && <PlainTh label="מעסיק" />}
+                        {visibleColumns.includes('recruiter_name') && <PlainTh label="מגייס" />}
                         {visibleColumns.includes('region_id') && <PlainTh label="אזור" />}
                         {visibleColumns.includes('city_id') && <PlainTh label="עיר" />}
                         {visibleColumns.includes('scope') && <PlainTh label="היקף" />}
@@ -735,6 +767,7 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('job_sub_role') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.job_sub_role)} labelById={subRoleName} empty="—" /></td>}
                             {visibleColumns.includes('account_name') && <td className="max-w-[220px] px-3 py-3"><span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"><Building2 className="h-3.5 w-3.5" />{job.account_name ?? '—'}</span></td>}
                             {visibleColumns.includes('employer_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.employer_contact_name ?? '—'}</td>}
+                            {visibleColumns.includes('recruiter_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.recruiter_contact_name ?? '—'}</td>}
                             {visibleColumns.includes('region_id') && <td className="px-3 py-3">{regionName(job.region_id)}</td>}
                             {visibleColumns.includes('city_id') && <td className="px-3 py-3">{cityName(job.city_id)}</td>}
                             {visibleColumns.includes('scope') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.scope)} labelById={scopeName} empty="—" /></td>}
@@ -786,6 +819,7 @@ export default function AdminJobsPage() {
             roles={roles}
             editSubRoleOptions={editSubRoleOptions}
             accountsList={accountsList}
+            contactsList={contactsList}
             regions={regions}
             cities={editCityOptions}
             scopes={scopes}
@@ -873,7 +907,8 @@ function UnifiedJobPanel({
                 <LabelValue label="תפקיד" value={roleName(job.job_role)} />
                 <LabelValue label="תתי־תפקידים" value={namesFromIds(normalizeIds(job.job_sub_role), subRoleName)} />
                 <LabelValue label="ארגון" value={job.account_name ?? '—'} />
-                <LabelValue label="מעסיק / מגייס" value={job.employer_contact_name ?? '—'} />
+                <LabelValue label="מעסיק" value={job.employer_contact_name ?? '—'} />
+                <LabelValue label="מגייס" value={job.recruiter_contact_name ?? job.employer_contact_name ?? '—'} />
               </PanelCard>
               <PanelCard title="מיקום והיקף">
                 <LabelValue label="אזור" value={regionName(job.region_id)} />
@@ -903,11 +938,13 @@ function UnifiedJobPanel({
                 <EditSelectField label="תפקיד ראשי" value={draft.job_role != null ? String(draft.job_role) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_role: value ? Number(value) : null, job_sub_role: [] }))} options={roles.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
                 <EditMultiSelectField label="תתי־תפקידים" values={draft.job_sub_role} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, job_sub_role: values }))} options={editSubRoleOptions} disabled={!draft.job_role} placeholder={draft.job_role ? 'בחרי תתי־תפקידים' : 'בחרי קודם תפקיד ראשי'} />
                 <EditSelectField label="ארגון" value={draft.account_link != null ? String(draft.account_link) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, account_link: value ? Number(value) : null }))} options={accountsList.map((item: any) => ({ value: String(item.account_id), label: item.account_name ?? '' }))} />
+                <EditSelectField label="מעסיק" value={draft.rel_employer_contact != null ? String(draft.rel_employer_contact) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, rel_employer_contact: value ? Number(value) : null }))} options={contactsList.map((item: any) => ({ value: String(item.contact_id), label: item.full_name ?? '' }))} />
+                <EditSelectField label="מגייס (אופציונלי)" value={draft.rel_recruiter_contact != null ? String(draft.rel_recruiter_contact) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, rel_recruiter_contact: value ? Number(value) : null }))} options={contactsList.map((item: any) => ({ value: String(item.contact_id), label: item.full_name ?? '' }))} />
               </PanelCard>
 
               <PanelCard title="מיקום והיקף">
                 <EditSelectField label="אזור" value={draft.region_id != null ? String(draft.region_id) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
-                <EditSelectField label="עיר" value={draft.city_id != null ? String(draft.city_id) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, city_id: value ? Number(value) : null }))} options={cities.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+                <EditSelectField label="עיר" value={draft.city_id != null ? String(draft.city_id) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, city_id: value ? Number(value) : null }))} options={cities} />
                 <EditTextField label="כתובת" value={draft.address} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, address: value }))} />
                 <EditMultiSelectField label="היקף משרה" values={draft.scope} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, scope: values }))} options={scopes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
                 <EditSelectField label="ניסיון נדרש" value={draft.required_experience != null ? String(draft.required_experience) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, required_experience: value ? Number(value) : null }))} options={experienceOptions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
