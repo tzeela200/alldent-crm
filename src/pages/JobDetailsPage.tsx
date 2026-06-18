@@ -106,11 +106,31 @@ export default function JobDetailsPage() {
   })
   const { data: regions = [] } = useQuery({ queryKey: ['dict_regions'], queryFn: () => fetchDict('dict_regions'), staleTime: 600_000 })
   const { data: cities = [] } = useQuery({
-    queryKey: ['dict_cities'],
+    queryKey: ['dict_cities', 'all-for-job-detail'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
-      if (error) throw error
-      return (data ?? []) as DictItem[]
+      // Supabase/PostgREST מחזיר ברירת מחדל עד 1,000 רשומות.
+      // במילון הערים יש יותר מזה, ולכן ערים בסוף הא״ב כמו שוהם עלולות לא להופיע בלי pagination.
+      const PAGE = 1000
+      const all: DictItem[] = []
+      let from = 0
+
+      while (true) {
+        const { data, error } = await supabase
+          .from('dict_cities')
+          .select('id,name,region_id')
+          .order('name')
+          .range(from, from + PAGE - 1)
+
+        if (error) throw error
+        const batch = (data ?? []) as DictItem[]
+        if (!batch.length) break
+
+        all.push(...batch)
+        if (batch.length < PAGE) break
+        from += PAGE
+      }
+
+      return all
     },
     staleTime: 600_000,
   })
@@ -137,6 +157,13 @@ export default function JobDetailsPage() {
   })
 
   useEffect(() => {
+    if (!cities.length || !draft) return
+    if (draft.region_id || !draft.city_id) return
+    const found = cities.find((c) => String(c.id) === String(draft.city_id))
+    if (found?.region_id) setDraft((prev) => prev ? { ...prev, region_id: String(found.region_id) } : prev)
+  }, [cities, draft?.city_id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
     if (!jobData) return
     setLocalJob(jobData)
     setDraft(toDraft(jobData))
@@ -159,6 +186,18 @@ export default function JobDetailsPage() {
 
   const setField = <K extends keyof JobDraft>(key: K, value: JobDraft[K]) => {
     setDraft((prev) => (prev ? { ...prev, [key]: value } : prev))
+  }
+
+  const setJobCity = (cityId: string) => {
+    const selectedCity = cities.find((city) => Number(city.id) === Number(cityId))
+    setDraft((prev) => {
+      if (!prev) return prev
+      return {
+        ...prev,
+        city_id: cityId,
+        region_id: selectedCity?.region_id ? String(selectedCity.region_id) : prev.region_id,
+      }
+    })
   }
 
   const saveJob = async () => {
@@ -297,7 +336,7 @@ export default function JobDetailsPage() {
                 <SelectField label="תפקיד" value={draft.job_role} onChange={(value) => setDraft((prev) => prev ? { ...prev, job_role: value, job_sub_role: [] } : prev)} options={roles.map(toOption)} />
                 <MultiSelectField label="תתי־תפקידים" values={draft.job_sub_role} onChange={(values) => setField('job_sub_role', values)} options={subRoleOptions.map(toOption)} />
                 <SelectField label="אזור" value={draft.region_id} onChange={(value) => setDraft((prev) => prev ? { ...prev, region_id: value, city_id: '' } : prev)} options={regions.map(toOption)} />
-                <SelectField label="עיר" value={draft.city_id} onChange={(value) => setField('city_id', value)} options={cityOptions.map(toOption)} />
+                <SelectField label="עיר" value={draft.city_id} onChange={setJobCity} options={cityOptions.map(toOption)} />
                 <TextField label="כתובת" value={draft.address} onChange={(value) => setField('address', value)} />
                 <SelectField label="ניסיון" value={draft.required_experience} onChange={(value) => setField('required_experience', value)} options={experience.map(toOption)} />
                 <MultiSelectField label="היקף" values={draft.scope} onChange={(values) => setField('scope', values)} options={scopes.map(toOption)} />

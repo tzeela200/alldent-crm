@@ -216,7 +216,7 @@ export default function AdminContactsPage() {
   const { data: cityOptions = [] } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
     queryKey: ['dict_cities'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
+      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').limit(2000)
       if (error) throw error
       return data ?? []
     },
@@ -1417,7 +1417,7 @@ export default function AdminContactsPage() {
                       </label>
                       <label className="flex flex-col gap-1">
                         <span className="text-[12px] font-semibold text-slate-500">עיר</span>
-                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.city_id ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, city_id: e.target.value ? Number(e.target.value) : null }))}>
+                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.city_id ?? ''} onChange={(e) => { const cityId = e.target.value ? Number(e.target.value) : null; const found = cityOptions.find((c) => c.id === cityId); setEditDraft((d) => ({ ...d, city_id: cityId, region_id: found?.region_id ?? d.region_id })) }}>
                           <option value="">— בחר —</option>
                           {cityOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                         </select>

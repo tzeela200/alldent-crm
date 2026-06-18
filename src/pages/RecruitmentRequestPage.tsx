@@ -107,6 +107,15 @@ export default function RecruitmentRequestPage() {
   const setField = <K extends keyof FormState>(key: K, value: FormState[K]) =>
     setForm((prev) => ({ ...prev, [key]: value }))
 
+  const handleCityChange = (cityId: string) => {
+    const found = cities.find((c) => String(c.id) === cityId)
+    setForm((prev) => ({
+      ...prev,
+      city_id: cityId,
+      region_id: found?.region_id ? String(found.region_id) : prev.region_id,
+    }))
+  }
+
   const handleSubmit = async () => {
     setError(null)
 
@@ -247,7 +256,7 @@ export default function RecruitmentRequestPage() {
               <SelectField
                 label="עיר המשרה *"
                 value={form.city_id}
-                onChange={(v) => setField('city_id', v)}
+                onChange={handleCityChange}
                 options={cityOptions.map(toOption)}
                 placeholder={form.region_id ? 'בחרו עיר' : 'בחרו אזור תחילה'}
               />

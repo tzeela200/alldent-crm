@@ -229,7 +229,7 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     supabase.from("dict_roles").select("id, name").order("id"),
     supabase.from("dict_sub_roles").select("id, name, role_id").order("id"),
     supabase.from("dict_availability").select("id, name").order("id"),
-    supabase.from("dict_cities").select("id, name, region_id").order("name"),
+    supabase.from("dict_cities").select("id, name, region_id").order("name").limit(2000),
     supabase.from("dict_regions").select("id, name").order("id"),
     supabase.from("dict_sources").select("id, name").order("id"),
     supabase.from("dict_check_statuses").select("id, name").order("id"),

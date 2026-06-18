@@ -353,7 +353,7 @@ export default function AdminEmployersPage({
   const { data: cities = [] } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
     queryKey: ['dict_cities'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
+      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').limit(2000)
       if (error) throw error
       return data ?? []
     },
@@ -423,8 +423,8 @@ export default function AdminEmployersPage({
       const primaryEmployerName = linkedContacts[0]?.full_name || linkedContacts[0]?.display_name || '—'
       const jobCityIds = Array.from(new Set(relatedJobs.map((job) => Number(job.city_id || 0)).filter(Boolean)))
       const jobRegionIds = Array.from(new Set(relatedJobs.map((job) => Number(job.region_id || 0)).filter(Boolean)))
-      const displayCityId = account.city_id ?? (jobCityIds.length === 1 ? jobCityIds[0] : null)
-      const displayRegionId = account.region_id ?? (jobRegionIds.length === 1 ? jobRegionIds[0] : null)
+      const displayCityId = account.city_id ?? null
+      const displayRegionId = account.region_id ?? null
       const locationLabel = jobCityIds.length > 1 ? 'כמה סניפים' : ''
       const missingPhone = !normalizeDigits(account.phone)
       const missingLocation = !displayRegionId || !displayCityId
@@ -1011,7 +1011,7 @@ export default function AdminEmployersPage({
                     </SectionCard>
                     <SectionCard title="מיקום ותפעול">
                       <SelectLikeField label="אזור" value={String(draft.region_id ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} />
-                      <SelectLikeField label="עיר" value={String(draft.city_id ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, city_id: value ? Number(value) : null }))} options={(draft.region_id ? cities.filter((item) => Number(item.region_id) === Number(draft.region_id)) : cities).map((item) => ({ value: String(item.id), label: item.name }))} />
+                      <SelectLikeField label="עיר" value={String(draft.city_id ?? '')} onChange={(value) => { const found = cities.find((c) => String(c.id) === value); setDraft((prev) => ({ ...prev, city_id: value ? Number(value) : null, region_id: found?.region_id ?? prev.region_id })) }} options={(draft.region_id ? cities.filter((item) => Number(item.region_id) === Number(draft.region_id)) : cities).map((item) => ({ value: String(item.id), label: item.name }))} />
                       <TextField label="כתובת" value={draft.address} onChange={(value) => setDraft((prev) => ({ ...prev, address: value }))} />
                       <TextField label="גודל צוות" value={draft.team_size} onChange={(value) => setDraft((prev) => ({ ...prev, team_size: value }))} type="number" />
                       <TextField label="מספר כיסאות" value={draft.chairs_count} onChange={(value) => setDraft((prev) => ({ ...prev, chairs_count: value }))} type="number" />

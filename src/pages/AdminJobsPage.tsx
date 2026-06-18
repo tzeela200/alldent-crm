@@ -250,7 +250,7 @@ export default function AdminJobsPage() {
   const { data: cities = [] } = useQuery<Array<DictItem & { region_id: number | null }>>({
     queryKey: ['dict_cities'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
+      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').limit(2000)
       if (error) throw error
       return (data ?? []) as Array<DictItem & { region_id: number | null }>
     },
@@ -311,6 +311,8 @@ export default function AdminJobsPage() {
   const publicStatusName = (id: number | null | undefined) => publicStatuses.find((item) => Number(item.id) === Number(id))?.name ?? '—'
   const regionName = (id: number | null | undefined) => regions.find((item) => Number(item.id) === Number(id))?.name ?? '—'
   const cityName = (id: number | null | undefined) => cities.find((item) => Number(item.id) === Number(id))?.name ?? '—'
+  const jobCityName = (job: { city_id?: number | null }) => cityName(job.city_id)
+  const jobRegionName = (job: { region_id?: number | null }) => regionName(job.region_id)
   const experienceName = (id: number | null | undefined) => experienceOptions.find((item) => Number(item.id) === Number(id))?.name ?? '—'
   const scopeName = (id: number | null | undefined) => scopes.find((item) => Number(item.id) === Number(id))?.name ?? '—'
   const subRoleName = (id: number | null | undefined) => subRoles.find((item) => Number(item.id) === Number(id))?.name ?? '—'
@@ -362,7 +364,7 @@ export default function AdminJobsPage() {
   const filteredJobs = useMemo(() => {
     const result = localJobs.filter((job) => {
       const search = String(filters.search ?? '').trim().toLowerCase()
-      const haystack = [job.job_code, job.job_title, job.account_name, job.employer_contact_name, cityName(job.city_id), roleName(job.job_role)]
+      const haystack = [job.job_code, job.job_title, job.account_name, job.employer_contact_name, jobCityName(job), roleName(job.job_role)]
         .map((item) => String(item ?? '').toLowerCase())
         .join(' ')
       if (search && !haystack.includes(search)) return false
@@ -642,8 +644,8 @@ export default function AdminJobsPage() {
       ארגון: job.account_name ?? '',
       מעסיק: job.employer_contact_name ?? '',
       מגייס: job.recruiter_contact_name ?? '',
-      אזור: regionName(job.region_id),
-      עיר: cityName(job.city_id),
+      אזור: jobRegionName(job),
+      עיר: jobCityName(job),
       היקף: namesFromIds(normalizeIds(job.scope), scopeName),
       'סטטוס משרה': statusName(job.job_status),
       'סטטוס פרסום': publicStatusName(job.public_status),
@@ -795,8 +797,8 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('account_name') && <td className="max-w-[220px] px-3 py-3"><span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"><Building2 className="h-3.5 w-3.5" />{job.account_name ?? '—'}</span></td>}
                             {visibleColumns.includes('employer_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.employer_contact_name ?? '—'}</td>}
                             {visibleColumns.includes('recruiter_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.recruiter_contact_name ?? '—'}</td>}
-                            {visibleColumns.includes('region_id') && <td className="px-3 py-3">{regionName(job.region_id)}</td>}
-                            {visibleColumns.includes('city_id') && <td className="px-3 py-3">{cityName(job.city_id)}</td>}
+                            {visibleColumns.includes('region_id') && <td className="px-3 py-3">{jobRegionName(job)}</td>}
+                            {visibleColumns.includes('city_id') && <td className="px-3 py-3">{jobCityName(job)}</td>}
                             {visibleColumns.includes('scope') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.scope)} labelById={scopeName} empty="—" /></td>}
                             {visibleColumns.includes('job_status') && (
                               <td className="px-3 py-3">
@@ -858,7 +860,8 @@ export default function AdminJobsPage() {
             accountsList={accountsList}
             contactsList={contactsList}
             regions={regions}
-            cities={editCityOptions}
+            cities={cities}
+            editCityOptions={editCityOptions}
             scopes={scopes}
             experienceOptions={experienceOptions}
             roleName={roleName}
@@ -868,6 +871,8 @@ export default function AdminJobsPage() {
             publicStatusName={publicStatusName}
             regionName={regionName}
             cityName={cityName}
+            jobCityName={jobCityName}
+            jobRegionName={jobRegionName}
             experienceName={experienceName}
             normalizeIds={normalizeIds}
           />
@@ -903,6 +908,7 @@ function UnifiedJobPanel({
   publicStatuses,
   roles,
   editSubRoleOptions,
+  editCityOptions,
   accountsList,
   contactsList,
   regions,
@@ -916,6 +922,8 @@ function UnifiedJobPanel({
   publicStatusName,
   regionName,
   cityName,
+  jobCityName,
+  jobRegionName,
   experienceName,
   normalizeIds,
 }: any) {
@@ -949,8 +957,8 @@ function UnifiedJobPanel({
                 <LabelValue label="מגייס" value={job.recruiter_contact_name ?? job.employer_contact_name ?? '—'} />
               </PanelCard>
               <PanelCard title="מיקום והיקף">
-                <LabelValue label="אזור" value={regionName(job.region_id)} />
-                <LabelValue label="עיר" value={cityName(job.city_id)} />
+                <LabelValue label="אזור" value={jobRegionName(job)} />
+                <LabelValue label="עיר" value={jobCityName(job)} />
                 <LabelValue label="כתובת" value={job.address ?? '—'} />
                 <LabelValue label="היקף" value={namesFromIds(normalizeIds(job.scope), scopeName)} />
                 <LabelValue label="ניסיון" value={experienceName(job.required_experience)} />
@@ -983,7 +991,20 @@ function UnifiedJobPanel({
 
               <PanelCard title="מיקום והיקף">
                 <EditSelectField label="אזור" value={draft.region_id != null ? String(draft.region_id) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
-                <EditSelectField label="עיר" value={draft.city_id != null ? String(draft.city_id) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, city_id: value ? Number(value) : null }))} options={cities} />
+                <EditSelectField
+                  label="עיר"
+                  value={draft.city_id != null ? String(draft.city_id) : ''}
+                  onChange={(value: string) => {
+                    const nextCityId = value ? Number(value) : null
+                    const selectedCity = nextCityId ? cities.find((city: DictItem & { region_id: number | null }) => Number(city.id) === Number(nextCityId)) : null
+                    setDraft((prev: JobDraft) => ({
+                      ...prev,
+                      city_id: nextCityId,
+                      region_id: selectedCity?.region_id ?? prev.region_id,
+                    }))
+                  }}
+                  options={editCityOptions}
+                />
                 <EditTextField label="כתובת" value={draft.address} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, address: value }))} />
                 <EditMultiSelectField label="היקף משרה" values={draft.scope} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, scope: values }))} options={scopes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
                 <EditSelectField label="ניסיון נדרש" value={draft.required_experience != null ? String(draft.required_experience) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, required_experience: value ? Number(value) : null }))} options={experienceOptions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
