@@ -250,9 +250,19 @@ export default function AdminJobsPage() {
   const { data: cities = [] } = useQuery<Array<DictItem & { region_id: number | null }>>({
     queryKey: ['dict_cities'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').limit(2000)
-      if (error) throw error
-      return (data ?? []) as Array<DictItem & { region_id: number | null }>
+      const PAGE = 1000
+      const all: Array<DictItem & { region_id: number | null }> = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').range(from, from + PAGE - 1)
+        if (error) throw error
+        const batch = (data ?? []) as Array<DictItem & { region_id: number | null }>
+        if (!batch.length) break
+        all.push(...batch)
+        if (batch.length < PAGE) break
+        from += PAGE
+      }
+      return all
     },
     staleTime: 600_000,
   })
