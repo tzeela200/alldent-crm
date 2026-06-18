@@ -178,39 +178,35 @@ export default function AdminContactsPage() {
 
   const pageSize = 20
 
-  const [rawContacts, setRawContacts] = useState<Contact[]>([])
-  const [contactsLoading, setContactsLoading] = useState(true)
-  const [contactsLoadKey, setContactsLoadKey] = useState(0)
-  const refreshContacts = () => setContactsLoadKey((k) => k + 1)
+  type ContactsResult = { contacts: import('@/types').Contact[]; total: number }
+  const { data: contactsResult, isFetching: contactsFetching } = useQuery<ContactsResult>({
+    queryKey: ['contacts-v2', filters, page, sortBy, sortDir],
+    queryFn: () => runContactsQuery(filters, page, pageSize, sortBy, sortDir),
+    placeholderData: (prev) => prev,
+    staleTime: 30_000,
+  })
 
-  useEffect(() => {
-    let cancelled = false
-    setContactsLoading(true)
-    async function load() {
-      const PAGE = 1000
-      let from = 0
-      let isFirst = true
-      while (true) {
-        const { data, error } = await supabase
-          .from('contact')
-          .select('*')
-          .order('contact_id')
-          .range(from, from + PAGE - 1)
-        if (cancelled) return
-        if (error) break
-        const batch = (data ?? []) as Contact[]
-        if (batch.length) {
-          if (isFirst) { setRawContacts(batch); isFirst = false }
-          else setRawContacts((prev) => [...prev, ...batch])
-        }
-        if (!batch.length || batch.length < PAGE) break
-        from += PAGE
-      }
-      if (!cancelled) setContactsLoading(false)
-    }
-    load()
-    return () => { cancelled = true }
-  }, [contactsLoadKey])
+  const { data: phoneNormCountsMap = new Map<string, number>() } = useQuery({
+    queryKey: ['contacts-phone-norms'],
+    queryFn: async () => {
+      const { data } = await supabase.from('contact').select('phone_norm').not('phone_norm', 'is', null)
+      const map = new Map<string, number>()
+      ;(data ?? []).forEach((r: { phone_norm: string }) => { map.set(r.phone_norm, (map.get(r.phone_norm) ?? 0) + 1) })
+      return map
+    },
+    staleTime: 120_000,
+  })
+
+  const { data: roleCountsMap = new Map<number, number>() } = useQuery({
+    queryKey: ['contacts-role-counts'],
+    queryFn: async () => {
+      const { data } = await supabase.from('contact').select('role').not('role', 'is', null)
+      const map = new Map<number, number>()
+      ;(data ?? []).forEach((r: { role: number }) => { const id = Number(r.role); map.set(id, (map.get(id) ?? 0) + 1) })
+      return map
+    },
+    staleTime: 120_000,
+  })
 
   const { data: regionOptions = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['dict_regions'],
@@ -241,8 +237,6 @@ export default function AdminContactsPage() {
     },
     staleTime: 60_000,
   })
-
-  const total = rawContacts.length
 
   const roleOptions = DICT_ROLES
   const availabilityOptions = DICT_AVAILABILITY
@@ -294,116 +288,26 @@ export default function AdminContactsPage() {
   }, [accountsList])
 
 
-  const phoneNormCounts = useMemo(() => {
-    const map = new Map<string, number>()
-    rawContacts.forEach((contact) => {
-      const key = String(contact.phone_norm ?? '').trim()
-      if (!key) return
-      map.set(key, (map.get(key) ?? 0) + 1)
-    })
-    return map
-  }, [rawContacts])
-
   const enrichedContacts = useMemo(() => {
-    return rawContacts.map((contact) => {
-      const localTags: string[] = []
-
+    const rawPage = (contactsResult?.contacts ?? []) as Contact[]
+    return rawPage.map((contact) => {
+      const isDuplicatePhone = Boolean(contact.phone_norm && (phoneNormCountsMap.get(String(contact.phone_norm)) ?? 0) > 1)
+      const isDuplicateEmail = Boolean(contact.dup_email_flag)
       const hasBrokenCv = Boolean(contact.has_cv && (!contact.cv_link || !isValidUrl(contact.cv_link)))
       const hasNoPhoneButEmail = !contact.phone_norm && Boolean(contact.email)
       const isPartialProfile = !contact.role || !contact.city_id || !contact.region_id
-      const isDuplicatePhone = Boolean(
-        contact.phone_norm && (phoneNormCounts.get(String(contact.phone_norm)) ?? 0) > 1,
-      )
-      const isDuplicateEmail = Boolean(contact.dup_email_flag)
-      const hasWarning =
-        hasBrokenCv || hasNoPhoneButEmail || isPartialProfile || isDuplicatePhone || isDuplicateEmail
+      const hasWarning = hasBrokenCv || hasNoPhoneButEmail || isPartialProfile || isDuplicatePhone || isDuplicateEmail
       const isFollowUpDue = isDateDue(contact.next_follow_up)
       const isLinked = Boolean(contact.account_link)
       const linkState: 'linked' | 'unlinked' = isLinked ? 'linked' : 'unlinked'
-
       return {
         ...contact,
-        linked_org_name:
-          contact.linked_org_name ??
-          (contact.account_link ? accountNameById.get(contact.account_link) ?? null : null),
-        localTags,
-        hasBrokenCv,
-        hasNoPhoneButEmail,
-        isPartialProfile,
-        isDuplicatePhone,
-        isDuplicateEmail,
-        hasWarning,
-        isFollowUpDue,
-        isLinked,
-        linkState,
+        linked_org_name: contact.linked_org_name ?? (contact.account_link ? accountNameById.get(contact.account_link) ?? null : null),
+        localTags: [] as string[],
+        hasBrokenCv, hasNoPhoneButEmail, isPartialProfile, isDuplicatePhone, isDuplicateEmail, hasWarning, isFollowUpDue, isLinked, linkState,
       }
     })
-  }, [rawContacts, phoneNormCounts, accountNameById])
-
-  const filteredContacts = useMemo(() => {
-    return enrichedContacts.filter((contact) => {
-      if (filters.search) {
-        const q = filters.search.toLowerCase().trim()
-        const haystack = [
-          contact.full_name,
-          contact.display_name,
-          contact.phone,
-          contact.phone_norm,
-          contact.email,
-          contact.second_email,
-          contact.linked_org_name,
-          roleName(contact.role),
-          subRoleName(contact.sub_role),
-          cityName(contact.city_id),
-          regionName(contact.region_id),
-        ]
-          .filter(Boolean)
-          .join(' | ')
-          .toLowerCase()
-
-        if (!haystack.includes(q)) return false
-      }
-
-      if (filters.role && contact.role !== filters.role) return false
-      if (filters.sub_role && contact.sub_role !== filters.sub_role) return false
-      if (filters.region_id && contact.region_id !== filters.region_id) return false
-      if (filters.city_id && contact.city_id !== filters.city_id) return false
-      if (filters.profile_type && contact.profile_type !== filters.profile_type) return false
-      if (filters.availability && contact.availability !== filters.availability) return false
-      if (filters.experience && contact.experience !== filters.experience) return false
-      if (filters.source && contact.source !== filters.source) return false
-      if (filters.has_cv === 'yes' && !contact.has_cv) return false
-      if (filters.has_cv === 'no' && contact.has_cv) return false
-      if (filters.social_status && contact.social_status !== filters.social_status) return false
-      if (filters.link_state && contact.linkState !== filters.link_state) return false
-      if (filters.tags && !contact.localTags.includes(filters.tags)) return false
-      if (filters.follow_up_due === 'yes' && !contact.isFollowUpDue) return false
-      if (filters.follow_up_due === 'no' && contact.isFollowUpDue) return false
-      if (filters.created_from && !isDateOnOrAfter(contact.created_timestamp, filters.created_from)) return false
-      if (filters.created_to && !isDateOnOrBefore(contact.created_timestamp, filters.created_to)) return false
-      if (filters.updated_from && !isDateOnOrAfter(contact.updated_timestamp, filters.updated_from)) return false
-      if (filters.updated_to && !isDateOnOrBefore(contact.updated_timestamp, filters.updated_to)) return false
-
-      return true
-    })
-  }, [enrichedContacts, filters])
-
-  const sortedContacts = useMemo(() => {
-    if (!sortBy) return filteredContacts
-    return [...filteredContacts].sort((a, b) => {
-      let av: string | number = ''
-      let bv: string | number = ''
-      if (sortBy === 'full_name') { av = a.full_name ?? a.display_name ?? ''; bv = b.full_name ?? b.display_name ?? '' }
-      else if (sortBy === 'phone') { av = a.phone ?? ''; bv = b.phone ?? '' }
-      else if (sortBy === 'email') { av = a.email ?? ''; bv = b.email ?? '' }
-      else if (sortBy === 'role') { av = roleName(a.role); bv = roleName(b.role) }
-      else if (sortBy === 'region') { av = regionName(a.region_id); bv = regionName(b.region_id) }
-      else if (sortBy === 'city') { av = cityName(a.city_id); bv = cityName(b.city_id) }
-      else if (sortBy === 'availability') { av = a.availability ?? 99; bv = b.availability ?? 99 }
-      if (typeof av === 'number' && typeof bv === 'number') return sortDir === 'asc' ? av - bv : bv - av
-      return sortDir === 'asc' ? String(av).localeCompare(String(bv), 'he') : String(bv).localeCompare(String(av), 'he')
-    })
-  }, [filteredContacts, sortBy, sortDir])
+  }, [contactsResult, phoneNormCountsMap, accountNameById])
 
   const handleSort = (key: string) => {
     if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -426,17 +330,18 @@ export default function AdminContactsPage() {
     document.addEventListener('mouseup', onUp)
   }
 
-  const totalVisible = sortedContacts.length
+  const totalVisible = contactsResult?.total ?? 0
+  const total = totalVisible
   const totalPages = Math.max(1, Math.ceil(totalVisible / pageSize))
-  const pageData = sortedContacts.slice(page * pageSize, (page + 1) * pageSize)
-  const selectedContact = sortedContacts.find((contact) => Number(contact.contact_id) === Number(selectedId)) ?? null
+  const pageData = enrichedContacts
+  const selectedContact = enrichedContacts.find((contact) => Number(contact.contact_id) === Number(selectedId)) ?? null
 
   const roleKpis = useMemo<KpiRoleCard[]>(() => {
     return KPI_ROLE_GROUPS.map((group) => ({
       ...group,
-      value: filteredContacts.filter((contact) => group.roleIds.includes(Number(contact.role))).length,
+      value: group.roleIds.reduce((sum, id) => sum + (roleCountsMap.get(id) ?? 0), 0),
     }))
-  }, [filteredContacts])
+  }, [roleCountsMap])
 
   const computedFilterCard = useMemo(() => {
     const roleLabel = filters.role ? roleName(filters.role) : 'כל התפקידים'
@@ -500,12 +405,16 @@ export default function AdminContactsPage() {
     setToast({ open: true, message, tone })
   }
 
-  const handleExport = () => {
+  const handleExport = async () => {
     try {
       setExportPending(true)
-      const rowsToExport = selectedRows.length
-        ? filteredContacts.filter((contact) => selectedRows.includes(Number(contact.contact_id)))
-        : filteredContacts
+      let rowsToExport: Contact[]
+      if (selectedRows.length) {
+        rowsToExport = enrichedContacts.filter((contact) => selectedRows.includes(Number(contact.contact_id)))
+      } else {
+        const result = await runContactsQuery(filters, 0, 99999, sortBy, sortDir)
+        rowsToExport = result.contacts
+      }
 
       const rows = rowsToExport.map((contact) => ({
         'שם מלא': contact.full_name ?? contact.display_name ?? '',
@@ -552,7 +461,7 @@ export default function AdminContactsPage() {
         .update({ [bulkField]: bulkValue })
         .in('contact_id', selectedRows)
       if (error) throw error
-      refreshContacts()
+      queryClient.invalidateQueries({ queryKey: ['contacts-v2'] })
       showToast(`${selectedRows.length} רשומות עודכנו בהצלחה`, 'success')
       setBulkUpdateOpen(false)
       setBulkField('')
@@ -600,7 +509,7 @@ export default function AdminContactsPage() {
       // Delete secondary
       await supabase.from('contact').delete().eq('contact_id', secondaryId)
 
-      refreshContacts()
+      queryClient.invalidateQueries({ queryKey: ['contacts-v2'] })
       showToast('הרשומות מוזגו בהצלחה', 'success')
       setMergeOpen(false)
       setMergePrimaryId(null)
@@ -659,7 +568,7 @@ export default function AdminContactsPage() {
         .update(editDraft)
         .eq('contact_id', selectedContact.contact_id)
       if (error) throw error
-      refreshContacts()
+      queryClient.invalidateQueries({ queryKey: ['contacts-v2'] })
       showToast('נשמר בהצלחה', 'success')
       setIsEditing(false)
     } catch {
@@ -693,7 +602,7 @@ export default function AdminContactsPage() {
   return (
     <Shell
       title="אנשי קשר"
-      subtitle={`מאגר האב של כל האנשים במערכת • ${totalVisible} תוצאות לאחר סינון`}
+      subtitle={`מאגר האב של כל האנשים במערכת • ${contactsFetching ? 'טוען...' : `${totalVisible} תוצאות`}`}
       icon={Users}
       actions={
         <div className="flex flex-wrap items-center gap-2">
@@ -726,7 +635,7 @@ export default function AdminContactsPage() {
           <ActionButton
             variant="ghost"
             icon={RefreshCw}
-            onClick={() => showToast('הרשימה רועננה', 'success')}
+            onClick={() => { queryClient.invalidateQueries({ queryKey: ['contacts-v2'] }); showToast('הרשימה רועננה', 'success') }}
           >
             רענון
           </ActionButton>
@@ -1000,7 +909,7 @@ export default function AdminContactsPage() {
           )}
 
           <Toolbar>
-            {contactsLoading && rawContacts.length === 0 && (
+            {contactsFetching && pageData.length === 0 && (
               <div className="mb-3 rounded-2xl border border-[#D9D9D9] bg-white px-5 py-4 text-right text-[13px] text-[#6B6B6B]">טוען אנשי קשר...</div>
             )}
             {pageData.length === 0 ? (
@@ -2292,6 +2201,75 @@ function PlainTh({
       )}
     </th>
   )
+}
+
+function todayIso() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+async function runContactsQuery(
+  filters: {
+    search?: string; role?: number; sub_role?: number; region_id?: number; city_id?: number
+    availability?: number; experience?: number; source?: number; profile_type?: number
+    check_status?: number; social_status?: number; has_cv?: 'yes' | 'no'
+    link_state?: 'linked' | 'unlinked'; follow_up_due?: 'yes' | 'no'; tags?: string
+    created_from?: string; created_to?: string; updated_from?: string; updated_to?: string
+  },
+  page: number,
+  pageSize: number,
+  sortBy: string | null,
+  sortDir: 'asc' | 'desc',
+) {
+  const { supabase: sb } = await import('@/lib/supabase')
+
+  let tagContactIds: number[] | null = null
+  if (filters.tags) {
+    const { data: tagRows } = await sb.from('contact_tags').select('contact_id').eq('tag', filters.tags)
+    tagContactIds = (tagRows ?? []).map((r: { contact_id: number }) => r.contact_id)
+    if (!tagContactIds.length) return { contacts: [] as import('@/types').Contact[], total: 0 }
+  }
+
+  let query = sb.from('contact').select('*', { count: 'exact' })
+
+  if (filters.search?.trim()) {
+    const q = filters.search.trim()
+    query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,phone_norm.ilike.%${q}%,email.ilike.%${q}%,linked_org_name.ilike.%${q}%`)
+  }
+  if (filters.role) query = query.eq('role', filters.role)
+  if (filters.sub_role) query = query.eq('sub_role', filters.sub_role)
+  if (filters.region_id) query = query.eq('region_id', filters.region_id)
+  if (filters.city_id) query = query.eq('city_id', filters.city_id)
+  if (filters.availability) query = query.eq('availability', filters.availability)
+  if (filters.experience) query = query.eq('experience', filters.experience)
+  if (filters.source) query = query.eq('source', filters.source)
+  if (filters.profile_type) query = query.eq('profile_type', filters.profile_type)
+  if (filters.check_status) query = query.eq('check_status', filters.check_status)
+  if (filters.social_status) query = query.eq('social_status', filters.social_status)
+  if (filters.has_cv === 'yes') query = query.eq('has_cv', true)
+  if (filters.has_cv === 'no') query = query.eq('has_cv', false)
+  if (filters.link_state === 'linked') query = query.not('account_link', 'is', null)
+  if (filters.link_state === 'unlinked') query = query.is('account_link', null)
+  if (filters.follow_up_due === 'yes') query = (query as any).lte('next_follow_up', todayIso()).not('next_follow_up', 'is', null)
+  if (filters.follow_up_due === 'no') query = query.or(`next_follow_up.is.null,next_follow_up.gt.${todayIso()}`)
+  if (filters.created_from) query = query.gte('created_timestamp', filters.created_from)
+  if (filters.created_to) query = query.lte('created_timestamp', filters.created_to + 'T23:59:59')
+  if (filters.updated_from) query = query.gte('updated_timestamp', filters.updated_from)
+  if (filters.updated_to) query = query.lte('updated_timestamp', filters.updated_to + 'T23:59:59')
+  if (tagContactIds !== null) query = query.in('contact_id', tagContactIds)
+
+  const sortColMap: Record<string, string> = {
+    full_name: 'full_name', phone: 'phone', email: 'email',
+    availability: 'availability', last_contact: 'last_contact_date',
+    whatsapp: 'whatsapp_campaign_last_sent', role: 'role', region: 'region_id', city: 'city_id',
+  }
+  const dbCol = sortBy ? (sortColMap[sortBy] ?? 'contact_id') : 'contact_id'
+  query = query.order(dbCol, { ascending: sortBy ? sortDir === 'asc' : false, nullsFirst: false })
+
+  if (pageSize < 99999) query = query.range(page * pageSize, (page + 1) * pageSize - 1)
+
+  const { data, count, error } = await query
+  if (error) throw error
+  return { contacts: (data ?? []) as import('@/types').Contact[], total: count ?? 0 }
 }
 
 function buildCsv(rows: Record<string, string | number>[]) {
