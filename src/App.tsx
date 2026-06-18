@@ -37,6 +37,7 @@ import PublicRoleJobsPage from '@/pages/PublicRoleJobsPage'
 import EmployersPage from '@/pages/EmployersPage'
 import EmployersDiscreetPage from '@/pages/EmployersDiscreetPage'
 import EmployersBrandingPage from '@/pages/EmployersBrandingPage'
+import RecruitmentRequestPage from '@/pages/RecruitmentRequestPage'
 import DentalShopPage from '@/pages/DentalShopPage'
 import DentalAssetsPage from '@/pages/DentalAssetsPage'
 import ClassDentalPage from '@/pages/ClassDentalPage'
@@ -74,6 +75,7 @@ export default function App() {
         <Route path="/employers" element={<EmployersPage />} />
         <Route path="/employers/discreet" element={<EmployersDiscreetPage />} />
         <Route path="/employers/branding" element={<EmployersBrandingPage />} />
+        <Route path="/employers/recruitment-request" element={<RecruitmentRequestPage />} />
 
         {/* Dental services */}
         <Route path="/dental-shop" element={<DentalShopPage />} />

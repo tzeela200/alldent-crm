@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Briefcase,
@@ -268,6 +269,7 @@ export default function AdminEmployersPage({
     follow_up: 140,
   })
 
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
 
   const { data: rawAccounts = [] } = useQuery<Account[]>({
@@ -961,6 +963,9 @@ export default function AdminEmployersPage({
                     {selectedAccount && <div className="mt-2 text-[13px] text-[#6B6B6B]">{selectedAccount.activeJobsCount} משרות פעילות · {selectedAccount.totalJobsCount} משרות סה״כ</div>}
                   </div>
                   <div className="flex items-center gap-2">
+                    {sheet.mode === 'view' && sheet.accountId && (
+                      <ActionButton variant="ghost" icon={Eye} onClick={() => navigate(`/admin/employers/${sheet.accountId}`)}>פתח ב-360</ActionButton>
+                    )}
                     {sheet.mode === 'view' && <ActionButton variant="ghost" icon={Edit2} onClick={() => setSheet((prev) => ({ ...prev, mode: 'edit' }))}>עריכה</ActionButton>}
                     <button type="button" onClick={closeSheet} className="rounded-xl border border-[#D9D9D9] p-2 text-[#6B6B6B] hover:bg-[#F3F4F6]"><X className="h-5 w-5" /></button>
                   </div>
