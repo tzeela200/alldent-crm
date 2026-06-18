@@ -178,30 +178,39 @@ export default function AdminContactsPage() {
 
   const pageSize = 20
 
-  const { data: rawContacts = [], isError: contactsError, error: contactsFetchError } = useQuery<Contact[]>({
-    queryKey: ['contacts'],
-    queryFn: async () => {
-      // Supabase מחזיר max 1000 שורות per request — שואבים בדפים עד שמסיימים
+  const [rawContacts, setRawContacts] = useState<Contact[]>([])
+  const [contactsLoading, setContactsLoading] = useState(true)
+  const [contactsLoadKey, setContactsLoadKey] = useState(0)
+  const refreshContacts = () => setContactsLoadKey((k) => k + 1)
+
+  useEffect(() => {
+    let cancelled = false
+    setContactsLoading(true)
+    async function load() {
       const PAGE = 1000
-      const all: Contact[] = []
       let from = 0
+      let isFirst = true
       while (true) {
         const { data, error } = await supabase
           .from('contact')
           .select('*')
           .order('contact_id')
           .range(from, from + PAGE - 1)
-        if (error) throw error
+        if (cancelled) return
+        if (error) break
         const batch = (data ?? []) as Contact[]
-        if (!batch.length) break
-        all.push(...batch)
-        if (batch.length < PAGE) break
+        if (batch.length) {
+          if (isFirst) { setRawContacts(batch); isFirst = false }
+          else setRawContacts((prev) => [...prev, ...batch])
+        }
+        if (!batch.length || batch.length < PAGE) break
         from += PAGE
       }
-      return all
-    },
-    staleTime: 60_000,
-  })
+      if (!cancelled) setContactsLoading(false)
+    }
+    load()
+    return () => { cancelled = true }
+  }, [contactsLoadKey])
 
   const { data: regionOptions = [] } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['dict_regions'],
@@ -543,7 +552,7 @@ export default function AdminContactsPage() {
         .update({ [bulkField]: bulkValue })
         .in('contact_id', selectedRows)
       if (error) throw error
-      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      refreshContacts()
       showToast(`${selectedRows.length} רשומות עודכנו בהצלחה`, 'success')
       setBulkUpdateOpen(false)
       setBulkField('')
@@ -591,7 +600,7 @@ export default function AdminContactsPage() {
       // Delete secondary
       await supabase.from('contact').delete().eq('contact_id', secondaryId)
 
-      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      refreshContacts()
       showToast('הרשומות מוזגו בהצלחה', 'success')
       setMergeOpen(false)
       setMergePrimaryId(null)
@@ -650,7 +659,7 @@ export default function AdminContactsPage() {
         .update(editDraft)
         .eq('contact_id', selectedContact.contact_id)
       if (error) throw error
-      await queryClient.invalidateQueries({ queryKey: ['contacts'] })
+      refreshContacts()
       showToast('נשמר בהצלחה', 'success')
       setIsEditing(false)
     } catch {
@@ -991,11 +1000,8 @@ export default function AdminContactsPage() {
           )}
 
           <Toolbar>
-            {contactsError && (
-              <div className="mb-3 rounded-2xl border border-red-200 bg-red-50 px-5 py-4 text-right">
-                <p className="text-sm font-semibold text-red-700">שגיאה בטעינת אנשי קשר מ-Supabase</p>
-                <p className="mt-0.5 text-xs text-red-500">{(contactsFetchError as Error)?.message ?? 'בעיית הרשאות RLS או חיבור'}</p>
-              </div>
+            {contactsLoading && rawContacts.length === 0 && (
+              <div className="mb-3 rounded-2xl border border-[#D9D9D9] bg-white px-5 py-4 text-right text-[13px] text-[#6B6B6B]">טוען אנשי קשר...</div>
             )}
             {pageData.length === 0 ? (
               <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
