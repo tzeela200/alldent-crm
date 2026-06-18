@@ -197,13 +197,24 @@ export default function AdminContactsPage() {
     staleTime: 120_000,
   })
 
-  const { data: roleCountsMap = new Map<number, number>() } = useQuery({
+  const { data: roleCounts = {} as Record<number, number> } = useQuery<Record<number, number>>({
     queryKey: ['contacts-role-counts'],
     queryFn: async () => {
       const { data } = await supabase.from('contact').select('role').not('role', 'is', null)
-      const map = new Map<number, number>()
-      ;(data ?? []).forEach((r: { role: number }) => { const id = Number(r.role); map.set(id, (map.get(id) ?? 0) + 1) })
-      return map
+      const rec: Record<number, number> = {}
+      ;(data ?? []).forEach((r: { role: number }) => { const id = Number(r.role); rec[id] = (rec[id] ?? 0) + 1 })
+      return rec
+    },
+    staleTime: 120_000,
+  })
+
+  const { data: regionCounts = {} as Record<number, number> } = useQuery<Record<number, number>>({
+    queryKey: ['contacts-region-counts'],
+    queryFn: async () => {
+      const { data } = await supabase.from('contact').select('region_id').not('region_id', 'is', null)
+      const rec: Record<number, number> = {}
+      ;(data ?? []).forEach((r: { region_id: number }) => { const id = Number(r.region_id); rec[id] = (rec[id] ?? 0) + 1 })
+      return rec
     },
     staleTime: 120_000,
   })
@@ -339,9 +350,9 @@ export default function AdminContactsPage() {
   const roleKpis = useMemo<KpiRoleCard[]>(() => {
     return KPI_ROLE_GROUPS.map((group) => ({
       ...group,
-      value: group.roleIds.reduce((sum, id) => sum + (roleCountsMap.get(id) ?? 0), 0),
+      value: group.roleIds.reduce((sum, id) => sum + (roleCounts[id] ?? 0), 0),
     }))
-  }, [roleCountsMap])
+  }, [roleCounts])
 
   const computedFilterCard = useMemo(() => {
     const roleLabel = filters.role ? roleName(filters.role) : 'כל התפקידים'
@@ -675,6 +686,38 @@ export default function AdminContactsPage() {
               />
             ))}
           </section>
+
+          {regionOptions.length > 0 && (
+            <section className="flex flex-wrap gap-2">
+              {regionOptions
+                .filter((r) => (regionCounts[r.id] ?? 0) > 0)
+                .sort((a, b) => (regionCounts[b.id] ?? 0) - (regionCounts[a.id] ?? 0))
+                .map((region) => {
+                  const isActive = filters.region_id === region.id
+                  return (
+                    <button
+                      key={region.id}
+                      onClick={() =>
+                        setFilters((prev) => ({
+                          ...prev,
+                          region_id: isActive ? undefined : region.id,
+                        }))
+                      }
+                      className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[13px] font-semibold transition-colors ${
+                        isActive
+                          ? 'border-blue-600 bg-blue-600 text-white'
+                          : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-blue-50'
+                      }`}
+                    >
+                      <span>{region.name}</span>
+                      <span className={`rounded-full px-1.5 py-0.5 text-[11px] ${isActive ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                        {regionCounts[region.id] ?? 0}
+                      </span>
+                    </button>
+                  )
+                })}
+            </section>
+          )}
 
           <Toolbar>
             <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
