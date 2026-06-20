@@ -47,6 +47,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import type { Contact } from '@/types'
 import { RoleBadge } from '@/components/admin/RoleBadge'
+import { MergeRecordsModal } from '@/components/MergeRecordsModal'
 
 type ExtendedFilters = {
   search?: string
@@ -230,11 +231,21 @@ export default function AdminContactsPage() {
   })
 
   const { data: cityOptions = [] } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
-    queryKey: ['dict_cities'],
+    queryKey: ['dict_cities-all'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').limit(2000)
-      if (error) throw error
-      return data ?? []
+      const PAGE = 1000
+      const all: { id: number; name: string; region_id: number | null }[] = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').range(from, from + PAGE - 1)
+        if (error) throw error
+        const batch = (data ?? []) as { id: number; name: string; region_id: number | null }[]
+        if (!batch.length) break
+        all.push(...batch)
+        if (batch.length < PAGE) break
+        from += PAGE
+      }
+      return all
     },
     staleTime: 5 * 60_000,
   })
@@ -485,47 +496,22 @@ export default function AdminContactsPage() {
     }
   }
 
-  const handleMerge = async () => {
-    if (selectedRows.length !== 2 || !mergePrimaryId) return
-    const secondaryId = selectedRows.find((id) => id !== mergePrimaryId)!
-    const primary = enrichedContacts.find((c) => Number(c.contact_id) === mergePrimaryId)
-    const secondary = enrichedContacts.find((c) => Number(c.contact_id) === secondaryId)
-    if (!primary || !secondary) return
+  const handleMerge = async (masterId: number, overrides: Record<string, unknown>) => {
+    const dupIds = selectedRows.filter((id) => id !== masterId)
     setMergePending(true)
     try {
-      // Fields to copy from secondary if primary is empty
-      const mergeFields = [
-        'phone', 'second_phone', 'email', 'second_email',
-        'city_id', 'region_id', 'role', 'availability',
-        'facebook_id', 'facebook_url', 'notes',
-      ] as const
-      const patch: Record<string, unknown> = {}
-      for (const f of mergeFields) {
-        if (!primary[f] && secondary[f]) patch[f] = secondary[f]
-      }
-
-      // Move tags from secondary to primary
-      const { data: secTags } = await supabase.from('contact_tags').select('tag').eq('contact_id', secondaryId)
-      if (secTags?.length) {
-        const { data: primTags } = await supabase.from('contact_tags').select('tag').eq('contact_id', mergePrimaryId)
-        const existingTags = new Set((primTags ?? []).map((t) => t.tag))
-        const newTags = secTags.filter((t) => !existingTags.has(t.tag)).map((t) => ({ contact_id: mergePrimaryId, tag: t.tag }))
-        if (newTags.length) await supabase.from('contact_tags').insert(newTags)
-      }
-
-      // Update primary with merged fields
-      if (Object.keys(patch).length) {
-        await supabase.from('contact').update(patch).eq('contact_id', mergePrimaryId)
-      }
-      // Delete secondary
-      await supabase.from('contact').delete().eq('contact_id', secondaryId)
-
+      const { error } = await supabase.rpc('merge_contacts', {
+        master_id: masterId,
+        dup_ids: dupIds,
+        overrides,
+      })
+      if (error) throw error
       queryClient.invalidateQueries({ queryKey: ['contacts-v2'] })
       showToast('הרשומות מוזגו בהצלחה', 'success')
       setMergeOpen(false)
       setMergePrimaryId(null)
       setSelectedRows([])
-      if (selectedId === secondaryId) setSelectedId(null)
+      if (selectedId && dupIds.includes(selectedId)) setSelectedId(null)
     } catch {
       showToast('שגיאה במיזוג הרשומות', 'error')
     } finally {
@@ -937,8 +923,8 @@ export default function AdminContactsPage() {
                     <SmallActionButton onClick={() => { setBulkField(''); setBulkValue(null); setBulkUpdateOpen(true) }}>
                       ✏️ עדכון שדה
                     </SmallActionButton>
-                    {selectedRows.length === 2 && (
-                      <SmallActionButton onClick={() => { setMergePrimaryId(selectedRows[0]); setMergeOpen(true) }}>
+                    {selectedRows.length >= 2 && (
+                      <SmallActionButton onClick={() => setMergeOpen(true)}>
                         🔀 מיזוג רשומות
                       </SmallActionButton>
                     )}
@@ -1683,67 +1669,31 @@ export default function AdminContactsPage() {
         )}
 
         {/* Merge Dialog */}
-        {mergeOpen && selectedRows.length === 2 && (() => {
-          const c1 = enrichedContacts.find((c) => Number(c.contact_id) === selectedRows[0])
-          const c2 = enrichedContacts.find((c) => Number(c.contact_id) === selectedRows[1])
-          if (!c1 || !c2) return null
-          const primary = mergePrimaryId === selectedRows[0] ? c1 : c2
-          const secondary = mergePrimaryId === selectedRows[0] ? c2 : c1
+        {mergeOpen && selectedRows.length >= 2 && (() => {
+          const selectedContacts = selectedRows
+            .map((id) => enrichedContacts.find((c) => Number(c.contact_id) === id))
+            .filter(Boolean) as typeof enrichedContacts
+          if (selectedContacts.length < 2) return null
           return (
-            <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4">
-              <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
-                <div className="mb-5 flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#FEF2F2] text-[#DC2626]">
-                    <Merge className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="text-[18px] font-bold text-[#0F172A]">מיזוג רשומות</div>
-                    <div className="text-[13px] font-medium text-slate-500">
-                      הרשומה הראשית תישמר • הרשומה המשנית תימחק לצמיתות
-                    </div>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 mb-5">
-                  {[c1, c2].map((c) => {
-                    const isPrimary = Number(c.contact_id) === mergePrimaryId
-                    return (
-                      <button
-                        key={c.contact_id}
-                        type="button"
-                        onClick={() => setMergePrimaryId(Number(c.contact_id))}
-                        className={`rounded-2xl border-2 p-4 text-right transition ${isPrimary ? 'border-[#008080] bg-[#F0FDFC]' : 'border-slate-200 bg-white hover:border-slate-300'}`}
-                      >
-                        <div className={`mb-2 text-[11px] font-bold uppercase tracking-wide ${isPrimary ? 'text-[#008080]' : 'text-slate-400'}`}>
-                          {isPrimary ? '✅ ראשית — תישמר' : '🗑️ משנית — תימחק'}
-                        </div>
-                        <div className="text-[15px] font-bold text-[#0F172A]">{c.full_name ?? c.display_name ?? '—'}</div>
-                        <div className="mt-1 space-y-0.5 text-[12px] text-slate-500">
-                          <div>{c.phone_norm ? formatPhone(c.phone_norm) : '—'}</div>
-                          <div>{c.email ?? '—'}</div>
-                          <div>{roleName(c.role)}</div>
-                        </div>
-                      </button>
-                    )
-                  })}
-                </div>
-
-                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-[13px] font-medium text-amber-800 mb-5">
-                  שדות ריקים ברשומה הראשית יושלמו מהרשומה המשנית. תגיות הרשומה המשנית יועברו לראשית.
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <ActionButton variant="ghost" onClick={() => { setMergeOpen(false); setMergePrimaryId(null) }}>ביטול</ActionButton>
-                  <ActionButton
-                    variant="primary"
-                    onClick={handleMerge}
-                    disabled={mergePending}
-                  >
-                    {mergePending ? 'ממזג...' : `מזג — שמור את "${primary.full_name ?? primary.display_name}"`}
-                  </ActionButton>
-                </div>
-              </div>
-            </div>
+            <MergeRecordsModal
+              records={selectedContacts as unknown as Record<string, unknown>[]}
+              idField="contact_id"
+              nameField="full_name"
+              displayFields={[
+                { key: 'full_name' as never, label: 'שם מלא' },
+                { key: 'phone' as never, label: 'טלפון', format: (v) => v ? formatPhone(String(v)) : '—' },
+                { key: 'email' as never, label: 'מייל' },
+                { key: 'role' as never, label: 'תפקיד', format: (v) => roleName(v as number) },
+                { key: 'availability' as never, label: 'זמינות', format: (v) => availabilityName(v as number) },
+                { key: 'region_id' as never, label: 'אזור', format: (v) => regionName(v as number) },
+                { key: 'city_id' as never, label: 'עיר', format: (v) => cityName(v as number) },
+                { key: 'notes' as never, label: 'הערות' },
+              ]}
+              onConfirm={handleMerge}
+              onClose={() => { setMergeOpen(false); setMergePrimaryId(null) }}
+              pending={mergePending}
+              title="מיזוג אנשי קשר"
+            />
           )
         })()}
 

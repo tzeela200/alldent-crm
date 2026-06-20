@@ -314,11 +314,21 @@ export default function AdminCandidatesPage() {
   })
 
   const { data: cityOptions = [] } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
-    queryKey: ['dict_cities'],
+    queryKey: ['dict_cities-all'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name')
-      if (error) throw error
-      return data ?? []
+      const PAGE = 1000
+      const all: { id: number; name: string; region_id: number | null }[] = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').range(from, from + PAGE - 1)
+        if (error) throw error
+        const batch = (data ?? []) as { id: number; name: string; region_id: number | null }[]
+        if (!batch.length) break
+        all.push(...batch)
+        if (batch.length < PAGE) break
+        from += PAGE
+      }
+      return all
     },
     staleTime: 5 * 60_000,
   })

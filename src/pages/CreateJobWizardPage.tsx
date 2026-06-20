@@ -129,11 +129,21 @@ export default function CreateJobWizardPage() {
   })
   const { data: regions = [] } = useQuery({ queryKey: ['dict_regions'], queryFn: () => fetchDict('dict_regions'), staleTime: 600_000 })
   const { data: cities = [] } = useQuery({
-    queryKey: ['dict_cities'],
+    queryKey: ['dict_cities-all'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').limit(2000)
-      if (error) throw error
-      return (data ?? []) as DictItem[]
+      const PAGE = 1000
+      const all: DictItem[] = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').range(from, from + PAGE - 1)
+        if (error) throw error
+        const batch = (data ?? []) as DictItem[]
+        if (!batch.length) break
+        all.push(...batch)
+        if (batch.length < PAGE) break
+        from += PAGE
+      }
+      return all
     },
     staleTime: 600_000,
   })

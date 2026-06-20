@@ -248,7 +248,7 @@ export default function AdminJobsPage() {
   const { data: scopes = [] } = useQuery<DictItem[]>({ queryKey: ['dict_scopes'], queryFn: () => fetchDict('dict_scopes'), staleTime: 600_000 })
   const { data: regions = [] } = useQuery<DictItem[]>({ queryKey: ['dict_regions'], queryFn: () => fetchDict('dict_regions'), staleTime: 600_000 })
   const { data: cities = [] } = useQuery<Array<DictItem & { region_id: number | null }>>({
-    queryKey: ['dict_cities'],
+    queryKey: ['dict_cities-all'],
     queryFn: async () => {
       const PAGE = 1000
       const all: Array<DictItem & { region_id: number | null }> = []

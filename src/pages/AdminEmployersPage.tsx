@@ -34,6 +34,7 @@ import {
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Account, Contact } from '@/types'
+import { MergeRecordsModal } from '@/components/MergeRecordsModal'
 
 type ViewMode = 'accounts' | 'employers'
 type ToastTone = 'success' | 'error' | 'info'
@@ -254,6 +255,8 @@ export default function AdminEmployersPage({
   const [visibleColumns, setVisibleColumns] = useState<string[]>([...DEFAULT_COLUMNS])
   const [bulkField, setBulkField] = useState<string>('')
   const [bulkValue, setBulkValue] = useState<string>('')
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [mergePending, setMergePending] = useState(false)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     account_name: 260,
     primary_contact: 190,
@@ -351,11 +354,21 @@ export default function AdminEmployersPage({
   })
 
   const { data: cities = [] } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
-    queryKey: ['dict_cities'],
+    queryKey: ['dict_cities-all'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').limit(2000)
-      if (error) throw error
-      return data ?? []
+      const PAGE = 1000
+      const all: { id: number; name: string; region_id: number | null }[] = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase.from('dict_cities').select('id,name,region_id').order('name').range(from, from + PAGE - 1)
+        if (error) throw error
+        const batch = (data ?? []) as { id: number; name: string; region_id: number | null }[]
+        if (!batch.length) break
+        all.push(...batch)
+        if (batch.length < PAGE) break
+        from += PAGE
+      }
+      return all
     },
     staleTime: 300_000,
   })
@@ -759,6 +772,27 @@ export default function AdminEmployersPage({
     }
   }
 
+  const handleMergeAccounts = async (masterId: number, overrides: Record<string, unknown>) => {
+    const dupIds = selectedRows.filter((id) => id !== masterId)
+    setMergePending(true)
+    try {
+      const { error } = await supabase.rpc('merge_accounts', {
+        master_id: masterId,
+        dup_ids: dupIds,
+        overrides,
+      })
+      if (error) throw error
+      await queryClient.invalidateQueries({ queryKey: ['accounts'] })
+      showToast('הארגונים מוזגו בהצלחה', 'success')
+      setMergeOpen(false)
+      setSelectedRows([])
+    } catch {
+      showToast('שגיאה במיזוג הארגונים', 'error')
+    } finally {
+      setMergePending(false)
+    }
+  }
+
   const bulkValueOptions = useMemo(() => {
     if (bulkField === 'account_status') return accountStatuses.map((item) => ({ value: String(item.id), label: item.name }))
     if (bulkField === 'account_type') return accountTypes.map((item) => ({ value: String(item.id), label: item.name }))
@@ -874,6 +908,9 @@ export default function AdminEmployersPage({
                   <SelectLikeField label="ערך חדש" value={bulkValue} onChange={setBulkValue} options={bulkValueOptions} />
                   <div className="flex items-end gap-2">
                     <ActionButton variant="primary" onClick={applyBulkUpdate}>בצע שינוי גורף</ActionButton>
+                    {selectedRows.length >= 2 && (
+                      <ActionButton variant="ghost" onClick={() => setMergeOpen(true)}>🔀 מיזוג רשומות</ActionButton>
+                    )}
                   </div>
                   <div className="flex items-end text-[12px] font-semibold text-[#6B6B6B]">העדכון נשמר ישירות ב־Supabase רק לרשומות המסומנות.</div>
                 </div>
@@ -1040,6 +1077,36 @@ export default function AdminEmployersPage({
             </div>
           </div>
         )}
+
+        {/* Merge Accounts Dialog */}
+        {mergeOpen && selectedRows.length >= 2 && (() => {
+          const selectedAccounts = selectedRows
+            .map((id) => pageData.find((a) => Number(a.account_id) === id))
+            .filter(Boolean) as typeof pageData
+          if (selectedAccounts.length < 2) return null
+          return (
+            <MergeRecordsModal
+              records={selectedAccounts as unknown as Record<string, unknown>[]}
+              idField="account_id"
+              nameField="account_name"
+              displayFields={[
+                { key: 'account_name' as never, label: 'שם ארגון' },
+                { key: 'phone' as never, label: 'טלפון' },
+                { key: 'email' as never, label: 'מייל' },
+                { key: 'address' as never, label: 'כתובת' },
+                { key: 'account_status' as never, label: 'סטטוס', format: (v) => accountStatusName(v as number) },
+                { key: 'account_type' as never, label: 'סוג', format: (v) => accountTypeName(v as number) },
+                { key: 'region_id' as never, label: 'אזור', format: (v) => regionName(v as number) },
+                { key: 'city_id' as never, label: 'עיר', format: (v) => cityName(v as number) },
+                { key: 'notes' as never, label: 'הערות' },
+              ]}
+              onConfirm={handleMergeAccounts}
+              onClose={() => setMergeOpen(false)}
+              pending={mergePending}
+              title="מיזוג ארגונים"
+            />
+          )
+        })()}
       </div>
     </Shell>
   )
