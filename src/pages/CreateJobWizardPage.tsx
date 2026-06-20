@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Shell, ActionButton } from '@/components/layout/Shell'
 import JobImageUpload from '@/components/admin/JobImageUpload'
 import JobAIWriter from '@/components/admin/JobAIWriter'
+import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 type ToastTone = 'success' | 'error' | 'info'
@@ -333,8 +334,15 @@ export default function CreateJobWizardPage() {
                 <TextField label="כותרת משרה" value={form.job_title} onChange={(value) => setField('job_title', value)} labelSuffix={<JobAIWriter mode="admin" field="job_title" currentValue={form.job_title} jobContext={{ role: form.job_role }} onApply={(v) => setField('job_title', v)} />} />
                 <SelectField label="תפקיד ראשי" value={form.job_role} onChange={(value) => setForm((prev) => ({ ...prev, job_role: value, job_sub_role: [] }))} options={roles.map(toOption)} />
                 <MultiSelectField label="תתי־תפקידים" values={form.job_sub_role} onChange={(values) => setField('job_sub_role', values)} options={subRoleOptions.map(toOption)} />
-                <SelectField label="אזור" value={form.region_id} onChange={(value) => setForm((prev) => ({ ...prev, region_id: value, city_id: '' }))} options={regions.map(toOption)} />
-                <SelectField label="עיר" value={form.city_id} onChange={handleJobCityChange} options={cityOptions.map(toOption)} />
+                <CityRegionPicker
+                  variant="edit"
+                  cityId={form.city_id ? Number(form.city_id) : null}
+                  regionId={form.region_id ? Number(form.region_id) : null}
+                  cities={cities}
+                  regions={regions}
+                  onCityChange={(id) => setForm((prev) => ({ ...prev, city_id: id ? String(id) : '' }))}
+                  onRegionChange={(id) => setForm((prev) => ({ ...prev, region_id: id ? String(id) : '', city_id: '' }))}
+                />
                 <TextField label="כתובת" value={form.address} onChange={(value) => setField('address', value)} />
                 <SelectField label="ניסיון נדרש" value={form.required_experience} onChange={(value) => setField('required_experience', value)} options={experience.map(toOption)} />
                 <MultiSelectField label="היקף משרה" values={form.scope} onChange={(values) => setField('scope', values)} options={scopes.map(toOption)} />

@@ -38,6 +38,7 @@ import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/timeAgo'
 import type { Job, DictItem } from '@/types'
 import { RoleBadge } from '@/components/admin/RoleBadge'
+import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 
 const PAGE_SIZE = 20
 
@@ -744,8 +745,15 @@ export default function AdminJobsPage() {
                 <SelectFilter value={String(filters.job_role ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, job_role: value ? Number(value) : undefined, job_sub_role: undefined }))} options={roles.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="תפקיד" />
                 <MultiSelectFilter values={filters.job_sub_role ?? []} onChange={(values) => setFilters((prev) => ({ ...prev, job_sub_role: values.length ? values : undefined }))} options={subRoleOptions} placeholder={filters.job_role ? 'תתי־תפקידים' : 'בחרי קודם תפקיד'} disabled={!filters.job_role} />
                 <SelectFilter value={String(filters.account_link ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_link: value ? Number(value) : undefined }))} options={accountOptions} placeholder="ארגון" />
-                <SelectFilter value={String(filters.region_id ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, region_id: value ? Number(value) : undefined, city_id: undefined }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="אזור" />
-                <SelectFilter value={String(filters.city_id ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, city_id: value ? Number(value) : undefined }))} options={activeCityOptions} placeholder="עיר" />
+                <CityRegionPicker
+                  variant="filter"
+                  cityId={filters.city_id ?? null}
+                  regionId={filters.region_id ?? null}
+                  cities={cities}
+                  regions={regions}
+                  onCityChange={(id) => setFilters((prev) => ({ ...prev, city_id: id ?? undefined }))}
+                  onRegionChange={(id) => setFilters((prev) => ({ ...prev, region_id: id ?? undefined, city_id: undefined }))}
+                />
                 <MultiSelectFilter values={filters.scope ?? []} onChange={(values) => setFilters((prev) => ({ ...prev, scope: values.length ? values : undefined }))} options={scopes.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="היקף משרה" />
                 <SelectFilter value={String(filters.required_experience ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, required_experience: value ? Number(value) : undefined }))} options={experienceOptions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="ניסיון נדרש" />
                 <SelectFilter value={String(filters.applicants_state ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, applicants_state: (value as 'with' | 'without') || undefined }))} options={[{ value: 'with', label: 'עם מועמדים' }, { value: 'without', label: 'ללא מועמדים' }]} placeholder="מצב מועמדים" />
@@ -1000,20 +1008,14 @@ function UnifiedJobPanel({
               </PanelCard>
 
               <PanelCard title="מיקום והיקף">
-                <EditSelectField label="אזור" value={draft.region_id != null ? String(draft.region_id) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
-                <EditSelectField
-                  label="עיר"
-                  value={draft.city_id != null ? String(draft.city_id) : ''}
-                  onChange={(value: string) => {
-                    const nextCityId = value ? Number(value) : null
-                    const selectedCity = nextCityId ? cities.find((city: DictItem & { region_id: number | null }) => Number(city.id) === Number(nextCityId)) : null
-                    setDraft((prev: JobDraft) => ({
-                      ...prev,
-                      city_id: nextCityId,
-                      region_id: selectedCity?.region_id ?? prev.region_id,
-                    }))
-                  }}
-                  options={editCityOptions}
+                <CityRegionPicker
+                  variant="edit"
+                  cityId={draft.city_id}
+                  regionId={draft.region_id}
+                  cities={cities}
+                  regions={regions}
+                  onCityChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, city_id: id }))}
+                  onRegionChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, region_id: id, city_id: null }))}
                 />
                 <EditTextField label="כתובת" value={draft.address} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, address: value }))} />
                 <EditMultiSelectField label="היקף משרה" values={draft.scope} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, scope: values }))} options={scopes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />

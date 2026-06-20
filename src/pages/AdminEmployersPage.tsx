@@ -35,6 +35,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Account, Contact } from '@/types'
 import { MergeRecordsModal } from '@/components/MergeRecordsModal'
+import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 
 type ViewMode = 'accounts' | 'employers'
 type ToastTone = 'success' | 'error' | 'info'
@@ -865,8 +866,15 @@ export default function AdminEmployersPage({
                 <SearchBar value={filters.search ?? ''} onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))} placeholder="חיפוש שם, טלפון, מייל, עיר..." />
                 <SelectFilter value={String(filters.account_status ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_status: value ? Number(value) : undefined }))} options={(isEmployersBoard ? accountStatuses.filter((item) => EMPLOYER_STATUS_IDS.includes(item.id)) : accountStatuses).map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סטטוס מעסיק" />
                 <SelectFilter value={String(filters.account_type ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_type: value ? Number(value) : undefined }))} options={accountTypes.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סוג ארגון" />
-                <SelectFilter value={String(filters.region_id ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, region_id: value ? Number(value) : undefined, city_id: undefined }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="אזור" />
-                <SelectFilter value={String(filters.city_id ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, city_id: value ? Number(value) : undefined }))} options={activeCityOptions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="עיר" />
+                <CityRegionPicker
+                  variant="filter"
+                  cityId={filters.city_id ?? null}
+                  regionId={filters.region_id ?? null}
+                  cities={cities}
+                  regions={regions}
+                  onCityChange={(id) => setFilters((prev) => ({ ...prev, city_id: id ?? undefined }))}
+                  onRegionChange={(id) => setFilters((prev) => ({ ...prev, region_id: id ?? undefined, city_id: undefined }))}
+                />
                 {!isEmployersBoard && <SelectFilter value={String(filters.has_jobs ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, has_jobs: value ? (value as 'yes' | 'no') : undefined }))} options={[{ value: 'yes', label: 'עם משרות' }, { value: 'no', label: 'ללא משרות' }]} placeholder="שיוך משרות" />}
                 <SelectFilter value={String(filters.active_jobs_only ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, active_jobs_only: value ? 'yes' : undefined }))} options={[{ value: 'yes', label: 'עם משרה פעילה' }]} placeholder="משרות פעילות" />
                 <SelectFilter value={String(filters.has_contact ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, has_contact: value ? (value as 'yes' | 'no') : undefined }))} options={[{ value: 'yes', label: 'עם איש קשר' }, { value: 'no', label: 'ללא איש קשר' }]} placeholder="אנשי קשר" />

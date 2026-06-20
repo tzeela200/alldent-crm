@@ -34,6 +34,7 @@ import {
   EmptyState,
 } from '@/components/layout/Shell'
 import { formatPhone } from '@/lib/normalizePhone'
+import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import {
   DICT_AVAILABILITY,
   DICT_CHECK_STATUSES,
@@ -744,25 +745,14 @@ export default function AdminContactsPage() {
                   }))}
                   placeholder="תת־תפקיד"
                 />
-                <SelectFilter
-                  value={String(filters.region_id ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      region_id: value ? Number(value) : undefined,
-                      city_id: undefined,
-                    }))
-                  }
-                  options={regionOptions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="אזור"
-                />
-                <SelectFilter
-                  value={String(filters.city_id ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, city_id: value ? Number(value) : undefined }))
-                  }
-                  options={activeCityOptions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="עיר"
+                <CityRegionPicker
+                  variant="filter"
+                  cityId={filters.city_id ?? null}
+                  regionId={filters.region_id ?? null}
+                  cities={cityOptions}
+                  regions={regionOptions}
+                  onCityChange={(id) => setFilters((prev) => ({ ...prev, city_id: id ?? undefined }))}
+                  onRegionChange={(id) => setFilters((prev) => ({ ...prev, region_id: id ?? undefined, city_id: undefined }))}
                 />
                 <SelectFilter
                   value={String(filters.profile_type ?? '')}

@@ -34,6 +34,7 @@ import {
 
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import {
   DICT_AVAILABILITY,
   DICT_CHECK_STATUSES,
@@ -836,26 +837,14 @@ export default function AdminCandidatesPage() {
                   placeholder="היקף מועדף"
                 />
 
-                <SelectFilter
-                  value={String(filters.region_id ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      region_id: value ? Number(value) : undefined,
-                      city_id: undefined,
-                    }))
-                  }
-                  options={regionOptions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="אזור"
-                />
-
-                <SelectFilter
-                  value={String(filters.city_id ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, city_id: value ? Number(value) : undefined }))
-                  }
-                  options={filteredCityOptions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="עיר"
+                <CityRegionPicker
+                  variant="filter"
+                  cityId={filters.city_id ?? null}
+                  regionId={filters.region_id ?? null}
+                  cities={cityOptions}
+                  regions={regionOptions}
+                  onCityChange={(id) => setFilters((prev) => ({ ...prev, city_id: id ?? undefined }))}
+                  onRegionChange={(id) => setFilters((prev) => ({ ...prev, region_id: id ?? undefined, city_id: undefined }))}
                 />
 
                 <SelectFilter
