@@ -53,6 +53,7 @@ import BlockProfessional from "@/components/contact/BlockProfessional";
 import BlockConditions from "@/components/contact/BlockConditions";
 import BlockSocial from "@/components/contact/BlockSocial";
 import type { JobRow } from "@/hooks/useContact360";
+import { RoleSubRolePicker } from "@/components/ui/RoleSubRolePicker";
 import { useQueryClient } from "@tanstack/react-query";
 
 const BRAND = { primary: "#008080" };
@@ -448,48 +449,14 @@ export default function Candidate360Page() {
                 <label className="mb-1 block text-sm font-medium text-slate-700">אימייל</label>
                 <Input value={newForm.email} onChange={(e) => setField("email", e.target.value)} placeholder="name@example.com" type="email" />
               </div>
-              {/* תפקיד */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">תפקיד</label>
-                <select className={selectCls} value={newForm.role} onChange={(e) => {
-                  setNewForm((f) => ({ ...f, role: e.target.value, sub_roles: [] }));
-                }}>
-                  <option value="">— בחרי תפקיד —</option>
-                  {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                </select>
-              </div>
-              {/* תת־תפקיד — בחירה מרובה, מסונן לפי תפקיד */}
-              <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">תת־תפקיד</label>
-                {!newForm.role ? (
-                  <p className="text-sm text-slate-400 py-2">בחרי תפקיד תחילה</p>
-                ) : filteredSubRoles.length === 0 ? (
-                  <p className="text-sm text-slate-400 py-2">אין תתי-תפקיד לתפקיד זה</p>
-                ) : (
-                  <div className="rounded-md border border-slate-200 bg-white p-3 space-y-2 max-h-48 overflow-y-auto">
-                    {filteredSubRoles.map((r) => (
-                      <label key={r.id} className="flex items-center gap-2 cursor-pointer text-sm text-slate-700">
-                        <input
-                          type="checkbox"
-                          value={String(r.id)}
-                          checked={newForm.sub_roles.includes(String(r.id))}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setNewForm((f) => ({
-                              ...f,
-                              sub_roles: e.target.checked
-                                ? [...f.sub_roles, val]
-                                : f.sub_roles.filter((v) => v !== val),
-                            }));
-                          }}
-                          className="accent-teal-600"
-                        />
-                        {r.name}
-                      </label>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* תפקיד + תת-תפקיד */}
+              <RoleSubRolePicker
+                variant="edit"
+                roleId={newForm.role ? Number(newForm.role) : null}
+                subRoleIds={newForm.sub_roles.map(Number)}
+                onRoleChange={(id) => setNewForm((f) => ({ ...f, role: id ? String(id) : '', sub_roles: [] }))}
+                onSubRoleChange={(ids) => setNewForm((f) => ({ ...f, sub_roles: ids.map(String) }))}
+              />
               {/* אזור + עיר — עיר מסוננת לפי אזור */}
               <div className="grid grid-cols-2 gap-4">
                 <div>

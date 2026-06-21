@@ -35,6 +35,7 @@ import {
 } from '@/components/layout/Shell'
 import { formatPhone } from '@/lib/normalizePhone'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
+import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import {
   DICT_AVAILABILITY,
   DICT_CHECK_STATUSES,
@@ -58,7 +59,7 @@ type ExtendedFilters = {
   availability?: number
   source?: number
   check_status?: number
-  sub_role?: number
+  sub_role_ids?: number[]
   profile_type?: number
   experience?: number
   has_cv?: 'yes' | 'no'
@@ -665,7 +666,7 @@ export default function AdminContactsPage() {
                 tone={card.tone}
                 onClick={() => {
                   if (card.roleIds.length === 1) {
-                    setFilters((prev) => ({ ...prev, role: card.roleIds[0], sub_role: undefined }))
+                    setFilters((prev) => ({ ...prev, role: card.roleIds[0], sub_role_ids: undefined }))
                   } else {
                     showToast('הקבוצה כוללת כמה תתי-תפקידים מקצועיים', 'info')
                   }
@@ -722,28 +723,12 @@ export default function AdminContactsPage() {
                   onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
                   placeholder="חיפוש שם, טלפון, אימייל, מפתח עסקי..."
                 />
-                <SelectFilter
-                  value={String(filters.role ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      role: value ? Number(value) : undefined,
-                      sub_role: undefined,
-                    }))
-                  }
-                  options={roleOptions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="תפקיד"
-                />
-                <SelectFilter
-                  value={String(filters.sub_role ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, sub_role: value ? Number(value) : undefined }))
-                  }
-                  options={activeSubRoleOptions.map((item) => ({
-                    value: String(item.id),
-                    label: item.name,
-                  }))}
-                  placeholder="תת־תפקיד"
+                <RoleSubRolePicker
+                  variant="filter"
+                  roleId={filters.role ?? null}
+                  subRoleIds={filters.sub_role_ids ?? []}
+                  onRoleChange={(id) => setFilters((prev) => ({ ...prev, role: id ?? undefined, sub_role_ids: undefined }))}
+                  onSubRoleChange={(ids) => setFilters((prev) => ({ ...prev, sub_role_ids: ids.length ? ids : undefined }))}
                 />
                 <CityRegionPicker
                   variant="filter"
@@ -2192,7 +2177,7 @@ function todayIso() {
 
 async function runContactsQuery(
   filters: {
-    search?: string; role?: number; sub_role?: number; region_id?: number; city_id?: number
+    search?: string; role?: number; sub_role_ids?: number[]; region_id?: number; city_id?: number
     availability?: number; experience?: number; source?: number; profile_type?: number
     check_status?: number; social_status?: number; has_cv?: 'yes' | 'no'
     link_state?: 'linked' | 'unlinked'; follow_up_due?: 'yes' | 'no'; tags?: string
@@ -2219,7 +2204,7 @@ async function runContactsQuery(
     query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,phone_norm.ilike.%${q}%,email.ilike.%${q}%,linked_org_name.ilike.%${q}%`)
   }
   if (filters.role) query = query.eq('role', filters.role)
-  if (filters.sub_role) query = query.eq('sub_role', filters.sub_role)
+  if (filters.sub_role_ids?.length) query = (query as any).filter('sub_role', 'ov', `{${filters.sub_role_ids.join(',')}}`)
   if (filters.region_id) query = query.eq('region_id', filters.region_id)
   if (filters.city_id) query = query.eq('city_id', filters.city_id)
   if (filters.availability) query = query.eq('availability', filters.availability)

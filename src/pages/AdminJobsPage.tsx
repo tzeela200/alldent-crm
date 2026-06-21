@@ -39,6 +39,7 @@ import { formatDate } from '@/lib/timeAgo'
 import type { Job, DictItem } from '@/types'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
+import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 
 const PAGE_SIZE = 20
 
@@ -742,8 +743,13 @@ export default function AdminJobsPage() {
                 <SearchBar value={filters.search ?? ''} onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))} placeholder="חיפוש לפי קוד, כותרת, ארגון או עיר" />
                 <SelectFilter value={String(filters.job_status ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, job_status: value ? Number(value) : undefined }))} options={jobStatuses.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סטטוס משרה" />
                 <SelectFilter value={String(filters.public_status ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, public_status: value ? Number(value) : undefined }))} options={publicStatuses.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סטטוס פרסום" />
-                <SelectFilter value={String(filters.job_role ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, job_role: value ? Number(value) : undefined, job_sub_role: undefined }))} options={roles.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="תפקיד" />
-                <MultiSelectFilter values={filters.job_sub_role ?? []} onChange={(values) => setFilters((prev) => ({ ...prev, job_sub_role: values.length ? values : undefined }))} options={subRoleOptions} placeholder={filters.job_role ? 'תתי־תפקידים' : 'בחרי קודם תפקיד'} disabled={!filters.job_role} />
+                <RoleSubRolePicker
+                  variant="filter"
+                  roleId={filters.job_role ?? null}
+                  subRoleIds={filters.job_sub_role ?? []}
+                  onRoleChange={(id) => setFilters((prev) => ({ ...prev, job_role: id ?? undefined, job_sub_role: undefined }))}
+                  onSubRoleChange={(ids) => setFilters((prev) => ({ ...prev, job_sub_role: ids.length ? ids : undefined }))}
+                />
                 <SelectFilter value={String(filters.account_link ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_link: value ? Number(value) : undefined }))} options={accountOptions} placeholder="ארגון" />
                 <CityRegionPicker
                   variant="filter"
@@ -1000,8 +1006,13 @@ function UnifiedJobPanel({
                 <EditTextField label="כותרת משרה" value={draft.job_title} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_title: value }))} />
                 <EditSelectField label="סטטוס משרה" value={draft.job_status != null ? String(draft.job_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_status: value ? Number(value) : null }))} options={jobStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
                 <EditSelectField label="סטטוס פרסום" value={draft.public_status != null ? String(draft.public_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, public_status: value ? Number(value) : null }))} options={publicStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
-                <EditSelectField label="תפקיד ראשי" value={draft.job_role != null ? String(draft.job_role) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_role: value ? Number(value) : null, job_sub_role: [] }))} options={roles.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
-                <EditMultiSelectField label="תתי־תפקידים" values={draft.job_sub_role} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, job_sub_role: values }))} options={editSubRoleOptions} disabled={!draft.job_role} placeholder={draft.job_role ? 'בחרי תתי־תפקידים' : 'בחרי קודם תפקיד ראשי'} />
+                <RoleSubRolePicker
+                  variant="edit"
+                  roleId={draft.job_role}
+                  subRoleIds={draft.job_sub_role}
+                  onRoleChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, job_role: id, job_sub_role: [] }))}
+                  onSubRoleChange={(ids) => setDraft((prev: JobDraft) => ({ ...prev, job_sub_role: ids }))}
+                />
                 <EditSelectField label="ארגון" value={draft.account_link != null ? String(draft.account_link) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, account_link: value ? Number(value) : null }))} options={accountsList.map((item: any) => ({ value: String(item.account_id), label: item.account_name ?? '' }))} />
                 <EditSelectField label="מעסיק" value={draft.rel_employer_contact != null ? String(draft.rel_employer_contact) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, rel_employer_contact: value ? Number(value) : null }))} options={contactsList.map((item: any) => ({ value: String(item.contact_id), label: item.full_name ?? '' }))} />
                 <EditSelectField label="מגייס (אופציונלי)" value={draft.rel_recruiter_contact != null ? String(draft.rel_recruiter_contact) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, rel_recruiter_contact: value ? Number(value) : null }))} options={contactsList.map((item: any) => ({ value: String(item.contact_id), label: item.full_name ?? '' }))} />

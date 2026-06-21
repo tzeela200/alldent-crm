@@ -35,6 +35,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
+import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import {
   DICT_AVAILABILITY,
   DICT_CHECK_STATUSES,
@@ -52,7 +53,7 @@ type JobRecord = { job_code: string; job_status: number; job_role?: number; titl
 type ExtendedCandidateFilters = {
   search?: string
   role?: number
-  sub_role?: number
+  sub_role_ids?: number[]
   experience?: number
   availability?: number
   preferred_scope?: string
@@ -460,7 +461,10 @@ export default function AdminCandidatesPage() {
       }
 
       if (filters.role && candidate.role !== filters.role) return false
-      if (filters.sub_role && candidate.sub_role !== filters.sub_role) return false
+      if (filters.sub_role_ids?.length) {
+        const cSubs = Array.isArray(candidate.sub_role) ? candidate.sub_role : (candidate.sub_role != null ? [candidate.sub_role] : [])
+        if (!filters.sub_role_ids.some((id) => cSubs.includes(id))) return false
+      }
       if (filters.experience && candidate.experience !== filters.experience) return false
       if (filters.availability && candidate.availability !== filters.availability) return false
       if (filters.preferred_scope && String(candidate.preferred_scope ?? '') !== filters.preferred_scope) return false
@@ -788,26 +792,12 @@ export default function AdminCandidatesPage() {
                   placeholder="חיפוש שם, טלפון, אימייל, מעסיק או שפה"
                 />
 
-                <SelectFilter
-                  value={String(filters.role ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      role: value ? Number(value) : undefined,
-                      sub_role: undefined,
-                    }))
-                  }
-                  options={DICT_ROLES.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="תפקיד"
-                />
-
-                <SelectFilter
-                  value={String(filters.sub_role ?? '')}
-                  onChange={(value) =>
-                    setFilters((prev) => ({ ...prev, sub_role: value ? Number(value) : undefined }))
-                  }
-                  options={subRoleOptions.map((item) => ({ value: String(item.id), label: item.name }))}
-                  placeholder="תת־תפקיד"
+                <RoleSubRolePicker
+                  variant="filter"
+                  roleId={filters.role ?? null}
+                  subRoleIds={filters.sub_role_ids ?? []}
+                  onRoleChange={(id) => setFilters((prev) => ({ ...prev, role: id ?? undefined, sub_role_ids: undefined }))}
+                  onSubRoleChange={(ids) => setFilters((prev) => ({ ...prev, sub_role_ids: ids.length ? ids : undefined }))}
                 />
 
                 <SelectFilter

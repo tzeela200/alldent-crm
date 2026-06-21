@@ -7,6 +7,7 @@ import { Shell, ActionButton } from '@/components/layout/Shell'
 import JobImageUpload from '@/components/admin/JobImageUpload'
 import JobAIWriter from '@/components/admin/JobAIWriter'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
+import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 type ToastTone = 'success' | 'error' | 'info'
@@ -332,8 +333,13 @@ export default function CreateJobWizardPage() {
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <TextField label="קוד משרה" value={form.job_code} onChange={(value) => setField('job_code', value)} dir="ltr" placeholder="אפשר להשאיר ריק ליצירה אוטומטית" />
                 <TextField label="כותרת משרה" value={form.job_title} onChange={(value) => setField('job_title', value)} labelSuffix={<JobAIWriter mode="admin" field="job_title" currentValue={form.job_title} jobContext={{ role: form.job_role }} onApply={(v) => setField('job_title', v)} />} />
-                <SelectField label="תפקיד ראשי" value={form.job_role} onChange={(value) => setForm((prev) => ({ ...prev, job_role: value, job_sub_role: [] }))} options={roles.map(toOption)} />
-                <MultiSelectField label="תתי־תפקידים" values={form.job_sub_role} onChange={(values) => setField('job_sub_role', values)} options={subRoleOptions.map(toOption)} />
+                <RoleSubRolePicker
+                  variant="edit"
+                  roleId={form.job_role ? Number(form.job_role) : null}
+                  subRoleIds={form.job_sub_role}
+                  onRoleChange={(id) => setForm((prev) => ({ ...prev, job_role: id ? String(id) : '', job_sub_role: [] }))}
+                  onSubRoleChange={(ids) => setField('job_sub_role', ids)}
+                />
                 <CityRegionPicker
                   variant="edit"
                   cityId={form.city_id ? Number(form.city_id) : null}

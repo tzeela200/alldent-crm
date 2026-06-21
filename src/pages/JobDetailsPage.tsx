@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/timeAgo'
 import JobImageUpload from '@/components/admin/JobImageUpload'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
+import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 type ToastTone = 'success' | 'error' | 'info'
@@ -334,8 +335,13 @@ export default function JobDetailsPage() {
                 <SelectField label="ארגון" value={draft.account_link} onChange={(value) => setField('account_link', value)} options={(accounts as any[]).map((a) => ({ value: String(a.account_id), label: a.account_name ?? '' }))} />
                 <SelectField label="מעסיק / איש קשר" value={draft.rel_employer_contact} onChange={(value) => setField('rel_employer_contact', value)} options={(contacts as any[]).map((c) => ({ value: String(c.contact_id), label: c.full_name ?? `#${c.contact_id}` }))} />
                 <SelectField label="מגייס" value={draft.rel_recruiter_contact} onChange={(value) => setField('rel_recruiter_contact', value)} options={(contacts as any[]).map((c) => ({ value: String(c.contact_id), label: c.full_name ?? `#${c.contact_id}` }))} />
-                <SelectField label="תפקיד" value={draft.job_role} onChange={(value) => setDraft((prev) => prev ? { ...prev, job_role: value, job_sub_role: [] } : prev)} options={roles.map(toOption)} />
-                <MultiSelectField label="תתי־תפקידים" values={draft.job_sub_role} onChange={(values) => setField('job_sub_role', values)} options={subRoleOptions.map(toOption)} />
+                <RoleSubRolePicker
+                  variant="edit"
+                  roleId={draft.job_role ? Number(draft.job_role) : null}
+                  subRoleIds={draft.job_sub_role}
+                  onRoleChange={(id) => setDraft((prev) => prev ? { ...prev, job_role: id ? String(id) : '', job_sub_role: [] } : prev)}
+                  onSubRoleChange={(ids) => setField('job_sub_role', ids)}
+                />
                 <CityRegionPicker
                   variant="edit"
                   cityId={draft.city_id ? Number(draft.city_id) : null}

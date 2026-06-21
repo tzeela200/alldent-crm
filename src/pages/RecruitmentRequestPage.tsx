@@ -2,6 +2,8 @@ import React, { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { normalizePhone } from '@/lib/normalizePhone'
+import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 
@@ -243,20 +245,15 @@ export default function RecruitmentRequestPage() {
           {/* חלק 2 — פרטי המשרה */}
           <SectionCard title="פרטי המשרה">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <SelectField
-                label="תפקיד *"
-                value={form.job_role}
-                onChange={(v) => setForm((prev) => ({ ...prev, job_role: v, job_sub_role: [] }))}
-                options={roles.map(toOption)}
-              />
-              {showSubRole && (
-                <MultiSelectField
-                  label="תת-תפקיד"
-                  values={form.job_sub_role}
-                  onChange={(v) => setField('job_sub_role', v)}
-                  options={subRoleOptions.map(toOption)}
+              <div className="sm:col-span-2">
+                <RoleSubRolePicker
+                  variant="edit"
+                  roleId={form.job_role ? Number(form.job_role) : null}
+                  subRoleIds={form.job_sub_role}
+                  onRoleChange={(id) => setForm((prev) => ({ ...prev, job_role: id ? String(id) : '', job_sub_role: [] }))}
+                  onSubRoleChange={(ids) => setField('job_sub_role', ids)}
                 />
-              )}
+              </div>
               <SelectField
                 label="אזור המשרה *"
                 value={form.region_id}
