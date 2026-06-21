@@ -41,6 +41,7 @@ import { RoleBadge } from '@/components/admin/RoleBadge'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { ContactPicker } from '@/components/ui/ContactPicker'
+import SidePanel from '@/components/ui/SidePanel'
 
 const PAGE_SIZE = 20
 
@@ -946,11 +947,7 @@ function UnifiedJobPanel({
   saving,
   jobStatuses,
   publicStatuses,
-  roles,
-  editSubRoleOptions,
-  editCityOptions,
   accountsList,
-  contactsList,
   regions,
   cities,
   scopes,
@@ -960,136 +957,138 @@ function UnifiedJobPanel({
   scopeName,
   statusName,
   publicStatusName,
-  regionName,
-  cityName,
   jobCityName,
   jobRegionName,
   experienceName,
   normalizeIds,
 }: any) {
-  return (
-    <div className="fixed inset-0 z-50 flex justify-start">
-      <div className="absolute inset-0 bg-slate-900/30" onClick={onClose} />
-      <aside className="relative z-10 flex h-full w-full max-w-[620px] flex-col overflow-hidden border-s border-[#D9D9D9] bg-[#F3F4F6] shadow-xl">
-        <header className="flex items-start justify-between gap-3 border-b border-[#D9D9D9] bg-white px-5 py-4">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-[6px] bg-[#E6F3F3] px-2.5 py-1 font-mono text-[12px] font-bold text-[#008080]">{job.job_code}</span>
-              <StatusPill label={statusName(job.job_status)} tone={jobStatusTone(Number(job.job_status))} />
-              <StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} />
-            </div>
-            <h2 className="text-[20px] font-bold text-[#2D2D2D]">{mode === 'edit' ? 'עריכת משרה' : job.job_title ?? 'פרטי משרה'}</h2>
-            <p className="text-[12px] text-[#6B6B6B]">פאנל אחד לצפייה ועריכה — בלי יציאה מהמסך</p>
-          </div>
-          <button type="button" onClick={onClose} className="rounded-xl p-2 text-[#6B6B6B] hover:bg-[#F3F4F6]"><X className="h-5 w-5" /></button>
-        </header>
+  const navigate = useNavigate()
 
-        <main className="flex-1 overflow-y-auto p-5">
-          {mode === 'view' ? (
-            <div className="space-y-4">
-              {job.public_image_url && <img src={job.public_image_url} alt="תמונת משרה" className="h-48 w-full rounded-[18px] object-cover" />}
-              <PanelCard title="פרטי משרה">
-                <LabelValue label="כותרת" value={job.job_title ?? '—'} />
-                <LabelValue label="תפקיד" value={roleName(job.job_role)} />
-                <LabelValue label="תתי־תפקידים" value={namesFromIds(normalizeIds(job.job_sub_role), subRoleName)} />
-                <LabelValue label="ארגון" value={job.account_name ?? '—'} />
-                <LabelValue label="מעסיק" value={job.employer_contact_name ?? '—'} />
-                <LabelValue label="מגייס" value={job.recruiter_contact_name ?? job.employer_contact_name ?? '—'} />
-              </PanelCard>
-              <PanelCard title="מיקום והיקף">
-                <LabelValue label="אזור" value={jobRegionName(job)} />
-                <LabelValue label="עיר" value={jobCityName(job)} />
-                <LabelValue label="כתובת" value={job.address ?? '—'} />
-                <LabelValue label="היקף" value={namesFromIds(normalizeIds(job.scope), scopeName)} />
-                <LabelValue label="ניסיון" value={experienceName(job.required_experience)} />
-              </PanelCard>
-              <PanelCard title="שכר ותמונה">
-                <LabelValue label="שכר שעתי" value={job.salary_expectation_hourly != null ? `${job.salary_expectation_hourly} ₪` : '—'} />
-                <LabelValue label="שכר גלובלי" value={job.salary_expectation_monthly != null ? `${job.salary_expectation_monthly} ₪` : '—'} />
-                <LabelValue label="הצגת שכר לציבור" value={job.show_salary_public ? 'כן' : 'לא'} />
-                <LabelValue label="תמונה ציבורית" value={job.public_image_url ? 'קיימת' : 'לא קיימת'} />
-              </PanelCard>
-              <PanelCard title="תיאור ודרישות">
-                <p className="whitespace-pre-wrap text-[13px] leading-6 text-[#2D2D2D]">{job.job_description || 'אין תיאור'}</p>
-                <div className="my-3 h-px bg-[#D9D9D9]" />
-                <p className="whitespace-pre-wrap text-[13px] leading-6 text-[#2D2D2D]">{job.job_requirements || 'אין דרישות'}</p>
-              </PanelCard>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <PanelCard title="פרטי משרה">
-                <EditTextField label="קוד משרה" value={draft.job_code ?? ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_code: value }))} />
-                <EditTextField label="כותרת משרה" value={draft.job_title} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_title: value }))} />
-                <EditSelectField label="סטטוס משרה" value={draft.job_status != null ? String(draft.job_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_status: value ? Number(value) : null }))} options={jobStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
-                <EditSelectField label="סטטוס פרסום" value={draft.public_status != null ? String(draft.public_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, public_status: value ? Number(value) : null }))} options={publicStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
-                <RoleSubRolePicker
-                  variant="edit"
-                  roleId={draft.job_role}
-                  subRoleIds={draft.job_sub_role}
-                  onRoleChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, job_role: id, job_sub_role: [] }))}
-                  onSubRoleChange={(ids) => setDraft((prev: JobDraft) => ({ ...prev, job_sub_role: ids }))}
-                />
-                <EditSelectField label="ארגון" value={draft.account_link != null ? String(draft.account_link) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, account_link: value ? Number(value) : null }))} options={accountsList.map((item: any) => ({ value: String(item.account_id), label: item.account_name ?? '' }))} />
-                <ContactPicker label="מעסיק" value={draft.rel_employer_contact} onChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, rel_employer_contact: id }))} />
-                <ContactPicker label="מגייס (אופציונלי)" value={draft.rel_recruiter_contact} onChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, rel_recruiter_contact: id }))} />
-              </PanelCard>
-
-              <PanelCard title="מיקום והיקף">
-                <CityRegionPicker
-                  variant="edit"
-                  cityId={draft.city_id}
-                  regionId={draft.region_id}
-                  cities={cities}
-                  regions={regions}
-                  onCityChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, city_id: id }))}
-                  onRegionChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, region_id: id, city_id: null }))}
-                />
-                <EditTextField label="כתובת" value={draft.address} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, address: value }))} />
-                <EditMultiSelectField label="היקף משרה" values={draft.scope} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, scope: values }))} options={scopes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
-                <EditSelectField label="ניסיון נדרש" value={draft.required_experience != null ? String(draft.required_experience) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, required_experience: value ? Number(value) : null }))} options={experienceOptions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
-              </PanelCard>
-
-              <PanelCard title="שכר ותמונה ציבורית">
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                  <EditTextField label="שכר שעתי" value={draft.salary_expectation_hourly} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, salary_expectation_hourly: value }))} type="number" />
-                  <EditTextField label="שכר גלובלי / חודשי" value={draft.salary_expectation_monthly} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, salary_expectation_monthly: value }))} type="number" />
-                </div>
-                <label className="mt-3 flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[13px] font-semibold text-[#2D2D2D]">
-                  <span>להציג שכר לציבור</span>
-                  <input type="checkbox" checked={draft.show_salary_public} onChange={(event) => setDraft((prev: JobDraft) => ({ ...prev, show_salary_public: event.target.checked }))} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" />
-                </label>
-                <EditTextField label="קישור תמונה ציבורית" value={draft.public_image_url} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, public_image_url: value }))} />
-                <ImageUploadField
-                  jobCode={job.job_code}
-                  value={draft.public_image_url}
-                  onChange={(url: string) => setDraft((prev: JobDraft) => ({ ...prev, public_image_url: url }))}
-                />
-                {draft.public_image_url && <div className="mt-3 flex items-center gap-2 text-[12px] text-[#6B6B6B]"><ImageIcon className="h-4 w-4" />התמונה תוצג בכרטיס המשרה הציבורי</div>}
-              </PanelCard>
-
-              <PanelCard title="תוכן וקישורים">
-                <EditTextField label="קישור משרה ציבורי" value={draft.job_url} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_url: value }))} />
-                <EditTextareaField label="תיאור המשרה" value={draft.job_description} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_description: value }))} />
-                <EditTextareaField label="דרישות המשרה" value={draft.job_requirements} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_requirements: value }))} />
-                <EditTextareaField label="הערות פנימיות" value={draft.notes} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, notes: value }))} />
-              </PanelCard>
-            </div>
-          )}
-        </main>
-
-        <footer className="flex items-center justify-between gap-3 border-t border-[#D9D9D9] bg-white px-5 py-4">
-          <button type="button" onClick={onClose} className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">סגור</button>
-          {mode === 'view' ? (
-            <button type="button" onClick={onEdit} className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]">ערוך משרה</button>
-          ) : (
-            <div className="flex gap-2">
-              <button type="button" onClick={onView} className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">חזרה לצפייה</button>
-              <button type="button" onClick={onSave} disabled={saving} className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309] disabled:opacity-60">{saving ? 'שומר...' : 'שמור'}</button>
-            </div>
-          )}
-        </footer>
-      </aside>
+  const header = (
+    <div className="flex items-start justify-between gap-3 px-5 py-4">
+      <div className="space-y-1.5 min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="rounded-[6px] bg-[#E6F3F3] px-2.5 py-1 font-mono text-[12px] font-bold text-[#008080]">{job.job_code}</span>
+          <StatusPill label={statusName(job.job_status)} tone={jobStatusTone(Number(job.job_status))} />
+          <StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} />
+        </div>
+        <h2 className="text-[20px] font-bold text-[#2D2D2D] leading-snug">{job.job_title ?? 'פרטי משרה'}</h2>
+        {job.account_name && <p className="text-[13px] text-[#6B6B6B]">{job.account_name}</p>}
+      </div>
+      <button type="button" onClick={onClose} className="shrink-0 rounded-xl p-2 text-[#6B6B6B] hover:bg-[#F3F4F6]"><X className="h-5 w-5" /></button>
     </div>
+  )
+
+  const footer = (
+    <div className="flex items-center justify-between gap-3">
+      <button
+        type="button"
+        onClick={onClose}
+        className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]"
+      >
+        סגור
+      </button>
+      <div className="flex items-center gap-2">
+        {mode === 'view' ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]"
+          >
+            עריכה מהירה
+          </button>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onView}
+              className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]"
+            >
+              ביטול
+            </button>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="rounded-[10px] bg-[#008080] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#006D6D] disabled:opacity-60"
+            >
+              {saving ? 'שומר...' : 'שמור'}
+            </button>
+          </>
+        )}
+        <button
+          type="button"
+          onClick={() => navigate(`/admin/jobs/${job.job_code}`)}
+          className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]"
+        >
+          עריכה מלאה ←
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <SidePanel open onClose={onClose} header={header} footer={footer}>
+      {mode === 'view' ? (
+        <div className="space-y-4">
+          {job.public_image_url && (
+            <img src={job.public_image_url} alt="תמונת משרה" className="h-40 w-full rounded-[14px] object-cover" />
+          )}
+          <PanelCard title="פרטי משרה">
+            <LabelValue label="כותרת" value={job.job_title ?? '—'} />
+            <LabelValue label="תפקיד" value={roleName(job.job_role)} />
+            <LabelValue label="תתי־תפקידים" value={namesFromIds(normalizeIds(job.job_sub_role), subRoleName)} />
+            <LabelValue label="ארגון" value={job.account_name ?? '—'} />
+            <LabelValue label="מעסיק" value={job.employer_contact_name ?? '—'} />
+            <LabelValue label="מגייס" value={job.recruiter_contact_name ?? '—'} />
+          </PanelCard>
+          <PanelCard title="מיקום והיקף">
+            <LabelValue label="אזור" value={jobRegionName(job)} />
+            <LabelValue label="עיר" value={jobCityName(job)} />
+            <LabelValue label="היקף" value={namesFromIds(normalizeIds(job.scope), scopeName)} />
+            <LabelValue label="ניסיון" value={experienceName(job.required_experience)} />
+          </PanelCard>
+          <p className="text-center text-[12px] text-[#9CA3AF]">לשכר, תיאור, הערות ותמונה — לחצי על עריכה מלאה</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          <PanelCard title="פרטי משרה">
+            <div className="rounded-xl border border-[#E5E7EB] bg-[#F8F9FA] px-3 py-2 text-[12px] font-mono font-bold text-[#008080]">
+              {draft.job_code}
+            </div>
+            <EditTextField label="כותרת משרה" value={draft.job_title} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_title: value }))} />
+            <EditSelectField label="סטטוס משרה" value={draft.job_status != null ? String(draft.job_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, job_status: value ? Number(value) : null }))} options={jobStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+            <EditSelectField label="סטטוס פרסום" value={draft.public_status != null ? String(draft.public_status) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, public_status: value ? Number(value) : null }))} options={publicStatuses.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+            <RoleSubRolePicker
+              variant="edit"
+              roleId={draft.job_role}
+              subRoleIds={draft.job_sub_role}
+              onRoleChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, job_role: id, job_sub_role: [] }))}
+              onSubRoleChange={(ids) => setDraft((prev: JobDraft) => ({ ...prev, job_sub_role: ids }))}
+            />
+            <EditSelectField label="ארגון" value={draft.account_link != null ? String(draft.account_link) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, account_link: value ? Number(value) : null }))} options={accountsList.map((item: any) => ({ value: String(item.account_id), label: item.account_name ?? '' }))} />
+            <ContactPicker label="מעסיק" value={draft.rel_employer_contact} onChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, rel_employer_contact: id }))} />
+            <ContactPicker label="מגייס (אופציונלי)" value={draft.rel_recruiter_contact} onChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, rel_recruiter_contact: id }))} />
+          </PanelCard>
+
+          <PanelCard title="מיקום והיקף">
+            <CityRegionPicker
+              variant="edit"
+              cityId={draft.city_id}
+              regionId={draft.region_id}
+              cities={cities}
+              regions={regions}
+              onCityChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, city_id: id }))}
+              onRegionChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, region_id: id, city_id: null }))}
+            />
+            <EditMultiSelectField label="היקף משרה" values={draft.scope} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, scope: values }))} options={scopes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+            <EditSelectField label="ניסיון נדרש" value={draft.required_experience != null ? String(draft.required_experience) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, required_experience: value ? Number(value) : null }))} options={experienceOptions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+          </PanelCard>
+
+          <p className="text-center text-[12px] text-[#9CA3AF]">לשכר, תיאור, הערות ותמונה — לחצי על עריכה מלאה</p>
+        </div>
+      )}
+    </SidePanel>
   )
 }
 

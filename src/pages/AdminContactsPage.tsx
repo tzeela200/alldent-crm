@@ -35,6 +35,7 @@ import {
 } from '@/components/layout/Shell'
 import { formatPhone } from '@/lib/normalizePhone'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
+import SidePanel from '@/components/ui/SidePanel'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import {
   DICT_AVAILABILITY,
@@ -1157,11 +1158,11 @@ export default function AdminContactsPage() {
         </div>
 
         {selectedContact && (
-          <div className="fixed inset-0 z-50 flex justify-start">
-            <div className="absolute inset-0 bg-slate-900/30" onClick={() => setSelectedId(null)} />
-            <aside className="relative z-10 h-full w-full max-w-[560px] overflow-y-auto border-l border-slate-200 bg-white shadow-xl">
-              <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-                <div className="flex items-start justify-between gap-3 px-5 py-5">
+          <SidePanel
+            open
+            onClose={() => setSelectedId(null)}
+            header={
+              <div className="flex items-start justify-between gap-3 px-5 py-5">
                   <div className="flex items-start gap-4">
                     <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[22px] font-bold text-[#008080] shadow-sm">
                       {(selectedContact.full_name ?? selectedContact.display_name ?? '?').charAt(0)}
@@ -1268,9 +1269,27 @@ export default function AdminContactsPage() {
                     <X className="h-5 w-5" />
                   </button>
                 </div>
+            }
+            footer={
+              <div className="flex items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSelectedId(null)}
+                  className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]"
+                >
+                  סגור
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/admin/contacts/${selectedContact.contact_id}`)}
+                  className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]"
+                >
+                  כרטסת 360 ←
+                </button>
               </div>
-
-              <div className="space-y-4 p-5">
+            }
+          >
+              <div className="space-y-4">
                 <SectionCard title="תגיות" compact>
                   <div className="flex flex-wrap gap-2">
                     {panelTags.map((tag) => (
@@ -1538,9 +1557,8 @@ export default function AdminContactsPage() {
                     />
                   </div>
                 </SectionCard>
-              </div>
-            </aside>
           </div>
+          </SidePanel>
         )}
 
         {/* Bulk Update Dialog */}

@@ -36,6 +36,7 @@ import { supabase } from '@/lib/supabase'
 import type { Account, Contact } from '@/types'
 import { MergeRecordsModal } from '@/components/MergeRecordsModal'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
+import SidePanel from '@/components/ui/SidePanel'
 
 type ViewMode = 'accounts' | 'employers'
 type ToastTone = 'success' | 'error' | 'info'
@@ -994,88 +995,131 @@ export default function AdminEmployersPage({
         </div>
 
         {sheet.open && (selectedAccount || sheet.mode === 'create') && (
-          <div className="fixed inset-0 z-50 flex justify-start">
-            <div className="absolute inset-0 bg-slate-900/30" onClick={closeSheet} />
-            <aside className="relative z-10 h-full w-full max-w-[620px] overflow-y-auto border-l border-[#D9D9D9] bg-white shadow-xl">
-              <div className="sticky top-0 z-20 border-b border-[#D9D9D9] bg-white/95 backdrop-blur-sm">
-                <div className="flex items-start justify-between gap-3 px-5 py-5">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full bg-[#E6F3F3] px-2.5 py-1 text-[12px] font-bold text-[#008080]">{sheet.mode === 'create' ? 'חדש' : `#${selectedAccount?.account_id}`}</span>
-                      {selectedAccount && <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{accountStatusName(selectedAccount.account_status)}</span>}
-                    </div>
-                    <h2 className="mt-2 text-[24px] font-bold text-[#2D2D2D]">{sheet.mode === 'create' ? (isEmployersBoard ? 'מעסיק חדש' : 'ארגון חדש') : selectedAccount?.account_name}</h2>
-                    {selectedAccount && <div className="mt-2 text-[13px] text-[#6B6B6B]">{selectedAccount.activeJobsCount} משרות פעילות · {selectedAccount.totalJobsCount} משרות סה״כ</div>}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {sheet.mode === 'view' && sheet.accountId && (
-                      <ActionButton variant="ghost" icon={Eye} onClick={() => navigate(`/admin/employers/${sheet.accountId}`)}>פתח ב-360</ActionButton>
+          <SidePanel
+            open
+            onClose={closeSheet}
+            header={
+              <div className="flex items-start justify-between gap-3 px-5 py-5">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="rounded-full bg-[#E6F3F3] px-2.5 py-1 text-[12px] font-bold text-[#008080]">
+                      {sheet.mode === 'create' ? 'חדש' : `#${selectedAccount?.account_id}`}
+                    </span>
+                    {selectedAccount && (
+                      <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">
+                        {accountStatusName(selectedAccount.account_status)}
+                      </span>
                     )}
-                    {sheet.mode === 'view' && <ActionButton variant="ghost" icon={Edit2} onClick={() => setSheet((prev) => ({ ...prev, mode: 'edit' }))}>עריכה</ActionButton>}
-                    <button type="button" onClick={closeSheet} className="rounded-xl border border-[#D9D9D9] p-2 text-[#6B6B6B] hover:bg-[#F3F4F6]"><X className="h-5 w-5" /></button>
                   </div>
+                  <h2 className="mt-2 text-[22px] font-bold text-[#2D2D2D] leading-snug">
+                    {sheet.mode === 'create' ? (isEmployersBoard ? 'מעסיק חדש' : 'ארגון חדש') : selectedAccount?.account_name}
+                  </h2>
+                  {selectedAccount && (
+                    <p className="mt-1 text-[13px] text-[#6B6B6B]">
+                      {selectedAccount.activeJobsCount} משרות פעילות · {selectedAccount.totalJobsCount} משרות סה״כ
+                    </p>
+                  )}
+                </div>
+                <button type="button" onClick={closeSheet} className="shrink-0 rounded-xl border border-[#D9D9D9] p-2 text-[#6B6B6B] hover:bg-[#F3F4F6]">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            }
+            footer={
+              <div className="flex items-center justify-between gap-3">
+                <button type="button" onClick={closeSheet} className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">
+                  סגור
+                </button>
+                <div className="flex items-center gap-2">
+                  {sheet.mode === 'view' && (
+                    <button
+                      type="button"
+                      onClick={() => setSheet((prev) => ({ ...prev, mode: 'edit' }))}
+                      className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]"
+                    >
+                      עריכה מהירה
+                    </button>
+                  )}
+                  {sheet.mode === 'edit' && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setSheet((prev) => ({ ...prev, mode: 'view' }))}
+                        className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]"
+                      >
+                        ביטול
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveSheet}
+                        disabled={savingSheet}
+                        className="rounded-[10px] bg-[#008080] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#006D6D] disabled:opacity-60"
+                      >
+                        {savingSheet ? 'שומר...' : 'שמור'}
+                      </button>
+                    </>
+                  )}
+                  {sheet.accountId && (
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/admin/employers/${sheet.accountId}`)}
+                      className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]"
+                    >
+                      360 מלא ←
+                    </button>
+                  )}
                 </div>
               </div>
-
-              <div className="space-y-4 p-5">
-                {sheet.mode === 'view' && selectedAccount ? (
-                  <>
-                    <SectionCard title="פרטי ארגון">
-                      <LabelValue label="שם" value={selectedAccount.account_name ?? '—'} />
-                      <LabelValue label="סוג" value={accountTypeName(selectedAccount.account_type)} />
-                      <LabelValue label="סטטוס ארגון" value={accountStatusName(selectedAccount.account_status)} />
-                      <LabelValue label="אזור" value={regionName(selectedAccount.region_id)} />
-                      <LabelValue label="עיר" value={cityName(selectedAccount.city_id)} />
-                    </SectionCard>
-                    <SectionCard title="משרות">
-                      <LabelValue label="משרות פעילות" value={String(selectedAccount.activeJobsCount)} />
-                      <LabelValue label="סה״כ משרות" value={String(selectedAccount.totalJobsCount)} />
-                      <div className="mt-3 flex flex-wrap gap-2">{selectedAccount.relatedJobs.slice(0, 12).map((job) => <span key={job.job_code} className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold">{job.job_code}</span>)}</div>
-                    </SectionCard>
-                    <SectionCard title="תקשורת ואנשי קשר">
-                      <LabelValue label="טלפון" value={formatPhone(selectedAccount.phone)} />
-                      <LabelValue label="מייל" value={selectedAccount.email ?? '—'} />
-                      <LabelValue label="אתר" value={(selectedAccount as any).website_url ?? '—'} />
-                      <LabelValue label="אנשי קשר" value={selectedAccount.linkedContactSummary || '—'} />
-                    </SectionCard>
-                  </>
-                ) : (
-                  <>
-                    <SectionCard title="פרטי בסיס">
-                      <TextField label="שם ארגון" value={draft.account_name} onChange={(value) => setDraft((prev) => ({ ...prev, account_name: value }))} />
-                      <SelectLikeField label="סטטוס ארגון" value={String(draft.account_status ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, account_status: value ? Number(value) : null }))} options={accountStatuses.map((item) => ({ value: String(item.id), label: item.name }))} />
-                      <SelectLikeField label="סוג ארגון" value={String(draft.account_type ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, account_type: value ? Number(value) : null }))} options={accountTypes.map((item) => ({ value: String(item.id), label: item.name }))} />
-                      <TextField label="ח.פ / מזהה" value={draft.bus_id} onChange={(value) => setDraft((prev) => ({ ...prev, bus_id: value }))} />
-                    </SectionCard>
-                    <SectionCard title="תקשורת">
-                      <TextField label="טלפון" value={draft.phone} onChange={(value) => setDraft((prev) => ({ ...prev, phone: value }))} />
-                      <TextField label="טלפון נוסף" value={draft.second_phone} onChange={(value) => setDraft((prev) => ({ ...prev, second_phone: value }))} />
-                      <TextField label="מייל" value={draft.email} onChange={(value) => setDraft((prev) => ({ ...prev, email: value }))} />
-                      <TextField label="מייל לחשבונית" value={draft.billing_email} onChange={(value) => setDraft((prev) => ({ ...prev, billing_email: value }))} />
-                      <TextField label="אתר" value={draft.website_url} onChange={(value) => setDraft((prev) => ({ ...prev, website_url: value }))} />
-                    </SectionCard>
-                    <SectionCard title="מיקום ותפעול">
-                      <SelectLikeField label="אזור" value={String(draft.region_id ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} />
-                      <SelectLikeField label="עיר" value={String(draft.city_id ?? '')} onChange={(value) => { const found = cities.find((c) => String(c.id) === value); setDraft((prev) => ({ ...prev, city_id: value ? Number(value) : null, region_id: found?.region_id ?? prev.region_id })) }} options={(draft.region_id ? cities.filter((item) => Number(item.region_id) === Number(draft.region_id)) : cities).map((item) => ({ value: String(item.id), label: item.name }))} />
-                      <TextField label="כתובת" value={draft.address} onChange={(value) => setDraft((prev) => ({ ...prev, address: value }))} />
-                      <TextField label="גודל צוות" value={draft.team_size} onChange={(value) => setDraft((prev) => ({ ...prev, team_size: value }))} type="number" />
-                      <TextField label="מספר כיסאות" value={draft.chairs_count} onChange={(value) => setDraft((prev) => ({ ...prev, chairs_count: value }))} type="number" />
-                      <DateField label="פולו־אפ הבא" value={draft.next_follow_up} onChange={(value) => setDraft((prev) => ({ ...prev, next_follow_up: value }))} />
-                    </SectionCard>
-                    <SectionCard title="הערות">
-                      <TextareaField label="הערות" value={draft.notes} onChange={(value) => setDraft((prev) => ({ ...prev, notes: value }))} />
-                    </SectionCard>
-                    <div className="sticky bottom-0 bg-white/95 pt-2 backdrop-blur-sm">
-                      <div className="flex justify-end gap-2 border-t border-[#D9D9D9] pt-4">
-                        <ActionButton variant="ghost" onClick={closeSheet}>ביטול</ActionButton>
-                        <ActionButton variant="primary" onClick={saveSheet} disabled={savingSheet}>{savingSheet ? 'שומר...' : 'שמור שינויים'}</ActionButton>
-                      </div>
-                    </div>
-                  </>
-                )}
+            }
+          >
+            {sheet.mode === 'view' && selectedAccount ? (
+              <div className="space-y-4">
+                <SectionCard title="פרטי ארגון">
+                  <LabelValue label="שם" value={selectedAccount.account_name ?? '—'} />
+                  <LabelValue label="סוג" value={accountTypeName(selectedAccount.account_type)} />
+                  <LabelValue label="סטטוס ארגון" value={accountStatusName(selectedAccount.account_status)} />
+                  <LabelValue label="אזור" value={regionName(selectedAccount.region_id)} />
+                  <LabelValue label="עיר" value={cityName(selectedAccount.city_id)} />
+                </SectionCard>
+                <SectionCard title="משרות">
+                  <LabelValue label="משרות פעילות" value={String(selectedAccount.activeJobsCount)} />
+                  <LabelValue label="סה״כ משרות" value={String(selectedAccount.totalJobsCount)} />
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {selectedAccount.relatedJobs.slice(0, 12).map((job) => (
+                      <span key={job.job_code} className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold">{job.job_code}</span>
+                    ))}
+                  </div>
+                </SectionCard>
+                <SectionCard title="תקשורת ואנשי קשר">
+                  <LabelValue label="טלפון" value={formatPhone(selectedAccount.phone)} />
+                  <LabelValue label="מייל" value={selectedAccount.email ?? '—'} />
+                  <LabelValue label="אתר" value={(selectedAccount as any).website_url ?? '—'} />
+                  <LabelValue label="אנשי קשר" value={selectedAccount.linkedContactSummary || '—'} />
+                </SectionCard>
               </div>
-            </aside>
-          </div>
+            ) : (
+              <div className="space-y-4">
+                <SectionCard title="פרטי בסיס">
+                  <TextField label="שם ארגון" value={draft.account_name} onChange={(value) => setDraft((prev) => ({ ...prev, account_name: value }))} />
+                  <SelectLikeField label="סטטוס ארגון" value={String(draft.account_status ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, account_status: value ? Number(value) : null }))} options={accountStatuses.map((item) => ({ value: String(item.id), label: item.name }))} />
+                  <SelectLikeField label="סוג ארגון" value={String(draft.account_type ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, account_type: value ? Number(value) : null }))} options={accountTypes.map((item) => ({ value: String(item.id), label: item.name }))} />
+                  <TextField label="ח.פ / מזהה" value={draft.bus_id} onChange={(value) => setDraft((prev) => ({ ...prev, bus_id: value }))} />
+                </SectionCard>
+                <SectionCard title="תקשורת">
+                  <TextField label="טלפון" value={draft.phone} onChange={(value) => setDraft((prev) => ({ ...prev, phone: value }))} />
+                  <TextField label="טלפון נוסף" value={draft.second_phone} onChange={(value) => setDraft((prev) => ({ ...prev, second_phone: value }))} />
+                  <TextField label="מייל" value={draft.email} onChange={(value) => setDraft((prev) => ({ ...prev, email: value }))} />
+                  <TextField label="מייל לחשבונית" value={draft.billing_email} onChange={(value) => setDraft((prev) => ({ ...prev, billing_email: value }))} />
+                  <TextField label="אתר" value={draft.website_url} onChange={(value) => setDraft((prev) => ({ ...prev, website_url: value }))} />
+                </SectionCard>
+                <SectionCard title="מיקום">
+                  <SelectLikeField label="אזור" value={String(draft.region_id ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} />
+                  <SelectLikeField label="עיר" value={String(draft.city_id ?? '')} onChange={(value) => { const found = cities.find((c) => String(c.id) === value); setDraft((prev) => ({ ...prev, city_id: value ? Number(value) : null, region_id: found?.region_id ?? prev.region_id })) }} options={(draft.region_id ? cities.filter((item) => Number(item.region_id) === Number(draft.region_id)) : cities).map((item) => ({ value: String(item.id), label: item.name }))} />
+                </SectionCard>
+                <p className="text-center text-[12px] text-[#9CA3AF]">לפרטים מלאים (כתובת, צוות, הערות, פולו-אפ) — לחצי על 360 מלא</p>
+              </div>
+            )}
+          </SidePanel>
         )}
 
         {toast.open && (
