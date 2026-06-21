@@ -85,7 +85,7 @@ export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
           }} />
 
           {/* CTA button — always visible, navigates to job detail */}
-          <div style={{ position: 'absolute', bottom: 12, left: 12 }}>
+          <div style={{ position: 'absolute', bottom: 12, left: 12, zIndex: 2 }}>
             <button
               onClick={e => {
                 e.stopPropagation()
@@ -229,32 +229,34 @@ export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
         </div>
       </div>
 
-      {/* ── CHEVRON — collapse/expand ── */}
-      <button
-        onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v) }}
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '10px 0 8px',
-          color: '#9CA3AF',
-          fontSize: 18,
-          lineHeight: 1,
-        }}
-        aria-label={expanded ? 'סגור' : 'פתח'}
-      >
-        <motion.span
-          animate={{ rotate: expanded ? 180 : 0 }}
-          transition={{ duration: 0.22 }}
-          style={{ display: 'inline-block' }}
+      {/* ── CHEVRON — only when there is a description to expand ── */}
+      {job.job_description && (
+        <button
+          onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v) }}
+          style={{
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            width: '100%',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '10px 0 8px',
+            color: '#9CA3AF',
+            fontSize: 18,
+            lineHeight: 1,
+          }}
+          aria-label={expanded ? 'סגור' : 'פתח'}
         >
-          ⌃
-        </motion.span>
-      </button>
+          <motion.span
+            animate={{ rotate: expanded ? 180 : 0 }}
+            transition={{ duration: 0.22 }}
+            style={{ display: 'inline-block' }}
+          >
+            ⌃
+          </motion.span>
+        </button>
+      )}
     </motion.div>
   )
 
