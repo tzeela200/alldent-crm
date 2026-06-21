@@ -40,6 +40,7 @@ import type { Job, DictItem } from '@/types'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { ContactPicker } from '@/components/ui/ContactPicker'
 
 const PAGE_SIZE = 20
 
@@ -225,13 +226,27 @@ export default function AdminJobsPage() {
     staleTime: 300_000,
   })
 
-  const { data: contactsList = [] } = useQuery<Array<{ contact_id: number; full_name: string | null; phone: string | null; phone_norm: string | null }>>({
-    queryKey: ['contacts-employers-v1'],
+  const contactIdsNeeded = useMemo(() => {
+    const ids = new Set<number>()
+    allJobs.forEach((job: any) => {
+      if (job.rel_employer_contact) ids.add(Number(job.rel_employer_contact))
+      if (job.rel_recruiter_contact) ids.add(Number(job.rel_recruiter_contact))
+    })
+    return [...ids]
+  }, [allJobs])
+
+  const { data: contactsList = [] } = useQuery<Array<{ contact_id: number; full_name: string | null; phone_norm: string | null }>>({
+    queryKey: ['contacts-for-jobs-v2', contactIdsNeeded.join(',')],
     queryFn: async () => {
-      const { data, error } = await supabase.from('contact').select('contact_id,full_name,phone,phone_norm').in('profile_type', [2, 3]).limit(1000)
+      if (!contactIdsNeeded.length) return []
+      const { data, error } = await supabase
+        .from('contact')
+        .select('contact_id,full_name,phone_norm')
+        .in('contact_id', contactIdsNeeded)
       if (error) throw error
-      return (data ?? []) as Array<{ contact_id: number; full_name: string | null; phone: string | null; phone_norm: string | null }>
+      return (data ?? []) as Array<{ contact_id: number; full_name: string | null; phone_norm: string | null }>
     },
+    enabled: contactIdsNeeded.length > 0,
     staleTime: 300_000,
   })
 
@@ -287,7 +302,7 @@ export default function AdminJobsPage() {
     contactsList.forEach((contact) => {
       map.set(Number(contact.contact_id), {
         name: String(contact.full_name ?? ''),
-        phone: contact.phone_norm || contact.phone || null,
+        phone: contact.phone_norm ?? null,
       })
     })
     return map
@@ -1014,8 +1029,8 @@ function UnifiedJobPanel({
                   onSubRoleChange={(ids) => setDraft((prev: JobDraft) => ({ ...prev, job_sub_role: ids }))}
                 />
                 <EditSelectField label="ארגון" value={draft.account_link != null ? String(draft.account_link) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, account_link: value ? Number(value) : null }))} options={accountsList.map((item: any) => ({ value: String(item.account_id), label: item.account_name ?? '' }))} />
-                <EditSelectField label="מעסיק" value={draft.rel_employer_contact != null ? String(draft.rel_employer_contact) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, rel_employer_contact: value ? Number(value) : null }))} options={contactsList.map((item: any) => ({ value: String(item.contact_id), label: item.full_name ?? '' }))} />
-                <EditSelectField label="מגייס (אופציונלי)" value={draft.rel_recruiter_contact != null ? String(draft.rel_recruiter_contact) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, rel_recruiter_contact: value ? Number(value) : null }))} options={contactsList.map((item: any) => ({ value: String(item.contact_id), label: item.full_name ?? '' }))} />
+                <ContactPicker label="מעסיק" value={draft.rel_employer_contact} onChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, rel_employer_contact: id }))} />
+                <ContactPicker label="מגייס (אופציונלי)" value={draft.rel_recruiter_contact} onChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, rel_recruiter_contact: id }))} />
               </PanelCard>
 
               <PanelCard title="מיקום והיקף">

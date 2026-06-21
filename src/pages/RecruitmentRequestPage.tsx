@@ -159,6 +159,13 @@ export default function RecruitmentRequestPage() {
         .limit(1)
       const accountLink = (accountRows as any)?.[0]?.account_id ?? null
 
+      const { data: matchedContact } = await supabase
+        .from('contact')
+        .select('contact_id')
+        .eq('phone_norm', normalizedPhone)
+        .maybeSingle()
+      const relEmployerContact = (matchedContact as any)?.contact_id ?? null
+
       const contactBlock = [
         '[בקשת גיוס — פרטי פונה]',
         `ארגון: ${form.company_name}`,
@@ -177,6 +184,7 @@ export default function RecruitmentRequestPage() {
         public_status: 1,
         published_at: null,
         account_link: accountLink,
+        rel_employer_contact: relEmployerContact,
         job_role: Number(form.job_role) || null,
         job_sub_role: form.job_sub_role.length ? form.job_sub_role : [],
         region_id: Number(form.region_id) || null,

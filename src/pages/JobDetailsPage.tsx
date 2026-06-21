@@ -9,6 +9,7 @@ import { formatDate } from '@/lib/timeAgo'
 import JobImageUpload from '@/components/admin/JobImageUpload'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { ContactPicker } from '@/components/ui/ContactPicker'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 type ToastTone = 'success' | 'error' | 'info'
@@ -80,15 +81,6 @@ export default function JobDetailsPage() {
     queryKey: ['accounts-for-job-detail'],
     queryFn: async () => {
       const { data, error } = await supabase.from('accounts').select('account_id,account_name').order('account_name')
-      if (error) throw error
-      return data ?? []
-    },
-    staleTime: 300_000,
-  })
-  const { data: contacts = [] } = useQuery({
-    queryKey: ['contacts-for-job-detail'],
-    queryFn: async () => {
-      const { data, error } = await supabase.from('contact').select('contact_id,full_name,phone,phone_norm').limit(1500)
       if (error) throw error
       return data ?? []
     },
@@ -333,8 +325,8 @@ export default function JobDetailsPage() {
                 <SelectField label="סטטוס פעילות" value={draft.job_status} onChange={(value) => setField('job_status', value)} options={jobStatuses.map(toOption)} />
                 <SelectField label="סטטוס פרסום" value={draft.public_status} onChange={(value) => setField('public_status', value)} options={publicStatuses.map(toOption)} />
                 <SelectField label="ארגון" value={draft.account_link} onChange={(value) => setField('account_link', value)} options={(accounts as any[]).map((a) => ({ value: String(a.account_id), label: a.account_name ?? '' }))} />
-                <SelectField label="מעסיק / איש קשר" value={draft.rel_employer_contact} onChange={(value) => setField('rel_employer_contact', value)} options={(contacts as any[]).map((c) => ({ value: String(c.contact_id), label: c.full_name ?? `#${c.contact_id}` }))} />
-                <SelectField label="מגייס" value={draft.rel_recruiter_contact} onChange={(value) => setField('rel_recruiter_contact', value)} options={(contacts as any[]).map((c) => ({ value: String(c.contact_id), label: c.full_name ?? `#${c.contact_id}` }))} />
+                <ContactPicker label="מעסיק / איש קשר" value={draft.rel_employer_contact ? Number(draft.rel_employer_contact) : null} onChange={(id) => setField('rel_employer_contact', id ? String(id) : '')} />
+                <ContactPicker label="מגייס" value={draft.rel_recruiter_contact ? Number(draft.rel_recruiter_contact) : null} onChange={(id) => setField('rel_recruiter_contact', id ? String(id) : '')} />
                 <RoleSubRolePicker
                   variant="edit"
                   roleId={draft.job_role ? Number(draft.job_role) : null}

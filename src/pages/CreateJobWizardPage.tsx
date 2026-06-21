@@ -8,6 +8,7 @@ import JobImageUpload from '@/components/admin/JobImageUpload'
 import JobAIWriter from '@/components/admin/JobAIWriter'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { ContactPicker } from '@/components/ui/ContactPicker'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 type ToastTone = 'success' | 'error' | 'info'
@@ -23,9 +24,7 @@ type FormState = {
   accountRegionId: string
   accountCityId: string
   accountAddress: string
-  employerContactName: string
-  employerContactPhone: string
-  employerContactEmail: string
+  rel_employer_contact: number | null
   job_code: string
   job_title: string
   job_role: string
@@ -61,9 +60,7 @@ const EMPTY_FORM: FormState = {
   accountRegionId: '',
   accountCityId: '',
   accountAddress: '',
-  employerContactName: '',
-  employerContactPhone: '',
-  employerContactEmail: '',
+  rel_employer_contact: null,
   job_code: '',
   job_title: '',
   job_role: '',
@@ -254,6 +251,7 @@ export default function CreateJobWizardPage() {
         work_schedule_text: cleanText(form.work_schedule_text),
         job_description: cleanText(form.job_description),
         job_requirements: cleanText(form.job_requirements),
+        rel_employer_contact: form.rel_employer_contact ?? null,
         employer_notes: cleanText(form.employer_notes),
         notes: cleanText(form.notes),
         public_excerpt: cleanText(form.public_excerpt),
@@ -321,10 +319,8 @@ export default function CreateJobWizardPage() {
                 </div>
               )}
 
-              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-3">
-                <TextField label="שם איש קשר" value={form.employerContactName} onChange={(value) => setField('employerContactName', value)} />
-                <TextField label="נייד איש קשר" value={form.employerContactPhone} onChange={(value) => setField('employerContactPhone', value)} dir="ltr" />
-                <TextField label="אימייל איש קשר" value={form.employerContactEmail} onChange={(value) => setField('employerContactEmail', value)} dir="ltr" />
+              <div className="mt-6">
+                <ContactPicker label="מעסיק / איש קשר (אופציונלי)" value={form.rel_employer_contact} onChange={(id) => setField('rel_employer_contact', id)} />
               </div>
             </section>
 

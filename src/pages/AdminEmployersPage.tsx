@@ -145,7 +145,7 @@ const ALL_COLUMNS = [
   { key: 'account_name', label: 'שם ארגון' },
   { key: 'primary_contact', label: 'שם מעסיק' },
   { key: 'account_type', label: 'סוג ארגון' },
-  { key: 'account_status', label: 'סטטוס מעסיק' },
+  { key: 'account_status', label: 'סטטוס ארגון' },
   { key: 'phone', label: 'נייד / טלפון' },
   { key: 'email', label: 'מייל' },
   { key: 'region', label: 'אזור' },
@@ -638,7 +638,7 @@ export default function AdminEmployersPage({
       'שם ארגון': item.account_name ?? '',
       'שם מעסיק': item.primaryEmployerName ?? '',
       'סוג ארגון': accountTypeName(item.account_type),
-      'סטטוס מעסיק': accountStatusName(item.account_status),
+      'סטטוס ארגון': accountStatusName(item.account_status),
       טלפון: item.phone ?? '',
       מייל: item.email ?? '',
       עיר: item.locationLabel || cityName(item.displayCityId),
@@ -864,7 +864,7 @@ export default function AdminEmployersPage({
 
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-6">
                 <SearchBar value={filters.search ?? ''} onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))} placeholder="חיפוש שם, טלפון, מייל, עיר..." />
-                <SelectFilter value={String(filters.account_status ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_status: value ? Number(value) : undefined }))} options={(isEmployersBoard ? accountStatuses.filter((item) => EMPLOYER_STATUS_IDS.includes(item.id)) : accountStatuses).map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סטטוס מעסיק" />
+                <SelectFilter value={String(filters.account_status ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_status: value ? Number(value) : undefined }))} options={(isEmployersBoard ? accountStatuses.filter((item) => EMPLOYER_STATUS_IDS.includes(item.id)) : accountStatuses).map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סטטוס ארגון" />
                 <SelectFilter value={String(filters.account_type ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_type: value ? Number(value) : undefined }))} options={accountTypes.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="סוג ארגון" />
                 <CityRegionPicker
                   variant="filter"
@@ -907,7 +907,7 @@ export default function AdminEmployersPage({
                     value={bulkField}
                     onChange={(value) => { setBulkField(value); setBulkValue('') }}
                     options={[
-                      { value: 'account_status', label: 'סטטוס מעסיק' },
+                      { value: 'account_status', label: 'סטטוס ארגון' },
                       { value: 'account_type', label: 'סוג ארגון' },
                       { value: 'region_id', label: 'אזור' },
                       { value: 'city_id', label: 'עיר' },
@@ -1023,7 +1023,7 @@ export default function AdminEmployersPage({
                     <SectionCard title="פרטי ארגון">
                       <LabelValue label="שם" value={selectedAccount.account_name ?? '—'} />
                       <LabelValue label="סוג" value={accountTypeName(selectedAccount.account_type)} />
-                      <LabelValue label="סטטוס מעסיק" value={accountStatusName(selectedAccount.account_status)} />
+                      <LabelValue label="סטטוס ארגון" value={accountStatusName(selectedAccount.account_status)} />
                       <LabelValue label="אזור" value={regionName(selectedAccount.region_id)} />
                       <LabelValue label="עיר" value={cityName(selectedAccount.city_id)} />
                     </SectionCard>
@@ -1043,7 +1043,7 @@ export default function AdminEmployersPage({
                   <>
                     <SectionCard title="פרטי בסיס">
                       <TextField label="שם ארגון" value={draft.account_name} onChange={(value) => setDraft((prev) => ({ ...prev, account_name: value }))} />
-                      <SelectLikeField label="סטטוס מעסיק" value={String(draft.account_status ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, account_status: value ? Number(value) : null }))} options={accountStatuses.map((item) => ({ value: String(item.id), label: item.name }))} />
+                      <SelectLikeField label="סטטוס ארגון" value={String(draft.account_status ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, account_status: value ? Number(value) : null }))} options={accountStatuses.map((item) => ({ value: String(item.id), label: item.name }))} />
                       <SelectLikeField label="סוג ארגון" value={String(draft.account_type ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, account_type: value ? Number(value) : null }))} options={accountTypes.map((item) => ({ value: String(item.id), label: item.name }))} />
                       <TextField label="ח.פ / מזהה" value={draft.bus_id} onChange={(value) => setDraft((prev) => ({ ...prev, bus_id: value }))} />
                     </SectionCard>

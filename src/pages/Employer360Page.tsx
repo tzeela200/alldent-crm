@@ -41,6 +41,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { ContactPicker } from "@/components/ui/ContactPicker";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -1310,6 +1311,47 @@ function KpiStrip({ account, jobs, applications, dicts }: { account: AccountRow;
   );
 }
 
+function LinkContactToAccountPanel({ accountId }: { accountId: number }) {
+  const [pendingId, setPendingId] = React.useState<number | null>(null)
+  const [saving, setSaving] = React.useState(false)
+
+  const handleLink = async () => {
+    if (!pendingId) return
+    setSaving(true)
+    const { error } = await supabase
+      .from('contact')
+      .update({ account_link: accountId })
+      .eq('contact_id', pendingId)
+    setSaving(false)
+    if (error) {
+      toast.error('שגיאה בשיוך איש הקשר')
+    } else {
+      toast.success('איש הקשר שויך לארגון בהצלחה')
+      setPendingId(null)
+    }
+  }
+
+  return (
+    <SectionCard title="שיוך איש קשר לארגון" icon={<Users className="h-4 w-4" />}>
+      <p className="mb-3 text-[13px] text-[#6B6B6B]">חפש איש קשר קיים ושייך אותו לארגון זה</p>
+      <ContactPicker
+        label="חיפוש איש קשר"
+        value={pendingId}
+        onChange={(id) => setPendingId(id)}
+      />
+      {pendingId && (
+        <Button
+          className="mt-3 w-full rounded-xl bg-[#008080] text-white hover:bg-[#006D6D]"
+          onClick={handleLink}
+          disabled={saving}
+        >
+          {saving ? 'משייך...' : 'שייך לארגון'}
+        </Button>
+      )}
+    </SectionCard>
+  )
+}
+
 function OrganizationDetails({ account, dicts, onCopy }: { account: AccountRow; dicts: DictBundle; onCopy: (value: string | null | undefined) => void }) {
   return (
     <SectionCard
@@ -2122,6 +2164,7 @@ export default function Employer360Page() {
           <TabsContent value="admin" className="mt-0 grid gap-4 xl:grid-cols-2">
             <OrganizationDetails account={account} dicts={dicts} onCopy={handleCopy} />
             <CommunicationDetails account={account} />
+            <LinkContactToAccountPanel accountId={account.account_id} />
             <BillingAdminPanel account={account} />
           </TabsContent>
 
