@@ -344,13 +344,13 @@ export default function JobDetailsPage() {
                   onRegionChange={(id) => setDraft((prev) => prev ? { ...prev, region_id: id ? String(id) : '', city_id: '' } : prev)}
                 />
                 <TextField label="כתובת" value={draft.address} onChange={(value) => setField('address', value)} />
-                <SelectField label="ניסיון" value={draft.required_experience} onChange={(value) => setField('required_experience', value)} options={experience.map(toOption)} />
-                <MultiSelectField label="היקף" values={draft.scope} onChange={(values) => setField('scope', values)} options={scopes.map(toOption)} />
-                <TextField label="ימים ושעות" value={draft.work_schedule_text} onChange={(value) => setField('work_schedule_text', value)} labelSuffix={<JobAIWriter mode="admin" field="work_schedule_text" currentValue={draft.work_schedule_text} onApply={(v) => setField('work_schedule_text', v)} />} />
-                <MultiSelectField label="שפות" values={draft.required_languages} onChange={(values) => setField('required_languages', values)} options={languages.map(toOption)} />
-                <MultiSelectField label="מערכות" values={draft.systems_used} onChange={(values) => setField('systems_used', values)} options={systems.map(toOption)} />
-                <SelectField label="מיסוי" value={draft.tax_type_id} onChange={(value) => setField('tax_type_id', value)} options={taxTypes.map(toOption)} />
-                <SelectField label="ניידות" value={draft.mobility_id} onChange={(value) => setField('mobility_id', value)} options={mobility.map(toOption)} />
+                <SelectField label="ניסיון נדרש" value={draft.required_experience} onChange={(value) => setField('required_experience', value)} options={experience.map(toOption)} />
+                <MultiSelectField label="היקף משרה" values={draft.scope} onChange={(values) => setField('scope', values)} options={scopes.map(toOption)} />
+                <TextField label="ימים ושעות עבודה" value={draft.work_schedule_text} onChange={(value) => setField('work_schedule_text', value)} labelSuffix={<JobAIWriter mode="admin" field="work_schedule_text" currentValue={draft.work_schedule_text} onApply={(v) => setField('work_schedule_text', v)} />} />
+                <MultiSelectField label="שפות נדרשות" values={draft.required_languages} onChange={(values) => setField('required_languages', values)} options={languages.map(toOption)} />
+                <MultiSelectField label="מערכות מחשב / תוכנות מחשב" values={draft.systems_used} onChange={(values) => setField('systems_used', values)} options={systems.map(toOption)} />
+                <SelectField label="סוג העסקה" value={draft.tax_type_id} onChange={(value) => setField('tax_type_id', value)} options={taxTypes.map(toOption)} />
+                <SelectField label="ניידות נדרשת" value={draft.mobility_id} onChange={(value) => setField('mobility_id', value)} options={mobility.map(toOption)} />
                 <TextField label="שכר שעתי" value={draft.salary_expectation_hourly} onChange={(value) => setField('salary_expectation_hourly', value)} dir="ltr" />
                 <TextField label="שכר חודשי / גלובלי" value={draft.salary_expectation_monthly} onChange={(value) => setField('salary_expectation_monthly', value)} dir="ltr" />
                 <label className="flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-[#FAFAF7] px-4 py-3 text-[13px] font-semibold lg:col-span-2"><span>הצגת שכר לציבור</span><input type="checkbox" checked={draft.show_salary_public} onChange={(event) => setField('show_salary_public', event.target.checked)} className="h-4 w-4 accent-[#008080]" /></label>
@@ -358,8 +358,19 @@ export default function JobDetailsPage() {
                 <TextAreaField label="דרישות המשרה" value={draft.job_requirements} onChange={(value) => setField('job_requirements', value)} labelSuffix={<JobAIWriter mode="admin" field="job_requirements" currentValue={draft.job_requirements} jobContext={{ title: draft.job_title, role: draft.job_role }} onApply={(v) => setField('job_requirements', v)} />} />
                 <TextAreaField label="תקציר ציבורי" value={draft.public_excerpt} onChange={(value) => setField('public_excerpt', value)} labelSuffix={<JobAIWriter mode="admin" field="public_excerpt" currentValue={draft.public_excerpt} jobContext={{ title: draft.job_title }} onApply={(v) => setField('public_excerpt', v)} />} />
                 <TextAreaField label="הערות פנימיות" value={draft.notes} onChange={(value) => setField('notes', value)} />
-                <TextAreaField label="הערות מעסיק" value={draft.employer_notes} onChange={(value) => setField('employer_notes', value)} className="lg:col-span-2" />
-                <TextField label="קישור משרה חיצוני" value={draft.job_url} onChange={(value) => setField('job_url', value)} dir="ltr" className="lg:col-span-2" />
+                <TextAreaField label="הערות מהלקוח / מהמעסיק" value={draft.employer_notes} onChange={(value) => setField('employer_notes', value)} className="lg:col-span-2" />
+                <div className="lg:col-span-2 flex flex-col gap-1.5">
+                  <span className="text-[13px] font-semibold text-[#6B6B6B]">קישור משרה חיצוני (אופציונלי)</span>
+                  <input dir="ltr" value={draft.job_url} onChange={(e) => setField('job_url', e.target.value)} className="h-11 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]" />
+                  {draft.job_code && (
+                    <p className="text-[11px] text-[#6B6B6B]" dir="ltr">
+                      קישור ציבורי צפוי: https://www.alldent.co.il/jobs/{draft.job_code.trim().toUpperCase()}
+                    </p>
+                  )}
+                  {draft.job_code.trim().toUpperCase().startsWith('MITOG') && draft.job_url && (
+                    <p className="text-[11px] text-[#6B6B6B]">קישור מיתוג קיים: <span dir="ltr">{draft.job_url}</span></p>
+                  )}
+                </div>
               </div>
             </section>
 

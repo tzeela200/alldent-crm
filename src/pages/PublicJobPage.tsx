@@ -49,23 +49,6 @@ export default function PublicJobPage() {
     </div>
   )
 
-  const chips = [
-    job.city_name && { label: '📍', value: job.city_name },
-    job.region_name && { label: 'אזור', value: job.region_name },
-    job.required_experience_name && { label: 'ניסיון', value: job.required_experience_name },
-    ...(Array.isArray(job.scope_names)
-      ? job.scope_names.map(s => ({ label: 'היקף', value: s }))
-      : job.scope_names ? [{ label: 'היקף', value: job.scope_names as string }] : []),
-    job.mobility_name && { label: 'ניידות', value: job.mobility_name },
-    job.tax_type_name && { label: 'מיסוי', value: job.tax_type_name },
-    ...(Array.isArray(job.system_names) && job.system_names.length
-      ? [{ label: 'מערכת', value: job.system_names.join(', ') }]
-      : []),
-    ...(Array.isArray(job.required_languages) && job.required_languages.length
-      ? [{ label: 'שפות', value: job.required_languages.join(', ') }]
-      : []),
-  ].filter(Boolean) as { label: string; value: string }[]
-
   const hasContent = !!(job.job_description || job.job_requirements)
 
   return (
@@ -119,47 +102,51 @@ export default function PublicJobPage() {
             </p>
           )}
 
-          {/* Salary badge in hero */}
-          {job.show_salary_public && (job.salary_expectation_monthly || job.salary_expectation_hourly) && (
-            <div className="flex gap-3 mt-4">
-              {job.salary_expectation_monthly && (
-                <span className="inline-flex items-center gap-1 bg-[#D9A928]/20 border border-[#D9A928]/50 text-[#FDD76A] rounded-full px-4 py-1.5 text-[13px] font-bold">
-                  ₪{job.salary_expectation_monthly.toLocaleString()} / חודש
-                </span>
-              )}
-              {job.salary_expectation_hourly && (
-                <span className="inline-flex items-center gap-1 bg-[#D9A928]/20 border border-[#D9A928]/50 text-[#FDD76A] rounded-full px-4 py-1.5 text-[13px] font-bold">
-                  ₪{job.salary_expectation_hourly.toLocaleString()} / שעה
-                </span>
-              )}
-            </div>
-          )}
         </div>
       </section>
 
-      {/* ── CHIPS BAR ─────────────────────────────────────────── */}
-      {chips.length > 0 && (
-        <div className="bg-white border-b border-[#E5E7EB] px-4 overflow-x-auto">
-          <div className="flex gap-0 max-w-4xl mx-auto min-w-max">
-            {chips.map((c, i) => (
-              <div key={i} className="flex items-center gap-1.5 px-5 py-4 border-e border-[#E5E7EB] last:border-e-0 shrink-0">
-                <span className="text-[11px] text-[#9CA3AF] font-medium uppercase tracking-wide">{c.label}</span>
-                <span className="text-[14px] text-[#0F0F10] font-semibold">{c.value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* ── MAIN CONTENT ──────────────────────────────────────── */}
-      <div className="max-w-4xl mx-auto px-4 md:px-8 py-10 space-y-10">
+      <div className="max-w-4xl mx-auto px-4 md:px-8 py-10 space-y-8">
+
+        {/* Job code */}
+        <p className="text-[14px] font-bold text-[#008080]">קוד משרה: {job.job_code}</p>
 
         {/* Excerpt / summary */}
         {job.public_excerpt && (
           <div className="bg-[#E6F7F7] border border-[#008080]/20 rounded-2xl px-6 py-5">
+            <p className="text-[12px] font-semibold text-[#008080] mb-2 uppercase tracking-wide">תקציר המשרה</p>
             <p className="text-[15px] text-[#006D6D] font-medium leading-relaxed text-right">
               {job.public_excerpt}
             </p>
+          </div>
+        )}
+
+        {/* Role / sub-role */}
+        {(job.job_role_name || (Array.isArray(job.job_sub_role_names) && job.job_sub_role_names.length > 0)) && (
+          <InfoRow label="תפקיד" value={job.job_role_name ?? ''}>
+            {Array.isArray(job.job_sub_role_names) && job.job_sub_role_names.length > 0 && (
+              <InfoField label="תת-תפקיד" value={job.job_sub_role_names.join(', ')} />
+            )}
+          </InfoRow>
+        )}
+
+        {/* Location */}
+        {(job.region_name || job.city_name) && (
+          <div className="flex flex-wrap gap-6">
+            {job.region_name && <InfoField label="אזור" value={job.region_name} />}
+            {job.city_name && <InfoField label="עיר משרה" value={job.city_name} />}
+          </div>
+        )}
+
+        {/* Scope + schedule */}
+        {(job.scope_names || job.work_schedule_text) && (
+          <div className="flex flex-wrap gap-6">
+            {job.scope_names && (
+              <InfoField label="היקף משרה" value={Array.isArray(job.scope_names) ? job.scope_names.join(', ') : String(job.scope_names)} />
+            )}
+            {job.work_schedule_text && (
+              <InfoField label="ימים ושעות" value={job.work_schedule_text} />
+            )}
           </div>
         )}
 
@@ -170,6 +157,16 @@ export default function PublicJobPage() {
               <ReactMarkdown>{job.job_description}</ReactMarkdown>
             </div>
           </ContentSection>
+        )}
+
+        {/* Experience + languages */}
+        {(job.required_experience_name || (Array.isArray(job.required_languages_names) && job.required_languages_names.length > 0)) && (
+          <div className="flex flex-wrap gap-6">
+            {job.required_experience_name && <InfoField label="ניסיון נדרש" value={job.required_experience_name} />}
+            {Array.isArray(job.required_languages_names) && job.required_languages_names.length > 0 && (
+              <InfoField label="שפות נדרשות" value={job.required_languages_names.join(', ')} />
+            )}
+          </div>
         )}
 
         {/* Requirements */}
@@ -188,13 +185,32 @@ export default function PublicJobPage() {
           </div>
         )}
 
+        {/* Additional criteria */}
+        {(job.mobility_name || (Array.isArray(job.system_names) && job.system_names.length > 0) || job.tax_type_name || (job.show_salary_public && (job.salary_expectation_monthly || job.salary_expectation_hourly))) && (
+          <ContentSection title="קריטריונים נוספים">
+            <div className="flex flex-wrap gap-6">
+              {job.mobility_name && <InfoField label="ניידות נדרשת" value={job.mobility_name} />}
+              {Array.isArray(job.system_names) && job.system_names.length > 0 && (
+                <InfoField label="מערכות מחשב / תוכנות מחשב" value={job.system_names.join(', ')} />
+              )}
+              {job.tax_type_name && <InfoField label="סוג העסקה" value={job.tax_type_name} />}
+              {job.show_salary_public && (job.salary_expectation_monthly || job.salary_expectation_hourly) && (
+                <InfoField
+                  label="שכר"
+                  value={[
+                    job.salary_expectation_monthly ? `₪${job.salary_expectation_monthly.toLocaleString()} / חודש` : null,
+                    job.salary_expectation_hourly ? `₪${job.salary_expectation_hourly.toLocaleString()} / שעה` : null,
+                  ].filter(Boolean).join(' · ')}
+                />
+              )}
+            </div>
+          </ContentSection>
+        )}
+
         {/* Discretion note */}
         <p className="text-[13px] text-[#9CA3AF] leading-relaxed text-right px-1">
           כל המשרות באתר AllDent מוצגות באופן דיסקרטי. פרטי המעסיק יימסרו רק בהמשך התהליך.
         </p>
-
-        {/* Job code */}
-        <p className="text-[12px] text-[#C4C4C4] text-end">קוד משרה: {job.job_code}</p>
 
       </div>
 
@@ -232,6 +248,25 @@ export default function PublicJobPage() {
 }
 
 /* ─── Sub-components ──────────────────────────────────────── */
+
+function InfoField({ label, value }: { label: string; value: string }) {
+  if (!value) return null
+  return (
+    <div className="flex flex-col gap-0.5 min-w-[120px]">
+      <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wide">{label}</span>
+      <span className="text-[14px] font-semibold text-[#0F0F10]">{value}</span>
+    </div>
+  )
+}
+
+function InfoRow({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex flex-wrap gap-6">
+      <InfoField label={label} value={value} />
+      {children}
+    </div>
+  )
+}
 
 function ContentSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (

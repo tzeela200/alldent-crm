@@ -25,6 +25,7 @@ type FormState = {
   accountCityId: string
   accountAddress: string
   rel_employer_contact: number | null
+  rel_recruiter_contact: number | null
   job_code: string
   job_title: string
   job_role: string
@@ -61,6 +62,7 @@ const EMPTY_FORM: FormState = {
   accountCityId: '',
   accountAddress: '',
   rel_employer_contact: null,
+  rel_recruiter_contact: null,
   job_code: '',
   job_title: '',
   job_role: '',
@@ -227,9 +229,20 @@ export default function CreateJobWizardPage() {
         accountLink = Number(newAccount.account_id)
       }
 
-      const jobCode = cleanText(form.job_code) || generateJobCode(Number(form.job_role || 0))
+      const normalized = (form.job_code ?? '').trim().toUpperCase()
+      if (!normalized) {
+        showToast('יש להזין קוד משרה', 'error')
+        setSaving(false)
+        return
+      }
+      const { data: existing } = await supabase.from('job').select('job_code').eq('job_code', normalized).maybeSingle()
+      if (existing) {
+        showToast('קוד משרה כבר קיים, בחרי קוד אחר', 'error')
+        setSaving(false)
+        return
+      }
       const payload = {
-        job_code: jobCode,
+        job_code: normalized,
         account_link: accountLink,
         job_status: JOB_STATUS_DRAFT,
         public_status: PUBLIC_STATUS_HIDDEN,
@@ -252,6 +265,7 @@ export default function CreateJobWizardPage() {
         job_description: cleanText(form.job_description),
         job_requirements: cleanText(form.job_requirements),
         rel_employer_contact: form.rel_employer_contact ?? null,
+        rel_recruiter_contact: form.rel_recruiter_contact ?? null,
         employer_notes: cleanText(form.employer_notes),
         notes: cleanText(form.notes),
         public_excerpt: cleanText(form.public_excerpt),
@@ -269,7 +283,7 @@ export default function CreateJobWizardPage() {
       const { error } = await supabase.from('job').insert(payload)
       if (error) throw error
       showToast('המשרה נשמרה כטיוטה מוסתרת', 'success')
-      navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`)
+      navigate(`/admin/jobs/${encodeURIComponent(normalized)}`)
     } catch (err) {
       console.error(err)
       showToast(err instanceof Error ? err.message : 'שגיאה בשמירת המשרה', 'error')
@@ -319,15 +333,20 @@ export default function CreateJobWizardPage() {
                 </div>
               )}
 
-              <div className="mt-6">
+              <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <ContactPicker label="מעסיק / איש קשר (אופציונלי)" value={form.rel_employer_contact} onChange={(id) => setField('rel_employer_contact', id)} />
+                <ContactPicker label="מגייס (אופציונלי)" value={form.rel_recruiter_contact} onChange={(id) => setField('rel_recruiter_contact', id)} />
               </div>
             </section>
 
             <section className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
               <SectionTitle icon={<Briefcase className="h-5 w-5" />} title="פרטי משרה" />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <TextField label="קוד משרה" value={form.job_code} onChange={(value) => setField('job_code', value)} dir="ltr" placeholder="אפשר להשאיר ריק ליצירה אוטומטית" />
+                <JobCodeField
+                  value={form.job_code}
+                  roleId={form.job_role ? Number(form.job_role) : null}
+                  onChange={(value) => setField('job_code', value)}
+                />
                 <TextField label="כותרת משרה" value={form.job_title} onChange={(value) => setField('job_title', value)} labelSuffix={<JobAIWriter mode="admin" field="job_title" currentValue={form.job_title} jobContext={{ role: form.job_role }} onApply={(v) => setField('job_title', v)} />} />
                 <RoleSubRolePicker
                   variant="edit"
@@ -350,9 +369,9 @@ export default function CreateJobWizardPage() {
                 <MultiSelectField label="היקף משרה" values={form.scope} onChange={(values) => setField('scope', values)} options={scopes.map(toOption)} />
                 <TextField label="ימים ושעות עבודה" value={form.work_schedule_text} onChange={(value) => setField('work_schedule_text', value)} labelSuffix={<JobAIWriter mode="admin" field="work_schedule_text" currentValue={form.work_schedule_text} onApply={(v) => setField('work_schedule_text', v)} />} />
                 <MultiSelectField label="שפות" values={form.required_languages} onChange={(values) => setField('required_languages', values)} options={languages.map(toOption)} />
-                <MultiSelectField label="מערכות" values={form.systems_used} onChange={(values) => setField('systems_used', values)} options={systems.map(toOption)} />
-                <SelectField label="מיסוי" value={form.tax_type_id} onChange={(value) => setField('tax_type_id', value)} options={taxTypes.map(toOption)} />
-                <SelectField label="ניידות" value={form.mobility_id} onChange={(value) => setField('mobility_id', value)} options={mobility.map(toOption)} />
+                <MultiSelectField label="מערכות מחשב / תוכנות מחשב" values={form.systems_used} onChange={(values) => setField('systems_used', values)} options={systems.map(toOption)} />
+                <SelectField label="סוג העסקה" value={form.tax_type_id} onChange={(value) => setField('tax_type_id', value)} options={taxTypes.map(toOption)} />
+                <SelectField label="ניידות נדרשת" value={form.mobility_id} onChange={(value) => setField('mobility_id', value)} options={mobility.map(toOption)} />
               </div>
             </section>
 
@@ -369,7 +388,7 @@ export default function CreateJobWizardPage() {
                 <TextAreaField label="דרישות המשרה" value={form.job_requirements} onChange={(value) => setField('job_requirements', value)} labelSuffix={<JobAIWriter mode="admin" field="job_requirements" currentValue={form.job_requirements} jobContext={{ title: form.job_title, role: form.job_role }} onApply={(v) => setField('job_requirements', v)} />} />
                 <TextAreaField label="תקציר ציבורי" value={form.public_excerpt} onChange={(value) => setField('public_excerpt', value)} labelSuffix={<JobAIWriter mode="admin" field="public_excerpt" currentValue={form.public_excerpt} jobContext={{ title: form.job_title }} onApply={(v) => setField('public_excerpt', v)} />} />
                 <TextAreaField label="הערות פנימיות" value={form.notes} onChange={(value) => setField('notes', value)} />
-                <TextAreaField label="הערות מעסיק" value={form.employer_notes} onChange={(value) => setField('employer_notes', value)} className="lg:col-span-2" />
+                <TextAreaField label="הערות מהלקוח / מהמעסיק" value={form.employer_notes} onChange={(value) => setField('employer_notes', value)} className="lg:col-span-2" />
               </div>
             </section>
 
@@ -388,7 +407,7 @@ export default function CreateJobWizardPage() {
               <SummaryRow label="סטטוס פעילות" value="טיוטה" />
               <SummaryRow label="סטטוס פרסום" value="מוסתרת" />
               <SummaryRow label="ארגון" value={form.createMode === 'existing' ? (selectedAccount?.account_name ?? 'לא נבחר') : (form.newAccountName || 'ארגון חדש')} />
-              <SummaryRow label="קוד" value={form.job_code || 'ייווצר אוטומטית'} />
+              <SummaryRow label="קוד" value={form.job_code || '—'} />
               <SummaryRow label="כותרת" value={form.job_title || '—'} />
               <SummaryRow label="עיר" value={cities.find((c) => String(c.id) === String(form.city_id))?.name ?? '—'} />
               <SummaryRow label="תמונה" value={form.public_image_url ? 'קיימת' : 'לא הועלתה'} />
@@ -448,5 +467,66 @@ function SummaryRow({ label, value }: { label: string; value: React.ReactNode })
 function toOption(item: DictItem) { return { value: String(item.id), label: item.name } }
 function cleanText(value: string) { const clean = String(value ?? '').trim(); return clean || null }
 function toNullableNumber(value: string) { const clean = String(value ?? '').trim(); if (!clean) return null; const numeric = Number(clean); return Number.isFinite(numeric) ? numeric : null }
-function generateJobCode(roleId: number) { return `JOB${roleId || ''}${Date.now().toString().slice(-5)}`.toUpperCase() }
 function toastClassName(tone: ToastTone) { if (tone === 'success') return 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]'; if (tone === 'error') return 'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]'; return 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1D4ED8]' }
+
+const ROLE_PREFIX: Record<number, string> = {
+  1: 'DOC', 2: 'DOC', 3: 'DOC', 4: 'DOC', 5: 'DOC', 6: 'DOC', 7: 'DOC', 8: 'DOC',
+  9: 'AS', 10: 'HY', 11: 'TEC',
+  12: 'ADM', 13: 'SE', 14: 'ADM', 15: 'ADM', 16: 'ADM', 17: 'ADM', 18: 'ADM',
+}
+
+async function suggestJobCode(roleId: number): Promise<string | null> {
+  const prefix = ROLE_PREFIX[roleId]
+  if (!prefix) return null
+  const { data } = await supabase.from('job').select('job_code').like('job_code', `${prefix}%`)
+  const regex = new RegExp(`^${prefix}(\\d+)$`, 'i')
+  const nums = (data ?? []).map(r => { const m = r.job_code.match(regex); return m ? parseInt(m[1], 10) : null }).filter((n): n is number => n !== null)
+  const maxNum = nums.length > 0 ? Math.max(...nums) : 0
+  return `${prefix}${maxNum + 1}`
+}
+
+function JobCodeField({ value, roleId, onChange }: { value: string; roleId: number | null; onChange: (v: string) => void }) {
+  const [suggesting, setSuggesting] = useState(false)
+  const [localToast, setLocalToast] = useState<string | null>(null)
+  const isMitog = value.trim().toUpperCase().startsWith('MITOG')
+
+  const handleSuggest = async () => {
+    if (!roleId) { setLocalToast('יש לבחור תפקיד תחילה'); setTimeout(() => setLocalToast(null), 2500); return }
+    setSuggesting(true)
+    const suggested = await suggestJobCode(roleId)
+    setSuggesting(false)
+    if (!suggested) { setLocalToast('לא ניתן להציע קוד לתפקיד זה'); setTimeout(() => setLocalToast(null), 2500); return }
+    if (!value.trim()) onChange(suggested)
+  }
+
+  const displayCode = value.trim().toUpperCase()
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[13px] font-semibold text-[#6B6B6B]">קוד משרה</span>
+      <div className="flex gap-2">
+        <input
+          dir="ltr"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="לדוגמה: AS207"
+          className="h-11 flex-1 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
+        />
+        <button
+          type="button"
+          onClick={handleSuggest}
+          disabled={!roleId || suggesting}
+          className="h-11 whitespace-nowrap rounded-xl border border-[#008080] bg-white px-3 text-[12px] font-bold text-[#008080] transition hover:bg-[#E6F3F3] disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {suggesting ? '...' : 'הצע קוד'}
+        </button>
+      </div>
+      {localToast && <p className="text-[12px] text-[#991B1B]">{localToast}</p>}
+      {displayCode && (
+        <p className="text-[11px] text-[#6B6B6B]" dir="ltr">
+          קישור ציבורי צפוי: https://www.alldent.co.il/jobs/{displayCode}
+        </p>
+      )}
+      {isMitog && <p className="text-[11px] text-[#6B6B6B]">שים לב: משרת MITOG — לינק מיתוג עשוי להיות שונה</p>}
+    </div>
+  )
+}

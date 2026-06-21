@@ -89,6 +89,7 @@ const DEFAULT_JOB_COLUMNS = [
   'job_sub_role',
   'account_name',
   'employer_name',
+  'recruiter_name',
   'region_id',
   'city_id',
   'scope',
