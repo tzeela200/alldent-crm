@@ -40,6 +40,7 @@ export interface Contact {
   profile_type: number | null // → dict_profile_types (display only)
   source: number | null // → dict_sources
   check_status: number | null // → dict_check_statuses
+  work_status?: number | null // → dict_contact_work_statuses
   social_status: number | null // → dict_social_statuses
   facebook_url: string | null
   facebook_name: string | null

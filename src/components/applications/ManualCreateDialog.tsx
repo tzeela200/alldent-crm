@@ -18,11 +18,14 @@ interface JobResult {
   job_code: string
   job_title: string | null
   job_role: number | null
+  job_status: number | null
   job_url: string | null
   city_id: number | null
   region_id: number | null
   account_link: number | null
   account_name: string | null
+  city_name?: string | null
+  region_name?: string | null
 }
 
 export function ManualCreateDialog({ onClose, onCreated }: Props) {
@@ -63,12 +66,14 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
       if (jobSearch.length < 2) return []
       const { data } = await supabase
         .from('job')
-        .select('job_code, job_title, job_role, job_url, city_id, region_id, account_link, accounts(account_name)')
+        .select('job_code, job_title, job_role, job_status, job_url, city_id, region_id, account_link, accounts(account_name), dict_cities(name), dict_regions(name)')
         .or(`job_code.ilike.%${jobSearch}%,job_title.ilike.%${jobSearch}%`)
         .limit(10)
       return (data ?? []).map((j: any) => ({
         ...j,
         account_name: Array.isArray(j.accounts) ? j.accounts[0]?.account_name ?? null : j.accounts?.account_name ?? null,
+        city_name: Array.isArray(j.dict_cities) ? j.dict_cities[0]?.name ?? null : j.dict_cities?.name ?? null,
+        region_name: Array.isArray(j.dict_regions) ? j.dict_regions[0]?.name ?? null : j.dict_regions?.name ?? null,
       })) as JobResult[]
     },
     enabled: jobSearch.length >= 2,
@@ -126,6 +131,8 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
         candidate_notes: null,
         check_status: checkStatus !== '' ? Number(checkStatus) : null,
         application_status: appStatus,
+        // TODO: master_availability/master_role/master_city/master_region נשמרים כ-ID בתוך string.
+        // לא לשנות DB. לוודא שה-display מציג Label ולא ID.
         master_availability: String(selectedContact.availability ?? ''),
         master_role: String(selectedContact.role ?? ''),
         master_city: String(selectedContact.city_id ?? ''),
@@ -232,19 +239,32 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
             <div>
               <label className="mb-1 block text-xs font-medium text-slate-500">משרה *</label>
               {selectedJob ? (
-                <div className="flex items-center justify-between rounded-xl border border-teal-300 bg-teal-50 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-medium text-teal-800">{selectedJob.job_code}</p>
-                    <p className="text-xs text-teal-600">
-                      {selectedJob.job_title ?? ''}{selectedJob.account_name ? ` · ${selectedJob.account_name}` : ''}
-                    </p>
+                <div className="rounded-xl border border-teal-300 bg-teal-50 px-3 py-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-teal-800">{selectedJob.job_code}</p>
+                      <p className="text-xs text-teal-600">
+                        {selectedJob.job_title ?? ''}
+                        {selectedJob.account_name ? ` · ${selectedJob.account_name}` : ''}
+                      </p>
+                      {(selectedJob.city_name || selectedJob.region_name) && (
+                        <p className="text-xs text-teal-500">
+                          {[selectedJob.city_name, selectedJob.region_name].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setSelectedJob(null)}
+                      className="text-teal-400 hover:text-teal-600"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
                   </div>
-                  <button
-                    onClick={() => setSelectedJob(null)}
-                    className="text-teal-400 hover:text-teal-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
+                  {selectedJob.job_status !== 3 && selectedJob.job_status != null && (
+                    <div className="mt-2 rounded-lg bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-800">
+                      ⚠ המשרה אינה פעילה — ניתן להמשיך אבל יש לוודא מול הגיוס
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="relative">
@@ -267,12 +287,22 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
                             setSelectedJob(j)
                             setJobSearch('')
                           }}
-                          className="flex w-full items-center justify-between px-3 py-2 text-right hover:bg-slate-50"
+                          className="flex w-full flex-col px-3 py-2 text-right hover:bg-slate-50"
                         >
-                          <span className="text-sm font-medium">{j.job_code}</span>
-                          <span className="text-xs text-slate-400">
-                            {j.job_title}{j.account_name ? ` · ${j.account_name}` : ''}
-                          </span>
+                          <div className="flex w-full items-center justify-between">
+                            <span className="text-sm font-medium">{j.job_code}</span>
+                            <span className="text-xs text-slate-400">
+                              {j.job_title}{j.account_name ? ` · ${j.account_name}` : ''}
+                            </span>
+                          </div>
+                          <div className="flex w-full items-center justify-between">
+                            <span className="text-[11px] text-slate-400">
+                              {[j.city_name, j.region_name].filter(Boolean).join(' · ')}
+                            </span>
+                            {j.job_status !== 3 && j.job_status != null && (
+                              <span className="text-[10px] font-medium text-amber-600">לא פעילה</span>
+                            )}
+                          </div>
                         </button>
                       ))}
                     </div>

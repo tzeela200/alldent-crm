@@ -36,9 +36,29 @@ export interface ApplicationRow {
   has_cv: boolean | null
   cv_storage_path: string | null
   cv_received_date: string | null
+
+  // Enriched from contact (via candidate_link) — not in DB table
+  contact_work_status?: number | null
+  contact_availability?: number | null
+  contact_profile_type?: number | null
+  contact_role?: number | null
+  contact_city_id?: number | null
+  contact_region_id?: number | null
+  contact_has_cv?: boolean | null
+  contact_cv_link?: string | null
+  contact_cv_received_date?: string | null
+  contact_display_name?: string | null
+
+  // Enriched from job (via job_code) — not in DB table
+  job_status?: number | null
+  job_title_from_job?: string | null
+  job_role_id?: number | null
+  job_city_id_from_job?: number | null
+  job_region_id_from_job?: number | null
 }
 
 export type CvFilter = 'all' | 'with' | 'without'
+export type InDbFilter = 'existing' | 'new'
 
 export interface ApplicationFilters {
   search?: string
@@ -47,13 +67,20 @@ export interface ApplicationFilters {
   source?: number
   job_region_id?: number
   job_role?: string
+  job_city_id?: number
+  job_status?: number
+  contact_work_status?: number
+  contact_availability?: number
+  in_db?: InDbFilter
   date_from?: string
   date_to?: string
   cv_state?: CvFilter
   is_manual?: boolean
   is_new_candidate?: boolean
-  assigned_to?: string
   has_follow_up?: boolean
+  active_apps_only?: boolean
+  closed_apps_only?: boolean
+  overdue_follow_up?: boolean
 }
 
 export interface ApplicationKPIs {

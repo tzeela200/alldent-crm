@@ -8,7 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
 import { whatsappLink } from '@/lib/normalizePhone'
 import { formatDate } from '@/lib/timeAgo'
-import { applicationStatusColors, checkStatusColors, getStatusBadge } from '@/lib/statusColors'
+import { applicationStatusColors, checkStatusColors, jobStatusColors, getStatusBadge } from '@/lib/statusColors'
 import { toast } from 'sonner'
 import type { Contact, Account, Job } from '@/types'
 
@@ -35,7 +35,6 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
   const [internalNotes, setInternalNotes] = useState('')
   const [appStatus, setAppStatus] = useState<number | ''>('')
   const [checkStatus, setCheckStatus] = useState<number | ''>('')
-  const [assignedTo, setAssignedTo] = useState('')
   const [followUpDate, setFollowUpDate] = useState('')
 
   const { data: contact } = useQuery({
@@ -115,6 +114,8 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
   const checkStatusLabel =
     getDictLabel(dicts?.checkStatuses, row.check_status) || checkBadge.label
 
+  const jobStatusBadge = job?.job_status ? getStatusBadge(jobStatusColors, job.job_status) : null
+
   return (
     <PanelShell onClose={onClose}>
       {/* Header */}
@@ -185,18 +186,18 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
               className="flex items-center gap-1 rounded-lg bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-100"
             >
               <UserRound className="h-3 w-3" />
-              360°
+              כרטיס מועמד
             </a>
           )}
           {row.job_code && (
             <a
-              href={`/admin/pipeline?job=${row.job_code}`}
+              href={`/admin/jobs?job=${row.job_code}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100"
             >
               <Briefcase className="h-3 w-3" />
-              ATS
+              פרטי משרה
             </a>
           )}
         </div>
@@ -210,14 +211,13 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
           <Field label="אימייל" value={row.candidate_email} dir="ltr" />
           <Field label="תאריך הגשה" value={formatDate(row.submission_date)} />
           <Field label="קוד משרה" value={row.job_code} />
-          <Field label="מעסיק" value={row.account_name} />
+          <Field label="ארגון" value={row.account_name} />
           <Field label="תפקיד משרה" value={row.job_role} />
-          <Field label="עיר" value={row.job_city} />
-          <Field label="אזור" value={row.job_region} />
+          <Field label="עיר משרה" value={row.job_city} />
+          <Field label="אזור משרה" value={row.job_region} />
           <Field label="מקור טופס" value={row.form_title} />
           <Field label="מקור" value={getDictLabel(dicts?.sources, row.source)} />
-          <Field label="מוקצה ל" value={row.assigned_to} />
-          <Field label="מעקב" value={formatDate(row.follow_up_date)} />
+          <Field label="תאריך פעולה הבאה" value={formatDate(row.follow_up_date)} />
         </FieldGrid>
         {row.candidate_notes && (
           <div className="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
@@ -295,32 +295,10 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
             </ActionButton>
           </div>
 
-          {/* assigned_to */}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-xs text-slate-500">מוקצה ל</label>
-              <input
-                type="text"
-                value={assignedTo !== '' ? assignedTo : (row.assigned_to ?? '')}
-                onChange={(e) => setAssignedTo(e.target.value)}
-                className="mt-1 h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500"
-                placeholder="שם / אימייל"
-              />
-            </div>
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              onClick={() => saveField('assigned_to', assignedTo || null, 'הקצאה')}
-              disabled={updateApplication.isPending}
-            >
-              שמור
-            </ActionButton>
-          </div>
-
           {/* follow_up_date */}
           <div className="flex gap-2">
             <div className="flex-1">
-              <label className="text-xs text-slate-500">תאריך מעקב</label>
+              <label className="text-xs text-slate-500">תאריך פעולה הבאה</label>
               <input
                 type="date"
                 value={followUpDate !== '' ? followUpDate : (row.follow_up_date?.slice(0, 10) ?? '')}
@@ -331,7 +309,7 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
             <ActionButton
               variant="secondary"
               size="sm"
-              onClick={() => saveField('follow_up_date', followUpDate || null, 'תאריך מעקב')}
+              onClick={() => saveField('follow_up_date', followUpDate || null, 'תאריך פעולה הבאה')}
               disabled={updateApplication.isPending}
             >
               שמור
@@ -391,6 +369,26 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
             <Field label="טלפון" value={contact.phone} dir="ltr" />
             <Field label="אימייל" value={contact.email} dir="ltr" />
             <Field label={'עם קו"ח'} value={contact.has_cv ? 'כן' : 'לא'} />
+            <Field
+              label="סטטוס תעסוקה"
+              value={getDictLabel(dicts?.workStatuses, contact.work_status)}
+            />
+            <Field
+              label="זמינות"
+              value={getDictLabel(dicts?.availabilities, contact.availability)}
+            />
+            <Field
+              label="תפקיד מועמד"
+              value={getDictLabel(dicts?.roles, contact.role)}
+            />
+            <Field
+              label="עיר מועמד"
+              value={getDictLabel(dicts?.cities, contact.city_id)}
+            />
+            <Field
+              label="אזור מועמד"
+              value={getDictLabel(dicts?.regions, contact.region_id)}
+            />
           </FieldGrid>
           {contact.cv_link && isValidUrl(contact.cv_link) && (
             <a
@@ -411,14 +409,31 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
         <Section title="פרטי משרה">
           <FieldGrid>
             <Field label="קוד משרה" value={job.job_code} />
-            <Field label="כותרת" value={job.job_title} />
-            <Field label="ניסיון נדרש" value={String(job.required_experience ?? '—')} />
-            <Field label="שפות" value={job.required_languages} />
+            <Field label="כותרת משרה" value={job.job_title} />
             <Field
-              label="שכר שעתי"
-              value={job.salary_min != null ? `₪${job.salary_min}` : undefined}
+              label="סטטוס משרה"
+              value={jobStatusBadge?.label ?? getDictLabel(dicts?.jobStatuses, job.job_status)}
             />
+            <Field
+              label="תפקיד משרה"
+              value={getDictLabel(dicts?.roles, job.job_role)}
+            />
+            <Field
+              label="עיר משרה"
+              value={getDictLabel(dicts?.cities, job.city_id)}
+            />
+            <Field
+              label="אזור משרה"
+              value={getDictLabel(dicts?.regions, job.region_id)}
+            />
+            <Field label="ניסיון נדרש" value={job.required_experience != null ? String(job.required_experience) : undefined} />
+            <Field label="שפות" value={job.required_languages} />
           </FieldGrid>
+          {job.job_status !== 3 && job.job_status != null && (
+            <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              ⚠ המשרה אינה פעילה כרגע
+            </div>
+          )}
           {job.job_description && (
             <div className="mt-2 max-h-32 overflow-y-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
               {job.job_description}
@@ -429,9 +444,9 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
 
       {/* Account data */}
       {account && (
-        <Section title="פרטי מעסיק">
+        <Section title="פרטי ארגון">
           <FieldGrid>
-            <Field label="שם עסק" value={account.account_name} />
+            <Field label="שם ארגון" value={account.account_name} />
             <Field label="טלפון" value={account.phone} dir="ltr" />
             <Field label="אימייל" value={account.email} dir="ltr" />
             <Field

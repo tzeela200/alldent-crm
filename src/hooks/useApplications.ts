@@ -28,6 +28,8 @@ export function useApplicationRows(filters: ApplicationFilters, page: number) {
         query = query.eq('source', filters.source)
       if (filters.job_region_id != null)
         query = query.eq('job_region_id', filters.job_region_id)
+      if (filters.job_city_id != null)
+        query = query.eq('job_city_id', filters.job_city_id)
       if (filters.job_role)
         query = query.ilike('job_role', `%${filters.job_role}%`)
       if (filters.date_from)
@@ -42,14 +44,88 @@ export function useApplicationRows(filters: ApplicationFilters, page: number) {
         query = query.eq('is_manual', filters.is_manual)
       if (filters.is_new_candidate != null)
         query = query.eq('is_new_candidate', filters.is_new_candidate)
-      if (filters.assigned_to != null)
-        query = query.eq('assigned_to', filters.assigned_to)
       if (filters.has_follow_up)
         query = query.not('follow_up_date', 'is', null)
+      if (filters.in_db === 'existing')
+        query = query.not('candidate_link', 'is', null).eq('is_new_candidate', false)
+      if (filters.in_db === 'new')
+        query = query.or('is_new_candidate.eq.true,candidate_link.is.null')
+      if (filters.active_apps_only)
+        query = query.not('application_status', 'in', '(5,10,13,14,15)')
+      if (filters.closed_apps_only)
+        query = query.in('application_status', [5, 13, 14, 15])
+      if (filters.overdue_follow_up) {
+        const today = new Date().toISOString().slice(0, 10)
+        query = query.not('follow_up_date', 'is', null).lte('follow_up_date', today)
+      }
 
       const { data, count, error } = await query
       if (error) throw error
-      return { rows: (data ?? []) as ApplicationRow[], total: count ?? 0 }
+
+      let rows = (data ?? []) as ApplicationRow[]
+
+      // Enrich with contact data
+      const candidateIds = [...new Set(rows.map((r) => r.candidate_link).filter(Boolean))] as number[]
+      if (candidateIds.length > 0) {
+        const { data: contacts } = await supabase
+          .from('contact')
+          .select('contact_id, work_status, availability, profile_type, role, city_id, region_id, has_cv, cv_link, cv_received_date, display_name')
+          .in('contact_id', candidateIds)
+        if (contacts) {
+          const contactMap = new Map(contacts.map((c) => [c.contact_id, c]))
+          rows = rows.map((r) => {
+            const c = r.candidate_link ? contactMap.get(r.candidate_link) : undefined
+            if (!c) return r
+            return {
+              ...r,
+              contact_work_status: c.work_status ?? null,
+              contact_availability: c.availability ?? null,
+              contact_profile_type: c.profile_type ?? null,
+              contact_role: c.role ?? null,
+              contact_city_id: c.city_id ?? null,
+              contact_region_id: c.region_id ?? null,
+              contact_has_cv: c.has_cv ?? null,
+              contact_cv_link: c.cv_link ?? null,
+              contact_cv_received_date: c.cv_received_date ?? null,
+              contact_display_name: c.display_name ?? null,
+            }
+          })
+        }
+      }
+
+      // Enrich with job data
+      const jobCodes = [...new Set(rows.map((r) => r.job_code).filter(Boolean))] as string[]
+      if (jobCodes.length > 0) {
+        const { data: jobs } = await supabase
+          .from('job')
+          .select('job_code, job_status, job_title, job_role, city_id, region_id')
+          .in('job_code', jobCodes)
+        if (jobs) {
+          const jobMap = new Map(jobs.map((j) => [j.job_code, j]))
+          rows = rows.map((r) => {
+            const j = r.job_code ? jobMap.get(r.job_code) : undefined
+            if (!j) return r
+            return {
+              ...r,
+              job_status: j.job_status ?? null,
+              job_title_from_job: j.job_title ?? null,
+              job_role_id: j.job_role ?? null,
+              job_city_id_from_job: j.city_id ?? null,
+              job_region_id_from_job: j.region_id ?? null,
+            }
+          })
+        }
+      }
+
+      // Client-side filters on enriched fields (job_status, work_status, availability)
+      if (filters.job_status != null)
+        rows = rows.filter((r) => r.job_status === filters.job_status)
+      if (filters.contact_work_status != null)
+        rows = rows.filter((r) => r.contact_work_status === filters.contact_work_status)
+      if (filters.contact_availability != null)
+        rows = rows.filter((r) => r.contact_availability === filters.contact_availability)
+
+      return { rows, total: count ?? 0 }
     },
     staleTime: 30_000,
   })
@@ -77,14 +153,13 @@ export function useApplicationKPIs() {
   return useQuery({
     queryKey: ['applications-kpis'],
     queryFn: async () => {
-      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
       const [total, newApps, waitingHandling, advanced, hires, missingCv, waitingEmployer, archived] =
         await Promise.all([
           supabase.from('applications').select('application_id', { count: 'exact', head: true }),
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })
-            .gte('submission_date', sevenDaysAgo),
+            .eq('application_status', 1),
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })

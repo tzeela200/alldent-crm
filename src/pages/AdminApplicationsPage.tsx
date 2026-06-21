@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ClipboardList, Download, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react'
+import { ClipboardList, Columns3, Download, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react'
 import {
   Shell,
   Toolbar,
@@ -15,7 +15,7 @@ import {
 } from '@/hooks/useApplications'
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
-import { applicationStatusColors, checkStatusColors, getStatusBadge } from '@/lib/statusColors'
+import { applicationStatusColors, checkStatusColors, jobStatusColors, getStatusBadge } from '@/lib/statusColors'
 import { formatDate } from '@/lib/timeAgo'
 import { whatsappLink } from '@/lib/normalizePhone'
 import { ApplicationFiltersBar } from '@/components/applications/ApplicationFiltersBar'
@@ -25,6 +25,41 @@ import { toast } from 'sonner'
 import type { ApplicationFilters, ApplicationRow } from '@/types/applications'
 
 type ViewMode = 'table' | 'grid'
+
+// ─── Column definitions ───────────────────────────────────────────────
+
+const ALL_COLUMNS = [
+  { key: 'registry_status', label: 'מצב במאגר' },
+  { key: 'work_status', label: 'סטטוס תעסוקה' },
+  { key: 'availability', label: 'זמינות' },
+  { key: 'job_role', label: 'תפקיד משרה' },
+  { key: 'job_city', label: 'עיר משרה' },
+  { key: 'job_region', label: 'אזור משרה' },
+  { key: 'org_name', label: 'שם ארגון' },
+  { key: 'job_status', label: 'סטטוס משרה' },
+  { key: 'check_status', label: 'סטטוס בדיקה' },
+  { key: 'cv', label: 'קו"ח' },
+  { key: 'source', label: 'מקור' },
+  { key: 'submission_date', label: 'תאריך הגשה' },
+  { key: 'follow_up_date', label: 'תאריך פעולה הבאה' },
+  { key: 'notes', label: 'הערות' },
+] as const
+
+type ColumnKey = (typeof ALL_COLUMNS)[number]['key']
+
+const DEFAULT_VISIBLE: ColumnKey[] = [
+  'registry_status',
+  'job_role',
+  'job_region',
+  'org_name',
+  'check_status',
+  'cv',
+  'source',
+  'submission_date',
+  'notes',
+]
+
+// ─── CSV helper ───────────────────────────────────────────────────────
 
 function toCsv(rows: Record<string, unknown>[]): string {
   if (!rows.length) return ''
@@ -36,6 +71,8 @@ function toCsv(rows: Record<string, unknown>[]): string {
   ].join('\n')
 }
 
+// ─── Page ────────────────────────────────────────────────────────────
+
 export default function AdminApplicationsPage() {
   const qc = useQueryClient()
   const [filters, setFilters] = useState<ApplicationFilters>({})
@@ -46,8 +83,8 @@ export default function AdminApplicationsPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [bulkStatus, setBulkStatus] = useState<number | ''>('')
   const [bulkCheck, setBulkCheck] = useState<number | ''>('')
-  const [bulkAssignTo, setBulkAssignTo] = useState('')
   const [bulkFollowUp, setBulkFollowUp] = useState('')
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_VISIBLE)
 
   const { data, isLoading } = useApplicationRows(filters, page)
   const { data: kpis } = useApplicationKPIs()
@@ -55,7 +92,6 @@ export default function AdminApplicationsPage() {
   const {
     bulkUpdateStatus,
     bulkUpdateCheckStatus,
-    bulkAssign,
     bulkSetFollowUp,
     createContactFromApplication,
     sendToLeadsV2,
@@ -83,25 +119,34 @@ export default function AdminApplicationsPage() {
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     )
 
+  const toggleColumn = (key: ColumnKey) =>
+    setVisibleColumns((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    )
+
   const exportCsv = (onlySelected = false) => {
     const source = onlySelected ? rows.filter((r) => selectedIds.includes(r.application_id)) : rows
     const prepared = source.map((r) => ({
-      'מזהה': r.application_id,
+      'מזהה הגשה': r.application_id,
       'שם מועמד': r.candidate_name ?? '',
-      'טלפון': r.candidate_phone ?? r.phone_norm ?? '',
-      'אימייל': r.candidate_email ?? '',
+      'נייד מועמד': r.candidate_phone ?? r.phone_norm ?? '',
+      'אימייל מועמד': r.candidate_email ?? '',
+      'מצב במאגר': r.candidate_link && !r.is_new_candidate ? 'קיים במאגר' : 'חדש למאגר',
+      'סטטוס תעסוקה': getDictLabel(dicts?.workStatuses, r.contact_work_status),
+      'זמינות': getDictLabel(dicts?.availabilities, r.contact_availability),
       'קוד משרה': r.job_code ?? '',
-      'מעסיק': r.account_name ?? '',
-      'תפקיד': r.job_role ?? '',
-      'אזור': r.job_region ?? '',
+      'תפקיד משרה': r.job_role ?? '',
+      'עיר משרה': r.job_city ?? '',
+      'אזור משרה': r.job_region ?? '',
+      'שם ארגון': r.account_name ?? '',
+      'סטטוס משרה': getDictLabel(dicts?.jobStatuses, r.job_status),
       'סטטוס הגשה': getDictLabel(dicts?.applicationStatuses, r.application_status),
       'סטטוס בדיקה': getDictLabel(dicts?.checkStatuses, r.check_status),
+      'מקור': getDictLabel(dicts?.sources, r.source),
       'תאריך הגשה': formatDate(r.submission_date),
-      'מוקצה ל': r.assigned_to ?? '',
-      'מעקב': formatDate(r.follow_up_date),
+      'תאריך פעולה הבאה': formatDate(r.follow_up_date),
       'עם קו"ח': r.cv_link ? 'כן' : 'לא',
       'ידני': r.is_manual ? 'כן' : 'לא',
-      'מועמד חדש': r.is_new_candidate ? 'כן' : 'לא',
       'הערות פנימיות': r.internal_notes ?? '',
     }))
     const csv = toCsv(prepared)
@@ -142,24 +187,13 @@ export default function AdminApplicationsPage() {
     setBulkCheck('')
   }
 
-  const runBulkAssign = async () => {
-    if (!selectedIds.length || !bulkAssignTo.trim()) {
-      toast.error('יש לבחור רשומות ושם')
-      return
-    }
-    await bulkAssign.mutateAsync({ applicationIds: selectedIds, assignedTo: bulkAssignTo.trim() })
-    toast.success(`הוקצה "${bulkAssignTo}" ל-${selectedIds.length} הגשות`)
-    setSelectedIds([])
-    setBulkAssignTo('')
-  }
-
   const runBulkFollowUp = async () => {
     if (!selectedIds.length || !bulkFollowUp) {
       toast.error('יש לבחור רשומות ותאריך')
       return
     }
     await bulkSetFollowUp.mutateAsync({ applicationIds: selectedIds, date: bulkFollowUp })
-    toast.success(`נקבע מעקב ל-${selectedIds.length} הגשות`)
+    toast.success(`פעולה הבאה נקבעה ל-${selectedIds.length} הגשות`)
     setSelectedIds([])
     setBulkFollowUp('')
   }
@@ -207,11 +241,11 @@ export default function AdminApplicationsPage() {
     >
       {/* KPI Row */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <KpiCard label="סה״כ" value={kpis?.total ?? 0} hint="במאגר" />
+        <KpiCard label="סה״כ" value={kpis?.total ?? 0} hint="כל ההגשות" />
         <KpiCard
           label="הגשות חדשות"
           value={kpis?.newApps ?? 0}
-          hint="7 ימים"
+          hint="סטטוס חדש"
           onClick={() => {
             setFilters({ application_status: 1 })
             setPage(0)
@@ -222,7 +256,7 @@ export default function AdminApplicationsPage() {
           value={kpis?.waitingHandling ?? 0}
           hint="סטטוסים 1-2"
           onClick={() => {
-            setFilters({ application_status: 2 })
+            setFilters({ active_apps_only: true })
             setPage(0)
           }}
         />
@@ -253,7 +287,7 @@ export default function AdminApplicationsPage() {
           }}
         />
         <KpiCard
-          label="ממתין למשוב מעסיק"
+          label="ממתין למשוב"
           value={kpis?.waitingEmployer ?? 0}
           hint="סטטוס 9"
           onClick={() => {
@@ -284,6 +318,10 @@ export default function AdminApplicationsPage() {
         sources={dicts?.sources ?? []}
         regions={dicts?.regions ?? []}
         roles={dicts?.roles ?? []}
+        cities={dicts?.cities ?? []}
+        jobStatuses={dicts?.jobStatuses ?? []}
+        workStatuses={dicts?.workStatuses ?? []}
+        availabilities={dicts?.availabilities ?? []}
       />
 
       {/* Bulk actions bar */}
@@ -338,23 +376,6 @@ export default function AdminApplicationsPage() {
             </button>
           </div>
 
-          {/* Bulk assign */}
-          <div className="flex items-center gap-1">
-            <input
-              type="text"
-              value={bulkAssignTo}
-              onChange={(e) => setBulkAssignTo(e.target.value)}
-              placeholder="הקצה ל..."
-              className="h-8 w-32 rounded-lg border border-teal-300 bg-white px-2 text-xs outline-none"
-            />
-            <button
-              onClick={runBulkAssign}
-              className="h-8 rounded-lg bg-teal-600 px-3 text-xs font-medium text-white hover:bg-teal-700"
-            >
-              הקצה
-            </button>
-          </div>
-
           {/* Bulk follow-up */}
           <div className="flex items-center gap-1">
             <input
@@ -367,7 +388,7 @@ export default function AdminApplicationsPage() {
               onClick={runBulkFollowUp}
               className="h-8 rounded-lg bg-teal-600 px-3 text-xs font-medium text-white hover:bg-teal-700"
             >
-              מעקב
+              פעולה הבאה
             </button>
           </div>
 
@@ -392,6 +413,37 @@ export default function AdminApplicationsPage() {
 
       {/* Table / Grid */}
       <Toolbar>
+        {/* Column picker — shown above table */}
+        {viewMode === 'table' && (
+          <div className="mb-2 flex justify-end">
+            <details className="relative">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50">
+                <Columns3 className="h-4 w-4" />
+                עמודות
+              </summary>
+              <div className="absolute end-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-md">
+                <div className="mb-3 text-[13px] font-bold text-slate-900">בחירת עמודות</div>
+                <div className="grid gap-2">
+                  {ALL_COLUMNS.map((col) => (
+                    <label
+                      key={col.key}
+                      className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-[13px] cursor-pointer hover:bg-slate-50"
+                    >
+                      <span>{col.label}</span>
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.includes(col.key)}
+                        onChange={() => toggleColumn(col.key)}
+                        className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </details>
+          </div>
+        )}
+
         {isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-teal-600" />
@@ -415,6 +467,7 @@ export default function AdminApplicationsPage() {
             onToggleRow={toggleRow}
             onRowClick={setDetailAppId}
             dicts={dicts}
+            visibleColumns={visibleColumns}
             onCreateContact={(app) => createContactFromApplication.mutate(app)}
             onSendToLeads={(app) => sendToLeadsV2.mutate(app)}
             onArchive={(id) => archiveApplication.mutate(id)}
@@ -492,6 +545,7 @@ function ApplicationsTable({
   onToggleRow,
   onRowClick,
   dicts,
+  visibleColumns,
   onCreateContact,
   onSendToLeads,
   onArchive,
@@ -503,13 +557,16 @@ function ApplicationsTable({
   onToggleRow: (id: number) => void
   onRowClick: (id: number) => void
   dicts: ReturnType<typeof useApplicationDicts>['data']
+  visibleColumns: ColumnKey[]
   onCreateContact: (app: ApplicationRow) => void
   onSendToLeads: (app: ApplicationRow) => void
   onArchive: (id: number) => void
 }) {
+  const col = (key: ColumnKey) => visibleColumns.includes(key)
+
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[1400px] text-sm">
+      <table className="w-full min-w-[900px] text-sm">
         <thead className="bg-[#F9FAFB]">
           <tr className="border-b border-[#D9D9D9] text-right text-[12px] font-semibold text-[#6B6B6B]">
             <th className="w-10 px-3 py-3">
@@ -520,18 +577,24 @@ function ApplicationsTable({
                 className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
               />
             </th>
-            <th className="px-3 py-3">שם</th>
-            <th className="px-3 py-3">נייד</th>
-            <th className="px-3 py-3">מצב פרופיל</th>
+            <th className="px-3 py-3">שם מועמד</th>
+            <th className="px-3 py-3">נייד מועמד</th>
+            {col('registry_status') && <th className="px-3 py-3">מצב במאגר</th>}
+            {col('work_status') && <th className="px-3 py-3">סטטוס תעסוקה</th>}
+            {col('availability') && <th className="px-3 py-3">זמינות</th>}
             <th className="px-3 py-3">קוד משרה</th>
-            <th className="px-3 py-3">תפקיד</th>
-            <th className="px-3 py-3">אזור</th>
-            <th className="px-3 py-3">שם מעסיק</th>
+            {col('job_role') && <th className="px-3 py-3">תפקיד משרה</th>}
+            {col('job_city') && <th className="px-3 py-3">עיר משרה</th>}
+            {col('job_region') && <th className="px-3 py-3">אזור משרה</th>}
+            {col('org_name') && <th className="px-3 py-3">שם ארגון</th>}
+            {col('job_status') && <th className="px-3 py-3">סטטוס משרה</th>}
             <th className="px-3 py-3">סטטוס הגשה</th>
-            <th className="px-3 py-3">קו"ח</th>
-            <th className="px-3 py-3">מקור</th>
-            <th className="px-3 py-3">תאריך הגשה</th>
-            <th className="px-3 py-3">הערות</th>
+            {col('check_status') && <th className="px-3 py-3">סטטוס בדיקה</th>}
+            {col('cv') && <th className="px-3 py-3">קו"ח</th>}
+            {col('source') && <th className="px-3 py-3">מקור</th>}
+            {col('submission_date') && <th className="px-3 py-3">תאריך הגשה</th>}
+            {col('follow_up_date') && <th className="px-3 py-3">פעולה הבאה</th>}
+            {col('notes') && <th className="px-3 py-3">הערות</th>}
             <th className="px-3 py-3">פעולות</th>
           </tr>
         </thead>
@@ -539,10 +602,14 @@ function ApplicationsTable({
           {rows.map((row) => {
             const appBadge = getStatusBadge(applicationStatusColors, row.application_status)
             const checkBadge = getStatusBadge(checkStatusColors, row.check_status)
+            const jobBadge = getStatusBadge(jobStatusColors, row.job_status)
             const appLabel = getDictLabel(dicts?.applicationStatuses, row.application_status) || appBadge.label
+            const checkLabel = getDictLabel(dicts?.checkStatuses, row.check_status) || checkBadge.label
             const sourceLabel = getDictLabel(dicts?.sources, row.source)
+            const workStatusLabel = getDictLabel(dicts?.workStatuses, row.contact_work_status)
+            const availabilityLabel = getDictLabel(dicts?.availabilities, row.contact_availability)
             const isSelected = selectedIds.includes(row.application_id)
-            const isNewWithNoProfile = row.is_new_candidate && !row.candidate_link
+            const isNewToRegistry = row.is_new_candidate || !row.candidate_link
             return (
               <tr
                 key={row.application_id}
@@ -556,58 +623,125 @@ function ApplicationsTable({
                     className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                   />
                 </td>
-                {/* שם — contact name if linked, otherwise candidate_name */}
+                {/* שם מועמד */}
                 <td
                   className="cursor-pointer px-3 py-3 font-medium text-slate-900 hover:text-teal-700"
                   onClick={() => onRowClick(row.application_id)}
                 >
                   {row.candidate_name ?? '—'}
                 </td>
+                {/* נייד מועמד */}
                 <td className="px-3 py-3 font-mono text-xs text-slate-600" dir="ltr">
                   {row.candidate_phone ?? '—'}
                 </td>
-                {/* מצב פרופיל */}
-                <td className="px-3 py-3">
-                  {row.is_new_candidate
-                    ? <span className="rounded-[6px] bg-slate-100 px-2 py-0.5 text-[10px] text-slate-500">לא קיים פרופיל</span>
-                    : <span className="rounded-[6px] bg-teal-50 px-2 py-0.5 text-[10px] text-teal-700">קיים פרופיל</span>
-                  }
-                </td>
+                {/* מצב במאגר */}
+                {col('registry_status') && (
+                  <td className="px-3 py-3">
+                    {isNewToRegistry
+                      ? <span className="rounded-[6px] bg-amber-50 px-2 py-0.5 text-[10px] text-amber-700">חדש למאגר</span>
+                      : <span className="rounded-[6px] bg-teal-50 px-2 py-0.5 text-[10px] text-teal-700">קיים במאגר</span>
+                    }
+                  </td>
+                )}
+                {/* סטטוס תעסוקה */}
+                {col('work_status') && (
+                  <td className="px-3 py-3 text-xs text-slate-600">
+                    {row.candidate_link ? workStatusLabel : '—'}
+                  </td>
+                )}
+                {/* זמינות */}
+                {col('availability') && (
+                  <td className="px-3 py-3 text-xs text-slate-600">
+                    {row.candidate_link ? availabilityLabel : '—'}
+                  </td>
+                )}
+                {/* קוד משרה */}
                 <td className="px-3 py-3 font-mono text-xs font-semibold text-slate-700">
                   {row.job_code ?? '—'}
                 </td>
-                <td className="px-3 py-3 text-xs text-slate-600">{row.job_role ?? '—'}</td>
-                <td className="px-3 py-3 text-xs text-slate-500">{row.job_region ?? '—'}</td>
-                <td className="px-3 py-3 text-xs text-slate-600">{row.account_name ?? '—'}</td>
+                {/* תפקיד משרה */}
+                {col('job_role') && (
+                  <td className="px-3 py-3 text-xs text-slate-600">{row.job_role ?? '—'}</td>
+                )}
+                {/* עיר משרה */}
+                {col('job_city') && (
+                  <td className="px-3 py-3 text-xs text-slate-500">{row.job_city ?? '—'}</td>
+                )}
+                {/* אזור משרה */}
+                {col('job_region') && (
+                  <td className="px-3 py-3 text-xs text-slate-500">{row.job_region ?? '—'}</td>
+                )}
+                {/* שם ארגון */}
+                {col('org_name') && (
+                  <td className="px-3 py-3 text-xs text-slate-600">{row.account_name ?? '—'}</td>
+                )}
+                {/* סטטוס משרה */}
+                {col('job_status') && (
+                  <td className="px-3 py-3">
+                    {row.job_status != null ? (
+                      <span className={`rounded-[6px] px-2 py-0.5 text-xs font-medium ${jobBadge.bg} ${jobBadge.text}`}>
+                        {jobBadge.label}
+                      </span>
+                    ) : '—'}
+                  </td>
+                )}
+                {/* סטטוס הגשה */}
                 <td className="px-3 py-3">
                   <span className={`rounded-[6px] px-2 py-0.5 text-xs font-medium ${appBadge.bg} ${appBadge.text}`}>
                     {appLabel}
                   </span>
                 </td>
+                {/* סטטוס בדיקה */}
+                {col('check_status') && (
+                  <td className="px-3 py-3">
+                    {row.check_status != null ? (
+                      <span className={`rounded-[6px] px-2 py-0.5 text-xs font-medium ${checkBadge.bg} ${checkBadge.text}`}>
+                        {checkLabel}
+                      </span>
+                    ) : '—'}
+                  </td>
+                )}
                 {/* קו"ח */}
-                <td className="px-3 py-3">
-                  {row.has_cv && row.cv_link ? (
-                    <a
-                      href={row.cv_link}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-xs text-blue-600 hover:underline whitespace-nowrap"
-                    >
-                      צפייה / הורדה ↗
-                    </a>
-                  ) : (
-                    <span className="text-xs text-slate-300">אין קו"ח</span>
-                  )}
-                </td>
+                {col('cv') && (
+                  <td className="px-3 py-3">
+                    {row.has_cv && row.cv_link ? (
+                      <a
+                        href={row.cv_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-blue-600 hover:underline whitespace-nowrap"
+                      >
+                        צפייה ↗
+                      </a>
+                    ) : (
+                      <span className="text-xs text-slate-300">—</span>
+                    )}
+                  </td>
+                )}
                 {/* מקור */}
-                <td className="px-3 py-3 text-xs text-slate-500">{sourceLabel || '—'}</td>
-                <td className="px-3 py-3 text-xs text-slate-400">
-                  {formatDate(row.submission_date)}
-                </td>
-                <td className="max-w-[120px] truncate px-3 py-3 text-xs text-slate-400">
-                  {row.internal_notes ?? '—'}
-                </td>
+                {col('source') && (
+                  <td className="px-3 py-3 text-xs text-slate-500">{sourceLabel || '—'}</td>
+                )}
+                {/* תאריך הגשה */}
+                {col('submission_date') && (
+                  <td className="px-3 py-3 text-xs text-slate-400">
+                    {formatDate(row.submission_date)}
+                  </td>
+                )}
+                {/* תאריך פעולה הבאה */}
+                {col('follow_up_date') && (
+                  <td className="px-3 py-3 text-xs text-slate-400">
+                    {row.follow_up_date ? formatDate(row.follow_up_date) : '—'}
+                  </td>
+                )}
+                {/* הערות */}
+                {col('notes') && (
+                  <td className="max-w-[120px] truncate px-3 py-3 text-xs text-slate-400">
+                    {row.internal_notes ?? '—'}
+                  </td>
+                )}
+                {/* פעולות */}
                 <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                   <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-2">
@@ -629,8 +763,7 @@ function ApplicationsTable({
                         פרטים
                       </button>
                     </div>
-                    {/* פעולות למועמד ללא פרופיל */}
-                    {isNewWithNoProfile && (
+                    {isNewToRegistry && (
                       <div className="flex flex-col gap-0.5">
                         <button
                           onClick={() => onCreateContact(row)}
