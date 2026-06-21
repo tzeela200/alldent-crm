@@ -915,7 +915,7 @@ function DetailSheet({
           <SectionCard title="employer summary">
             <DetailsGrid
               items={[
-                { label: 'מעסיק', value: row.account_name },
+                { label: 'ארגון', value: row.account_name },
                 { label: 'status in master', value: row.status_in_master ?? '—' },
                 { label: 'עודכן', value: timeAgo(row.updated_timestamp) },
                 { label: 'נוצר', value: formatDate(row.created_timestamp) },

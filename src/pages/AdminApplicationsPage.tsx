@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { ClipboardList, Columns3, Download, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronUp, ChevronsUpDown, ClipboardList, Columns3, Download, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react'
+import { getRoleColor, RoleBadge } from '@/components/admin/RoleBadge'
 import {
   Shell,
   Toolbar,
@@ -78,6 +79,12 @@ export default function AdminApplicationsPage() {
   const [filters, setFilters] = useState<ApplicationFilters>({})
   const [page, setPage] = useState(0)
   const [viewMode, setViewMode] = useState<ViewMode>('table')
+  const [sortBy, setSortBy] = useState('submission_date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const handleSort = (key: string) => {
+    if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setSortBy(key); setSortDir('asc') }
+  }
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [detailAppId, setDetailAppId] = useState<number | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -86,7 +93,7 @@ export default function AdminApplicationsPage() {
   const [bulkFollowUp, setBulkFollowUp] = useState('')
   const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_VISIBLE)
 
-  const { data, isLoading } = useApplicationRows(filters, page)
+  const { data, isLoading } = useApplicationRows(filters, page, sortBy, sortDir)
   const { data: kpis } = useApplicationKPIs()
   const { data: dicts } = useApplicationDicts()
   const {
@@ -471,6 +478,9 @@ export default function AdminApplicationsPage() {
             onCreateContact={(app) => createContactFromApplication.mutate(app)}
             onSendToLeads={(app) => sendToLeadsV2.mutate(app)}
             onArchive={(id) => archiveApplication.mutate(id)}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSort={handleSort}
           />
         ) : (
           <ApplicationsGrid rows={rows} onRowClick={setDetailAppId} dicts={dicts} />
@@ -537,6 +547,20 @@ function KpiCard({
 
 // ─── Table View ───────────────────────────────────────────────────────
 
+function getRoleBorderColor(roleId: number | null | undefined): string {
+  if (!roleId) return 'border-slate-100'
+  if (roleId >= 1 && roleId <= 8) return 'border-blue-300'
+  if (roleId === 9)  return 'border-violet-400'
+  if (roleId === 10) return 'border-pink-400'
+  if (roleId === 11) return 'border-amber-400'
+  if (roleId === 12) return 'border-indigo-400'
+  if (roleId === 13) return 'border-green-400'
+  if (roleId === 14) return 'border-teal-400'
+  if (roleId === 15 || roleId === 17 || roleId === 18) return 'border-sky-400'
+  if (roleId === 16) return 'border-rose-400'
+  return 'border-slate-100'
+}
+
 function ApplicationsTable({
   rows,
   selectedIds,
@@ -549,6 +573,9 @@ function ApplicationsTable({
   onCreateContact,
   onSendToLeads,
   onArchive,
+  sortBy,
+  sortDir,
+  onSort,
 }: {
   rows: ApplicationRow[]
   selectedIds: number[]
@@ -561,8 +588,34 @@ function ApplicationsTable({
   onCreateContact: (app: ApplicationRow) => void
   onSendToLeads: (app: ApplicationRow) => void
   onArchive: (id: number) => void
+  sortBy: string
+  sortDir: 'asc' | 'desc'
+  onSort: (key: string) => void
 }) {
   const col = (key: ColumnKey) => visibleColumns.includes(key)
+
+  function SortableTh({ label, field }: { label: string; field: string }) {
+    const active = sortBy === field
+    return (
+      <th
+        onClick={() => onSort(field)}
+        className="cursor-pointer select-none px-3 py-3 hover:bg-slate-100"
+      >
+        <span className="flex items-center gap-1">
+          {label}
+          {active ? (
+            sortDir === 'asc' ? (
+              <ChevronUp className="h-3 w-3 text-teal-600" />
+            ) : (
+              <ChevronDown className="h-3 w-3 text-teal-600" />
+            )
+          ) : (
+            <ChevronsUpDown className="h-3 w-3 text-slate-300" />
+          )}
+        </span>
+      </th>
+    )
+  }
 
   return (
     <div className="overflow-x-auto">
@@ -577,23 +630,23 @@ function ApplicationsTable({
                 className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
               />
             </th>
-            <th className="px-3 py-3">שם מועמד</th>
+            <SortableTh label="שם מועמד" field="candidate_name" />
             <th className="px-3 py-3">נייד מועמד</th>
             {col('registry_status') && <th className="px-3 py-3">מצב במאגר</th>}
             {col('work_status') && <th className="px-3 py-3">סטטוס תעסוקה</th>}
             {col('availability') && <th className="px-3 py-3">זמינות</th>}
-            <th className="px-3 py-3">קוד משרה</th>
+            <SortableTh label="קוד משרה" field="job_code" />
             {col('job_role') && <th className="px-3 py-3">תפקיד משרה</th>}
             {col('job_city') && <th className="px-3 py-3">עיר משרה</th>}
             {col('job_region') && <th className="px-3 py-3">אזור משרה</th>}
-            {col('org_name') && <th className="px-3 py-3">שם ארגון</th>}
+            {col('org_name') && <SortableTh label="שם ארגון" field="account_name" />}
             {col('job_status') && <th className="px-3 py-3">סטטוס משרה</th>}
             <th className="px-3 py-3">סטטוס הגשה</th>
             {col('check_status') && <th className="px-3 py-3">סטטוס בדיקה</th>}
             {col('cv') && <th className="px-3 py-3">קו"ח</th>}
             {col('source') && <th className="px-3 py-3">מקור</th>}
-            {col('submission_date') && <th className="px-3 py-3">תאריך הגשה</th>}
-            {col('follow_up_date') && <th className="px-3 py-3">פעולה הבאה</th>}
+            {col('submission_date') && <SortableTh label="תאריך הגשה" field="submission_date" />}
+            {col('follow_up_date') && <SortableTh label="פעולה הבאה" field="follow_up_date" />}
             {col('notes') && <th className="px-3 py-3">הערות</th>}
             <th className="px-3 py-3">פעולות</th>
           </tr>
@@ -610,10 +663,11 @@ function ApplicationsTable({
             const availabilityLabel = getDictLabel(dicts?.availabilities, row.contact_availability)
             const isSelected = selectedIds.includes(row.application_id)
             const isNewToRegistry = row.is_new_candidate || !row.candidate_link
+            const roleBorderColor = getRoleBorderColor(row.job_role_id)
             return (
               <tr
                 key={row.application_id}
-                className={`text-[13px] text-[#2D2D2D] transition-colors hover:bg-[#FAFAF7] ${isSelected ? 'bg-[#F0FDFC]' : ''}`}
+                className={`border-s-4 ${roleBorderColor} text-[13px] text-[#2D2D2D] transition-colors hover:bg-[#FAFAF7] ${isSelected ? 'bg-[#F0FDFC]' : ''}`}
               >
                 <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
                   <input
@@ -661,7 +715,12 @@ function ApplicationsTable({
                 </td>
                 {/* תפקיד משרה */}
                 {col('job_role') && (
-                  <td className="px-3 py-3 text-xs text-slate-600">{row.job_role ?? '—'}</td>
+                  <td className="px-3 py-3">
+                    {row.job_role
+                      ? <RoleBadge roleId={row.job_role_id} label={row.job_role} />
+                      : <span className="text-xs text-slate-300">—</span>
+                    }
+                  </td>
                 )}
                 {/* עיר משרה */}
                 {col('job_city') && (

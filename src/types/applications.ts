@@ -81,6 +81,7 @@ export interface ApplicationFilters {
   active_apps_only?: boolean
   closed_apps_only?: boolean
   overdue_follow_up?: boolean
+  account_name_search?: string
 }
 
 export interface ApplicationKPIs {

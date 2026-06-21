@@ -4,14 +4,19 @@ import type { ApplicationRow, ApplicationFilters, ApplicationKPIs } from '@/type
 
 export const APPLICATIONS_PAGE_SIZE = 20
 
-export function useApplicationRows(filters: ApplicationFilters, page: number) {
+export function useApplicationRows(
+  filters: ApplicationFilters,
+  page: number,
+  sortBy = 'submission_date',
+  sortDir: 'asc' | 'desc' = 'desc'
+) {
   return useQuery({
-    queryKey: ['applications', filters, page],
+    queryKey: ['applications', filters, page, sortBy, sortDir],
     queryFn: async () => {
       let query = supabase
         .from('applications')
         .select('*', { count: 'exact' })
-        .order('submission_date', { ascending: false })
+        .order(sortBy, { ascending: sortDir === 'asc' })
         .range(page * APPLICATIONS_PAGE_SIZE, (page + 1) * APPLICATIONS_PAGE_SIZE - 1)
 
       if (filters.search) {
@@ -58,6 +63,8 @@ export function useApplicationRows(filters: ApplicationFilters, page: number) {
         const today = new Date().toISOString().slice(0, 10)
         query = query.not('follow_up_date', 'is', null).lte('follow_up_date', today)
       }
+      if (filters.account_name_search)
+        query = query.ilike('account_name', `%${filters.account_name_search}%`)
 
       const { data, count, error } = await query
       if (error) throw error

@@ -1,8 +1,20 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { SearchBar, SelectFilter } from '@/components/layout/Shell'
+import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import type { ApplicationFilters } from '@/types/applications'
 import type { DictItem } from '@/types'
+
+const ROLE_CHIPS = [
+  { label: 'הכל', value: '' },
+  { label: 'סייעות', value: 'סייעת' },
+  { label: 'שינניות', value: 'שיננית' },
+  { label: 'טכנאים', value: 'טכנאי' },
+  { label: 'רופאים', value: 'רופא' },
+  { label: 'מומחים', value: 'מומחה' },
+  { label: 'מזכירות', value: 'מזכיר' },
+  { label: 'מכירות', value: 'מכירות' },
+] as const
 
 interface Props {
   filters: ApplicationFilters
@@ -55,17 +67,35 @@ export function ApplicationFiltersBar({
     filters.has_follow_up ||
     filters.active_apps_only ||
     filters.closed_apps_only ||
-    filters.overdue_follow_up
+    filters.overdue_follow_up ||
+    filters.account_name_search
   )
 
   return (
     <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
+      {/* Role chips */}
+      <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-3">
+        {ROLE_CHIPS.map((chip) => (
+          <button
+            key={chip.value}
+            onClick={() => set({ job_role: chip.value || undefined })}
+            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+              (filters.job_role ?? '') === chip.value
+                ? 'bg-teal-600 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            {chip.label}
+          </button>
+        ))}
+      </div>
+
       {/* Row 1 */}
       <div className="flex flex-wrap items-end gap-3">
         <SearchBar
           value={filters.search ?? ''}
           onChange={(v) => set({ search: v || undefined })}
-          placeholder="חיפוש שם, טלפון, אימייל, קוד משרה, ארגון..."
+          placeholder="חיפוש שם, טלפון, אימייל, קוד משרה..."
         />
         <SelectFilter
           value={filters.application_status != null ? String(filters.application_status) : ''}
@@ -85,17 +115,24 @@ export function ApplicationFiltersBar({
           options={sources.map((s) => ({ value: String(s.id), label: s.name }))}
           placeholder="מקור"
         />
-        <SelectFilter
-          value={filters.job_region_id != null ? String(filters.job_region_id) : ''}
-          onChange={(v) => set({ job_region_id: v ? Number(v) : undefined })}
-          options={regions.map((r) => ({ value: String(r.id), label: r.name }))}
-          placeholder="אזור משרה"
-        />
-        <SelectFilter
-          value={filters.job_role ?? ''}
-          onChange={(v) => set({ job_role: v || undefined })}
-          options={roles.map((r) => ({ value: r.name, label: r.name }))}
-          placeholder="תפקיד משרה"
+        {/* City + Region combined picker */}
+        <div className="flex min-w-[260px] items-end gap-2">
+          <CityRegionPicker
+            variant="filter"
+            cityId={filters.job_city_id ?? null}
+            regionId={filters.job_region_id ?? null}
+            onCityChange={(id) => set({ job_city_id: id ?? undefined })}
+            onRegionChange={(id) => set({ job_region_id: id ?? undefined })}
+          />
+        </div>
+        {/* Employer search */}
+        <input
+          type="text"
+          value={filters.account_name_search ?? ''}
+          onChange={(e) => set({ account_name_search: e.target.value || undefined })}
+          placeholder="שם ארגון..."
+          className="h-11 rounded-[14px] border border-[#D9D9D9] bg-white px-3 text-sm outline-none transition-colors focus:border-[#008080]"
+          dir="rtl"
         />
         {hasActive && (
           <button
@@ -118,12 +155,6 @@ export function ApplicationFiltersBar({
       {/* Row 2 — Advanced */}
       {showAdvanced && (
         <div className="flex flex-wrap items-end gap-3 border-t border-slate-100 pt-3">
-          <SelectFilter
-            value={filters.job_city_id != null ? String(filters.job_city_id) : ''}
-            onChange={(v) => set({ job_city_id: v ? Number(v) : undefined })}
-            options={cities.map((c) => ({ value: String(c.id), label: c.name }))}
-            placeholder="עיר משרה"
-          />
           <SelectFilter
             value={filters.job_status != null ? String(filters.job_status) : ''}
             onChange={(v) => set({ job_status: v ? Number(v) : undefined })}
