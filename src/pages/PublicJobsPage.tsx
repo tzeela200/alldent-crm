@@ -25,7 +25,7 @@ const FIXED_FILTERS = [
   { label: 'שיננית',        filterValue: 'שינ',    slug: 'hygienists',  color: '#d10383' },
   { label: 'סייעת',         filterValue: 'סייע',   slug: 'assistants',  color: '#774196' },
   { label: 'מזכירות',       filterValue: 'מזכיר',  slug: 'secretaries', color: '#ff751f' },
-  { label: 'ניהול',         filterValue: 'ניהול',  slug: 'managers',    color: '#076911' },
+  { label: 'ניהול',         filterValue: 'ניהול',  slug: 'management-sales', color: '#076911' },
   { label: 'טכנאי שיניים',  filterValue: 'טכנא',  slug: 'technicians', color: '#d4a800' },
 ]
 
@@ -278,7 +278,7 @@ export default function PublicJobsPage() {
               key={f.filterValue}
               label={f.label}
               color={f.color}
-              onClick={() => navigate(`/jobs/role/${f.slug}`)}
+              onClick={() => navigate(`/jobs/${f.slug}`)}
             />
           ))}
         </div>

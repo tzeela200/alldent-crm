@@ -4,33 +4,44 @@ export type RolePageSlug =
   | 'hygienists'
   | 'assistants'
   | 'secretaries'
-  | 'managers'
+  | 'management-sales'
   | 'technicians'
 
 export const ALL_ROLE_SLUGS: RolePageSlug[] = [
   'dentists', 'specialists', 'hygienists', 'assistants',
-  'secretaries', 'managers', 'technicians',
+  'secretaries', 'management-sales', 'technicians',
 ]
 
 export const SLUG_TO_JOB_ROLE_NAME: Record<RolePageSlug, string> = {
-  dentists:    'רופאי שיניים',
-  specialists: 'מומחים',
-  hygienists:  'שינניות',
-  assistants:  'סייעות',
-  secretaries: 'מזכירות',
-  managers:    'ניהול מרפאה',
-  technicians: 'טכנאי שיניים',
+  dentists:           'רופאי שיניים',
+  specialists:        'מומחים',
+  hygienists:         'שינניות',
+  assistants:         'סייעות',
+  secretaries:        'מזכירות',
+  'management-sales': 'ניהול מרפאה',
+  technicians:        'טכנאי שיניים',
 }
 
-// שורש לחיפוש ilike — תופס את כל וריאציות התפקיד ב-DB
+// סינון לפי job_role (מספר) — מדויק, ללא ilike
+export const SLUG_TO_JOB_ROLE_IDS: Record<RolePageSlug, number[]> = {
+  dentists:           [1],
+  specialists:        [2, 3, 4, 5, 6, 7, 8],
+  hygienists:         [10],
+  assistants:         [9],
+  secretaries:        [13],
+  'management-sales': [12, 15, 17],
+  technicians:        [11],
+}
+
+// שורש לחיפוש ilike — נשמר לצרכי צבע/תצוגה בלבד
 export const SLUG_TO_SEARCH_ROOT: Record<RolePageSlug, string> = {
-  dentists:    'רופא',    // רופא/ת שיניים, רופאי שיניים
-  specialists: 'מומח',   // מומחה שיקום, מומחה פדו, מומחה אנדו...
-  hygienists:  'שינ',    // שיננית, שינניות
-  assistants:  'סייע',   // סייעת, סייעות
-  secretaries: 'מזכיר',  // מזכירה, מזכירות
-  managers:    'ניהול',  // ניהול מרפאה, מנהל/ת דנטלי
-  technicians: 'טכנא',   // טכנאי שיניים, טכנאית שיניים
+  dentists:           'רופא',
+  specialists:        'מומח',
+  hygienists:         'שינ',
+  assistants:         'סייע',
+  secretaries:        'מזכיר',
+  'management-sales': 'ניהול',
+  technicians:        'טכנא',
 }
 
 export type PublicRolePage = {
@@ -114,7 +125,7 @@ export const PUBLIC_ROLE_PAGES: Record<RolePageSlug, PublicRolePage> = {
     color: '#ff751f',
     searchRoot: 'מזכיר',
   },
-  managers: {
+  'management-sales': {
     title: 'משרות לניהול מרפאה',
     subtitle: 'משרות ניהול, תפעול, שירות ומכירות במרפאות שיניים ורשתות דנטליות.',
     badge: 'לוח משרות דנטלי',

@@ -2,16 +2,16 @@ import { useParams, Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import PublicJobCard from '@/components/public/PublicJobCard'
 import { usePublicJobs } from '@/hooks/usePublicJobs'
-import { getRolePage, type RolePageSlug, PUBLIC_ROLE_PAGES } from '@/lib/publicRolePages'
+import { getRolePage, type RolePageSlug, PUBLIC_ROLE_PAGES, SLUG_TO_JOB_ROLE_IDS } from '@/lib/publicRolePages'
 
 const ALL_ROLE_NAV = [
-  { slug: 'dentists',    label: 'רופאי שיניים' },
-  { slug: 'specialists', label: 'מומחים' },
-  { slug: 'hygienists',  label: 'שיננית' },
-  { slug: 'assistants',  label: 'סייעת' },
-  { slug: 'secretaries', label: 'מזכירות' },
-  { slug: 'managers',    label: 'ניהול' },
-  { slug: 'technicians', label: 'טכנאי שיניים' },
+  { slug: 'dentists',           label: 'רופאי שיניים' },
+  { slug: 'specialists',        label: 'מומחים' },
+  { slug: 'hygienists',         label: 'שיננית' },
+  { slug: 'assistants',         label: 'סייעת' },
+  { slug: 'secretaries',        label: 'מזכירות' },
+  { slug: 'management-sales',   label: 'ניהול' },
+  { slug: 'technicians',        label: 'טכנאי שיניים' },
 ] as const
 
 function RoleNavPill({
@@ -46,13 +46,14 @@ function RoleNavPill({
 }
 
 export default function PublicRoleJobsPage() {
-  const { role } = useParams<{ role: string }>()
+  const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
-  const rolePage = role ? getRolePage(role) : undefined
+  const rolePage = slug ? getRolePage(slug) : undefined
 
-  if (!rolePage || !role) return <Navigate to="/jobs" replace />
+  if (!rolePage || !slug) return <Navigate to="/jobs" replace />
 
-  const { data: jobs, isLoading } = usePublicJobs({ role: rolePage.searchRoot })
+  const roleIds = SLUG_TO_JOB_ROLE_IDS[slug as RolePageSlug]
+  const { data: jobs, isLoading } = usePublicJobs({ roleIds })
   const total = jobs?.length ?? 0
 
   return (
@@ -132,8 +133,8 @@ export default function PublicRoleJobsPage() {
               key={r.slug}
               label={r.label}
               color={PUBLIC_ROLE_PAGES[r.slug].color}
-              isActive={r.slug === role}
-              onClick={() => navigate(`/jobs/role/${r.slug}`)}
+              isActive={r.slug === slug}
+              onClick={() => navigate(`/jobs/${r.slug}`)}
             />
           ))}
         </div>

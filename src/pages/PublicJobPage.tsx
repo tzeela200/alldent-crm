@@ -27,7 +27,7 @@ const PROSE_STYLE = `
 `
 
 export default function PublicJobPage() {
-  const { jobCode } = useParams<{ jobCode: string }>()
+  const { slug: jobCode } = useParams<{ slug: string }>()
   const [job, setJob] = useState<PublicJob | null>(null)
   const [loading, setLoading] = useState(true)
   const [applyOpen, setApplyOpen] = useState(false)

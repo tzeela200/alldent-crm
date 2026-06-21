@@ -33,12 +33,13 @@ export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
   const roleColor = roleColorFromName(job.job_role_name)
 
   const tags = [
+    job.job_code,
     job.city_name,
-    ...(Array.isArray(job.scope_names)
-      ? job.scope_names
-      : job.scope_names ? [job.scope_names as string] : []),
-    job.required_experience_name,
   ].filter(Boolean) as string[]
+
+  const publishedDate = job.published_at
+    ? new Date(job.published_at).toLocaleDateString('he-IL', { day: '2-digit', month: '2-digit', year: 'numeric' })
+    : null
 
   const card = (
     <motion.div
@@ -162,6 +163,13 @@ export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
               lineHeight: 1.45,
             }}>
               {job.public_excerpt}
+            </p>
+          )}
+
+          {/* Published date */}
+          {publishedDate && (
+            <p style={{ margin: 0, fontSize: 11, color: '#9CA3AF' }}>
+              פורסם: {publishedDate}
             </p>
           )}
 

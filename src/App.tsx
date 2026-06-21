@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
+import { ALL_ROLE_SLUGS } from '@/lib/publicRolePages'
 
 // Auth
 import { AuthProvider } from '@/contexts/AuthContext'
@@ -57,6 +58,22 @@ function LegacyJobRedirect() {
   return <Navigate to={`/jobs/${normalizedJobCode}`} replace />
 }
 
+// Redirects from old /jobs/role/:role pattern to clean /jobs/:slug
+function RoleSlugRedirect() {
+  const { role } = useParams<{ role: string }>()
+  return <Navigate to={`/jobs/${role}`} replace />
+}
+
+// Dispatch: role page or job detail based on the slug
+function JobsSlugDispatch() {
+  const { slug } = useParams<{ slug: string }>()
+  if (slug && (ALL_ROLE_SLUGS as readonly string[]).includes(slug)) {
+    return <PublicRoleJobsPage />
+  }
+  return <PublicJobPage />
+}
+
+
 export default function App() {
   return (
     <AuthProvider>
@@ -66,10 +83,10 @@ export default function App() {
       <Route element={<PublicLayout />}>
         <Route path="/" element={<PublicHomePage />} />
 
-        {/* Jobs — /jobs/role/:role must come before /jobs/:jobCode */}
+        {/* Jobs */}
         <Route path="/jobs" element={<PublicJobsPage />} />
-        <Route path="/jobs/role/:role" element={<PublicRoleJobsPage />} />
-        <Route path="/jobs/:jobCode" element={<PublicJobPage />} />
+        <Route path="/jobs/role/:role" element={<RoleSlugRedirect />} />
+        <Route path="/jobs/:slug" element={<JobsSlugDispatch />} />
 
         {/* Employers */}
         <Route path="/employers" element={<EmployersPage />} />
@@ -126,6 +143,14 @@ export default function App() {
         {/* Tools */}
         <Route path="smart-match" element={<SmartMatchPage />} />
       </Route>
+
+      {/* ─── Legacy category URLs from old site ─── */}
+      <Route path="/dentjob" element={<Navigate to="/jobs" replace />} />
+      <Route path="/job.dentists" element={<Navigate to="/jobs/dentists" replace />} />
+      <Route path="/hygiene-job" element={<Navigate to="/jobs/hygienists" replace />} />
+      <Route path="/dental-assistant-job" element={<Navigate to="/jobs/assistants" replace />} />
+      <Route path="/Dental-secretary" element={<Navigate to="/jobs/secretaries" replace />} />
+      <Route path="/clinic-manager-job" element={<Navigate to="/jobs/management-sales" replace />} />
 
       {/* ─── Legacy job URLs from previous site ─── */}
       <Route path="/:legacyJobCode" element={<LegacyJobRedirect />} />

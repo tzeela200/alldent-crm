@@ -168,8 +168,8 @@ export const DICT_SOCIAL_STATUSES: DictItem[] = [
 /** SSOT: dict_profile_types */
 export const DICT_PROFILE_TYPES: DictItem[] = [
   { id: 1, name: 'מועמד' },
-  { id: 2, name: 'מגייס' },
-  { id: 3, name: 'איש גיוס' },
+  { id: 2, name: 'מעסיק' },
+  { id: 3, name: 'מגייס' },
   { id: 4, name: 'אנשי קשר' },
   { id: 5, name: 'עובד ארגון' },
 ]

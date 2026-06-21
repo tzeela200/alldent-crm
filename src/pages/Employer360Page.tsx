@@ -811,6 +811,8 @@ function useAccountApplications(jobCodes: string[], previewMode: boolean) {
 
 type EditSection = "general" | "crm";
 
+type CityRowFull = { id: number; name: string | null; region_id: number | null };
+
 type EditFields = {
   account_name: string;
   account_status: string;
@@ -822,6 +824,8 @@ type EditFields = {
   billing_email: string;
   website_url: string;
   facebook_url: string;
+  region_id: string;
+  city_id: string;
   address: string;
   clinic_type: string;
   chairs_count: string;
@@ -860,6 +864,8 @@ function AccountEditSheet({
     billing_email: a.billing_email ?? "",
     website_url: a.website_url ?? "",
     facebook_url: a.facebook_url ?? "",
+    region_id: String(a.region_id ?? ""),
+    city_id: String(a.city_id ?? ""),
     address: a.address ?? "",
     clinic_type: a.clinic_type ?? "",
     chairs_count: a.chairs_count != null ? String(a.chairs_count) : "",
@@ -883,6 +889,39 @@ function AccountEditSheet({
     setFields((prev) => ({ ...prev, [key]: e.target.value }));
   };
 
+  const { data: cityRows = [] } = useQuery<CityRowFull[]>({
+    queryKey: ["dict_cities_with_region"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("dict_cities")
+        .select("id, name, region_id")
+        .order("name");
+      if (error) throw error;
+      return (data ?? []) as CityRowFull[];
+    },
+    staleTime: 10 * 60 * 1000,
+  });
+
+  const filteredCities = fields.region_id
+    ? cityRows.filter((c) => String(c.region_id) === fields.region_id)
+    : cityRows;
+
+  const regionOptions = Array.from(dicts.regions.entries()).map(([id, name]) => ({ id, name }));
+
+  const handleRegionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setFields((prev) => ({ ...prev, region_id: e.target.value, city_id: "" }));
+  };
+
+  const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const cityId = e.target.value;
+    const found = cityRows.find((c) => String(c.id) === cityId);
+    setFields((prev) => ({
+      ...prev,
+      city_id: cityId,
+      region_id: found?.region_id ? String(found.region_id) : prev.region_id,
+    }));
+  };
+
   const handleSave = async () => {
     setSaving(true);
     try {
@@ -897,6 +936,8 @@ function AccountEditSheet({
         billing_email: fields.billing_email.trim() || null,
         website_url: fields.website_url.trim() || null,
         facebook_url: fields.facebook_url.trim() || null,
+        region_id: fields.region_id ? Number(fields.region_id) : null,
+        city_id: fields.city_id ? Number(fields.city_id) : null,
         address: fields.address.trim() || null,
         clinic_type: fields.clinic_type.trim() || null,
         chairs_count: fields.chairs_count ? Number(fields.chairs_count) : null,
@@ -1020,6 +1061,26 @@ function AccountEditSheet({
               <div>
                 <label className={labelClass}>פייסבוק</label>
                 <input className={inputClass} dir="ltr" value={fields.facebook_url} onChange={set("facebook_url")} />
+              </div>
+
+              <div>
+                <label className={labelClass}>אזור</label>
+                <select className={inputClass} value={fields.region_id} onChange={handleRegionChange}>
+                  <option value="">— בחר אזור —</option>
+                  {regionOptions.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className={labelClass}>עיר</label>
+                <select className={inputClass} value={fields.city_id} onChange={handleCityChange}>
+                  <option value="">— בחר עיר —</option>
+                  {filteredCities.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
 
               <div className="sm:col-span-2">
