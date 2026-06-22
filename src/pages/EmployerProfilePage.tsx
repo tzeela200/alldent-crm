@@ -28,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { OrgContactPicker } from "@/components/ui/OrgContactPicker";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -202,6 +203,7 @@ type EditFields = {
   billing_email: string; website_url: string; facebook_url: string;
   address: string; clinic_type: string; chairs_count: string; team_size: string;
   notes: string; last_contact_date: string; next_follow_up: string;
+  contact_link: string;
 };
 
 function buildEditFields(a: AccountRow): EditFields {
@@ -223,6 +225,7 @@ function buildEditFields(a: AccountRow): EditFields {
     notes: a.notes ?? "",
     last_contact_date: a.last_contact_date ? a.last_contact_date.slice(0, 10) : "",
     next_follow_up: a.next_follow_up ? a.next_follow_up.slice(0, 10) : "",
+    contact_link: String(a.contact_link ?? ""),
   };
 }
 
@@ -279,6 +282,7 @@ function AccountEditDialog({
         notes: fields.notes.trim() || null,
         last_contact_date: fields.last_contact_date || null,
         next_follow_up: fields.next_follow_up || null,
+        contact_link: fields.contact_link || null,
       }).eq("account_id", account.account_id);
       if (error) throw error;
       toast.success("הארגון עודכן בהצלחה");
@@ -318,6 +322,13 @@ function AccountEditDialog({
             <div className="sm:col-span-2">
               <label className={lc}>שם הארגון *</label>
               <input className={ic} value={fields.account_name} onChange={set("account_name")} />
+            </div>
+            <div className="sm:col-span-2">
+              <OrgContactPicker
+                accountId={account.account_id}
+                employerValue={fields.contact_link}
+                onEmployerChange={(id) => setFields((p) => ({ ...p, contact_link: id ?? "" }))}
+              />
             </div>
             <div>
               <label className={lc}>סטטוס</label>

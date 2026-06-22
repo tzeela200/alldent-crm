@@ -1,242 +1,119 @@
-import { useEffect, useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import ApplyModal from '@/components/public/ApplyModal'
 import { getPublicJobByCode } from '@/services/publicJobsService'
 import type { PublicJob } from '@/services/publicJobsService'
 
-/* ─── Markdown prose styles injected once ────────────────── */
-const PROSE_STYLE = `
-  .job-prose { direction: rtl; text-align: right; }
-  .job-prose h1,.job-prose h2,.job-prose h3 {
-    font-family:'Heebo',sans-serif; font-weight:700;
-    color:#0F0F10; margin-top:1.5em; margin-bottom:.5em;
-    line-height:1.35;
-  }
-  .job-prose h1 { font-size:1.35rem; }
-  .job-prose h2 { font-size:1.15rem; }
-  .job-prose h3 { font-size:1rem; }
-  .job-prose p  { margin:.65em 0; }
-  .job-prose ul,.job-prose ol { padding-inline-end:1.4em; margin:.65em 0; }
-  .job-prose li { margin:.3em 0; }
-  .job-prose li::marker { color:#008080; }
-  .job-prose strong { font-weight:700; color:#0F0F10; }
-  .job-prose em { font-style:italic; }
-  .job-prose a  { color:#008080; text-decoration:underline; }
-  .job-prose hr { border:none; border-top:1px solid #E5E7EB; margin:1.5em 0; }
-`
+type DetailItem = {
+  label: string
+  value: string
+}
 
 export default function PublicJobPage() {
   const { slug: jobCode } = useParams<{ slug: string }>()
   const [job, setJob] = useState<PublicJob | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [applyOpen, setApplyOpen] = useState(false)
   const [imgLoaded, setImgLoaded] = useState(false)
 
   useEffect(() => {
-    if (!jobCode) return
-    getPublicJobByCode(jobCode).then((data) => {
-      setJob(data)
+    if (!jobCode) {
       setLoading(false)
-    })
+      setJob(null)
+      return
+    }
+
+    let active = true
+    setLoading(true)
+    setError(false)
+    setImgLoaded(false)
+
+    getPublicJobByCode(jobCode)
+      .then((data) => {
+        if (!active) return
+        setJob(data)
+      })
+      .catch(() => {
+        if (!active) return
+        setError(true)
+        setJob(null)
+      })
+      .finally(() => {
+        if (!active) return
+        setLoading(false)
+      })
+
+    return () => {
+      active = false
+    }
   }, [jobCode])
 
+  const details = useMemo(() => buildDetails(job), [job])
+
   if (loading) return <PageSpinner />
+  if (error) return <JobNotFound title="לא הצלחנו לטעון את המשרה" />
+  if (!job) return <JobNotFound title="המשרה לא נמצאה" />
 
-  if (!job) return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAFAF7]" dir="rtl">
-      <p className="text-[#6B6B6B] text-lg" style={{ fontFamily: 'Heebo,sans-serif' }}>המשרה לא נמצאה</p>
-    </div>
-  )
-
-  const hasContent = !!(job.job_description || job.job_requirements)
+  const locationText = [job.city_name, job.region_name].filter(Boolean).join(' · ')
+  const hasMainContent = Boolean(job.public_excerpt || job.job_description || job.job_requirements)
 
   return (
     <div
-      className="bg-[#FAFAF7] min-h-screen pb-28"
       dir="rtl"
-      style={{ fontFamily: 'Heebo,sans-serif' }}
+      className="min-h-screen bg-[#FAFAF7] pb-24 text-[#0F0F10]"
+      style={{ fontFamily: 'Heebo, Assistant, Noto Sans Hebrew, sans-serif' }}
     >
-      <style>{PROSE_STYLE}</style>
+      <JobHero
+        job={job}
+        locationText={locationText}
+        imgLoaded={imgLoaded}
+        onImageLoad={() => setImgLoaded(true)}
+      />
 
-      {/* ── HERO ──────────────────────────────────────────────── */}
-      <section className="relative w-full overflow-hidden" style={{ minHeight: 480 }}>
-        {/* Image */}
-        {job.public_image_url ? (
-          <img
-            src={job.public_image_url}
-            alt={job.job_title ?? ''}
-            onLoad={() => setImgLoaded(true)}
-            className="absolute inset-0 w-full h-full object-cover transition-opacity duration-700"
-            style={{ opacity: imgLoaded ? 1 : 0 }}
-          />
-        ) : (
-          <div className="absolute inset-0 bg-[#1A2A28]" />
-        )}
+      <main className="mx-auto max-w-6xl px-4 py-5 md:px-8 md:py-6">
+        <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)] lg:items-start">
+          <aside className="lg:sticky lg:top-6">
+            <JobDetailsPanel job={job} details={details} onApply={() => setApplyOpen(true)} />
+          </aside>
 
-        {/* Gradient overlay — two layers for depth */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/10" />
-        <div className="absolute inset-0 bg-gradient-to-e from-black/30 to-transparent" />
+          <article className="min-w-0 space-y-4">
+            {job.public_excerpt && (
+              <section className="rounded-xl border border-[#D9D9D9] bg-white px-5 py-4 shadow-sm md:px-6">
+                <h2 className="mb-2 text-[14px] font-bold text-[#008080]">תקציר המשרה</h2>
+                <p className="text-[15px] font-normal leading-7 text-[#2D2D2D] md:text-[16px]">
+                  {job.public_excerpt}
+                </p>
+              </section>
+            )}
 
-        {/* Back link */}
-        <Link
-          to="/jobs"
-          className="absolute top-6 end-6 flex items-center gap-1.5 text-white/80 hover:text-white text-sm font-medium transition-colors z-10"
-        >
-          <span>← חזרה ללוח</span>
-        </Link>
+            {job.job_description && (
+              <ContentSection title="תיאור המשרה">
+                <MarkdownContent>{job.job_description}</MarkdownContent>
+              </ContentSection>
+            )}
 
-        {/* Title block — bottom of hero */}
-        <div className="relative flex flex-col justify-end h-full px-6 md:px-14 pb-10 pt-24">
-          {job.job_role_name && (
-            <span className="text-[#4DD9D9] text-[13px] font-semibold tracking-wide uppercase mb-2">
-              {job.job_role_name}
-            </span>
-          )}
-          <h1 className="text-white font-black leading-tight text-[28px] md:text-[42px] max-w-3xl" style={{ letterSpacing: '-0.02em' }}>
-            {job.job_title}
-          </h1>
-          {(job.city_name || job.region_name) && (
-            <p className="text-white/60 text-[14px] mt-2">
-              {[job.city_name, job.region_name].filter(Boolean).join(' · ')}
+            {job.job_requirements && (
+              <ContentSection title="דרישות התפקיד">
+                <MarkdownContent>{job.job_requirements}</MarkdownContent>
+              </ContentSection>
+            )}
+
+            {!hasMainContent && (
+              <section className="rounded-xl border border-[#D9D9D9] bg-white px-6 py-9 text-center shadow-sm">
+                <p className="text-sm text-[#6B6B6B]">פרטים נוספים יתקבלו בפנייה לתפקיד.</p>
+              </section>
+            )}
+
+            <p className="border-t border-[#D9D9D9] pt-4 text-sm leading-7 text-[#6B6B6B]">
+              כל המשרות באתר AllDent מוצגות באופן דיסקרטי. פרטי המעסיק יימסרו רק בהמשך התהליך ולא מוצגים באתר הציבורי.
             </p>
-          )}
-
+          </article>
         </div>
-      </section>
+      </main>
 
-      {/* ── MAIN CONTENT ──────────────────────────────────────── */}
-      <div className="max-w-4xl mx-auto px-4 md:px-8 py-10 space-y-8">
-
-        {/* Job code */}
-        <p className="text-[14px] font-bold text-[#008080]">קוד משרה: {job.job_code}</p>
-
-        {/* Excerpt / summary */}
-        {job.public_excerpt && (
-          <div className="bg-[#E6F7F7] border border-[#008080]/20 rounded-2xl px-6 py-5">
-            <p className="text-[12px] font-semibold text-[#008080] mb-2 uppercase tracking-wide">תקציר המשרה</p>
-            <p className="text-[15px] text-[#006D6D] font-medium leading-relaxed text-right">
-              {job.public_excerpt}
-            </p>
-          </div>
-        )}
-
-        {/* Role / sub-role */}
-        {(job.job_role_name || (Array.isArray(job.job_sub_role_names) && job.job_sub_role_names.length > 0)) && (
-          <InfoRow label="תפקיד" value={job.job_role_name ?? ''}>
-            {Array.isArray(job.job_sub_role_names) && job.job_sub_role_names.length > 0 && (
-              <InfoField label="תת-תפקיד" value={job.job_sub_role_names.join(', ')} />
-            )}
-          </InfoRow>
-        )}
-
-        {/* Location */}
-        {(job.region_name || job.city_name) && (
-          <div className="flex flex-wrap gap-6">
-            {job.region_name && <InfoField label="אזור" value={job.region_name} />}
-            {job.city_name && <InfoField label="עיר משרה" value={job.city_name} />}
-          </div>
-        )}
-
-        {/* Scope + schedule */}
-        {(job.scope_names || job.work_schedule_text) && (
-          <div className="flex flex-wrap gap-6">
-            {job.scope_names && (
-              <InfoField label="היקף משרה" value={Array.isArray(job.scope_names) ? job.scope_names.join(', ') : String(job.scope_names)} />
-            )}
-            {job.work_schedule_text && (
-              <InfoField label="ימים ושעות" value={job.work_schedule_text} />
-            )}
-          </div>
-        )}
-
-        {/* Description */}
-        {job.job_description && (
-          <ContentSection title="תיאור המשרה">
-            <div className="job-prose text-[15px] text-[#374151] leading-[1.85]">
-              <ReactMarkdown>{job.job_description}</ReactMarkdown>
-            </div>
-          </ContentSection>
-        )}
-
-        {/* Experience + languages */}
-        {(job.required_experience_name || (Array.isArray(job.required_languages_names) && job.required_languages_names.length > 0)) && (
-          <div className="flex flex-wrap gap-6">
-            {job.required_experience_name && <InfoField label="ניסיון נדרש" value={job.required_experience_name} />}
-            {Array.isArray(job.required_languages_names) && job.required_languages_names.length > 0 && (
-              <InfoField label="שפות נדרשות" value={job.required_languages_names.join(', ')} />
-            )}
-          </div>
-        )}
-
-        {/* Requirements */}
-        {job.job_requirements && (
-          <ContentSection title="דרישות התפקיד">
-            <div className="job-prose text-[15px] text-[#374151] leading-[1.85]">
-              <ReactMarkdown>{job.job_requirements}</ReactMarkdown>
-            </div>
-          </ContentSection>
-        )}
-
-        {/* Empty state */}
-        {!hasContent && !job.public_excerpt && (
-          <div className="bg-white rounded-2xl p-10 text-center border border-[#E5E7EB]">
-            <p className="text-[#9CA3AF] text-[15px]">פרטים נוספים יתקבלו בפנייה לתפקיד</p>
-          </div>
-        )}
-
-        {/* Additional criteria */}
-        {(job.mobility_name || (Array.isArray(job.system_names) && job.system_names.length > 0) || job.tax_type_name || (job.show_salary_public && (job.salary_expectation_monthly || job.salary_expectation_hourly))) && (
-          <ContentSection title="קריטריונים נוספים">
-            <div className="flex flex-wrap gap-6">
-              {job.mobility_name && <InfoField label="ניידות נדרשת" value={job.mobility_name} />}
-              {Array.isArray(job.system_names) && job.system_names.length > 0 && (
-                <InfoField label="מערכות מחשב / תוכנות מחשב" value={job.system_names.join(', ')} />
-              )}
-              {job.tax_type_name && <InfoField label="סוג העסקה" value={job.tax_type_name} />}
-              {job.show_salary_public && (job.salary_expectation_monthly || job.salary_expectation_hourly) && (
-                <InfoField
-                  label="שכר"
-                  value={[
-                    job.salary_expectation_monthly ? `₪${job.salary_expectation_monthly.toLocaleString()} / חודש` : null,
-                    job.salary_expectation_hourly ? `₪${job.salary_expectation_hourly.toLocaleString()} / שעה` : null,
-                  ].filter(Boolean).join(' · ')}
-                />
-              )}
-            </div>
-          </ContentSection>
-        )}
-
-        {/* Discretion note */}
-        <p className="text-[13px] text-[#9CA3AF] leading-relaxed text-right px-1">
-          כל המשרות באתר AllDent מוצגות באופן דיסקרטי. פרטי המעסיק יימסרו רק בהמשך התהליך.
-        </p>
-
-      </div>
-
-      {/* ── STICKY BOTTOM CTA ─────────────────────────────────── */}
-      <div className="fixed bottom-0 inset-x-0 z-40 bg-white/90 backdrop-blur-md border-t border-[#E5E7EB] px-4 py-3 flex items-center justify-between gap-4 md:hidden">
-        <div className="min-w-0">
-          <p className="text-[13px] font-bold text-[#0F0F10] truncate">{job.job_title}</p>
-          {job.city_name && <p className="text-[12px] text-[#6B6B6B]">{job.city_name}</p>}
-        </div>
-        <button
-          onClick={() => setApplyOpen(true)}
-          className="shrink-0 bg-[#008080] text-white rounded-full px-6 py-2.5 text-[14px] font-bold hover:bg-[#006D6D] transition-colors active:scale-95"
-        >
-          הגשת מועמדות
-        </button>
-      </div>
-
-      {/* Desktop CTA — inside content */}
-      <div className="hidden md:flex max-w-4xl mx-auto px-4 md:px-8 pb-16 justify-end">
-        <button
-          onClick={() => setApplyOpen(true)}
-          className="bg-[#008080] text-white rounded-full px-10 py-3.5 text-[15px] font-bold hover:bg-[#006D6D] transition-colors shadow-lg shadow-[#008080]/20 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-[#008080]/25 active:scale-95"
-        >
-          הגשת מועמדות
-        </button>
-      </div>
+      <JobMobileApplyBar job={job} locationText={locationText} onApply={() => setApplyOpen(true)} />
 
       <ApplyModal
         isOpen={applyOpen}
@@ -247,44 +124,231 @@ export default function PublicJobPage() {
   )
 }
 
-/* ─── Sub-components ──────────────────────────────────────── */
-
-function InfoField({ label, value }: { label: string; value: string }) {
-  if (!value) return null
+function JobHero({
+  job,
+  locationText,
+  imgLoaded,
+  onImageLoad,
+}: {
+  job: PublicJob
+  locationText: string
+  imgLoaded: boolean
+  onImageLoad: () => void
+}) {
   return (
-    <div className="flex flex-col gap-0.5 min-w-[120px]">
-      <span className="text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wide">{label}</span>
-      <span className="text-[14px] font-semibold text-[#0F0F10]">{value}</span>
-    </div>
-  )
-}
+    <section className="relative isolate min-h-[220px] overflow-hidden bg-[#2D2D2D] text-white md:min-h-[270px]">
+      {job.public_image_url ? (
+        <img
+          src={job.public_image_url}
+          alt={job.job_title ?? ''}
+          onLoad={onImageLoad}
+          className="absolute inset-0 -z-20 h-full w-full object-cover transition-opacity duration-500"
+          style={{ opacity: imgLoaded ? 0.34 : 0 }}
+        />
+      ) : (
+        <div className="absolute inset-0 -z-20 bg-[#2D2D2D]" />
+      )}
 
-function InfoRow({ label, value, children }: { label: string; value: string; children?: React.ReactNode }) {
-  return (
-    <div className="flex flex-wrap gap-6">
-      <InfoField label={label} value={value} />
-      {children}
-    </div>
-  )
-}
+      <div className="absolute inset-0 -z-10 bg-gradient-to-l from-[#008080]/85 via-[#2D2D2D]/86 to-[#0F0F10]/80" />
 
-function ContentSection({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden">
-      {/* Section header */}
-      <div className="px-6 py-4 border-b border-[#E5E7EB] flex items-center gap-3">
-        <div className="w-1 h-5 bg-[#008080] rounded-full" />
-        <h2 className="text-[16px] font-bold text-[#0F0F10]">{title}</h2>
+      <div className="mx-auto max-w-6xl px-4 py-4 md:px-8 md:py-5">
+        <div className="mb-4 flex items-center justify-between gap-3 md:mb-5">
+          <Link to="/jobs" className="text-sm font-bold text-white/80 transition-colors hover:text-white">
+            ← חזרה ללוח המשרות
+          </Link>
+          <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold text-white/85">
+            קוד משרה: {job.job_code}
+          </span>
+        </div>
+
+        <div className="max-w-3xl">
+          {job.job_role_name && (
+            <p className="mb-2 text-[13px] font-bold text-[#E6F3F3]">{job.job_role_name}</p>
+          )}
+
+          <h1 className="max-w-3xl text-[26px] font-extrabold leading-[1.25] md:text-[40px] md:leading-[1.22]">
+            {job.job_title}
+          </h1>
+
+          {locationText && (
+            <p className="mt-2 text-[14px] font-medium text-white/75 md:text-[15px]">{locationText}</p>
+          )}
+
+        </div>
       </div>
-      <div className="px-6 py-6">{children}</div>
+    </section>
+  )
+}
+
+function JobDetailsPanel({
+  job,
+  details,
+  onApply,
+}: {
+  job: PublicJob
+  details: DetailItem[]
+  onApply: () => void
+}) {
+  return (
+    <section className="overflow-hidden rounded-xl border border-[#D9D9D9] bg-white shadow-sm">
+      <div className="border-b border-[#D9D9D9] px-5 py-4">
+        <p className="mb-1 text-xs font-extrabold text-[#008080]">פרטי המשרה</p>
+        <h2 className="text-[15px] font-extrabold leading-6 text-[#0F0F10]">{job.job_title}</h2>
+      </div>
+
+      <dl className="divide-y divide-[#D9D9D9] px-5">
+        {details.map((item) => (
+          <DetailRow key={item.label} label={item.label} value={item.value} />
+        ))}
+      </dl>
+
+      <div className="hidden px-5 pb-5 pt-4 md:block">
+        <button
+          onClick={onApply}
+          className="w-full rounded-full bg-[#D97706] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#B45309] focus:outline-none focus:ring-4 focus:ring-[#D97706]/25 active:scale-[0.98]"
+        >
+          הגשת מועמדות
+        </button>
+      </div>
+    </section>
+  )
+}
+
+function DetailRow({ label, value }: DetailItem) {
+  return (
+    <div className="py-3 text-right">
+      <dt className="mb-1 text-[12px] font-semibold text-[#6B6B6B]">{label}</dt>
+      <dd className="text-[14px] font-semibold leading-6 text-[#0F0F10]">{value}</dd>
+    </div>
+  )
+}
+
+function ContentSection({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border border-[#D9D9D9] bg-white px-5 py-5 shadow-sm md:px-6 md:py-6">
+      <h2 className="mb-3 border-r-4 border-[#008080] pr-3 text-[18px] font-extrabold leading-7 text-[#0F0F10]">
+        {title}
+      </h2>
+      {children}
+    </section>
+  )
+}
+
+function MarkdownContent({ children }: { children: string }) {
+  return (
+    <div className="text-[15px] leading-7 text-[#2D2D2D] md:text-[16px] md:leading-8">
+      <ReactMarkdown
+        components={{
+          h1: ({ children }) => <h3 className="mb-2 mt-4 text-[18px] font-extrabold leading-7 text-[#0F0F10]">{children}</h3>,
+          h2: ({ children }) => <h3 className="mb-2 mt-4 text-[17px] font-extrabold leading-7 text-[#0F0F10]">{children}</h3>,
+          h3: ({ children }) => <h3 className="mb-2 mt-3 text-[16px] font-extrabold leading-7 text-[#0F0F10]">{children}</h3>,
+          p: ({ children }) => <p className="my-3">{children}</p>,
+          ul: ({ children }) => <ul className="my-3 list-disc space-y-1 pr-5">{children}</ul>,
+          ol: ({ children }) => <ol className="my-3 list-decimal space-y-1 pr-5">{children}</ol>,
+          li: ({ children }) => <li className="pr-1 marker:text-[#008080]">{children}</li>,
+          strong: ({ children }) => <strong className="font-bold text-[#0F0F10]">{children}</strong>,
+          a: ({ href, children }) => (
+            <a href={href} className="font-bold text-[#008080] underline underline-offset-4">
+              {children}
+            </a>
+          ),
+          hr: () => <hr className="my-6 border-[#D9D9D9]" />,
+        }}
+      >
+        {children}
+      </ReactMarkdown>
+    </div>
+  )
+}
+
+function JobMobileApplyBar({
+  job,
+  locationText,
+  onApply,
+}: {
+  job: PublicJob
+  locationText: string
+  onApply: () => void
+}) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-[#D9D9D9] bg-white/95 px-4 py-3 backdrop-blur md:hidden">
+      <div className="min-w-0">
+        <p className="truncate text-sm font-bold text-[#0F0F10]">{job.job_title}</p>
+        {locationText && <p className="truncate text-xs text-[#6B6B6B]">{locationText}</p>}
+      </div>
+      <button
+        onClick={onApply}
+        className="shrink-0 rounded-full bg-[#D97706] px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#B45309] active:scale-[0.98]"
+      >
+        הגשה
+      </button>
+    </div>
+  )
+}
+
+function JobNotFound({ title }: { title: string }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-[#FAFAF7] px-6" dir="rtl">
+      <div className="text-center" style={{ fontFamily: 'Heebo, Assistant, Noto Sans Hebrew, sans-serif' }}>
+        <p className="mb-2 text-xl font-bold text-[#0F0F10]">{title}</p>
+        <Link to="/jobs" className="text-sm font-bold text-[#008080] transition-colors hover:text-[#006D6D]">
+          חזרה ללוח המשרות
+        </Link>
+      </div>
     </div>
   )
 }
 
 function PageSpinner() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#FAFAF7]">
-      <div className="h-9 w-9 animate-spin rounded-full border-4 border-[#E5E7EB] border-t-[#008080]" />
+    <div className="flex min-h-screen items-center justify-center bg-[#FAFAF7]">
+      <div className="h-9 w-9 animate-spin rounded-full border-4 border-[#D9D9D9] border-t-[#008080]" />
     </div>
   )
+}
+
+function buildDetails(job: PublicJob | null): DetailItem[] {
+  if (!job) return []
+
+  return [
+    { label: 'קוד משרה', value: job.job_code },
+    { label: 'תפקיד', value: job.job_role_name ?? '' },
+    {
+      label: 'תת־תפקיד',
+      value: Array.isArray(job.job_sub_role_names) ? job.job_sub_role_names.join(', ') : '',
+    },
+    { label: 'עיר משרה', value: job.city_name ?? '' },
+    { label: 'אזור', value: job.region_name ?? '' },
+    {
+      label: 'היקף משרה',
+      value: Array.isArray(job.scope_names)
+        ? job.scope_names.join(', ')
+        : job.scope_names
+          ? String(job.scope_names)
+          : '',
+    },
+    { label: 'ימים ושעות', value: job.work_schedule_text ?? '' },
+    { label: 'ניסיון נדרש', value: job.required_experience_name ?? '' },
+    {
+      label: 'שפות נדרשות',
+      value: Array.isArray(job.required_languages_names) ? job.required_languages_names.join(', ') : '',
+    },
+    {
+      label: 'מערכות',
+      value: Array.isArray(job.system_names) ? job.system_names.join(', ') : '',
+    },
+    { label: 'ניידות', value: job.mobility_name ?? '' },
+    { label: 'סוג העסקה', value: job.tax_type_name ?? '' },
+    {
+      label: 'שכר',
+      value: job.show_salary_public
+        ? [
+            job.salary_expectation_monthly ? `₪${job.salary_expectation_monthly.toLocaleString()} / חודש` : '',
+            job.salary_expectation_hourly ? `₪${job.salary_expectation_hourly.toLocaleString()} / שעה` : '',
+          ]
+            .filter(Boolean)
+            .join(' · ')
+        : '',
+    },
+  ].filter((item) => item.value.trim().length > 0)
 }

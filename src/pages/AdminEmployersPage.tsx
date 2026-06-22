@@ -36,6 +36,7 @@ import { supabase } from '@/lib/supabase'
 import type { Account, Contact } from '@/types'
 import { MergeRecordsModal } from '@/components/MergeRecordsModal'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
+import { OrgContactPicker } from '@/components/ui/OrgContactPicker'
 import SidePanel from '@/components/ui/SidePanel'
 
 type ViewMode = 'accounts' | 'employers'
@@ -95,6 +96,7 @@ type EmployerDraft = {
   chairs_count: string
   notes: string
   next_follow_up: string
+  contact_link: string | null
 }
 
 type EnrichedAccount = Account & {
@@ -189,6 +191,7 @@ const EMPTY_DRAFT: EmployerDraft = {
   chairs_count: '',
   notes: '',
   next_follow_up: '',
+  contact_link: null,
 }
 
 function normalizeDigits(value?: string | null) {
@@ -222,6 +225,73 @@ function isValidEmail(value: string) {
 
 function isLikelyUrl(value: string) {
   return /^https?:\/\//i.test(value)
+}
+
+function AccountActionsMenu({
+  accountId,
+  hasPhone,
+  onView,
+  onEdit,
+  onNavigate360,
+  onWhatsapp,
+  onCall,
+  onProfile,
+}: {
+  accountId: number
+  hasPhone: boolean
+  onView: () => void
+  onEdit: () => void
+  onNavigate360: () => void
+  onWhatsapp: () => void
+  onCall: () => void
+  onProfile: () => void
+}) {
+  const [open, setOpen] = React.useState(false)
+  const ref = React.useRef<HTMLDivElement>(null)
+
+  React.useEffect(() => {
+    if (!open) return
+    const handle = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [open])
+
+  const item = (label: string, action: () => void, disabled = false) => (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={() => { action(); setOpen(false) }}
+      className={`block w-full px-4 py-2 text-right text-[13px] font-medium ${disabled ? 'cursor-not-allowed text-slate-300' : 'text-slate-700 hover:bg-[#F3F4F6]'}`}
+    >
+      {label}
+    </button>
+  )
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="flex h-8 w-8 items-center justify-center rounded-full text-[18px] font-bold text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        title="פעולות"
+      >
+        ⋮
+      </button>
+      {open && (
+        <div className="absolute left-0 z-50 mt-1 min-w-[160px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+          {item('צפייה', onView)}
+          {item('עריכת ארגון', onEdit)}
+          {item('מעבר ל-360', onNavigate360)}
+          {item('פרופיל להדפסה', onProfile)}
+          <hr className="my-1 border-slate-100" />
+          {item('WhatsApp', onWhatsapp, !hasPhone)}
+          {item('טלפון', onCall, !hasPhone)}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function buildCsv(rows: Record<string, string>[]) {
@@ -435,7 +505,8 @@ export default function AdminEmployersPage({
         .map((item) => item.full_name || item.display_name || item.email || item.phone_norm || item.phone)
         .filter(Boolean)
         .join(' · ')
-      const primaryEmployerName = linkedContacts[0]?.full_name || linkedContacts[0]?.display_name || '—'
+      const employerContact = linkedContacts.find((c) => String(c.contact_id) === String(account.contact_link))
+      const primaryEmployerName = employerContact?.full_name || employerContact?.display_name || '—'
       const jobCityIds = Array.from(new Set(relatedJobs.map((job) => Number(job.city_id || 0)).filter(Boolean)))
       const jobRegionIds = Array.from(new Set(relatedJobs.map((job) => Number(job.region_id || 0)).filter(Boolean)))
       const displayCityId = account.city_id ?? null
@@ -450,7 +521,7 @@ export default function AdminEmployersPage({
       const signals = [
         !linkedContacts.length ? 'ללא איש קשר' : null,
         hasJobs ? null : 'ללא משרות',
-        hasJobs && !hasActiveJobs ? 'מעסיק ישן' : null,
+        hasJobs && !hasActiveJobs ? 'גיוס ישן' : null,
         missingPhone ? 'ללא טלפון' : null,
         missingLocation ? 'מיקום חסר' : null,
       ].filter(Boolean) as string[]
@@ -594,6 +665,7 @@ export default function AdminEmployersPage({
       chairs_count: (selectedAccount as any).chairs_count == null ? '' : String((selectedAccount as any).chairs_count),
       notes: selectedAccount.notes ?? '',
       next_follow_up: toDateInputValue((selectedAccount as any).next_follow_up),
+      contact_link: String(selectedAccount.contact_link ?? ''),
     })
   }, [isEmployersBoard, selectedAccount, sheet.mode])
 
@@ -698,6 +770,7 @@ export default function AdminEmployersPage({
         chairs_count: draft.chairs_count ? Number(draft.chairs_count) : null,
         notes: draft.notes.trim() || null,
         next_follow_up: draft.next_follow_up || null,
+        contact_link: draft.contact_link || null,
         updated_timestamp: new Date().toISOString(),
       }
 
@@ -739,7 +812,7 @@ export default function AdminEmployersPage({
         .eq('account_id', accountId)
       if (error) throw error
       await queryClient.invalidateQueries({ queryKey: ['accounts'] })
-      showToast('סטטוס המעסיק עודכן', 'success')
+      showToast('סטטוס הארגון עודכן', 'success')
     } catch {
       showToast('שגיאה בעדכון סטטוס', 'error')
     }
@@ -841,19 +914,20 @@ export default function AdminEmployersPage({
     >
       <div dir="rtl" className="min-h-screen bg-[#F3F4F6] font-['Heebo'] text-[#2D2D2D]">
         <div className="space-y-6">
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5">
+          <section className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${isEmployersBoard ? 'xl:grid-cols-5' : 'xl:grid-cols-6'}`}>
             <KpiCard label={isEmployersBoard ? 'סה״כ מעסיקים' : 'סה״כ ארגונים'} value={kpis.total} hint="לאחר סינון" onClick={clearFilters} />
             <KpiCard label="מגייסים פעילים" value={kpis.activeEmployers} hint="account_status = 7" tone="success" onClick={() => setFilters((prev) => ({ ...prev, account_status: ACTIVE_RECRUITER_STATUS_ID }))} />
             <KpiCard label="מגייסים ישנים" value={kpis.oldEmployers} hint="account_status = 8" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, account_status: OLD_RECRUITER_STATUS_ID }))} />
             <KpiCard label="משרות פעילות" value={kpis.activeJobs} hint="job_status = פעילה" tone="success" onClick={() => setFilters((prev) => ({ ...prev, active_jobs_only: 'yes' }))} />
             <KpiCard label="סה״כ משרות" value={kpis.totalJobs} hint="לפי job.account_link" />
+            {!isEmployersBoard && <KpiCard label="עם איש קשר" value={kpis.withContacts} hint="ארגונים עם contact משויך" onClick={() => setFilters((prev) => ({ ...prev, has_contact: 'yes' }))} />}
           </section>
 
           <Toolbar>
             <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-4 shadow-sm">
               {isEmployersBoard && (
                 <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[#D9D9D9] pb-4">
-                  <button type="button" onClick={() => setTab('all')} className={`rounded-full px-4 py-2 text-[13px] font-semibold ${tab === 'all' ? 'bg-[#E6F3F3] text-[#008080]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>כל המעסיקים</button>
+                  <button type="button" onClick={() => setTab('all')} className={`rounded-full px-4 py-2 text-[13px] font-semibold ${tab === 'all' ? 'bg-[#E6F3F3] text-[#008080]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>כל הארגונים</button>
                   <button type="button" onClick={() => setTab('active')} className={`rounded-full px-4 py-2 text-[13px] font-semibold ${tab === 'active' ? 'bg-[#E6F3F3] text-[#008080]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>מגייסים פעילים בלבד</button>
                 </div>
               )}
@@ -949,7 +1023,7 @@ export default function AdminEmployersPage({
                         {visibleColumns.includes('city') && <th className="px-3 py-3">עיר</th>}
                         {visibleColumns.includes('active_jobs') && <SortableTh label="משרות פעילות" sortKey="activeJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
                         {visibleColumns.includes('total_jobs') && <SortableTh label="סה״כ משרות" sortKey="totalJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
-                        {visibleColumns.includes('contacts') && <th className="px-3 py-3">אנשי קשר</th>}
+                        {visibleColumns.includes('contacts') && <th className="px-3 py-3">אנשי קשר משויכים</th>}
                         {visibleColumns.includes('follow_up') && <th className="px-3 py-3">פולו־אפ</th>}
                         <th className="px-3 py-3">פעולות</th>
                       </tr>
@@ -959,12 +1033,12 @@ export default function AdminEmployersPage({
                         const selected = selectedRows.includes(Number(account.account_id))
                         const status = getEmployerStatusBadge(account.account_status, accountStatusName(account.account_status))
                         return (
-                          <tr key={account.account_id} onClick={() => openSheet(Number(account.account_id), 'view')} className={`font-medium transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#FAFAF7]'}`}>
+                          <tr key={account.account_id} className={`font-medium transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#FAFAF7]'}`}>
                             <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}><input type="checkbox" checked={selected} onChange={() => toggleRowSelection(Number(account.account_id))} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></td>
-                            {visibleColumns.includes('account_name') && <td style={{ width: columnWidths.account_name }} className="px-3 py-3"><div className="font-bold text-[#2D2D2D]">{account.account_name ?? '—'}</div></td>}
+                            {visibleColumns.includes('account_name') && <td style={{ width: columnWidths.account_name }} className="px-3 py-3 cursor-pointer" onClick={() => openSheet(Number(account.account_id), 'view')}><div className="font-bold text-[#008080] hover:underline">{account.account_name ?? '—'}</div></td>}
                             {visibleColumns.includes('primary_contact') && <td style={{ width: columnWidths.primary_contact }} className="px-4 py-3 font-bold text-[#2D2D2D]">{account.primaryEmployerName}</td>}
                             {visibleColumns.includes('account_type') && <td style={{ width: columnWidths.account_type }} className="px-3 py-3">{accountTypeName(account.account_type)}</td>}
-                            {visibleColumns.includes('account_status') && <td style={{ width: columnWidths.account_status }} className="px-3 py-3"><select dir="rtl" value={String(account.account_status ?? '')} onChange={(event) => updateAccountStatusInline(Number(account.account_id), Number(event.target.value))} className={`h-9 rounded-[8px] border px-2.5 text-[12px] font-bold outline-none ${status.bg} ${status.text} ${status.border}`}>{(isEmployersBoard ? accountStatuses.filter((item) => EMPLOYER_STATUS_IDS.includes(item.id)) : accountStatuses).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></td>}
+                            {visibleColumns.includes('account_status') && <td style={{ width: columnWidths.account_status }} className="px-3 py-3" onClick={(e) => e.stopPropagation()}><select dir="rtl" value={String(account.account_status ?? '')} onChange={(event) => updateAccountStatusInline(Number(account.account_id), Number(event.target.value))} className={`h-9 rounded-[8px] border px-2.5 text-[12px] font-bold outline-none ${status.bg} ${status.text} ${status.border}`}>{(isEmployersBoard ? accountStatuses.filter((item) => EMPLOYER_STATUS_IDS.includes(item.id)) : accountStatuses).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></td>}
                             {visibleColumns.includes('phone') && <td style={{ width: columnWidths.phone }} dir="ltr" className="px-4 py-3 font-mono text-[12px]">{formatPhone(account.phone)}</td>}
                             {visibleColumns.includes('email') && <td style={{ width: columnWidths.email }} dir="ltr" className="px-4 py-3 text-[12px]">{account.email ?? '—'}</td>}
                             {visibleColumns.includes('region') && <td style={{ width: columnWidths.region }} className="px-3 py-3">{regionName(account.displayRegionId)}</td>}
@@ -974,13 +1048,16 @@ export default function AdminEmployersPage({
                             {visibleColumns.includes('contacts') && <td style={{ width: columnWidths.contacts }} className="px-3 py-3"><div className="truncate">{account.linkedContactSummary || '—'}</div></td>}
                             {visibleColumns.includes('follow_up') && <td style={{ width: columnWidths.follow_up }} className="px-3 py-3">{formatDate((account as any).next_follow_up)}</td>}
                             <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-1.5">
-                                <IconAction title="צפייה" onClick={() => openSheet(Number(account.account_id), 'view')} icon={<Eye className="h-4 w-4" />} />
-                                <IconAction title="עריכה" onClick={() => openSheet(Number(account.account_id), 'edit')} icon={<Edit2 className="h-4 w-4" />} />
-                                <IconAction title="משרות" onClick={() => openSheet(Number(account.account_id), 'view')} icon={<Briefcase className="h-4 w-4" />} disabled={account.totalJobsCount === 0} />
-                                <IconAction title="וואטסאפ" onClick={() => openWhatsapp(account)} icon={<MessageCircle className="h-4 w-4" />} disabled={!account.phone && !account.linkedContacts[0]?.phone_norm} />
-                                <IconAction title="טלפון" onClick={() => account.phone ? (window.location.href = `tel:${account.phone}`) : showToast('אין טלפון זמין', 'error')} icon={<Phone className="h-4 w-4" />} disabled={!account.phone} />
-                              </div>
+                              <AccountActionsMenu
+                                accountId={Number(account.account_id)}
+                                hasPhone={!!account.phone}
+                                onView={() => openSheet(Number(account.account_id), 'view')}
+                                onEdit={() => openSheet(Number(account.account_id), 'edit')}
+                                onNavigate360={() => navigate(`/admin/employers/${account.account_id}`)}
+                                onWhatsapp={() => openWhatsapp(account)}
+                                onCall={() => account.phone ? (window.location.href = `tel:${account.phone}`) : showToast('אין טלפון זמין', 'error')}
+                                onProfile={() => navigate(`/employers/${account.account_id}/profile`)}
+                              />
                             </td>
                           </tr>
                         )
@@ -1116,6 +1193,17 @@ export default function AdminEmployersPage({
                   <SelectLikeField label="אזור" value={String(draft.region_id ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} />
                   <SelectLikeField label="עיר" value={String(draft.city_id ?? '')} onChange={(value) => { const found = cities.find((c) => String(c.id) === value); setDraft((prev) => ({ ...prev, city_id: value ? Number(value) : null, region_id: found?.region_id ?? prev.region_id })) }} options={(draft.region_id ? cities.filter((item) => Number(item.region_id) === Number(draft.region_id)) : cities).map((item) => ({ value: String(item.id), label: item.name }))} />
                 </SectionCard>
+                {sheet.mode === 'edit' && sheet.accountId && (
+                  <SectionCard title="איש קשר ראשי">
+                    <div className="sm:col-span-2">
+                      <OrgContactPicker
+                        accountId={sheet.accountId}
+                        employerValue={draft.contact_link}
+                        onEmployerChange={(id) => setDraft((prev) => ({ ...prev, contact_link: id }))}
+                      />
+                    </div>
+                  </SectionCard>
+                )}
                 <p className="text-center text-[12px] text-[#9CA3AF]">לפרטים מלאים (כתובת, צוות, הערות, פולו-אפ) — לחצי על 360 מלא</p>
               </div>
             )}

@@ -13,14 +13,13 @@ import {
   Sparkles,
   Send,
   X,
-  MapPin,
   Building2,
-  Users,
   Clock3,
   CheckCircle2,
   AlertTriangle,
   MessageCircle,
   Image as ImageIcon,
+  MoreHorizontal,
   ChevronDown,
   ChevronUp,
 } from 'lucide-react'
@@ -67,16 +66,16 @@ const PUBLIC_STATUS_IDS = {
 
 const ALL_JOB_COLUMNS = [
   { key: 'job_code', label: 'קוד' },
-  { key: 'job_title', label: 'כותרת' },
   { key: 'job_role', label: 'תפקיד' },
+  { key: 'job_status', label: 'סטטוס משרה' },
+  { key: 'city_id', label: 'עיר' },
+  { key: 'region_id', label: 'אזור' },
+  { key: 'scope', label: 'היקף' },
+  { key: 'job_title', label: 'כותרת' },
   { key: 'job_sub_role', label: 'תתי־תפקידים' },
   { key: 'account_name', label: 'ארגון' },
   { key: 'employer_name', label: 'מעסיק' },
   { key: 'recruiter_name', label: 'מגייס' },
-  { key: 'region_id', label: 'אזור' },
-  { key: 'city_id', label: 'עיר' },
-  { key: 'scope', label: 'היקף' },
-  { key: 'job_status', label: 'סטטוס משרה' },
   { key: 'public_status', label: 'סטטוס פרסום' },
   { key: 'total_applicants', label: 'מועמדים' },
   { key: 'last_publish_date', label: 'פרסום אחרון' },
@@ -85,16 +84,14 @@ const ALL_JOB_COLUMNS = [
 
 const DEFAULT_JOB_COLUMNS = [
   'job_code',
-  'job_title',
   'job_role',
+  'job_status',
+  'city_id',
+  'region_id',
+  'scope',
+  'job_title',
   'job_sub_role',
   'account_name',
-  'employer_name',
-  'recruiter_name',
-  'region_id',
-  'city_id',
-  'scope',
-  'job_status',
   'public_status',
   'total_applicants',
 ] as const
@@ -802,26 +799,26 @@ export default function AdminJobsPage() {
             ) : (
               <div className="overflow-hidden rounded-[18px] border border-[#D9D9D9] bg-white shadow-sm">
                 <div className="overflow-x-auto">
-                  <table className="w-full min-w-[1680px] border-collapse text-right text-[13px]">
+                  <table className="w-full min-w-[1280px] border-collapse text-right text-[13px]">
                     <thead className="bg-[#F9FAFB]">
                       <tr className="border-b border-[#D9D9D9] text-[12px] font-semibold text-[#6B6B6B]">
                         <th className="w-10 px-3 py-3"><input type="checkbox" checked={pageFullySelected} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
                         {visibleColumns.includes('job_code') && <SortableTh label="קוד" sortKey="job_code" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
-                        {visibleColumns.includes('job_title') && <SortableTh label="כותרת" sortKey="job_title" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('job_role') && <PlainTh label="תפקיד" />}
+                        {visibleColumns.includes('job_status') && <PlainTh label="סטטוס משרה" />}
+                        {visibleColumns.includes('city_id') && <PlainTh label="עיר" />}
+                        {visibleColumns.includes('region_id') && <PlainTh label="אזור" />}
+                        {visibleColumns.includes('scope') && <PlainTh label="היקף" />}
+                        {visibleColumns.includes('job_title') && <SortableTh label="כותרת" sortKey="job_title" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('job_sub_role') && <PlainTh label="תתי־תפקידים" />}
                         {visibleColumns.includes('account_name') && <PlainTh label="ארגון" />}
                         {visibleColumns.includes('employer_name') && <PlainTh label="מעסיק" />}
                         {visibleColumns.includes('recruiter_name') && <PlainTh label="מגייס" />}
-                        {visibleColumns.includes('region_id') && <PlainTh label="אזור" />}
-                        {visibleColumns.includes('city_id') && <PlainTh label="עיר" />}
-                        {visibleColumns.includes('scope') && <PlainTh label="היקף" />}
-                        {visibleColumns.includes('job_status') && <PlainTh label="סטטוס משרה" />}
                         {visibleColumns.includes('public_status') && <PlainTh label="סטטוס פרסום" />}
                         {visibleColumns.includes('total_applicants') && <PlainTh label="מועמדים" />}
                         {visibleColumns.includes('last_publish_date') && <PlainTh label="פרסום אחרון" />}
                         {visibleColumns.includes('updated_timestamp') && <PlainTh label="עודכן" />}
-                        <th className="w-[250px] px-3 py-3">פעולות</th>
+                        <th className="w-14 px-3 py-3 text-center">פעולות</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F3F4F6]">
@@ -832,15 +829,7 @@ export default function AdminJobsPage() {
                           <tr key={jobCode} className={`transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#FAFAF7]'}`}>
                             <td className="px-3 py-3"><input type="checkbox" checked={selected} onChange={() => toggleRowSelection(jobCode)} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></td>
                             {visibleColumns.includes('job_code') && <td className="px-3 py-3"><button type="button" onClick={() => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`)} className="font-mono font-bold text-[#008080] hover:underline">{job.job_code}</button></td>}
-                            {visibleColumns.includes('job_title') && <td className="max-w-[230px] px-3 py-3 font-semibold text-[#2D2D2D]">{job.job_title ?? '—'}</td>}
                             {visibleColumns.includes('job_role') && <td className="px-3 py-3"><RoleBadge roleId={Number(job.job_role)} label={roleName(job.job_role)} /></td>}
-                            {visibleColumns.includes('job_sub_role') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.job_sub_role)} labelById={subRoleName} empty="—" /></td>}
-                            {visibleColumns.includes('account_name') && <td className="max-w-[220px] px-3 py-3"><span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"><Building2 className="h-3.5 w-3.5" />{job.account_name ?? '—'}</span></td>}
-                            {visibleColumns.includes('employer_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.employer_contact_name ?? '—'}</td>}
-                            {visibleColumns.includes('recruiter_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.recruiter_contact_name ?? '—'}</td>}
-                            {visibleColumns.includes('region_id') && <td className="px-3 py-3">{jobRegionName(job)}</td>}
-                            {visibleColumns.includes('city_id') && <td className="px-3 py-3">{jobCityName(job)}</td>}
-                            {visibleColumns.includes('scope') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.scope)} labelById={scopeName} empty="—" /></td>}
                             {visibleColumns.includes('job_status') && (
                               <td className="px-3 py-3">
                                 <select
@@ -849,27 +838,36 @@ export default function AdminJobsPage() {
                                     const value = Number(event.target.value)
                                     if (value) updateJobPatch(String(job.job_code), { job_status: value }, `סטטוס משרה עודכן ל־${statusName(value)}`)
                                   }}
-                                  className="h-8 rounded-xl border border-[#D9D9D9] bg-white px-2 text-[12px] font-semibold outline-none focus:border-[#008080] cursor-pointer"
-                                  style={{ color: job.job_status === JOB_STATUS_IDS.active ? '#166534' : job.job_status === JOB_STATUS_IDS.hold || job.job_status === JOB_STATUS_IDS.draft ? '#B45309' : '#6B6B6B' }}
+                                  className={`h-8 cursor-pointer rounded-xl border px-2 text-[12px] font-bold outline-none transition focus:border-[#008080] ${jobStatusSelectClass(Number(job.job_status))}`}
                                 >
                                   {jobStatuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
                                 </select>
                               </td>
                             )}
+                            {visibleColumns.includes('city_id') && <td className="px-3 py-3">{jobCityName(job)}</td>}
+                            {visibleColumns.includes('region_id') && <td className="px-3 py-3">{jobRegionName(job)}</td>}
+                            {visibleColumns.includes('scope') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.scope)} labelById={scopeName} empty="—" /></td>}
+                            {visibleColumns.includes('job_title') && <td className="max-w-[230px] px-3 py-3 font-semibold text-[#2D2D2D]">{job.job_title ?? '—'}</td>}
+                            {visibleColumns.includes('job_sub_role') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.job_sub_role)} labelById={subRoleName} empty="—" /></td>}
+                            {visibleColumns.includes('account_name') && <td className="max-w-[220px] px-3 py-3"><span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"><Building2 className="h-3.5 w-3.5" />{job.account_name ?? '—'}</span></td>}
+                            {visibleColumns.includes('employer_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.employer_contact_name ?? '—'}</td>}
+                            {visibleColumns.includes('recruiter_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.recruiter_contact_name ?? '—'}</td>}
                             {visibleColumns.includes('public_status') && <td className="px-3 py-3"><StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} /></td>}
                             {visibleColumns.includes('total_applicants') && <td className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold">{Number(job.total_applicants ?? 0)}</span></td>}
                             {visibleColumns.includes('last_publish_date') && <td className="px-3 py-3 text-[#6B6B6B]">{job.last_publish_date ? formatDate(job.last_publish_date) : '—'}</td>}
                             {visibleColumns.includes('updated_timestamp') && <td className="px-3 py-3 text-[#6B6B6B]">{job.updated_timestamp ? formatDate(job.updated_timestamp) : '—'}</td>}
                             <td className="px-3 py-3">
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <IconButton title="צפייה בפאנל" icon={<Eye className="h-4 w-4" />} onClick={() => openPanel(job, 'view')} />
-                                <IconButton title="עריכה מלאה" icon={<Edit2 className="h-4 w-4" />} onClick={() => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`)} />
-                                <IconButton title="שכפול" icon={<Copy className="h-4 w-4" />} onClick={() => duplicateJob(job)} pending={rowActionPending === jobCode} />
-                                <IconButton title="פרסום" icon={<Send className="h-4 w-4" />} onClick={() => publishJob(job)} pending={rowActionPending === jobCode} />
-                                <IconButton title="Smart Match" icon={<Sparkles className="h-4 w-4" />} onClick={() => showToast('Smart Match לא מחובר למסך הזה עדיין', 'info')} />
-                                <IconButton title="וואטסאפ" icon={<MessageCircle className="h-4 w-4" />} onClick={() => openWhatsApp(job)} />
-                                <IconButton title="ארכוב" icon={<Archive className="h-4 w-4" />} onClick={() => updateJobPatch(jobCode, { job_status: JOB_STATUS_IDS.archived, public_status: PUBLIC_STATUS_IDS.hidden, unpublished_at: new Date().toISOString() }, 'המשרה הועברה לארכיון')} pending={rowActionPending === jobCode} />
-                              </div>
+                              <RowActionsMenu
+                                jobCode={jobCode}
+                                pending={rowActionPending === jobCode}
+                                onView={() => openPanel(job, 'view')}
+                                onEdit={() => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`)}
+                                onDuplicate={() => duplicateJob(job)}
+                                onPublish={() => publishJob(job)}
+                                onSmartMatch={() => showToast('Smart Match לא מחובר למסך הזה עדיין', 'info')}
+                                onWhatsApp={() => openWhatsApp(job)}
+                                onArchive={() => updateJobPatch(jobCode, { job_status: JOB_STATUS_IDS.archived, public_status: PUBLIC_STATUS_IDS.hidden, unpublished_at: new Date().toISOString() }, 'המשרה הועברה לארכיון')}
+                              />
                             </td>
                           </tr>
                         )
@@ -1143,10 +1141,75 @@ function PlainTh({ label }: { label: string }) {
   return <th className="whitespace-nowrap px-3 py-3 select-none">{label}</th>
 }
 
-function IconButton({ title, icon, onClick, disabled, pending }: { title: string; icon: React.ReactNode; onClick?: () => void; disabled?: boolean; pending?: boolean }) {
+function RowActionsMenu({
+  jobCode,
+  pending,
+  onView,
+  onEdit,
+  onDuplicate,
+  onPublish,
+  onSmartMatch,
+  onWhatsApp,
+  onArchive,
+}: {
+  jobCode: string
+  pending?: boolean
+  onView: () => void
+  onEdit: () => void
+  onDuplicate: () => void
+  onPublish: () => void
+  onSmartMatch: () => void
+  onWhatsApp: () => void
+  onArchive: () => void
+}) {
   return (
-    <button type="button" title={title} onClick={onClick} disabled={disabled || pending} className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#D9D9D9] bg-white text-[#6B6B6B] shadow-[3px_3px_6px_rgba(0,0,0,0.08)] transition-all hover:shadow-[1px_1px_3px_rgba(0,0,0,0.10)] hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-50">
-      {pending ? <Clock3 className="h-4 w-4 animate-spin" /> : icon}
+    <details className="relative flex justify-center">
+      <summary
+        title={`פעולות למשרה ${jobCode}`}
+        className="inline-flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-[10px] border border-[#D9D9D9] bg-white text-[#6B6B6B] shadow-[3px_3px_6px_rgba(0,0,0,0.08)] transition-all hover:text-[#008080] hover:shadow-[1px_1px_3px_rgba(0,0,0,0.10)]"
+      >
+        {pending ? <Clock3 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
+      </summary>
+      <div className="absolute left-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-[16px] border border-[#D9D9D9] bg-white p-1.5 text-right shadow-lg">
+        <RowActionItem icon={<Eye className="h-4 w-4" />} label="צפייה בפאנל" onClick={onView} />
+        <RowActionItem icon={<Edit2 className="h-4 w-4" />} label="עריכה מלאה" onClick={onEdit} />
+        <RowActionItem icon={<Copy className="h-4 w-4" />} label="שכפול" onClick={onDuplicate} disabled={pending} />
+        <RowActionItem icon={<Send className="h-4 w-4" />} label="פרסום" onClick={onPublish} disabled={pending} />
+        <RowActionItem icon={<Sparkles className="h-4 w-4" />} label="Smart Match" onClick={onSmartMatch} />
+        <RowActionItem icon={<MessageCircle className="h-4 w-4" />} label="וואטסאפ" onClick={onWhatsApp} />
+        <div className="my-1 border-t border-[#F3F4F6]" />
+        <RowActionItem icon={<Archive className="h-4 w-4" />} label="ארכוב" onClick={onArchive} disabled={pending} danger />
+      </div>
+    </details>
+  )
+}
+
+function RowActionItem({
+  icon,
+  label,
+  onClick,
+  disabled,
+  danger,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  disabled?: boolean
+  danger?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-semibold transition ${
+        danger
+          ? 'text-[#991B1B] hover:bg-[#FEE2E2]'
+          : 'text-[#2D2D2D] hover:bg-[#F3F4F6] hover:text-[#008080]'
+      } disabled:cursor-not-allowed disabled:opacity-50`}
+    >
+      {icon}
+      <span>{label}</span>
     </button>
   )
 }
@@ -1305,11 +1368,34 @@ function namesFromIds(ids: number[], labelById: (id: number) => string) {
   return names.length ? names.join(', ') : '—'
 }
 
+function jobStatusSelectClass(status: number) {
+  if (status === JOB_STATUS_IDS.active) {
+    return 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534] focus:ring-2 focus:ring-[#DCFCE7]'
+  }
+  if (
+    status === JOB_STATUS_IDS.closedSuccess ||
+    status === JOB_STATUS_IDS.closedOther ||
+    status === JOB_STATUS_IDS.cancelled ||
+    status === JOB_STATUS_IDS.archived
+  ) {
+    return 'border-[#FECACA] bg-[#FEE2E2] text-[#991B1B] focus:ring-2 focus:ring-[#FEE2E2]'
+  }
+  if (status === JOB_STATUS_IDS.hold || status === JOB_STATUS_IDS.draft || status === JOB_STATUS_IDS.new) {
+    return 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309] focus:ring-2 focus:ring-[#FEF3C7]'
+  }
+  return 'border-[#D9D9D9] bg-white text-[#6B6B6B] focus:ring-2 focus:ring-[#E6F3F3]'
+}
+
 function jobStatusTone(status: number): 'default' | 'success' | 'warning' | 'danger' | 'muted' {
   if (status === JOB_STATUS_IDS.active) return 'success'
   if (status === JOB_STATUS_IDS.hold || status === JOB_STATUS_IDS.draft || status === JOB_STATUS_IDS.new) return 'warning'
-  if (status === JOB_STATUS_IDS.filled || status === JOB_STATUS_IDS.closedSuccess) return 'default'
-  if (status === JOB_STATUS_IDS.closedOther || status === JOB_STATUS_IDS.cancelled) return 'danger'
+  if (
+    status === JOB_STATUS_IDS.closedSuccess ||
+    status === JOB_STATUS_IDS.closedOther ||
+    status === JOB_STATUS_IDS.cancelled ||
+    status === JOB_STATUS_IDS.archived
+  ) return 'danger'
+  if (status === JOB_STATUS_IDS.filled) return 'default'
   return 'muted'
 }
 

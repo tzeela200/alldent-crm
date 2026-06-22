@@ -232,14 +232,15 @@ export default function RecruitmentRequestPage() {
 
   return (
     <div dir="rtl" className="min-h-screen bg-[#FAFAF7] font-['Heebo'] text-[#2D2D2D]">
-      <div className="max-w-3xl mx-auto px-4 py-12">
+      <div className="max-w-5xl mx-auto px-4 py-8 md:py-12">
         <div className="mb-8">
           <span className="rounded-full bg-[#E6F3F3] px-3 py-1 text-[12px] font-bold text-[#008080]">מעסיקים</span>
-          <h1 className="mt-3 text-[32px] font-bold text-[#2D2D2D]">בקשת גיוס</h1>
-          <p className="mt-2 text-[16px] text-[#6B6B6B]">מלאו את הטופס ואנחנו נחזור אליכם בהקדם עם הצעה מותאמת.</p>
+          <h1 className="mt-3 text-[34px] md:text-[40px] font-bold tracking-tight text-[#2D2D2D]">בקשת גיוס</h1>
+          <p className="mt-3 text-[16px] leading-7 text-[#6B6B6B] max-w-2xl">מלאו את הטופס ואנחנו נחזור אליכם בהקדם עם הצעה מותאמת.</p>
+          <div className="mt-6 h-px bg-[#E5E7EB]" />
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* חלק 1 — פרטי המעסיק */}
           <SectionCard title="פרטי המעסיק / הארגון">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -331,7 +332,7 @@ export default function RecruitmentRequestPage() {
               type="button"
               onClick={handleSubmit}
               disabled={submitting}
-              className="flex items-center gap-2 rounded-xl bg-[#008080] px-8 py-3 text-[15px] font-bold text-white transition hover:bg-[#006D6D] disabled:opacity-60"
+              className="flex items-center gap-2 rounded-xl bg-[#008080] px-10 py-4 text-[15px] font-bold text-white shadow-sm transition hover:bg-[#006D6D] disabled:opacity-60"
             >
               {submitting ? 'שולח...' : 'שליחת בקשת גיוס'}
             </button>
@@ -348,8 +349,8 @@ function toOption(item: DictItem) {
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
-      <h2 className="mb-5 text-[18px] font-bold text-[#2D2D2D]">{title}</h2>
+    <div className="rounded-2xl border border-[#E5E7EB] bg-white p-7 md:p-8 shadow-sm">
+      <h2 className="mb-6 text-[20px] font-bold tracking-tight text-[#2D2D2D]">{title}</h2>
       {children}
     </div>
   )
@@ -362,14 +363,14 @@ function TextField({
 }) {
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
+      <span className="text-[12px] font-semibold text-[#6B6B6B]">{label}</span>
       <input
         dir={dir}
         type={type}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
+        className="h-12 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
       />
     </div>
   )
@@ -382,12 +383,12 @@ function SelectField({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
+      <span className="text-[12px] font-semibold text-[#6B6B6B]">{label}</span>
       <select
         dir="rtl"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="h-11 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
+        className="h-12 rounded-xl border border-[#D9D9D9] bg-white px-3 text-[14px] font-medium text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
       >
         <option value="">{placeholder}</option>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -403,7 +404,7 @@ function MultiSelectField({
 }) {
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
+      <span className="text-[12px] font-semibold text-[#6B6B6B]">{label}</span>
       <div className="max-h-44 overflow-y-auto rounded-xl border border-[#D9D9D9] bg-white p-2">
         {options.length ? options.map((o) => {
           const num = Number(o.value)
@@ -432,13 +433,13 @@ function TextAreaField({
 }) {
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>
+      <span className="text-[12px] font-semibold text-[#6B6B6B]">{label}</span>
       <textarea
         dir="rtl"
         rows={rows}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[14px] leading-7 text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
+        className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-3 text-[14px] leading-7 text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
       />
     </div>
   )

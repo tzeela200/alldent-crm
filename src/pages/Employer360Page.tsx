@@ -42,6 +42,8 @@ import {
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ContactPicker } from "@/components/ui/ContactPicker";
+import { CityRegionPicker } from "@/components/ui/CityRegionPicker";
+import { OrgContactPicker } from "@/components/ui/OrgContactPicker";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -812,10 +814,11 @@ function useAccountApplications(jobCodes: string[], previewMode: boolean) {
 
 type EditSection = "general" | "crm";
 
-type CityRowFull = { id: number; name: string | null; region_id: number | null };
 
 type EditFields = {
   account_name: string;
+  bus_id: string;
+  contact_link: string;
   account_status: string;
   account_type: string;
   phone: string;
@@ -856,6 +859,8 @@ function AccountEditSheet({
 
   const buildFields = (a: AccountRow): EditFields => ({
     account_name: a.account_name ?? "",
+    bus_id: (a as any).bus_id ?? "",
+    contact_link: String(a.contact_link ?? ""),
     account_status: String(a.account_status ?? ""),
     account_type: String(a.account_type ?? ""),
     phone: a.phone ?? "",
@@ -890,44 +895,16 @@ function AccountEditSheet({
     setFields((prev) => ({ ...prev, [key]: e.target.value }));
   };
 
-  const { data: cityRows = [] } = useQuery<CityRowFull[]>({
-    queryKey: ["dict_cities_with_region"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("dict_cities")
-        .select("id, name, region_id")
-        .order("name");
-      if (error) throw error;
-      return (data ?? []) as CityRowFull[];
-    },
-    staleTime: 10 * 60 * 1000,
-  });
 
-  const filteredCities = fields.region_id
-    ? cityRows.filter((c) => String(c.region_id) === fields.region_id)
-    : cityRows;
 
-  const regionOptions = Array.from(dicts.regions.entries()).map(([id, name]) => ({ id, name }));
-
-  const handleRegionChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setFields((prev) => ({ ...prev, region_id: e.target.value, city_id: "" }));
-  };
-
-  const handleCityChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const cityId = e.target.value;
-    const found = cityRows.find((c) => String(c.id) === cityId);
-    setFields((prev) => ({
-      ...prev,
-      city_id: cityId,
-      region_id: found?.region_id ? String(found.region_id) : prev.region_id,
-    }));
-  };
 
   const handleSave = async () => {
     setSaving(true);
     try {
       const updates: Record<string, unknown> = {
         account_name: fields.account_name.trim() || account.account_name,
+        bus_id: fields.bus_id.trim() || null,
+        contact_link: fields.contact_link || null,
         account_status: fields.account_status ? Number(fields.account_status) : null,
         account_type: fields.account_type ? Number(fields.account_type) : null,
         phone: fields.phone.trim() || null,
@@ -1010,6 +987,19 @@ function AccountEditSheet({
               </div>
 
               <div>
+                <label className={labelClass}>ח.פ / עוסק מורשה</label>
+                <input className={inputClass} value={fields.bus_id} onChange={set("bus_id")} placeholder="מספר ח.פ או עוסק מורשה" />
+              </div>
+
+              <div className="sm:col-span-2">
+                <OrgContactPicker
+                  accountId={account.account_id}
+                  employerValue={fields.contact_link}
+                  onEmployerChange={(id) => setFields((prev) => ({ ...prev, contact_link: id ?? "" }))}
+                />
+              </div>
+
+              <div>
                 <label className={labelClass}>סטטוס</label>
                 <select className={inputClass} value={fields.account_status} onChange={set("account_status")}>
                   <option value="">— בחר סטטוס —</option>
@@ -1064,24 +1054,14 @@ function AccountEditSheet({
                 <input className={inputClass} dir="ltr" value={fields.facebook_url} onChange={set("facebook_url")} />
               </div>
 
-              <div>
-                <label className={labelClass}>אזור</label>
-                <select className={inputClass} value={fields.region_id} onChange={handleRegionChange}>
-                  <option value="">— בחר אזור —</option>
-                  {regionOptions.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className={labelClass}>עיר</label>
-                <select className={inputClass} value={fields.city_id} onChange={handleCityChange}>
-                  <option value="">— בחר עיר —</option>
-                  {filteredCities.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+              <div className="sm:col-span-2">
+                <CityRegionPicker
+                  variant="edit"
+                  regionId={fields.region_id ? Number(fields.region_id) : null}
+                  cityId={fields.city_id ? Number(fields.city_id) : null}
+                  onRegionChange={(regionId) => setFields((prev) => ({ ...prev, region_id: regionId != null ? String(regionId) : "", city_id: "" }))}
+                  onCityChange={(cityId) => setFields((prev) => ({ ...prev, city_id: cityId != null ? String(cityId) : "" }))}
+                />
               </div>
 
               <div className="sm:col-span-2">
@@ -2115,7 +2095,7 @@ export default function Employer360Page() {
         <KpiStrip account={account} jobs={jobs} applications={applications} dicts={dicts} />
 
         <Tabs defaultValue="overview" dir="rtl" className="space-y-4">
-          <TabsList className="grid h-auto grid-cols-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200 md:grid-cols-5">
+          <TabsList className="grid h-auto grid-cols-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200 md:grid-cols-4">
             <TabsTrigger value="overview" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
               תפעולי
             </TabsTrigger>
@@ -2127,9 +2107,6 @@ export default function Employer360Page() {
             </TabsTrigger>
             <TabsTrigger value="admin" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
               מנהלה
-            </TabsTrigger>
-            <TabsTrigger value="data" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
-              נתונים נוספים
             </TabsTrigger>
           </TabsList>
 
@@ -2168,9 +2145,6 @@ export default function Employer360Page() {
             <BillingAdminPanel account={account} />
           </TabsContent>
 
-          <TabsContent value="data" className="mt-0">
-            <AdditionalDataPanel account={account} />
-          </TabsContent>
         </Tabs>
       </div>
 
