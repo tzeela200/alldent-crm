@@ -99,8 +99,6 @@ const PUBLIC_JOB_FIELDS = [
   'tax_type_id',
   'tax_type_name',
 
-  'work_schedule_text',
-
   'job_description',
   'job_requirements',
 
@@ -169,7 +167,7 @@ export function stripPrivateInfo(row: Record<string, unknown>): PublicJob {
       typeof row.tax_type_id === 'number' ? row.tax_type_id : row.tax_type_id ? Number(row.tax_type_id) : null,
     tax_type_name: typeof row.tax_type_name === 'string' ? row.tax_type_name : null,
 
-    work_schedule_text: typeof row.work_schedule_text === 'string' ? row.work_schedule_text : null,
+    work_schedule_text: null, // v_job_public does not expose this column
 
     job_description: typeof row.job_description === 'string' ? row.job_description : null,
     job_requirements: typeof row.job_requirements === 'string' ? row.job_requirements : null,
