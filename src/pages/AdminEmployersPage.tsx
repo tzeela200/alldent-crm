@@ -85,7 +85,12 @@ type AppLite = {
   application_id: number
   job_code: string | null
   application_status: number | null
+  check_status: number | null
   account_link: number | null
+  candidate_link: number | null
+  candidate_name: string | null
+  candidate_phone: string | null
+  phone_norm: string | null
 }
 
 type EmployerDraft = {
@@ -114,6 +119,7 @@ type EnrichedAccount = Account & {
   activeJobsCount: number
   totalJobsCount: number
   totalAppsCount: number
+  uniqueCandidatesCount: number
   newAppsCount: number
   transferredCount: number
   interviewCount: number
@@ -170,6 +176,7 @@ const ALL_COLUMNS = [
   { key: 'active_jobs', label: 'משרות פעילות' },
   { key: 'total_jobs', label: 'סה״כ משרות' },
   { key: 'total_apps', label: 'סה״כ הגשות' },
+  { key: 'unique_candidates', label: 'מועמדים ייחודיים' },
   { key: 'new_apps', label: 'הגשות חדשות' },
   { key: 'transferred', label: 'הועבר למעסיק' },
   { key: 'contacts', label: 'אנשי קשר' },
@@ -187,6 +194,9 @@ const DEFAULT_COLUMNS = [
   'city',
   'active_jobs',
   'total_jobs',
+  'total_apps',
+  'unique_candidates',
+  'new_apps',
   'contacts',
   'follow_up',
 ] as const
@@ -323,7 +333,7 @@ function buildCsv(rows: Record<string, string>[]) {
 
 export default function AdminEmployersPage({
   viewMode = 'employers',
-  initialTab = 'all',
+  initialTab = 'active',
   pageTitle,
   pageSubtitle,
 }: AdminEmployersPageProps = {}) {
@@ -331,8 +341,25 @@ export default function AdminEmployersPage({
   const title = pageTitle ?? (isEmployersBoard ? 'מעסיקים' : 'ארגונים')
   const subtitle = pageSubtitle ?? (isEmployersBoard ? 'רק ארגונים עם משרות משויכות — מגייס פעיל או מגייס ישן' : 'כל הארגונים במערכת')
 
-  const [filters, setFilters] = useState<EmployerFilters>({})
-  const [tab, setTab] = useState<'active' | 'all'>(initialTab)
+  // Persist filters + tab across navigation (only reset on clearFilters / manual change).
+  const FILTERS_KEY = `employers-filters-${viewMode}`
+  const TAB_KEY = `employers-tab-${viewMode}`
+  const [filters, setFilters] = useState<EmployerFilters>(() => {
+    try {
+      const raw = sessionStorage.getItem(FILTERS_KEY)
+      return raw ? (JSON.parse(raw) as EmployerFilters) : {}
+    } catch {
+      return {}
+    }
+  })
+  const [tab, setTab] = useState<'active' | 'all'>(() => {
+    try {
+      const raw = sessionStorage.getItem(TAB_KEY)
+      return raw === 'active' || raw === 'all' ? raw : initialTab
+    } catch {
+      return initialTab
+    }
+  })
   const [page, setPage] = useState(0)
   const [selectedRows, setSelectedRows] = useState<number[]>([])
   const [sheet, setSheet] = useState<SheetState>({ open: false, accountId: null, mode: 'view' })
@@ -507,7 +534,7 @@ export default function AdminEmployersPage({
     queryFn: async () => {
       const { data, error } = await supabase
         .from('applications')
-        .select('application_id,job_code,application_status,account_link')
+        .select('application_id,job_code,application_status,check_status,account_link,candidate_link,candidate_name,candidate_phone,phone_norm')
       if (error) throw error
       return (data ?? []) as AppLite[]
     },
@@ -519,20 +546,23 @@ export default function AdminEmployersPage({
   const regionName = (id: number | null | undefined) => regions.find((item) => item.id === id)?.name ?? '—'
   const cityName = (id: number | null | undefined) => cities.find((item) => item.id === id)?.name ?? '—'
 
-  // Application status ID helpers — resolved from dict at runtime
-  const getAppStatusIds = (nameSubstrings: string[]) =>
-    dictAppStatuses
-      .filter((s) => nameSubstrings.some((sub) => s.name.includes(sub)))
-      .map((s) => s.id)
-
-  const newStatusIds = useMemo(() => getAppStatusIds(['הגשה חדשה', 'חדש']), [dictAppStatuses])
-  const transferredStatusIds = useMemo(() => getAppStatusIds(['הועבר למעסיק', 'הועבר']), [dictAppStatuses])
-  const interviewStatusIds = useMemo(() => getAppStatusIds(['ראיון', 'נקבע ראיון']), [dictAppStatuses])
-  const feedbackStatusIds = useMemo(() => getAppStatusIds(['ממתין למשוב', 'משוב מעסיק']), [dictAppStatuses])
+  // Explicit application_status IDs (verified against dict_application_statuses):
+  // 1=הגשה חדשה, 6=הועבר למעסיק, 7=נקבע ראיון, 8=בוצע ראיון, 9=ממתין למשוב מעסיק.
+  // Substring matching is avoided — 'ראיון' would wrongly catch 10="הברזה מראיון".
+  const NEW_STATUS_IDS = [1]
+  const TRANSFERRED_STATUS_IDS = [6]
+  const INTERVIEW_STATUS_IDS = [7, 8]
+  const FEEDBACK_STATUS_IDS = [9]
+  // check_status 2 = ספאם, application_status 15 = לא דנטלי/ארכיון — excluded from all counts.
+  const SPAM_CHECK_STATUS = 2
+  const ARCHIVE_APP_STATUS = 15
 
   const applicationsByAccount = useMemo(() => {
     const map = new Map<number, AppLite[]>()
     allApplications.forEach((app) => {
+      // Exclude spam / archived from every employer-board count.
+      if (Number(app.check_status) === SPAM_CHECK_STATUS) return
+      if (Number(app.application_status) === ARCHIVE_APP_STATUS) return
       let accountId = app.account_link ? Number(app.account_link) : null
       // fallback: resolve via job → account_link
       if (!accountId && app.job_code) {
@@ -579,16 +609,21 @@ export default function AdminEmployersPage({
       const activeJobsCount = relatedJobs.filter((job) => Number(job.job_status) === ACTIVE_JOB_STATUS_ID).length
       const accountApps = applicationsByAccount.get(Number(account.account_id)) ?? []
       const totalAppsCount = accountApps.length
-      const newAppsCount = newStatusIds.length > 0 ? accountApps.filter((a) => newStatusIds.includes(a.application_status!)).length : accountApps.filter((a) => a.application_status === 1).length
-      const transferredCount = transferredStatusIds.length > 0 ? accountApps.filter((a) => transferredStatusIds.includes(a.application_status!)).length : 0
-      const interviewCount = interviewStatusIds.length > 0 ? accountApps.filter((a) => interviewStatusIds.includes(a.application_status!)).length : 0
-      const feedbackPendingCount = feedbackStatusIds.length > 0 ? accountApps.filter((a) => feedbackStatusIds.includes(a.application_status!)).length : 0
+      const uniqueCandidatesCount = new Set(
+        accountApps.map((a) => a.candidate_link ?? a.phone_norm ?? a.candidate_phone ?? a.application_id),
+      ).size
+      const newAppsCount = accountApps.filter((a) => NEW_STATUS_IDS.includes(Number(a.application_status))).length
+      const transferredCount = accountApps.filter((a) => TRANSFERRED_STATUS_IDS.includes(Number(a.application_status))).length
+      const interviewCount = accountApps.filter((a) => INTERVIEW_STATUS_IDS.includes(Number(a.application_status))).length
+      const feedbackPendingCount = accountApps.filter((a) => FEEDBACK_STATUS_IDS.includes(Number(a.application_status))).length
       const linkedContactSummary = linkedContacts
         .slice(0, 3)
         .map((item) => item.full_name || item.display_name || item.email || item.phone_norm || item.phone)
         .filter(Boolean)
         .join(' · ')
-      const employerContact = linkedContacts.find((c) => String(c.contact_id) === String(account.contact_link))
+      // account.contact_link is unused (null for all employers); fall back to the first linked contact.
+      const employerContact =
+        linkedContacts.find((c) => String(c.contact_id) === String(account.contact_link)) ?? linkedContacts[0]
       const primaryEmployerName = employerContact?.full_name || employerContact?.display_name || '—'
       const jobCityIds = Array.from(new Set(relatedJobs.map((job) => Number(job.city_id || 0)).filter(Boolean)))
       const jobRegionIds = Array.from(new Set(relatedJobs.map((job) => Number(job.region_id || 0)).filter(Boolean)))
@@ -616,6 +651,7 @@ export default function AdminEmployersPage({
         totalJobsCount,
         activeJobsCount,
         totalAppsCount,
+        uniqueCandidatesCount,
         newAppsCount,
         transferredCount,
         interviewCount,
@@ -732,6 +768,22 @@ export default function AdminEmployersPage({
   }, [filteredRows])
 
   useEffect(() => setPage(0), [filters, tab, viewMode])
+
+  // Persist filters + tab so they survive leaving and returning to the board.
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(FILTERS_KEY, JSON.stringify(filters))
+    } catch {
+      /* ignore quota / privacy-mode errors */
+    }
+  }, [filters, FILTERS_KEY])
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(TAB_KEY, tab)
+    } catch {
+      /* ignore */
+    }
+  }, [tab, TAB_KEY])
 
   useEffect(() => {
     if (!toast.open) return
@@ -1148,6 +1200,7 @@ export default function AdminEmployersPage({
                         {visibleColumns.includes('active_jobs') && <SortableTh label="משרות פעילות" sortKey="activeJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
                         {visibleColumns.includes('total_jobs') && <SortableTh label="סה״כ משרות" sortKey="totalJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
                         {visibleColumns.includes('total_apps') && <th className="px-3 py-3">סה״כ הגשות</th>}
+                        {visibleColumns.includes('unique_candidates') && <th className="px-3 py-3">מועמדים ייחודיים</th>}
                         {visibleColumns.includes('new_apps') && <th className="px-3 py-3">הגשות חדשות</th>}
                         {visibleColumns.includes('transferred') && <th className="px-3 py-3">הועבר למעסיק</th>}
                         {visibleColumns.includes('contacts') && <th className="px-3 py-3">אנשי קשר משויכים</th>}
@@ -1173,6 +1226,7 @@ export default function AdminEmployersPage({
                             {visibleColumns.includes('active_jobs') && <td style={{ width: columnWidths.active_jobs }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F0FDF4] px-2.5 py-1 text-[12px] font-bold text-[#16A34A]">{account.activeJobsCount}</span></td>}
                             {visibleColumns.includes('total_jobs') && <td style={{ width: columnWidths.total_jobs }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{account.totalJobsCount}</span></td>}
                             {visibleColumns.includes('total_apps') && <td style={{ width: (columnWidths as any).total_apps }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{account.totalAppsCount}</span></td>}
+                            {visibleColumns.includes('unique_candidates') && <td style={{ width: (columnWidths as any).unique_candidates }} className="px-3 py-3"><span className="rounded-[6px] bg-[#EEF2FF] px-2.5 py-1 text-[12px] font-bold text-[#4338CA]">{account.uniqueCandidatesCount}</span></td>}
                             {visibleColumns.includes('new_apps') && <td style={{ width: (columnWidths as any).new_apps }} className="px-3 py-3"><span className="rounded-[6px] bg-[#ECFDF5] px-2.5 py-1 text-[12px] font-bold text-[#16A34A]">{account.newAppsCount}</span></td>}
                             {visibleColumns.includes('transferred') && <td style={{ width: (columnWidths as any).transferred }} className="px-3 py-3"><span className="rounded-[6px] bg-[#FFF7ED] px-2.5 py-1 text-[12px] font-bold text-[#C2410C]">{account.transferredCount}</span></td>}
                             {visibleColumns.includes('contacts') && <td style={{ width: columnWidths.contacts }} className="px-3 py-3"><div className="truncate">{account.linkedContactSummary || '—'}</div></td>}
@@ -1288,15 +1342,63 @@ export default function AdminEmployersPage({
                   <LabelValue label="אזור" value={regionName(selectedAccount.region_id)} />
                   <LabelValue label="עיר" value={cityName(selectedAccount.city_id)} />
                 </SectionCard>
-                <SectionCard title="משרות">
+                <SectionCard title={`משרות (${selectedAccount.totalJobsCount})`}>
                   <LabelValue label="משרות פעילות" value={String(selectedAccount.activeJobsCount)} />
-                  <LabelValue label="סה״כ משרות" value={String(selectedAccount.totalJobsCount)} />
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {selectedAccount.relatedJobs.slice(0, 12).map((job) => (
-                      <span key={job.job_code} className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold">{job.job_code}</span>
-                    ))}
-                  </div>
+                  {selectedAccount.relatedJobs.length === 0 ? (
+                    <p className="mt-2 text-[12px] text-[#9CA3AF]">אין משרות לארגון זה</p>
+                  ) : (
+                    <div className="mt-2 space-y-1.5">
+                      {selectedAccount.relatedJobs.map((job) => (
+                        <button
+                          key={job.job_code}
+                          type="button"
+                          onClick={() => navigate(`/admin/jobs/${job.job_code}`)}
+                          className="flex w-full items-center justify-between gap-2 rounded-lg border border-[#EEE] bg-[#FAFAFA] px-3 py-2 text-right hover:bg-[#F3F4F6]"
+                        >
+                          <span className="min-w-0 truncate">
+                            <span className="font-semibold text-[#2D2D2D]">{job.job_title || job.job_code}</span>
+                            <span className="mr-2 font-mono text-[11px] text-[#9CA3AF]" dir="ltr">{job.job_code}</span>
+                          </span>
+                          <span className="flex shrink-0 items-center gap-2">
+                            {Number(job.job_status) === ACTIVE_JOB_STATUS_ID && (
+                              <span className="rounded-[6px] bg-[#F0FDF4] px-2 py-0.5 text-[11px] font-bold text-[#16A34A]">פעילה</span>
+                            )}
+                            <span className="rounded-[6px] bg-[#EEF2FF] px-2 py-0.5 text-[11px] font-bold text-[#4338CA]">{job.total_applicants ?? 0} מועמדים</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </SectionCard>
+                {(() => {
+                  const apps = applicationsByAccount.get(Number(selectedAccount.account_id)) ?? []
+                  const appStatusName = (id: number | null) => dictAppStatuses.find((s) => s.id === id)?.name ?? '—'
+                  return (
+                    <SectionCard title={`מועמדים (${apps.length})`}>
+                      {apps.length === 0 ? (
+                        <p className="text-[12px] text-[#9CA3AF]">אין מועמדים פעילים (ספאם/ארכיון מוחרגים)</p>
+                      ) : (
+                        <div className="space-y-1.5">
+                          {apps.map((app) => (
+                            <div key={app.application_id} className="flex items-center justify-between gap-2 rounded-lg border border-[#EEE] bg-[#FAFAFA] px-3 py-2">
+                              <span className="min-w-0 truncate">
+                                {app.candidate_link ? (
+                                  <button type="button" onClick={() => navigate(`/admin/candidates/${app.candidate_link}`)} className="font-semibold text-[#008080] hover:underline">
+                                    {app.candidate_name || 'מועמד ללא שם'}
+                                  </button>
+                                ) : (
+                                  <span className="font-semibold text-[#2D2D2D]">{app.candidate_name || 'מועמד ללא שם'}</span>
+                                )}
+                                {app.candidate_phone && <span className="mr-2 font-mono text-[11px] text-[#9CA3AF]" dir="ltr">{app.candidate_phone}</span>}
+                              </span>
+                              <span className="shrink-0 rounded-[6px] bg-[#F3F4F6] px-2 py-0.5 text-[11px] font-bold text-[#2D2D2D]">{appStatusName(app.application_status)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </SectionCard>
+                  )
+                })()}
                 <SectionCard title="תקשורת ואנשי קשר">
                   <LabelValue label="טלפון" value={formatPhone(selectedAccount.phone)} />
                   <LabelValue label="מייל" value={selectedAccount.email ?? '—'} />

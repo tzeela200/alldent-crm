@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { X, Phone, FileText, MessageCircle, UserRound, Briefcase } from 'lucide-react'
 import { ActionButton } from '@/components/layout/Shell'
 import { useApplicationRow } from '@/hooks/useApplications'
@@ -28,9 +29,10 @@ function isValidUrl(url: string | null | undefined): boolean {
 }
 
 export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
+  const navigate = useNavigate()
   const { data: row, isLoading } = useApplicationRow(applicationId)
   const { data: dicts } = useApplicationDicts()
-  const { updateApplication, createContactFromApplication } = useApplicationMutations()
+  const { updateApplication, createContactFromApplication, markSpam } = useApplicationMutations()
   const [editingNotes, setEditingNotes] = useState(false)
   const [internalNotes, setInternalNotes] = useState('')
   const [appStatus, setAppStatus] = useState<number | ''>('')
@@ -95,6 +97,34 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
       jobCode: jobCodeOverride ?? row?.job_code,
     })
     toast.success(`${label} עודכן`)
+  }
+
+  // ── Unified review flow (check_status is the single source of truth) ──────
+  // "מאושר למאגר" → create + link contact, navigate to its card.
+  // "ספאם" → archive + exclude from counts. Other values → plain field update.
+  const checkStatusName = (id: number | null | undefined) =>
+    dicts?.checkStatuses?.find((s) => s.id === id)?.name ?? null
+
+  const approveToRegistry = () => {
+    if (!row) return
+    createContactFromApplication.mutate(row, {
+      onSuccess: (contactId) => navigate(`/admin/candidates/${contactId}`),
+    })
+  }
+
+  const handleSpam = () => {
+    if (!row) return
+    markSpam.mutate(row)
+  }
+
+  const handleCheckStatusSave = (value: number) => {
+    const name = checkStatusName(value)
+    if (name === 'מאושר למאגר') {
+      if (!row?.candidate_link) return approveToRegistry()
+      return saveField('check_status', value, 'סטטוס בדיקה')
+    }
+    if (name === 'ספאם') return handleSpam()
+    return saveField('check_status', value, 'סטטוס בדיקה')
   }
 
   if (isLoading || !row) {
@@ -180,7 +210,7 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
           )}
           {row.candidate_link && (
             <a
-              href={`/admin/contacts?contact_id=${row.candidate_link}`}
+              href={`/admin/candidates/${row.candidate_link}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 rounded-lg bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-100"
@@ -285,11 +315,13 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
             <ActionButton
               variant="secondary"
               size="sm"
-              onClick={() =>
-                checkStatus !== '' &&
-                saveField('check_status', Number(checkStatus), 'סטטוס בדיקה')
+              onClick={() => checkStatus !== '' && handleCheckStatusSave(Number(checkStatus))}
+              disabled={
+                checkStatus === '' ||
+                updateApplication.isPending ||
+                createContactFromApplication.isPending ||
+                markSpam.isPending
               }
-              disabled={checkStatus === '' || updateApplication.isPending}
             >
               שמור
             </ActionButton>
@@ -361,26 +393,40 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
         )}
       </Section>
 
-      {/* הקם פרופיל / פעולות המשך */}
+      {/* החלטת בדיקה / פעולות המשך */}
       {!row.candidate_link && (
-        <Section title="מצב במאגר">
+        <Section title="החלטת בדיקה">
           <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-            מועמד זה טרם קיים במאגר
+            מועמד זה טרם קיים במאגר — נדרשת בדיקה
+            {row.check_status != null && (
+              <span className="block text-xs text-amber-600">
+                סטטוס נוכחי: {checkStatusName(row.check_status) ?? '—'}
+              </span>
+            )}
           </div>
-          <button
-            onClick={() => createContactFromApplication.mutate(row)}
-            disabled={createContactFromApplication.isPending}
-            className="mt-2 w-full rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
-          >
-            {createContactFromApplication.isPending ? 'יוצר פרופיל...' : 'הקם פרופיל'}
-          </button>
+          <div className="mt-2 flex gap-2">
+            <button
+              onClick={approveToRegistry}
+              disabled={createContactFromApplication.isPending || markSpam.isPending}
+              className="flex-1 rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
+            >
+              {createContactFromApplication.isPending ? 'מאשר...' : 'מאושר למאגר ←'}
+            </button>
+            <button
+              onClick={handleSpam}
+              disabled={createContactFromApplication.isPending || markSpam.isPending}
+              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+            >
+              {markSpam.isPending ? 'מסמן...' : 'ספאם / לא רלוונטי'}
+            </button>
+          </div>
         </Section>
       )}
       {row.candidate_link && (
         <Section title="פעולות המשך">
           <div className="flex flex-wrap gap-2">
             <a
-              href={`/admin/contacts?contact_id=${row.candidate_link}`}
+              href={`/admin/candidates/${row.candidate_link}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 rounded-lg bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 hover:bg-teal-100"
@@ -400,7 +446,7 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
               </a>
             )}
             <a
-              href={`/admin/contacts?contact_id=${row.candidate_link}&tab=profile`}
+              href={`/admin/candidates/${row.candidate_link}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"

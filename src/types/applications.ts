@@ -36,6 +36,8 @@ export interface ApplicationRow {
   has_cv: boolean | null
   cv_storage_path: string | null
   cv_received_date: string | null
+  candidate_availability_ids: number[] | null
+  candidate_salary_type_ids: number[] | null
 
   // Enriched from contact (via candidate_link) — not in DB table
   contact_work_status?: number | null

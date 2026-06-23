@@ -137,16 +137,19 @@ export default function JobDetailsPage() {
   const { data: mobility = [] } = useQuery({ queryKey: ['dict_mobility'], queryFn: () => fetchDict('dict_mobility'), staleTime: 600_000 })
   const { data: salaryTypes = [] } = useQuery({ queryKey: ['dict_salary_types'], queryFn: () => fetchDict('dict_salary_types'), staleTime: 600_000 })
 
+  const { data: applicationStatuses = [] } = useQuery({ queryKey: ['dict_application_statuses'], queryFn: () => fetchDict('dict_application_statuses'), staleTime: 600_000 })
+
   const { data: applications = [] } = useQuery({
     queryKey: ['applications-for-job', code],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('applications')
-        .select('application_id,candidate_link,candidate_name,application_status,submission_date,cv_link,contact:candidate_link(full_name,display_name)')
+        .select('application_id,candidate_link,candidate_name,candidate_phone,application_status,check_status,submission_date,cv_link,contact:candidate_link(full_name,display_name)')
         .eq('job_code', code!)
         .order('submission_date', { ascending: false })
       if (error) throw error
-      return data ?? []
+      // Hide spam (check_status=2) and archived (application_status=15) from the job's candidate list.
+      return (data ?? []).filter((a: any) => Number(a.check_status) !== 2 && Number(a.application_status) !== 15)
     },
     enabled: !!code,
     staleTime: 60_000,
@@ -382,7 +385,7 @@ export default function JobDetailsPage() {
 
             <section className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
               <SectionTitle icon={<Users className="h-5 w-5" />} title={`מועמדים למשרה (${applications.length})`} />
-              {applications.length === 0 ? <div className="rounded-xl bg-[#FAFAF7] p-6 text-center text-[14px] text-[#6B6B6B]">אין מועמדים למשרה זו עדיין</div> : <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-right text-[13px]"><thead className="bg-[#FAFAF7] text-[#6B6B6B]"><tr><th className="px-3 py-3">מועמד</th><th className="px-3 py-3">תאריך</th><th className="px-3 py-3">קו״ח</th></tr></thead><tbody className="divide-y divide-[#F3F4F6]">{(applications as any[]).map((app) => <tr key={app.application_id}><td className="px-3 py-3 font-semibold">{(() => { const name = (app as any).contact?.full_name || (app as any).contact?.display_name || app.candidate_name || 'מועמד ללא שם'; return app.candidate_link ? <Link to={`/admin/candidates/${app.candidate_link}`} className="text-[#008080] hover:underline">{name}</Link> : name })()}</td><td className="px-3 py-3">{app.submission_date ? formatDate(app.submission_date) : '—'}</td><td className="px-3 py-3">{app.cv_link ? <a href={app.cv_link} target="_blank" rel="noreferrer" className="text-[#008080] hover:underline">פתיחה</a> : '—'}</td></tr>)}</tbody></table></div>}
+              {applications.length === 0 ? <div className="rounded-xl bg-[#FAFAF7] p-6 text-center text-[14px] text-[#6B6B6B]">אין מועמדים למשרה זו עדיין</div> : <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-right text-[13px]"><thead className="bg-[#FAFAF7] text-[#6B6B6B]"><tr><th className="px-3 py-3">מועמד</th><th className="px-3 py-3">נייד</th><th className="px-3 py-3">סטטוס הגשה</th><th className="px-3 py-3">תאריך</th><th className="px-3 py-3">קו״ח</th></tr></thead><tbody className="divide-y divide-[#F3F4F6]">{(applications as any[]).map((app) => <tr key={app.application_id}><td className="px-3 py-3 font-semibold">{(() => { const name = (app as any).contact?.full_name || (app as any).contact?.display_name || app.candidate_name || 'מועמד ללא שם'; return app.candidate_link ? <Link to={`/admin/candidates/${app.candidate_link}`} className="text-[#008080] hover:underline">{name}</Link> : name })()}</td><td className="px-3 py-3 font-mono text-[12px]" dir="ltr">{app.candidate_phone ?? '—'}</td><td className="px-3 py-3">{applicationStatuses.find((s: any) => s.id === app.application_status)?.name ?? '—'}</td><td className="px-3 py-3">{app.submission_date ? formatDate(app.submission_date) : '—'}</td><td className="px-3 py-3">{app.cv_link ? <a href={app.cv_link} target="_blank" rel="noreferrer" className="text-[#008080] hover:underline">פתיחה</a> : '—'}</td></tr>)}</tbody></table></div>}
             </section>
           </main>
 

@@ -101,6 +101,7 @@ export default function AdminApplicationsPage() {
     bulkUpdateCheckStatus,
     bulkSetFollowUp,
     createContactFromApplication,
+    markSpam,
     sendToLeadsV2,
     archiveApplication,
   } = useApplicationMutations()
@@ -476,6 +477,7 @@ export default function AdminApplicationsPage() {
             dicts={dicts}
             visibleColumns={visibleColumns}
             onCreateContact={(app) => createContactFromApplication.mutate(app)}
+            onMarkSpam={(app) => markSpam.mutate(app)}
             onSendToLeads={(app) => sendToLeadsV2.mutate(app)}
             onArchive={(id) => archiveApplication.mutate(id)}
             sortBy={sortBy}
@@ -571,6 +573,7 @@ function ApplicationsTable({
   dicts,
   visibleColumns,
   onCreateContact,
+  onMarkSpam,
   onSendToLeads,
   onArchive,
   sortBy,
@@ -586,6 +589,7 @@ function ApplicationsTable({
   dicts: ReturnType<typeof useApplicationDicts>['data']
   visibleColumns: ColumnKey[]
   onCreateContact: (app: ApplicationRow) => void
+  onMarkSpam: (app: ApplicationRow) => void
   onSendToLeads: (app: ApplicationRow) => void
   onArchive: (id: number) => void
   sortBy: string
@@ -826,9 +830,15 @@ function ApplicationsTable({
                       <div className="flex flex-col gap-0.5">
                         <button
                           onClick={() => onCreateContact(row)}
-                          className="text-[10px] font-medium text-blue-600 hover:text-blue-800 text-right whitespace-nowrap"
+                          className="text-[10px] font-medium text-teal-600 hover:text-teal-800 text-right whitespace-nowrap"
                         >
-                          הקם פרופיל
+                          מאושר למאגר
+                        </button>
+                        <button
+                          onClick={() => onMarkSpam(row)}
+                          className="text-[10px] font-medium text-red-600 hover:text-red-800 text-right whitespace-nowrap"
+                        >
+                          ספאם
                         </button>
                         <button
                           onClick={() => onSendToLeads(row)}

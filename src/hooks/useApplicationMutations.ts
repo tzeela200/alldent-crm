@@ -139,21 +139,30 @@ export function useApplicationMutations() {
     onError: (err: Error) => toast.error(err.message),
   })
 
-  /** Create a contact record from application data and link it back. */
+  /**
+   * Approve to registry ("מאושר למאגר"): create a contact from application data,
+   * link it back, and mark both records check_status=3.
+   * profile_type / work_status are NOT set here — the DB trigger
+   * `ensure_candidate_profile_from_application` sets them once candidate_link is filled,
+   * and also maintains rel_contact_profiles (the "candidates" membership).
+   * Returns the new contact_id for navigation.
+   */
   const createContactFromApplication = useMutation({
-    mutationFn: async (app: ApplicationRow) => {
-      // Fetch dict IDs for profile_type, work_status, check_status by name
-      const [profileTypeRes, workStatusRes, checkStatusRes] = await Promise.all([
-        supabase.from('dict_profile_types').select('id').eq('name', 'מועמד').maybeSingle(),
-        supabase.from('dict_contact_work_statuses').select('id').eq('name', 'מחפש עבודה אקטיבי').maybeSingle(),
-        supabase.from('dict_check_statuses').select('id').eq('name', 'ממתין לבדיקה').maybeSingle(),
-      ])
+    mutationFn: async (app: ApplicationRow): Promise<number> => {
+      // check_status = "מאושר למאגר" (3). Trigger does not touch contact.check_status,
+      // so it must be set explicitly on both the contact and the application.
+      const { data: approvedRes } = await supabase
+        .from('dict_check_statuses')
+        .select('id')
+        .eq('name', 'מאושר למאגר')
+        .maybeSingle()
+      const approvedId = approvedRes?.id ?? 3
 
       const { data: contact, error: contactError } = await supabase
         .from('contact')
         .insert({
-          display_name: app.candidate_name,
           full_name: app.candidate_name,
+          display_name: app.candidate_name,
           phone: app.candidate_phone,
           phone_norm: app.phone_norm,
           email: app.candidate_email,
@@ -162,9 +171,9 @@ export function useApplicationMutations() {
           has_cv: app.has_cv ?? false,
           cv_received_date: app.cv_received_date ?? null,
           source: app.source ?? null,
-          profile_type: profileTypeRes.data?.id ?? null,
-          work_status: workStatusRes.data?.id ?? null,
-          check_status: checkStatusRes.data?.id ?? null,
+          candidate_availability_ids: app.candidate_availability_ids ?? null,
+          candidate_salary_type_ids: app.candidate_salary_type_ids ?? null,
+          check_status: approvedId,
         })
         .select('contact_id')
         .single()
@@ -172,13 +181,50 @@ export function useApplicationMutations() {
 
       const { error: updateError } = await supabase
         .from('applications')
-        .update({ candidate_link: contact.contact_id, is_new_candidate: false })
+        .update({
+          candidate_link: contact.contact_id,
+          is_new_candidate: false,
+          check_status: approvedId,
+          updated_timestamp: new Date().toISOString(),
+        })
         .eq('application_id', app.application_id)
       if (updateError) throw updateError
+
+      return contact.contact_id as number
     },
     onSuccess: () => {
       invalidate()
-      toast.success('פרופיל נוצר בהצלחה')
+      toast.success('מאושר למאגר — פרופיל נוצר')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  /**
+   * Mark an application as spam / not relevant ("ספאם"):
+   * check_status=2 + application_status=15 (archive). Classification only — no data is deleted.
+   */
+  const markSpam = useMutation({
+    mutationFn: async (app: ApplicationRow) => {
+      const { data: spamRes } = await supabase
+        .from('dict_check_statuses')
+        .select('id')
+        .eq('name', 'ספאם')
+        .maybeSingle()
+      const spamId = spamRes?.id ?? 2
+
+      const { error } = await supabase
+        .from('applications')
+        .update({
+          check_status: spamId,
+          application_status: ARCHIVE_STATUS,
+          updated_timestamp: new Date().toISOString(),
+        })
+        .eq('application_id', app.application_id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidate()
+      toast.success('סומן כספאם — הועבר לארכיון')
     },
     onError: (err: Error) => toast.error(err.message),
   })
@@ -237,6 +283,7 @@ export function useApplicationMutations() {
     bulkSetFollowUp,
     createApplication,
     createContactFromApplication,
+    markSpam,
     sendToLeadsV2,
     archiveApplication,
   }
