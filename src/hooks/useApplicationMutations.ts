@@ -142,17 +142,29 @@ export function useApplicationMutations() {
   /** Create a contact record from application data and link it back. */
   const createContactFromApplication = useMutation({
     mutationFn: async (app: ApplicationRow) => {
+      // Fetch dict IDs for profile_type, work_status, check_status by name
+      const [profileTypeRes, workStatusRes, checkStatusRes] = await Promise.all([
+        supabase.from('dict_profile_types').select('id').eq('name', 'מועמד').maybeSingle(),
+        supabase.from('dict_contact_work_statuses').select('id').eq('name', 'מחפש עבודה אקטיבי').maybeSingle(),
+        supabase.from('dict_check_statuses').select('id').eq('name', 'ממתין לבדיקה').maybeSingle(),
+      ])
+
       const { data: contact, error: contactError } = await supabase
         .from('contact')
         .insert({
           display_name: app.candidate_name,
+          full_name: app.candidate_name,
           phone: app.candidate_phone,
           phone_norm: app.phone_norm,
           email: app.candidate_email,
           cv_link: app.cv_link,
+          cv_storage_path: app.cv_storage_path ?? null,
           has_cv: app.has_cv ?? false,
-          cv_received_date: app.cv_received_date,
-          source: app.source,
+          cv_received_date: app.cv_received_date ?? null,
+          source: app.source ?? null,
+          profile_type: profileTypeRes.data?.id ?? null,
+          work_status: workStatusRes.data?.id ?? null,
+          check_status: checkStatusRes.data?.id ?? null,
         })
         .select('contact_id')
         .single()

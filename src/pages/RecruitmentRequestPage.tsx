@@ -28,6 +28,7 @@ type FormState = {
   salary_expectation_monthly: string
   salary_expectation_hourly: string
   show_salary_public: boolean
+  salary_type_ids: number[]
   employer_notes: string
 }
 
@@ -52,6 +53,7 @@ const EMPTY_FORM: FormState = {
   salary_expectation_monthly: '',
   salary_expectation_hourly: '',
   show_salary_public: false,
+  salary_type_ids: [],
   employer_notes: '',
 }
 
@@ -103,6 +105,7 @@ export default function RecruitmentRequestPage() {
   const { data: systems = [] } = useQuery({ queryKey: ['dict_systems'], queryFn: () => fetchDict('dict_systems'), staleTime: 600_000 })
   const { data: taxTypes = [] } = useQuery({ queryKey: ['dict_tax_types'], queryFn: () => fetchDict('dict_tax_types'), staleTime: 600_000 })
   const { data: mobility = [] } = useQuery({ queryKey: ['dict_mobility'], queryFn: () => fetchDict('dict_mobility'), staleTime: 600_000 })
+  const { data: salaryTypes = [] } = useQuery({ queryKey: ['dict_salary_types'], queryFn: () => fetchDict('dict_salary_types'), staleTime: 600_000 })
 
   const cityOptions = useMemo(() => {
     const regionId = Number(form.region_id || 0)
@@ -201,6 +204,7 @@ export default function RecruitmentRequestPage() {
         salary_expectation_monthly: form.salary_expectation_monthly ? Number(form.salary_expectation_monthly) : null,
         salary_expectation_hourly: form.salary_expectation_hourly ? Number(form.salary_expectation_hourly) : null,
         show_salary_public: form.show_salary_public,
+        salary_type_ids: form.salary_type_ids.length ? form.salary_type_ids : [],
         employer_notes: contactBlock,
         show_employer_name: false,
         created_time: new Date().toISOString(),
@@ -302,6 +306,7 @@ export default function RecruitmentRequestPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField label="שכר חודשי / גלובלי (₪)" value={form.salary_expectation_monthly} onChange={(v) => setField('salary_expectation_monthly', v)} dir="ltr" type="number" />
               <TextField label="שכר שעתי (₪)" value={form.salary_expectation_hourly} onChange={(v) => setField('salary_expectation_hourly', v)} dir="ltr" type="number" />
+              <MultiSelectField label="סוג שכר" values={form.salary_type_ids} onChange={(v) => setField('salary_type_ids', v)} options={salaryTypes.map(toOption)} className="sm:col-span-2" />
               <label className="sm:col-span-2 flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-[#FAFAF7] px-4 py-3 text-[13px] font-semibold text-[#2D2D2D] cursor-pointer">
                 <span>הצגת שכר לציבור — האם לפרסם את השכר במשרה?</span>
                 <input type="checkbox" checked={form.show_salary_public} onChange={(e) => setField('show_salary_public', e.target.checked)} className="h-4 w-4 accent-[#008080]" />

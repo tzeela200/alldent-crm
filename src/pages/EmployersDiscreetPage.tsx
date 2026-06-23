@@ -400,9 +400,9 @@ export default function EmployersDiscreetPage() {
                 דברו איתנו בוואטסאפ
               </a>
 
-              <Link to="/employers" className={PRIMARY_CTA_CLASS}>
+              <Link to="/employers/recruitment-request" className={PRIMARY_CTA_CLASS}>
                 <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                חזרה למסלולים
+                פתחו בקשת גיוס
               </Link>
             </div>
           </div>

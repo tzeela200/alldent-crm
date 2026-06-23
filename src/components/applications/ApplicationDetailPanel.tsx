@@ -30,7 +30,7 @@ function isValidUrl(url: string | null | undefined): boolean {
 export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
   const { data: row, isLoading } = useApplicationRow(applicationId)
   const { data: dicts } = useApplicationDicts()
-  const { updateApplication } = useApplicationMutations()
+  const { updateApplication, createContactFromApplication } = useApplicationMutations()
   const [editingNotes, setEditingNotes] = useState(false)
   const [internalNotes, setInternalNotes] = useState('')
   const [appStatus, setAppStatus] = useState<number | ''>('')
@@ -207,7 +207,7 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
       <Section title="פרטי הגשה">
         <FieldGrid>
           <Field label="שם מועמד" value={row.candidate_name} />
-          <Field label="טלפון" value={row.candidate_phone} dir="ltr" />
+          <Field label="נייד" value={row.candidate_phone} dir="ltr" />
           <Field label="אימייל" value={row.candidate_email} dir="ltr" />
           <Field label="תאריך הגשה" value={formatDate(row.submission_date)} />
           <Field label="קוד משרה" value={row.job_code} />
@@ -215,7 +215,7 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
           <Field label="תפקיד משרה" value={row.job_role} />
           <Field label="עיר משרה" value={row.job_city} />
           <Field label="אזור משרה" value={row.job_region} />
-          <Field label="מקור טופס" value={row.form_title} />
+          <Field label="שם טופס" value={row.form_title} />
           <Field label="מקור" value={getDictLabel(dicts?.sources, row.source)} />
           <Field label="תאריך פעולה הבאה" value={formatDate(row.follow_up_date)} />
         </FieldGrid>
@@ -361,12 +361,63 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
         )}
       </Section>
 
+      {/* הקם פרופיל / פעולות המשך */}
+      {!row.candidate_link && (
+        <Section title="מצב במאגר">
+          <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+            מועמד זה טרם קיים במאגר
+          </div>
+          <button
+            onClick={() => createContactFromApplication.mutate(row)}
+            disabled={createContactFromApplication.isPending}
+            className="mt-2 w-full rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
+          >
+            {createContactFromApplication.isPending ? 'יוצר פרופיל...' : 'הקם פרופיל'}
+          </button>
+        </Section>
+      )}
+      {row.candidate_link && (
+        <Section title="פעולות המשך">
+          <div className="flex flex-wrap gap-2">
+            <a
+              href={`/admin/contacts?contact_id=${row.candidate_link}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 rounded-lg bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 hover:bg-teal-100"
+            >
+              <UserRound className="h-3 w-3" />
+              פתח לעריכה
+            </a>
+            {row.account_link && (
+              <a
+                href={`/admin/accounts/${row.account_link}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1 rounded-lg bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100"
+              >
+                <Briefcase className="h-3 w-3" />
+                פרופיל 360 מעסיק
+              </a>
+            )}
+            <a
+              href={`/admin/contacts?contact_id=${row.candidate_link}&tab=profile`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+            >
+              <FileText className="h-3 w-3" />
+              המשך השלמת פרופיל
+            </a>
+          </div>
+        </Section>
+      )}
+
       {/* Live contact data */}
       {contact && (
         <Section title="פרטי מועמד (מאגר)">
           <FieldGrid>
             <Field label="שם מלא" value={contact.full_name ?? contact.display_name} />
-            <Field label="טלפון" value={contact.phone} dir="ltr" />
+            <Field label="נייד" value={contact.phone} dir="ltr" />
             <Field label="אימייל" value={contact.email} dir="ltr" />
             <Field label={'עם קו"ח'} value={contact.has_cv ? 'כן' : 'לא'} />
             <Field
@@ -427,7 +478,19 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
               value={getDictLabel(dicts?.regions, job.region_id)}
             />
             <Field label="ניסיון נדרש" value={job.required_experience != null ? String(job.required_experience) : undefined} />
-            <Field label="שפות" value={job.required_languages} />
+            <Field
+              label="שפות"
+              value={
+                Array.isArray(job.required_languages)
+                  ? (job.required_languages as number[])
+                      .map((id) => getDictLabel(dicts?.languages, id))
+                      .filter((v) => v !== '—')
+                      .join(', ') || '—'
+                  : job.required_languages != null
+                    ? getDictLabel(dicts?.languages, job.required_languages as unknown as number)
+                    : undefined
+              }
+            />
           </FieldGrid>
           {job.job_status !== 3 && job.job_status != null && (
             <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
@@ -449,10 +512,6 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
             <Field label="שם ארגון" value={account.account_name} />
             <Field label="טלפון" value={account.phone} dir="ltr" />
             <Field label="אימייל" value={account.email} dir="ltr" />
-            <Field
-              label="משרות פעילות"
-              value={String(account.active_job_count_auto ?? 0)}
-            />
           </FieldGrid>
         </Section>
       )}
@@ -472,7 +531,7 @@ function PanelShell({
   return (
     <>
       <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
-      <div className="fixed bottom-0 left-0 top-0 z-50 flex w-[520px] flex-col overflow-y-auto bg-white shadow-xl">
+      <div className="fixed bottom-0 right-0 top-0 z-50 flex w-[520px] flex-col overflow-y-auto bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
           <h3 className="text-sm font-semibold text-slate-700">פרטי הגשה</h3>
           <button

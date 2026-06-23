@@ -78,7 +78,7 @@ const PROPERTIES = [
   },
 ]
 
-// ─── Property card — alternating layout ───────────────────────────────────────
+// ─── Property card — cinematic split reveal ────────────────────────────────────
 
 function PropertyRevealCard({
   prop,
@@ -91,29 +91,38 @@ function PropertyRevealCard({
 
   return (
     <div
-      className={`grid items-center gap-8 py-16 md:grid-cols-2 md:gap-14 ${
-        reversed ? '' : ''
-      }`}
+      className="grid items-center gap-10 py-20 md:grid-cols-2 md:gap-16 md:py-28"
       dir="rtl"
     >
-      {/* Image */}
-      <div className={`${reversed ? 'md:order-2' : 'md:order-1'} relative overflow-hidden rounded-2xl`}>
+      {/* Image — directional slide from its side */}
+      <motion.div
+        className={`${reversed ? 'md:order-2' : 'md:order-1'} group relative overflow-hidden rounded-[24px]`}
+        initial={{ opacity: 0, x: reversed ? 60 : -60 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1], delay: 0.15 }}
+      >
         {!imgError ? (
           <img
             src={prop.image}
             alt={prop.title}
             onError={() => setImgError(true)}
-            className="h-[300px] w-full object-cover md:h-[400px]"
+            className="h-[340px] w-full object-cover transition-transform duration-700 group-hover:scale-[1.03] md:h-[500px]"
           />
         ) : (
-          <div className="h-[300px] w-full bg-gradient-to-br from-[#1a3a3a] to-[#2D2D2D] md:h-[400px]" />
+          <div className="h-[340px] w-full bg-gradient-to-br from-[#1a3a3a] to-[#2D2D2D] md:h-[500px]" />
         )}
-        {/* Subtle overlay on image */}
-        <div className="absolute inset-0 rounded-2xl ring-1 ring-white/10" />
-      </div>
+        <div className="absolute inset-0 rounded-[24px] ring-1 ring-white/10" />
+      </motion.div>
 
-      {/* Content */}
-      <div className={`${reversed ? 'md:order-1' : 'md:order-2'} flex flex-col gap-4`}>
+      {/* Content — slides from the opposite side */}
+      <motion.div
+        className={`${reversed ? 'md:order-1' : 'md:order-2'} flex flex-col gap-4`}
+        initial={{ opacity: 0, x: reversed ? -40 : 40 }}
+        whileInView={{ opacity: 1, x: 0 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.75, ease: [0.16, 1, 0.3, 1], delay: 0.25 }}
+      >
         <div className="flex items-center gap-3">
           <span className="font-mono text-[13px] font-bold text-[#008080]/60">{prop.index}</span>
           <span className="rounded-full bg-[#D97706]/20 px-3 py-1 text-[11px] font-extrabold tracking-widest text-[#D97706]">
@@ -121,7 +130,7 @@ function PropertyRevealCard({
           </span>
         </div>
 
-        <h2 className="text-[26px] font-black leading-tight tracking-tight text-white md:text-[32px]">
+        <h2 className="text-[28px] font-black leading-tight tracking-tight text-white md:text-[40px]">
           {prop.title}
         </h2>
 
@@ -151,9 +160,9 @@ function PropertyRevealCard({
           >
             לפרטים נוספים ←
           </a>
-          <span className="text-[12px] text-white/40 font-mono">{prop.contactName}</span>
+          <span className="font-mono text-[12px] text-white/40">{prop.contactName}</span>
         </div>
-      </div>
+      </motion.div>
     </div>
   )
 }
@@ -170,36 +179,38 @@ export default function DentalAssetsPage() {
 
         <div className="relative z-10 mx-auto max-w-4xl px-5 text-center md:px-8">
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
+            initial={{ opacity: 0, y: 24 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col items-center gap-6"
           >
-            <p className="mb-5 inline-flex rounded-full border border-white/10 bg-white/[0.07] px-5 py-2 text-[12px] font-extrabold tracking-[0.28em] text-[#D97706] backdrop-blur" dir="ltr">
+            <p className="text-[12px] font-extrabold tracking-[0.28em] text-[#D97706]" dir="ltr">
               HOME DENT
             </p>
             <h1
-              className="font-black leading-tight tracking-tight text-white"
+              className="font-black leading-[1.1] text-white"
               style={{ fontSize: 'clamp(38px, 6vw, 72px)', letterSpacing: '-0.03em' }}
             >
               נכסים דנטליים
             </h1>
-            <p className="mx-auto mt-5 max-w-2xl text-[16px] leading-relaxed text-white/60 md:text-[18px]">
+            <p className="max-w-xl text-[17px] leading-relaxed text-white/70">
               מרפאות, מעבדות והזדמנויות עסקיות בעולם הדנטל — מכירה, השכרה, שותפויות והעברת פעילות.
             </p>
-
-            <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-              <div className="rounded-2xl border border-white/10 bg-white/[0.06] px-6 py-4 text-center backdrop-blur">
-                <div className="text-[28px] font-black text-[#008080]">{PROPERTIES.length}</div>
-                <div className="mt-0.5 text-[11px] tracking-widest text-white/50">נכסים פעילים</div>
-              </div>
+            <div className="flex flex-wrap items-center justify-center gap-4">
               <a
                 href="https://wa.me/972533959003"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_28px_-14px_rgba(37,211,102,0.6)] transition hover:bg-[#20bd5a]"
+                className="inline-flex items-center gap-2 rounded-full bg-[#D97706] px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-[#B45309]"
               >
                 <MessageCircle className="h-4 w-4" />
-                צרו קשר
+                פרסמו נכס
+              </a>
+              <a
+                href="#properties"
+                className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-white/15"
+              >
+                לכל הנכסים ↓
               </a>
             </div>
           </motion.div>
@@ -207,15 +218,15 @@ export default function DentalAssetsPage() {
       </section>
 
       {/* Properties list */}
-      <section className="mx-auto max-w-5xl px-5 md:px-8">
-        <div className="divide-y divide-white/10">
+      <section id="properties" className="mx-auto max-w-5xl px-5 md:px-8">
+        <div className="divide-y divide-white/[0.07]">
           {PROPERTIES.map((prop, i) => (
             <motion.div
               key={prop.id}
-              initial={{ opacity: 0, y: 60 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: '-80px' }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1], delay: i * 0.08 }}
+              initial={{ opacity: 0, y: 80, scale: 0.94 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: true, margin: '-60px' }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: i * 0.12 }}
             >
               <PropertyRevealCard prop={prop} reversed={i % 2 !== 0} />
             </motion.div>

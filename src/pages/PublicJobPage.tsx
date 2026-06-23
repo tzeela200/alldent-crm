@@ -340,6 +340,10 @@ function buildDetails(job: PublicJob | null): DetailItem[] {
     { label: 'ניידות', value: job.mobility_name ?? '' },
     { label: 'סוג העסקה', value: job.tax_type_name ?? '' },
     {
+      label: 'סוג שכר',
+      value: Array.isArray(job.salary_type_names) ? job.salary_type_names.join(', ') : '',
+    },
+    {
       label: 'שכר',
       value: job.show_salary_public
         ? [

@@ -42,6 +42,7 @@ type FormState = {
   salary_expectation_hourly: string
   salary_expectation_monthly: string
   show_salary_public: boolean
+  salary_type_ids: number[]
   work_schedule_text: string
   job_description: string
   job_requirements: string
@@ -79,6 +80,7 @@ const EMPTY_FORM: FormState = {
   salary_expectation_hourly: '',
   salary_expectation_monthly: '',
   show_salary_public: false,
+  salary_type_ids: [],
   work_schedule_text: '',
   job_description: '',
   job_requirements: '',
@@ -154,6 +156,7 @@ export default function CreateJobWizardPage() {
   const { data: systems = [] } = useQuery({ queryKey: ['dict_systems'], queryFn: () => fetchDict('dict_systems'), staleTime: 600_000 })
   const { data: taxTypes = [] } = useQuery({ queryKey: ['dict_tax_types'], queryFn: () => fetchDict('dict_tax_types'), staleTime: 600_000 })
   const { data: mobility = [] } = useQuery({ queryKey: ['dict_mobility'], queryFn: () => fetchDict('dict_mobility'), staleTime: 600_000 })
+  const { data: salaryTypes = [] } = useQuery({ queryKey: ['dict_salary_types'], queryFn: () => fetchDict('dict_salary_types'), staleTime: 600_000 })
 
   const selectedAccount = useMemo(
     () => accounts.find((account: any) => String(account.account_id) === String(form.existingAccountId)),
@@ -256,6 +259,7 @@ export default function CreateJobWizardPage() {
         scope: form.scope.length ? form.scope : null,
         required_languages: form.required_languages.length ? form.required_languages : null,
         systems_used: form.systems_used.length ? form.systems_used : null,
+        salary_type_ids: form.salary_type_ids.length ? form.salary_type_ids : null,
         tax_type_id: toNullableNumber(form.tax_type_id),
         mobility_id: toNullableNumber(form.mobility_id),
         salary_expectation_hourly: toNullableNumber(form.salary_expectation_hourly),
@@ -380,6 +384,7 @@ export default function CreateJobWizardPage() {
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
                 <TextField label="שכר שעתי" value={form.salary_expectation_hourly} onChange={(value) => setField('salary_expectation_hourly', value)} dir="ltr" />
                 <TextField label="שכר חודשי / גלובלי" value={form.salary_expectation_monthly} onChange={(value) => setField('salary_expectation_monthly', value)} dir="ltr" />
+                <MultiSelectField label="סוג שכר" values={form.salary_type_ids} onChange={(values) => setField('salary_type_ids', values)} options={salaryTypes.map(toOption)} />
                 <label className="flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-[#FAFAF7] px-4 py-3 text-[13px] font-semibold text-[#2D2D2D] lg:col-span-2">
                   <span>להציג שכר באתר הציבורי לאחר פרסום</span>
                   <input type="checkbox" checked={form.show_salary_public} onChange={(event) => setField('show_salary_public', event.target.checked)} className="h-4 w-4 accent-[#008080]" />

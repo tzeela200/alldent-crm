@@ -40,6 +40,9 @@ export interface PublicJob {
   job_description: string | null
   job_requirements: string | null
 
+  salary_type_ids: number[] | null
+  salary_type_names: string[] | null
+
   salary_expectation_monthly: number | null
   salary_expectation_hourly: number | null
   show_salary_public: boolean | null
@@ -101,6 +104,9 @@ const PUBLIC_JOB_FIELDS = [
 
   'job_description',
   'job_requirements',
+
+  'salary_type_ids',
+  'salary_type_names',
 
   'salary_expectation_monthly',
   'salary_expectation_hourly',
@@ -171,6 +177,9 @@ export function stripPrivateInfo(row: Record<string, unknown>): PublicJob {
 
     job_description: typeof row.job_description === 'string' ? row.job_description : null,
     job_requirements: typeof row.job_requirements === 'string' ? row.job_requirements : null,
+
+    salary_type_ids: asNumberArray(row.salary_type_ids),
+    salary_type_names: asStringArray(row.salary_type_names),
 
     salary_expectation_monthly:
       typeof row.salary_expectation_monthly === 'number'

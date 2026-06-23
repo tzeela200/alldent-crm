@@ -37,6 +37,7 @@ type JobDraft = {
   salary_expectation_hourly: string
   salary_expectation_monthly: string
   show_salary_public: boolean
+  salary_type_ids: number[]
   work_schedule_text: string
   job_description: string
   job_requirements: string
@@ -134,13 +135,14 @@ export default function JobDetailsPage() {
   const { data: systems = [] } = useQuery({ queryKey: ['dict_systems'], queryFn: () => fetchDict('dict_systems'), staleTime: 600_000 })
   const { data: taxTypes = [] } = useQuery({ queryKey: ['dict_tax_types'], queryFn: () => fetchDict('dict_tax_types'), staleTime: 600_000 })
   const { data: mobility = [] } = useQuery({ queryKey: ['dict_mobility'], queryFn: () => fetchDict('dict_mobility'), staleTime: 600_000 })
+  const { data: salaryTypes = [] } = useQuery({ queryKey: ['dict_salary_types'], queryFn: () => fetchDict('dict_salary_types'), staleTime: 600_000 })
 
   const { data: applications = [] } = useQuery({
     queryKey: ['applications-for-job', code],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('applications')
-        .select('application_id,candidate_link,candidate_name,application_status,submission_date,cv_link')
+        .select('application_id,candidate_link,candidate_name,application_status,submission_date,cv_link,contact:candidate_link(full_name,display_name)')
         .eq('job_code', code!)
         .order('submission_date', { ascending: false })
       if (error) throw error
@@ -219,6 +221,7 @@ export default function JobDetailsPage() {
         required_experience: toNullableNumber(draft.required_experience),
         required_languages: draft.required_languages.length ? draft.required_languages : [],
         systems_used: draft.systems_used.length ? draft.systems_used : [],
+        salary_type_ids: draft.salary_type_ids.length ? draft.salary_type_ids : [],
         tax_type_id: toNullableNumber(draft.tax_type_id),
         mobility_id: toNullableNumber(draft.mobility_id),
         salary_expectation_hourly: toNullableNumber(draft.salary_expectation_hourly),
@@ -353,6 +356,7 @@ export default function JobDetailsPage() {
                 <SelectField label="ניידות נדרשת" value={draft.mobility_id} onChange={(value) => setField('mobility_id', value)} options={mobility.map(toOption)} />
                 <TextField label="שכר שעתי" value={draft.salary_expectation_hourly} onChange={(value) => setField('salary_expectation_hourly', value)} dir="ltr" />
                 <TextField label="שכר חודשי / גלובלי" value={draft.salary_expectation_monthly} onChange={(value) => setField('salary_expectation_monthly', value)} dir="ltr" />
+                <MultiSelectField label="סוג שכר" values={draft.salary_type_ids} onChange={(values) => setField('salary_type_ids', values)} options={salaryTypes.map(toOption)} />
                 <label className="flex items-center justify-between rounded-xl border border-[#D9D9D9] bg-[#FAFAF7] px-4 py-3 text-[13px] font-semibold lg:col-span-2"><span>הצגת שכר לציבור</span><input type="checkbox" checked={draft.show_salary_public} onChange={(event) => setField('show_salary_public', event.target.checked)} className="h-4 w-4 accent-[#008080]" /></label>
                 <TextAreaField label="תיאור המשרה" value={draft.job_description} onChange={(value) => setField('job_description', value)} labelSuffix={<JobAIWriter mode="admin" field="job_description" currentValue={draft.job_description} jobContext={{ title: draft.job_title, role: draft.job_role }} onApply={(v) => setField('job_description', v)} />} />
                 <TextAreaField label="דרישות המשרה" value={draft.job_requirements} onChange={(value) => setField('job_requirements', value)} labelSuffix={<JobAIWriter mode="admin" field="job_requirements" currentValue={draft.job_requirements} jobContext={{ title: draft.job_title, role: draft.job_role }} onApply={(v) => setField('job_requirements', v)} />} />
@@ -378,7 +382,7 @@ export default function JobDetailsPage() {
 
             <section className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
               <SectionTitle icon={<Users className="h-5 w-5" />} title={`מועמדים למשרה (${applications.length})`} />
-              {applications.length === 0 ? <div className="rounded-xl bg-[#FAFAF7] p-6 text-center text-[14px] text-[#6B6B6B]">אין מועמדים למשרה זו עדיין</div> : <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-right text-[13px]"><thead className="bg-[#FAFAF7] text-[#6B6B6B]"><tr><th className="px-3 py-3">מועמד</th><th className="px-3 py-3">תאריך</th><th className="px-3 py-3">קו״ח</th></tr></thead><tbody className="divide-y divide-[#F3F4F6]">{(applications as any[]).map((app) => <tr key={app.application_id}><td className="px-3 py-3 font-semibold">{app.candidate_link ? <Link to={`/admin/candidates/${app.candidate_link}`} className="text-[#008080] hover:underline">#{app.candidate_link}</Link> : app.candidate_name ?? '—'}</td><td className="px-3 py-3">{app.submission_date ? formatDate(app.submission_date) : '—'}</td><td className="px-3 py-3">{app.cv_link ? <a href={app.cv_link} target="_blank" rel="noreferrer" className="text-[#008080] hover:underline">פתיחה</a> : '—'}</td></tr>)}</tbody></table></div>}
+              {applications.length === 0 ? <div className="rounded-xl bg-[#FAFAF7] p-6 text-center text-[14px] text-[#6B6B6B]">אין מועמדים למשרה זו עדיין</div> : <div className="overflow-x-auto"><table className="w-full min-w-[560px] text-right text-[13px]"><thead className="bg-[#FAFAF7] text-[#6B6B6B]"><tr><th className="px-3 py-3">מועמד</th><th className="px-3 py-3">תאריך</th><th className="px-3 py-3">קו״ח</th></tr></thead><tbody className="divide-y divide-[#F3F4F6]">{(applications as any[]).map((app) => <tr key={app.application_id}><td className="px-3 py-3 font-semibold">{(() => { const name = (app as any).contact?.full_name || (app as any).contact?.display_name || app.candidate_name || 'מועמד ללא שם'; return app.candidate_link ? <Link to={`/admin/candidates/${app.candidate_link}`} className="text-[#008080] hover:underline">{name}</Link> : name })()}</td><td className="px-3 py-3">{app.submission_date ? formatDate(app.submission_date) : '—'}</td><td className="px-3 py-3">{app.cv_link ? <a href={app.cv_link} target="_blank" rel="noreferrer" className="text-[#008080] hover:underline">פתיחה</a> : '—'}</td></tr>)}</tbody></table></div>}
             </section>
           </main>
 
@@ -413,7 +417,7 @@ export default function JobDetailsPage() {
 
 function toDraft(job: any): JobDraft {
   return {
-    job_code: String(job.job_code ?? ''), job_title: String(job.job_title ?? ''), job_status: job.job_status != null ? String(job.job_status) : '', public_status: job.public_status != null ? String(job.public_status) : '', job_role: job.job_role != null ? String(job.job_role) : '', job_sub_role: normalizeIds(job.job_sub_role), account_link: job.account_link != null ? String(job.account_link) : '', rel_employer_contact: job.rel_employer_contact != null ? String(job.rel_employer_contact) : '', rel_recruiter_contact: job.rel_recruiter_contact != null ? String(job.rel_recruiter_contact) : '', region_id: job.region_id != null ? String(job.region_id) : '', city_id: job.city_id != null ? String(job.city_id) : '', address: String(job.address ?? ''), scope: normalizeIds(job.scope), required_experience: job.required_experience != null ? String(job.required_experience) : '', required_languages: normalizeIds(job.required_languages), systems_used: normalizeIds(job.systems_used), tax_type_id: job.tax_type_id != null ? String(job.tax_type_id) : '', mobility_id: job.mobility_id != null ? String(job.mobility_id) : '', salary_expectation_hourly: job.salary_expectation_hourly != null ? String(job.salary_expectation_hourly) : '', salary_expectation_monthly: job.salary_expectation_monthly != null ? String(job.salary_expectation_monthly) : '', show_salary_public: Boolean(job.show_salary_public), work_schedule_text: String(job.work_schedule_text ?? ''), job_description: String(job.job_description ?? ''), job_requirements: String(job.job_requirements ?? ''), employer_notes: String(job.employer_notes ?? ''), notes: String(job.notes ?? ''), public_excerpt: String(job.public_excerpt ?? ''), public_image_url: String(job.public_image_url ?? ''), job_url: String(job.job_url ?? '')
+    job_code: String(job.job_code ?? ''), job_title: String(job.job_title ?? ''), job_status: job.job_status != null ? String(job.job_status) : '', public_status: job.public_status != null ? String(job.public_status) : '', job_role: job.job_role != null ? String(job.job_role) : '', job_sub_role: normalizeIds(job.job_sub_role), account_link: job.account_link != null ? String(job.account_link) : '', rel_employer_contact: job.rel_employer_contact != null ? String(job.rel_employer_contact) : '', rel_recruiter_contact: job.rel_recruiter_contact != null ? String(job.rel_recruiter_contact) : '', region_id: job.region_id != null ? String(job.region_id) : '', city_id: job.city_id != null ? String(job.city_id) : '', address: String(job.address ?? ''), scope: normalizeIds(job.scope), required_experience: job.required_experience != null ? String(job.required_experience) : '', required_languages: normalizeIds(job.required_languages), systems_used: normalizeIds(job.systems_used), salary_type_ids: normalizeIds(job.salary_type_ids), tax_type_id: job.tax_type_id != null ? String(job.tax_type_id) : '', mobility_id: job.mobility_id != null ? String(job.mobility_id) : '', salary_expectation_hourly: job.salary_expectation_hourly != null ? String(job.salary_expectation_hourly) : '', salary_expectation_monthly: job.salary_expectation_monthly != null ? String(job.salary_expectation_monthly) : '', show_salary_public: Boolean(job.show_salary_public), work_schedule_text: String(job.work_schedule_text ?? ''), job_description: String(job.job_description ?? ''), job_requirements: String(job.job_requirements ?? ''), employer_notes: String(job.employer_notes ?? ''), notes: String(job.notes ?? ''), public_excerpt: String(job.public_excerpt ?? ''), public_image_url: String(job.public_image_url ?? ''), job_url: String(job.job_url ?? '')
   }
 }
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) { return <div className="mb-5 flex items-center gap-2 text-[18px] font-bold text-[#2D2D2D]"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F3F3] text-[#008080]">{icon}</span>{title}</div> }

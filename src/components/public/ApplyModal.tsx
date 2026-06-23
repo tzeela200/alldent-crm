@@ -18,14 +18,17 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
     notes: '',
     consent: false,
   })
+
   const [cvFile, setCvFile] = useState<File | null>(null)
   const [status, setStatus] = useState<Status>('idle')
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   if (!isOpen) return null
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const target = e.target as HTMLInputElement
+
     if (target.name === 'consent') {
       setForm({ ...form, consent: target.checked })
     } else {
@@ -35,7 +38,9 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
     if (!form.consent) return
+
     setStatus('loading')
 
     try {
@@ -71,163 +76,236 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
         p_consent: true,
       })
 
-      if (error) { setStatus('error'); return }
+      if (error) {
+        console.error('[ApplyModal] RPC error:', error)
+        setErrorMsg(error.message ?? null)
+        setStatus('error')
+        return
+      }
 
-      const result = (data as { status?: string })?.status
+      const result = (data as { status?: string }[] | null)?.[0]?.status
       setStatus(result === 'duplicate' ? 'duplicate' : 'success')
-    } catch {
+    } catch (err) {
+      console.error('[ApplyModal] submit failed:', err)
       setStatus('error')
     }
   }
 
   return (
     <div
-      className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 px-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-[#0F0F10]/60 px-4 py-6 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
         dir="rtl"
-        className="bg-white w-full max-w-md rounded-3xl p-6 shadow-xl max-h-[90vh] overflow-y-auto"
+        className="w-full max-w-[520px] overflow-hidden rounded-[28px] bg-white shadow-[0_24px_70px_rgba(15,15,16,0.28)]"
         style={{ fontFamily: 'Heebo, sans-serif' }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <button
-            onClick={onClose}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition"
-          >
-            <X className="text-gray-500 hover:text-black" size={18} />
-          </button>
-          <h2 className="text-lg font-semibold text-gray-900">הגשת מועמדות</h2>
-        </div>
-
-        {/* Success / Duplicate */}
-        {status === 'success' && (
-          <Result icon={CheckCircle2} text="המועמדות נשלחה בהצלחה!" iconClass="text-green-500" />
-        )}
-        {status === 'duplicate' && (
-          <Result icon={AlertCircle} text="כבר שלחת מועמדות למשרה זו" iconClass="text-amber-500" />
-        )}
-
-        {/* Error */}
-        {status === 'error' && (
-          <p className="text-red-500 text-sm text-center mb-4">הייתה שגיאה, נסה שוב</p>
-        )}
-
-        {/* Form */}
-        {(status === 'idle' || status === 'loading' || status === 'error') && (
-          <form onSubmit={handleSubmit} className="space-y-4 text-right">
-            <Field label="שם מלא *">
-              <input
-                name="full_name"
-                onChange={handleChange}
-                required
-                placeholder="ישראל ישראלי"
-                className={inputCls}
-              />
-            </Field>
-
-            <Field label="נייד *">
-              <input
-                name="phone"
-                type="tel"
-                onChange={handleChange}
-                required
-                placeholder="050-0000000"
-                dir="ltr"
-                className={`${inputCls} text-left`}
-              />
-            </Field>
-
-            <Field label="אימייל">
-              <input
-                name="email"
-                type="email"
-                onChange={handleChange}
-                placeholder="name@example.com"
-                dir="ltr"
-                className={`${inputCls} text-left`}
-              />
-            </Field>
-
-            {/* CV Upload */}
-            <Field label='קורות חיים'>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".pdf,.doc,.docx"
-                className="hidden"
-                onChange={(e) => setCvFile(e.target.files?.[0] ?? null)}
-              />
-              <button
-                type="button"
-                onClick={() => fileRef.current?.click()}
-                className={`${inputCls} flex items-center gap-2 cursor-pointer hover:border-[#D97706] text-right`}
-              >
-                <Paperclip className="h-4 w-4 text-gray-400 flex-shrink-0" />
-                <span className={cvFile ? 'text-gray-800' : 'text-gray-400'}>
-                  {cvFile ? cvFile.name : 'בחרו קובץ PDF / Word'}
-                </span>
-              </button>
-            </Field>
-
-            <Field label="הערות / הודעה">
-              <textarea
-                name="notes"
-                onChange={handleChange}
-                placeholder="ספרו לנו עוד קצת..."
-                rows={3}
-                className={`${inputCls} resize-none`}
-              />
-            </Field>
-
-            {/* Consent */}
-            <label className="flex items-start gap-2 cursor-pointer">
-              <input
-                name="consent"
-                type="checkbox"
-                checked={form.consent}
-                onChange={handleChange}
-                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[#D97706] focus:ring-[#D97706] flex-shrink-0"
-              />
-              <span className="text-[13px] text-gray-500 leading-relaxed">
-                אני מסכים/ה לשמירת פרטיי לצורך גיוס עובדים
-              </span>
-            </label>
+        <div className="border-b border-[#EFEFEF] px-6 py-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="text-right">
+              <p className="mb-1 text-[12px] font-semibold text-[#D97706]">
+                משרה {jobCode}
+              </p>
+              <h2 className="text-[22px] font-bold leading-tight text-[#1A1A1A]">
+                הגשת מועמדות למשרה
+              </h2>
+              <p className="mt-2 text-[14px] leading-6 text-[#6B6B6B]">
+                מלאו פרטים קצרים ונחזור אליכם בהקדם.
+              </p>
+            </div>
 
             <button
-              type="submit"
-              disabled={status === 'loading' || !form.consent}
-              className="w-full py-3 bg-[#D97706] text-white rounded-[20px] font-medium shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#B45309] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              type="button"
+              onClick={onClose}
+              aria-label="סגירת חלון"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#6B6B6B] transition hover:bg-[#F3F4F6] hover:text-[#1A1A1A]"
             >
-              {status === 'loading' && <Loader2 className="animate-spin w-4 h-4" />}
-              שליחת מועמדות
+              <X size={18} />
             </button>
-          </form>
-        )}
+          </div>
+        </div>
+
+        <div className="max-h-[78vh] overflow-y-auto px-6 py-6">
+          {/* Success / Duplicate */}
+          {status === 'success' && (
+            <Result
+              icon={CheckCircle2}
+              title="המועמדות נשלחה בהצלחה"
+              text="קיבלנו את הפרטים שלך ונחזור אליך בהמשך התהליך."
+              iconClass="text-[#15803D]"
+            />
+          )}
+
+          {status === 'duplicate' && (
+            <Result
+              icon={AlertCircle}
+              title="המועמדות כבר קיימת"
+              text="נראה שכבר שלחת מועמדות למשרה הזו."
+              iconClass="text-[#D97706]"
+            />
+          )}
+
+          {/* Error */}
+          {status === 'error' && (
+            <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-right text-[14px] leading-6 text-red-700">
+              הייתה שגיאה בשליחת המועמדות. אפשר לנסות שוב בעוד רגע.
+              {errorMsg && (
+                <p className="mt-1 font-mono text-[11px] text-red-500">{errorMsg}</p>
+              )}
+            </div>
+          )}
+
+          {/* Form */}
+          {(status === 'idle' || status === 'loading' || status === 'error') && (
+            <form onSubmit={handleSubmit} className="space-y-5 text-right">
+              <Field label="שם מלא" required>
+                <input
+                  name="full_name"
+                  value={form.full_name}
+                  onChange={handleChange}
+                  required
+                  placeholder="שם פרטי ושם משפחה"
+                  className={inputCls}
+                />
+              </Field>
+
+              <Field label="נייד" required>
+                <input
+                  name="phone"
+                  type="tel"
+                  value={form.phone}
+                  onChange={handleChange}
+                  required
+                  placeholder="050-1234567"
+                  dir="ltr"
+                  className={`${inputCls} text-left`}
+                />
+              </Field>
+
+              <Field label="דוא״ל">
+                <input
+                  name="email"
+                  type="email"
+                  value={form.email}
+                  onChange={handleChange}
+                  placeholder="name@example.com"
+                  dir="ltr"
+                  className={`${inputCls} text-left`}
+                />
+              </Field>
+
+              <Field label="קורות חיים">
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  className="hidden"
+                  onChange={(e) => setCvFile(e.target.files?.[0] ?? null)}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => fileRef.current?.click()}
+                  className="flex h-12 w-full items-center justify-between gap-3 rounded-2xl border border-[#D9D9D9] bg-white px-4 text-right text-[14px] transition hover:border-[#D97706] hover:bg-[#FFF8F0]"
+                >
+                  <span className={cvFile ? 'truncate text-[#1A1A1A]' : 'text-[#9CA3AF]'}>
+                    {cvFile ? cvFile.name : 'העלאת קובץ PDF / Word'}
+                  </span>
+
+                  <Paperclip className="h-4 w-4 shrink-0 text-[#6B6B6B]" />
+                </button>
+              </Field>
+
+              <Field label="הודעה קצרה">
+                <textarea
+                  name="notes"
+                  value={form.notes}
+                  onChange={handleChange}
+                  placeholder="אפשר לציין זמינות, ניסיון רלוונטי או שאלה קצרה"
+                  rows={4}
+                  className={`${inputCls} min-h-[108px] resize-none py-3 leading-6`}
+                />
+              </Field>
+
+              <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[#FAFAF7] px-4 py-3">
+                <input
+                  name="consent"
+                  type="checkbox"
+                  checked={form.consent}
+                  onChange={handleChange}
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-[#D9D9D9] text-[#D97706] focus:ring-[#D97706]"
+                />
+
+                <span className="text-[13px] leading-6 text-[#6B6B6B]">
+                  אני מאשר/ת שמירת הפרטים לצורך טיפול במועמדות ויצירת קשר.
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                disabled={status === 'loading' || !form.consent}
+                className="flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#D97706] px-6 py-3.5 text-[15px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.25)] transition hover:bg-[#B45309] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {status === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
+                שליחת מועמדות
+              </button>
+
+              <p className="text-center text-[12px] leading-5 text-[#9CA3AF]">
+                הפרטים נשמרים במערכת AllDent לצורך טיפול בפנייה בלבד.
+              </p>
+            </form>
+          )}
+        </div>
       </div>
     </div>
   )
 }
 
 const inputCls =
-  'w-full px-3.5 py-2.5 rounded-[16px] border border-gray-200 text-[15px] text-gray-900 placeholder-gray-400 outline-none focus:border-[#D97706] transition bg-white'
+  'h-12 w-full rounded-2xl border border-[#D9D9D9] bg-white px-4 text-[15px] text-[#1A1A1A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D97706] focus:ring-4 focus:ring-[#D97706]/10'
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
+function Field({
+  label,
+  required,
+  children,
+}: {
+  label: string
+  required?: boolean
+  children: React.ReactNode
+}) {
   return (
     <div>
-      <label className="block text-sm text-gray-500 mb-1">{label}</label>
+      <label className="mb-1.5 block text-right text-[13px] font-semibold text-[#2D2D2D]">
+        {label}
+        {required && <span className="mr-1 text-[#D97706]">*</span>}
+      </label>
+
       {children}
     </div>
   )
 }
 
-function Result({ icon: Icon, text, iconClass }: { icon: React.ElementType; text: string; iconClass: string }) {
+function Result({
+  icon: Icon,
+  title,
+  text,
+  iconClass,
+}: {
+  icon: React.ElementType
+  title: string
+  text: string
+  iconClass: string
+}) {
   return (
-    <div className="text-center py-6">
-      <Icon className={`mx-auto mb-3 ${iconClass}`} size={30} />
-      <p className="text-gray-800 font-medium">{text}</p>
+    <div className="py-8 text-center">
+      <Icon className={`mx-auto mb-4 ${iconClass}`} size={38} />
+      <h3 className="text-[20px] font-bold text-[#1A1A1A]">{title}</h3>
+      <p className="mx-auto mt-2 max-w-[340px] text-[14px] leading-6 text-[#6B6B6B]">
+        {text}
+      </p>
     </div>
   )
 }

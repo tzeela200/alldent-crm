@@ -12,13 +12,14 @@ interface ApplicationDicts {
   availabilities: DictItem[]
   jobStatuses: DictItem[]
   cities: DictItem[]
+  languages: DictItem[]
 }
 
 export function useApplicationDicts() {
   return useQuery({
     queryKey: ['application-dicts'],
     queryFn: async (): Promise<ApplicationDicts> => {
-      const [appStatuses, checkStatuses, sources, regions, roles, workStatuses, availabilities, jobStatuses, cities] =
+      const [appStatuses, checkStatuses, sources, regions, roles, workStatuses, availabilities, jobStatuses, cities, languages] =
         await Promise.all([
           supabase.from('dict_application_statuses').select('id, name').order('id'),
           supabase.from('dict_check_statuses').select('id, name').order('id'),
@@ -29,6 +30,7 @@ export function useApplicationDicts() {
           supabase.from('dict_availability').select('id, name').order('id'),
           supabase.from('dict_job_statuses').select('id, name').order('id'),
           supabase.from('dict_cities').select('id, name').order('name'),
+          supabase.from('dict_languages').select('id, name').order('name'),
         ])
       return {
         applicationStatuses: (appStatuses.data ?? []) as DictItem[],
@@ -40,6 +42,7 @@ export function useApplicationDicts() {
         availabilities: (availabilities.data ?? []) as DictItem[],
         jobStatuses: (jobStatuses.data ?? []) as DictItem[],
         cities: (cities.data ?? []) as DictItem[],
+        languages: (languages.data ?? []) as DictItem[],
       }
     },
     staleTime: 5 * 60_000,

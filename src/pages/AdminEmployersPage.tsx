@@ -66,6 +66,7 @@ type EmployerFilters = {
   has_phone?: 'yes' | 'no'
   has_email?: 'yes' | 'no'
   has_website?: 'yes' | 'no'
+  role_filter?: number | null
 }
 
 type JobLite = {
@@ -77,6 +78,14 @@ type JobLite = {
   total_applicants: number | null
   city_id: number | null
   region_id: number | null
+  job_role: number | null
+}
+
+type AppLite = {
+  application_id: number
+  job_code: string | null
+  application_status: number | null
+  account_link: number | null
 }
 
 type EmployerDraft = {
@@ -104,6 +113,11 @@ type EnrichedAccount = Account & {
   relatedJobs: JobLite[]
   activeJobsCount: number
   totalJobsCount: number
+  totalAppsCount: number
+  newAppsCount: number
+  transferredCount: number
+  interviewCount: number
+  feedbackPendingCount: number
   linkedContactSummary: string
   primaryEmployerName: string
   displayCityId: number | null
@@ -155,6 +169,9 @@ const ALL_COLUMNS = [
   { key: 'city', label: 'עיר' },
   { key: 'active_jobs', label: 'משרות פעילות' },
   { key: 'total_jobs', label: 'סה״כ משרות' },
+  { key: 'total_apps', label: 'סה״כ הגשות' },
+  { key: 'new_apps', label: 'הגשות חדשות' },
+  { key: 'transferred', label: 'הועבר למעסיק' },
   { key: 'contacts', label: 'אנשי קשר' },
   { key: 'follow_up', label: 'פולו־אפ' },
 ] as const
@@ -400,7 +417,7 @@ export default function AdminEmployersPage({
       while (true) {
         const { data, error } = await supabase
           .from('job')
-          .select('job_code,account_link,job_status,public_status,job_title,total_applicants,city_id,region_id')
+          .select('job_code,account_link,job_status,public_status,job_title,total_applicants,city_id,region_id,job_role')
           .order('job_code')
           .range(from, from + PAGE - 1)
         if (error) throw error
@@ -465,10 +482,70 @@ export default function AdminEmployersPage({
     staleTime: 300_000,
   })
 
+  const { data: dictRoles = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_roles'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_roles').select('id,name').order('name')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 300_000,
+  })
+
+  const { data: dictAppStatuses = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_application_statuses'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_application_statuses').select('id,name').order('id')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 300_000,
+  })
+
+  const { data: allApplications = [] } = useQuery<AppLite[]>({
+    queryKey: ['applications-for-employers'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('applications')
+        .select('application_id,job_code,application_status,account_link')
+      if (error) throw error
+      return (data ?? []) as AppLite[]
+    },
+    staleTime: 5 * 60_000,
+  })
+
   const accountStatusName = (id: number | null | undefined) => accountStatuses.find((item) => item.id === id)?.name ?? '—'
   const accountTypeName = (id: number | null | undefined) => accountTypes.find((item) => item.id === id)?.name ?? '—'
   const regionName = (id: number | null | undefined) => regions.find((item) => item.id === id)?.name ?? '—'
   const cityName = (id: number | null | undefined) => cities.find((item) => item.id === id)?.name ?? '—'
+
+  // Application status ID helpers — resolved from dict at runtime
+  const getAppStatusIds = (nameSubstrings: string[]) =>
+    dictAppStatuses
+      .filter((s) => nameSubstrings.some((sub) => s.name.includes(sub)))
+      .map((s) => s.id)
+
+  const newStatusIds = useMemo(() => getAppStatusIds(['הגשה חדשה', 'חדש']), [dictAppStatuses])
+  const transferredStatusIds = useMemo(() => getAppStatusIds(['הועבר למעסיק', 'הועבר']), [dictAppStatuses])
+  const interviewStatusIds = useMemo(() => getAppStatusIds(['ראיון', 'נקבע ראיון']), [dictAppStatuses])
+  const feedbackStatusIds = useMemo(() => getAppStatusIds(['ממתין למשוב', 'משוב מעסיק']), [dictAppStatuses])
+
+  const applicationsByAccount = useMemo(() => {
+    const map = new Map<number, AppLite[]>()
+    allApplications.forEach((app) => {
+      let accountId = app.account_link ? Number(app.account_link) : null
+      // fallback: resolve via job → account_link
+      if (!accountId && app.job_code) {
+        const job = jobs.find((j) => j.job_code === app.job_code)
+        if (job?.account_link) accountId = Number(job.account_link)
+      }
+      if (!accountId) return
+      const current = map.get(accountId) ?? []
+      current.push(app)
+      map.set(accountId, current)
+    })
+    return map
+  }, [allApplications, jobs])
 
   const jobsByAccount = useMemo(() => {
     const map = new Map<number, JobLite[]>()
@@ -500,6 +577,12 @@ export default function AdminEmployersPage({
       const linkedContacts = contactsByAccount.get(Number(account.account_id)) ?? []
       const totalJobsCount = relatedJobs.length
       const activeJobsCount = relatedJobs.filter((job) => Number(job.job_status) === ACTIVE_JOB_STATUS_ID).length
+      const accountApps = applicationsByAccount.get(Number(account.account_id)) ?? []
+      const totalAppsCount = accountApps.length
+      const newAppsCount = newStatusIds.length > 0 ? accountApps.filter((a) => newStatusIds.includes(a.application_status!)).length : accountApps.filter((a) => a.application_status === 1).length
+      const transferredCount = transferredStatusIds.length > 0 ? accountApps.filter((a) => transferredStatusIds.includes(a.application_status!)).length : 0
+      const interviewCount = interviewStatusIds.length > 0 ? accountApps.filter((a) => interviewStatusIds.includes(a.application_status!)).length : 0
+      const feedbackPendingCount = feedbackStatusIds.length > 0 ? accountApps.filter((a) => feedbackStatusIds.includes(a.application_status!)).length : 0
       const linkedContactSummary = linkedContacts
         .slice(0, 3)
         .map((item) => item.full_name || item.display_name || item.email || item.phone_norm || item.phone)
@@ -532,6 +615,11 @@ export default function AdminEmployersPage({
         relatedJobs,
         totalJobsCount,
         activeJobsCount,
+        totalAppsCount,
+        newAppsCount,
+        transferredCount,
+        interviewCount,
+        feedbackPendingCount,
         linkedContactSummary,
         primaryEmployerName,
         displayCityId,
@@ -608,6 +696,10 @@ export default function AdminEmployersPage({
       if (filters.has_email === 'no' && item.email) return false
       if (filters.has_website === 'yes' && !item.website_url) return false
       if (filters.has_website === 'no' && item.website_url) return false
+      if (filters.role_filter != null) {
+        const hasRole = (item as EnrichedAccount).relatedJobs.some((j) => j.job_role === filters.role_filter)
+        if (!hasRole) return false
+      }
       return true
     })
 
@@ -631,7 +723,12 @@ export default function AdminEmployersPage({
     const totalJobs = rows.reduce((sum, item) => sum + item.totalJobsCount, 0)
     const activeJobs = rows.reduce((sum, item) => sum + item.activeJobsCount, 0)
     const withContacts = rows.filter((item) => item.derived.linkedContactsCount > 0).length
-    return { total: rows.length, activeEmployers, oldEmployers, totalJobs, activeJobs, withContacts }
+    const totalApps = rows.reduce((sum, item) => sum + item.totalAppsCount, 0)
+    const newApps = rows.reduce((sum, item) => sum + item.newAppsCount, 0)
+    const transferred = rows.reduce((sum, item) => sum + item.transferredCount, 0)
+    const interview = rows.reduce((sum, item) => sum + item.interviewCount, 0)
+    const feedbackPending = rows.reduce((sum, item) => sum + item.feedbackPendingCount, 0)
+    return { total: rows.length, activeEmployers, oldEmployers, totalJobs, activeJobs, withContacts, totalApps, newApps, transferred, interview, feedbackPending }
   }, [filteredRows])
 
   useEffect(() => setPage(0), [filters, tab, viewMode])
@@ -914,11 +1011,15 @@ export default function AdminEmployersPage({
     >
       <div dir="rtl" className="min-h-screen bg-[#F3F4F6] font-['Heebo'] text-[#2D2D2D]">
         <div className="space-y-6">
-          <section className={`grid grid-cols-1 gap-4 md:grid-cols-2 ${isEmployersBoard ? 'xl:grid-cols-5' : 'xl:grid-cols-6'}`}>
+          <section className="grid grid-cols-2 gap-4 md:grid-cols-4 xl:grid-cols-5">
             <KpiCard label={isEmployersBoard ? 'סה״כ מעסיקים' : 'סה״כ ארגונים'} value={kpis.total} hint="לאחר סינון" onClick={clearFilters} />
-            <KpiCard label="מגייסים פעילים" value={kpis.activeEmployers} hint="account_status = 7" tone="success" onClick={() => setFilters((prev) => ({ ...prev, account_status: ACTIVE_RECRUITER_STATUS_ID }))} />
-            <KpiCard label="מגייסים ישנים" value={kpis.oldEmployers} hint="account_status = 8" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, account_status: OLD_RECRUITER_STATUS_ID }))} />
-            <KpiCard label="משרות פעילות" value={kpis.activeJobs} hint="job_status = פעילה" tone="success" onClick={() => setFilters((prev) => ({ ...prev, active_jobs_only: 'yes' }))} />
+            <KpiCard label="מגייסים פעילים" value={kpis.activeEmployers} hint="סטטוס מגייס פעיל" tone="success" onClick={() => setFilters((prev) => ({ ...prev, account_status: ACTIVE_RECRUITER_STATUS_ID }))} />
+            <KpiCard label="משרות פעילות" value={kpis.activeJobs} hint="לפי משרות הארגון" tone="success" onClick={() => setFilters((prev) => ({ ...prev, active_jobs_only: 'yes' }))} />
+            <KpiCard label="סה״כ הגשות" value={kpis.totalApps} hint="כל ההגשות" />
+            <KpiCard label="הגשות חדשות" value={kpis.newApps} hint="סטטוס חדש" tone="success" />
+            <KpiCard label="הועבר למעסיק" value={kpis.transferred} hint="ממתין לתגובה" tone="warning" />
+            <KpiCard label="נקבע ראיון" value={kpis.interview} hint="בתהליך ראיון" tone="success" />
+            <KpiCard label="ממתין למשוב" value={kpis.feedbackPending} hint="ממתין למשוב מעסיק" tone="warning" />
             <KpiCard label="סה״כ משרות" value={kpis.totalJobs} hint="לפי job.account_link" />
             {!isEmployersBoard && <KpiCard label="עם איש קשר" value={kpis.withContacts} hint="ארגונים עם contact משויך" onClick={() => setFilters((prev) => ({ ...prev, has_contact: 'yes' }))} />}
           </section>
@@ -929,6 +1030,29 @@ export default function AdminEmployersPage({
                 <div className="mb-4 flex flex-wrap items-center gap-2 border-b border-[#D9D9D9] pb-4">
                   <button type="button" onClick={() => setTab('all')} className={`rounded-full px-4 py-2 text-[13px] font-semibold ${tab === 'all' ? 'bg-[#E6F3F3] text-[#008080]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>כל הארגונים</button>
                   <button type="button" onClick={() => setTab('active')} className={`rounded-full px-4 py-2 text-[13px] font-semibold ${tab === 'active' ? 'bg-[#E6F3F3] text-[#008080]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>מגייסים פעילים בלבד</button>
+                </div>
+              )}
+
+              {/* Role filter chips */}
+              {dictRoles.length > 0 && (
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFilters((prev) => ({ ...prev, role_filter: undefined }))}
+                    className={`rounded-full px-3 py-1.5 text-[12px] font-semibold ${filters.role_filter == null ? 'bg-[#008080] text-white' : 'bg-[#F3F4F6] text-[#6B6B6B] hover:bg-[#E6F3F3]'}`}
+                  >
+                    הכל
+                  </button>
+                  {dictRoles.map((role) => (
+                    <button
+                      key={role.id}
+                      type="button"
+                      onClick={() => setFilters((prev) => ({ ...prev, role_filter: prev.role_filter === role.id ? undefined : role.id }))}
+                      className={`rounded-full px-3 py-1.5 text-[12px] font-semibold ${filters.role_filter === role.id ? 'bg-[#008080] text-white' : 'bg-[#F3F4F6] text-[#6B6B6B] hover:bg-[#E6F3F3]'}`}
+                    >
+                      {role.name}
+                    </button>
+                  ))}
                 </div>
               )}
 
@@ -1023,6 +1147,9 @@ export default function AdminEmployersPage({
                         {visibleColumns.includes('city') && <th className="px-3 py-3">עיר</th>}
                         {visibleColumns.includes('active_jobs') && <SortableTh label="משרות פעילות" sortKey="activeJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
                         {visibleColumns.includes('total_jobs') && <SortableTh label="סה״כ משרות" sortKey="totalJobsCount" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} />}
+                        {visibleColumns.includes('total_apps') && <th className="px-3 py-3">סה״כ הגשות</th>}
+                        {visibleColumns.includes('new_apps') && <th className="px-3 py-3">הגשות חדשות</th>}
+                        {visibleColumns.includes('transferred') && <th className="px-3 py-3">הועבר למעסיק</th>}
                         {visibleColumns.includes('contacts') && <th className="px-3 py-3">אנשי קשר משויכים</th>}
                         {visibleColumns.includes('follow_up') && <th className="px-3 py-3">פולו־אפ</th>}
                         <th className="px-3 py-3">פעולות</th>
@@ -1045,6 +1172,9 @@ export default function AdminEmployersPage({
                             {visibleColumns.includes('city') && <td style={{ width: columnWidths.city }} className="px-3 py-3">{account.locationLabel || cityName(account.displayCityId)}</td>}
                             {visibleColumns.includes('active_jobs') && <td style={{ width: columnWidths.active_jobs }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F0FDF4] px-2.5 py-1 text-[12px] font-bold text-[#16A34A]">{account.activeJobsCount}</span></td>}
                             {visibleColumns.includes('total_jobs') && <td style={{ width: columnWidths.total_jobs }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{account.totalJobsCount}</span></td>}
+                            {visibleColumns.includes('total_apps') && <td style={{ width: (columnWidths as any).total_apps }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{account.totalAppsCount}</span></td>}
+                            {visibleColumns.includes('new_apps') && <td style={{ width: (columnWidths as any).new_apps }} className="px-3 py-3"><span className="rounded-[6px] bg-[#ECFDF5] px-2.5 py-1 text-[12px] font-bold text-[#16A34A]">{account.newAppsCount}</span></td>}
+                            {visibleColumns.includes('transferred') && <td style={{ width: (columnWidths as any).transferred }} className="px-3 py-3"><span className="rounded-[6px] bg-[#FFF7ED] px-2.5 py-1 text-[12px] font-bold text-[#C2410C]">{account.transferredCount}</span></td>}
                             {visibleColumns.includes('contacts') && <td style={{ width: columnWidths.contacts }} className="px-3 py-3"><div className="truncate">{account.linkedContactSummary || '—'}</div></td>}
                             {visibleColumns.includes('follow_up') && <td style={{ width: columnWidths.follow_up }} className="px-3 py-3">{formatDate((account as any).next_follow_up)}</td>}
                             <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>

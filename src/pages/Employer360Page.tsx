@@ -1283,8 +1283,8 @@ function KpiStrip({ account, jobs, applications, dicts }: { account: AccountRow;
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <KpiCard icon={<Briefcase className="h-5 w-5" />} value={account.active_job_count_auto ?? activeJobs.length} label="משרות פעילות" hint="מחושב לפי משרות הארגון" />
-      <KpiCard icon={<FileText className="h-5 w-5" />} value={account.total_jobs_count ?? jobs.length} label='סה"כ משרות' hint="פעילות והיסטוריות" />
+      <KpiCard icon={<Briefcase className="h-5 w-5" />} value={activeJobs.length} label="משרות פעילות" hint="מחושב לפי משרות הארגון" />
+      <KpiCard icon={<FileText className="h-5 w-5" />} value={jobs.length} label='סה"כ משרות' hint="פעילות והיסטוריות" />
       <KpiCard icon={<Users className="h-5 w-5" />} value={uniqueCandidates} label="מועמדים ייחודיים" hint={`${openApplications} הגשות פתוחות`} />
       <KpiCard icon={<CalendarClock className="h-5 w-5" />} value={overdueFollowUps} label="פולואפים באיחור" hint={account.next_follow_up ? `הבא: ${formatDate(account.next_follow_up)}` : "לא נקבע פולואפ"} />
     </div>

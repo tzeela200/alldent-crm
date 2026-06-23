@@ -133,6 +133,7 @@ type JobDraft = {
   salary_expectation_hourly: string
   salary_expectation_monthly: string
   show_salary_public: boolean
+  salary_type_ids: number[]
   public_image_url: string
   job_url: string
   job_description: string
@@ -158,6 +159,7 @@ const EMPTY_JOB_DRAFT: JobDraft = {
   salary_expectation_hourly: '',
   salary_expectation_monthly: '',
   show_salary_public: false,
+  salary_type_ids: [],
   public_image_url: '',
   job_url: '',
   job_description: '',
@@ -167,9 +169,28 @@ const EMPTY_JOB_DRAFT: JobDraft = {
 
 const EMPTY_JOBS: Job[] = []
 
+const ADMIN_JOBS_FILTERS_STORAGE_KEY = 'alldent.adminJobs.filters.v1'
+const DEFAULT_FILTERS: FilterState = { job_status: JOB_STATUS_IDS.active }
+
+function getInitialFilters(): FilterState {
+  if (typeof window === 'undefined') return DEFAULT_FILTERS
+
+  try {
+    const saved = window.localStorage.getItem(ADMIN_JOBS_FILTERS_STORAGE_KEY)
+    if (!saved) return DEFAULT_FILTERS
+
+    const parsed = JSON.parse(saved) as FilterState
+    if (!parsed || typeof parsed !== 'object' || !Object.keys(parsed).length) return DEFAULT_FILTERS
+
+    return parsed
+  } catch {
+    return DEFAULT_FILTERS
+  }
+}
+
 export default function AdminJobsPage() {
   const navigate = useNavigate()
-  const [filters, setFilters] = useState<FilterState>({})
+  const [filters, setFilters] = useState<FilterState>(getInitialFilters)
   const [page, setPage] = useState(0)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
   const [visibleColumns, setVisibleColumns] = useState<string[]>([...DEFAULT_JOB_COLUMNS])
@@ -262,6 +283,7 @@ export default function AdminJobsPage() {
     staleTime: 600_000,
   })
   const { data: scopes = [] } = useQuery<DictItem[]>({ queryKey: ['dict_scopes'], queryFn: () => fetchDict('dict_scopes'), staleTime: 600_000 })
+  const { data: salaryTypes = [] } = useQuery<DictItem[]>({ queryKey: ['dict_salary_types'], queryFn: () => fetchDict('dict_salary_types'), staleTime: 600_000 })
   const { data: regions = [] } = useQuery<DictItem[]>({ queryKey: ['dict_regions'], queryFn: () => fetchDict('dict_regions'), staleTime: 600_000 })
   const { data: cities = [] } = useQuery<Array<DictItem & { region_id: number | null }>>({
     queryKey: ['dict_cities-all'],
@@ -326,6 +348,13 @@ export default function AdminJobsPage() {
 
   useEffect(() => setLocalJobs(allJobsWithLookups), [allJobsWithLookups])
   useEffect(() => setPage(0), [filters])
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(ADMIN_JOBS_FILTERS_STORAGE_KEY, JSON.stringify(filters))
+    } catch {
+      // localStorage is optional; filtering should still work without persistence.
+    }
+  }, [filters])
   useEffect(() => {
     if (!toast.open) return
     const timer = window.setTimeout(() => setToast((prev) => ({ ...prev, open: false })), 2600)
@@ -468,7 +497,7 @@ export default function AdminJobsPage() {
   }
 
   const clearFilters = () => {
-    setFilters({})
+    setFilters(DEFAULT_FILTERS)
     setSelectedRows([])
   }
 
@@ -502,6 +531,7 @@ export default function AdminJobsPage() {
       salary_expectation_hourly: job.salary_expectation_hourly != null ? String(job.salary_expectation_hourly) : '',
       salary_expectation_monthly: job.salary_expectation_monthly != null ? String(job.salary_expectation_monthly) : '',
       show_salary_public: Boolean(job.show_salary_public),
+      salary_type_ids: normalizeIds(job.salary_type_ids),
       public_image_url: job.public_image_url ?? '',
       job_url: job.job_url ?? '',
       job_description: job.job_description ?? '',
@@ -548,6 +578,7 @@ export default function AdminJobsPage() {
         salary_expectation_hourly: toNullableNumber(jobDraft.salary_expectation_hourly),
         salary_expectation_monthly: toNullableNumber(jobDraft.salary_expectation_monthly),
         show_salary_public: jobDraft.show_salary_public,
+        salary_type_ids: jobDraft.salary_type_ids.length ? jobDraft.salary_type_ids : null,
         public_image_url: cleanText(jobDraft.public_image_url),
         job_url: cleanText(jobDraft.job_url),
         job_description: cleanText(jobDraft.job_description),
@@ -801,7 +832,7 @@ export default function AdminJobsPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[1280px] border-collapse text-right text-[13px]">
                     <thead className="bg-[#F9FAFB]">
-                      <tr className="border-b border-[#D9D9D9] text-[12px] font-semibold text-[#6B6B6B]">
+                      <tr className="border-b border-[#D9D9D9] text-[13px] font-bold text-[#6B6B6B]">
                         <th className="w-10 px-3 py-3"><input type="checkbox" checked={pageFullySelected} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
                         {visibleColumns.includes('job_code') && <SortableTh label="קוד" sortKey="job_code" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('job_role') && <PlainTh label="תפקיד" />}
@@ -902,6 +933,7 @@ export default function AdminJobsPage() {
             cities={cities}
             editCityOptions={editCityOptions}
             scopes={scopes}
+            salaryTypes={salaryTypes}
             experienceOptions={experienceOptions}
             roleName={roleName}
             subRoleName={subRoleName}
@@ -949,6 +981,7 @@ function UnifiedJobPanel({
   regions,
   cities,
   scopes,
+  salaryTypes,
   experienceOptions,
   roleName,
   subRoleName,
@@ -1080,6 +1113,7 @@ function UnifiedJobPanel({
               onRegionChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, region_id: id, city_id: null }))}
             />
             <EditMultiSelectField label="היקף משרה" values={draft.scope} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, scope: values }))} options={scopes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
+            <EditMultiSelectField label="סוג שכר" values={draft.salary_type_ids} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, salary_type_ids: values }))} options={salaryTypes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
             <EditSelectField label="ניסיון נדרש" value={draft.required_experience != null ? String(draft.required_experience) : ''} onChange={(value: string) => setDraft((prev: JobDraft) => ({ ...prev, required_experience: value ? Number(value) : null }))} options={experienceOptions.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
           </PanelCard>
 
