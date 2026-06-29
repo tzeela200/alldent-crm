@@ -1,6 +1,5 @@
-import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import type { PublicJob } from '@/services/publicJobsService'
 import { getJobImage } from '@/lib/publicJobUtils'
 import { roleColorFromName } from '@/lib/publicRolePages'
@@ -27,7 +26,6 @@ interface Props {
 }
 
 export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
-  const [expanded, setExpanded] = useState(false)
   const navigate = useNavigate()
   const image = getJobImage(job)
   const roleColor = roleColorFromName(job.job_role_name)
@@ -204,59 +202,8 @@ export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
             </div>
           )}
 
-          {/* Expanded description */}
-          <AnimatePresence>
-            {expanded && job.job_description && (
-              <motion.p
-                key="desc"
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: 'auto', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.28, ease: [0.4, 0, 0.2, 1] }}
-                style={{
-                  margin: 0,
-                  fontSize: 12,
-                  color: C.descText,
-                  lineHeight: 1.65,
-                  overflow: 'hidden',
-                }}
-              >
-                {job.job_description.slice(0, 240)}
-                {job.job_description.length > 240 ? '...' : ''}
-              </motion.p>
-            )}
-          </AnimatePresence>
         </div>
       </div>
-
-      {/* ── CHEVRON — only when there is a description to expand ── */}
-      {job.job_description && (
-        <button
-          onClick={e => { e.preventDefault(); e.stopPropagation(); setExpanded(v => !v) }}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            padding: '10px 0 8px',
-            color: '#9CA3AF',
-            fontSize: 18,
-            lineHeight: 1,
-          }}
-          aria-label={expanded ? 'סגור' : 'פתח'}
-        >
-          <motion.span
-            animate={{ rotate: expanded ? 180 : 0 }}
-            transition={{ duration: 0.22 }}
-            style={{ display: 'inline-block' }}
-          >
-            ⌃
-          </motion.span>
-        </button>
-      )}
     </motion.div>
   )
 
