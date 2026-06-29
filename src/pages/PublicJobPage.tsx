@@ -82,9 +82,7 @@ export default function PublicJobPage() {
             {job.public_excerpt && (
               <section className="rounded-xl border border-[#D9D9D9] bg-white px-5 py-4 shadow-sm md:px-6">
                 <h2 className="mb-2 text-[14px] font-bold text-[#008080]">תקציר המשרה</h2>
-                <p className="text-[15px] font-normal leading-7 text-[#2D2D2D] md:text-[16px]">
-                  {job.public_excerpt}
-                </p>
+                <MarkdownContent>{job.public_excerpt}</MarkdownContent>
               </section>
             )}
 
@@ -234,6 +232,30 @@ function ContentSection({ title, children }: { title: string; children: ReactNod
   )
 }
 
+function normalizeBulletText(text: string): string {
+  return text
+    .split('\n')
+    .map((line) => {
+      const trimmed = line.trim()
+
+      // שורה שמתחילה ב-• הופכת לפריט רשימה תקני
+      if (trimmed.startsWith('•')) {
+        return `- ${trimmed.slice(1).trim()}`
+      }
+
+      // שורה ריקה נשארת ריקה (שומרת על מעבר פסקה)
+      if (trimmed.length === 0) {
+        return ''
+      }
+
+      // כל שורה אחרת מקבלת "hard line break" של Markdown (שני רווחים בסוף),
+      // כך שירידת שורה רגילה באדמין תישמר בדיוק כמו שהיא נכתבה,
+      // בלי קשר אם יש בה נקודה, פסיק, או כלום
+      return `${line.trimEnd()}  `
+    })
+    .join('\n')
+}
+
 function MarkdownContent({ children }: { children: string }) {
   return (
     <div className="text-[15px] leading-7 text-[#2D2D2D] md:text-[16px] md:leading-8">
@@ -255,7 +277,7 @@ function MarkdownContent({ children }: { children: string }) {
           hr: () => <hr className="my-6 border-[#D9D9D9]" />,
         }}
       >
-        {children}
+        {normalizeBulletText(children)}
       </ReactMarkdown>
     </div>
   )
