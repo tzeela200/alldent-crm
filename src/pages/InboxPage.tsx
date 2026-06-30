@@ -23,7 +23,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-import { mockInboxLeads, mockAccounts, mockContacts } from "@/mocks/data";
+const mockInboxLeads: any[] = []
+const mockAccounts: any[] = []
+const mockContacts: any[] = []
 import {
   mockSources,
   mockSocialStatuses,

@@ -5,15 +5,6 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'sonner'
 import App from './App'
 import './index.css'
-import { validateMockData } from './mocks/validateMockData'
-
-if (import.meta.env.DEV) {
-  const result = validateMockData()
-  if (!result.ok) {
-    console.error('[validateMockData] mock integrity failed:', result.errors)
-  }
-}
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

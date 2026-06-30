@@ -6,17 +6,42 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Contact, Account, ContactFilters, DictItem } from '@/types'
 
-// Re-export mock hooks that don't have live data yet
-export {
-  useDicts,
-  useDictName,
-  useJobs,
-  useJob,
-  useApplications,
-  useInbox,
-  useSmartMatch,
-  useMockMutations,
-} from '@/hooks/useMockData'
+export function useDicts(): Record<string, DictItem[]> {
+  return {
+    roles: [], subRoles: [], regions: [], cities: [], availability: [],
+    experience: [], applicationStatuses: [], jobStatuses: [], accountStatuses: [],
+    accountTypes: [], checkStatuses: [], socialStatuses: [], sources: [],
+    profileTypes: [], scopes: [], genders: [],
+  }
+}
+
+export function useDictName() {
+  return (_list: any[], _id: any): string => '—'
+}
+
+export function useJobs(_filters: Record<string, unknown> = {}) {
+  return { data: [], isLoading: false, loading: false, error: null }
+}
+
+export function useJob(_jobCode: string | undefined) {
+  return { data: null, isLoading: false, loading: false, error: null }
+}
+
+export function useApplications(_filters: Record<string, unknown> = {}) {
+  return { data: [], isLoading: false, loading: false, error: null }
+}
+
+export function useInbox(_filters: Record<string, unknown> = {}) {
+  return { data: [], isLoading: false, loading: false, error: null }
+}
+
+export function useSmartMatch() {
+  return { data: [], isLoading: false, loading: false, error: null }
+}
+
+export function useMockMutations() {
+  return {}
+}
 
 // ==================== CONTACTS ====================
 

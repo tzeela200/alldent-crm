@@ -28,7 +28,7 @@ import {
   ActionButton,
   EmptyState,
 } from '@/components/layout/Shell'
-import { useApplications, useDicts, useJobs } from '@/hooks/useMockData'
+import { useApplications, useDicts, useJobs } from '@/hooks/useSupabaseData'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
 import { applicationStatusColors, checkStatusColors, getStatusBadge } from '@/lib/statusColors'
 

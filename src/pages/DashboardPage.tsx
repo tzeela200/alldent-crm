@@ -28,7 +28,7 @@ import {
   EmptyState,
   StatusPill,
 } from '@/components/layout/Shell'
-import { useApplications, useInbox, useJobs, useCandidates, useAccounts, useDicts } from '@/hooks/useMockData'
+import { useApplications, useInbox, useJobs, useCandidates, useAccounts, useDicts } from '@/hooks/useSupabaseData'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
 import { applicationStatusColors, jobStatusColors, getStatusBadge } from '@/lib/statusColors'
 

@@ -30,7 +30,7 @@ import {
   ActionButton,
   EmptyState,
 } from '@/components/layout/Shell'
-import { useApplications, useCandidates, useDicts, useJobs } from '@/hooks/useMockData'
+import { useApplications, useCandidates, useDicts, useJobs } from '@/hooks/useSupabaseData'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
 
 
