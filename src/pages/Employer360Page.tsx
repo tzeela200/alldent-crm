@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAccountMutations } from "@/hooks/useAccountMutations";
+import { useContactMutations } from "@/hooks/useContactMutations";
 import {
   AlertCircle,
   ArrowRight,
@@ -854,6 +856,7 @@ function AccountEditSheet({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { updateAccount } = useAccountMutations();
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState<EditSection>(section);
 
@@ -925,10 +928,7 @@ function AccountEditSheet({
         next_follow_up: fields.next_follow_up || null,
       };
 
-      const { error } = await supabase
-        .from("accounts")
-        .update(updates)
-        .eq("account_id", account.account_id);
+      const { error } = await updateAccount(account.account_id, updates);
 
       if (error) throw error;
 
@@ -1292,16 +1292,14 @@ function KpiStrip({ account, jobs, applications, dicts }: { account: AccountRow;
 }
 
 function LinkContactToAccountPanel({ accountId }: { accountId: number }) {
+  const { updateContact } = useContactMutations()
   const [pendingId, setPendingId] = React.useState<number | null>(null)
   const [saving, setSaving] = React.useState(false)
 
   const handleLink = async () => {
     if (!pendingId) return
     setSaving(true)
-    const { error } = await supabase
-      .from('contact')
-      .update({ account_link: accountId })
-      .eq('contact_id', pendingId)
+    const { error } = await updateContact(pendingId, { account_link: accountId })
     setSaving(false)
     if (error) {
       toast.error('שגיאה בשיוך איש הקשר')

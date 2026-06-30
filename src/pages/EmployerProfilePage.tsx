@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAccountMutations } from "@/hooks/useAccountMutations";
 import {
   ArrowRight,
   Briefcase,
@@ -246,6 +247,7 @@ function AccountEditDialog({
   onClose: () => void;
   onSaved: () => void;
 }) {
+  const { updateAccount } = useAccountMutations();
   const [saving, setSaving] = useState(false);
   const [activeSection, setActiveSection] = useState<EditSection>(section);
   const [fields, setFields] = useState<EditFields>(() => buildEditFields(account));
@@ -264,7 +266,7 @@ function AccountEditDialog({
   const handleSave = async () => {
     setSaving(true);
     try {
-      const { error } = await supabase.from("accounts").update({
+      const { error } = await updateAccount(account.account_id, {
         account_name: fields.account_name.trim() || account.account_name,
         account_status: fields.account_status ? Number(fields.account_status) : null,
         account_type: fields.account_type ? Number(fields.account_type) : null,
@@ -283,7 +285,7 @@ function AccountEditDialog({
         last_contact_date: fields.last_contact_date || null,
         next_follow_up: fields.next_follow_up || null,
         contact_link: fields.contact_link || null,
-      }).eq("account_id", account.account_id);
+      });
       if (error) throw error;
       toast.success("הארגון עודכן בהצלחה");
       onSaved();

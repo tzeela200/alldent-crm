@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useAccountMutations } from '@/hooks/useAccountMutations'
 import {
   AlertTriangle,
   Briefcase,
@@ -396,6 +397,7 @@ export default function AdminEmployersPage({
 
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { updateAccount, insertAccount, bulkUpdateAccounts, mergeAccountsRpc } = useAccountMutations()
 
   const { data: rawAccounts = [] } = useQuery<Account[]>({
     queryKey: ['accounts', 'admin-board'],
@@ -932,13 +934,12 @@ export default function AdminEmployersPage({
       }
 
       if (sheet.mode === 'create') {
-        const { error } = await supabase.from('accounts').insert(payload)
+        const { error } = await insertAccount(payload)
         if (error) throw error
       } else if (sheet.accountId) {
-        const { error } = await supabase.from('accounts').update(payload).eq('account_id', sheet.accountId)
+        const { error } = await updateAccount(sheet.accountId, payload)
         if (error) throw error
       }
-      await queryClient.invalidateQueries({ queryKey: ['accounts'] })
       showToast('השינויים נשמרו בהצלחה', 'success')
       closeSheet()
     } catch {
@@ -963,12 +964,8 @@ export default function AdminEmployersPage({
 
   const updateAccountStatusInline = async (accountId: number, nextStatus: number) => {
     try {
-      const { error } = await supabase
-        .from('accounts')
-        .update({ account_status: nextStatus, updated_timestamp: new Date().toISOString() })
-        .eq('account_id', accountId)
+      const { error } = await updateAccount(accountId, { account_status: nextStatus, updated_timestamp: new Date().toISOString() })
       if (error) throw error
-      await queryClient.invalidateQueries({ queryKey: ['accounts'] })
       showToast('סטטוס הארגון עודכן', 'success')
     } catch {
       showToast('שגיאה בעדכון סטטוס', 'error')
@@ -992,9 +989,8 @@ export default function AdminEmployersPage({
     }
 
     try {
-      const { error } = await supabase.from('accounts').update(payload).in('account_id', selectedRows)
+      const { error } = await bulkUpdateAccounts(selectedRows, payload)
       if (error) throw error
-      await queryClient.invalidateQueries({ queryKey: ['accounts'] })
       setBulkField('')
       setBulkValue('')
       setSelectedRows([])
@@ -1008,13 +1004,12 @@ export default function AdminEmployersPage({
     const dupIds = selectedRows.filter((id) => id !== masterId)
     setMergePending(true)
     try {
-      const { error } = await supabase.rpc('merge_accounts', {
+      const { error } = await mergeAccountsRpc({
         master_id: masterId,
         dup_ids: dupIds,
         overrides,
       })
       if (error) throw error
-      await queryClient.invalidateQueries({ queryKey: ['accounts'] })
       showToast('הארגונים מוזגו בהצלחה', 'success')
       setMergeOpen(false)
       setSelectedRows([])
