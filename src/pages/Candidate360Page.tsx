@@ -57,7 +57,29 @@ import type { JobRow } from "@/hooks/useContact360";
 import { RoleSubRolePicker } from "@/components/ui/RoleSubRolePicker";
 import { useQueryClient } from "@tanstack/react-query";
 
-const BRAND = { primary: "#008080" };
+const BRAND = { primary: "#008080", pageBg: "#F8FAFC", cardBorder: "#E2E8F0" };
+
+const ROLE_COLORS = {
+  specialists: "#086df4",
+  dentists: "#0cc0df",
+  hygienist: "#d10383",
+  assistant: "#774196",
+  secretary: "#ff751f",
+  management: "#076911",
+  technician: "#d4a800",
+} as const;
+
+function getRoleAccentColor(roleName?: string | null) {
+  const normalized = String(roleName ?? "").toLowerCase();
+  if (normalized.includes("רופא") || normalized.includes("dent")) return ROLE_COLORS.dentists;
+  if (normalized.includes("שיננ") || normalized.includes("hygien")) return ROLE_COLORS.hygienist;
+  if (normalized.includes("סייע") || normalized.includes("assist")) return ROLE_COLORS.assistant;
+  if (normalized.includes("מזכיר") || normalized.includes("secret")) return ROLE_COLORS.secretary;
+  if (normalized.includes("ניהול") || normalized.includes("מנהל") || normalized.includes("management")) return ROLE_COLORS.management;
+  if (normalized.includes("טכנ") || normalized.includes("technician")) return ROLE_COLORS.technician;
+  if (normalized.includes("מומח") || normalized.includes("special")) return ROLE_COLORS.specialists;
+  return BRAND.primary;
+}
 
 type ToastState = { type: "success" | "error"; text: string } | null;
 
@@ -128,13 +150,13 @@ function renderUnknownValue(value: unknown): string {
 function availabilityBadgeClass(value?: number | null) {
   if (value === 1) return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (value === 2 || value === 3) return "border-blue-200 bg-blue-50 text-blue-700";
-  if (value === 4) return "border-amber-200 bg-amber-50 text-amber-700";
+  if (value === 4) return "border-amber-200 bg-amber-50 text-slate-600";
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
 
 function checkBadgeClass(value?: number | null) {
   if (value === 2) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (value === 1) return "border-amber-200 bg-amber-50 text-amber-700";
+  if (value === 1) return "border-amber-200 bg-amber-50 text-slate-600";
   if (value === 3) return "border-red-200 bg-red-50 text-red-700";
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
@@ -142,7 +164,7 @@ function checkBadgeClass(value?: number | null) {
 function applicationBadgeClass(value?: number | null) {
   if (value === 8 || value === 15) return "border-emerald-200 bg-emerald-50 text-emerald-700";
   if (value === 4 || value === 5 || value === 6 || value === 7) return "border-blue-200 bg-blue-50 text-blue-700";
-  if (value === 1 || value === 2 || value === 3) return "border-amber-200 bg-amber-50 text-amber-700";
+  if (value === 1 || value === 2 || value === 3) return "border-amber-200 bg-amber-50 text-slate-600";
   if ([9, 10, 11, 12, 13, 14].includes(value ?? -1)) return "border-red-200 bg-red-50 text-red-700";
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
@@ -158,22 +180,72 @@ function LabelValue({ label, value }: { label: string; value?: React.ReactNode }
   );
 }
 
+function LabelValueMuted({ label, value }: { label: string; value?: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2 leading-[1.6]">
+      <span className="shrink-0 text-xs text-slate-400">{label}</span>
+      <span className="text-end text-xs font-medium text-slate-400">{value || "—"}</span>
+    </div>
+  );
+}
+
 function KpiCard({
   value,
   label,
   icon,
+  accentColor = BRAND.primary,
+  onClick,
+  children,
 }: {
   value: React.ReactNode;
   label: string;
   icon: React.ReactNode;
+  accentColor?: string;
+  onClick?: React.MouseEventHandler<HTMLDivElement>;
+  children?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-2 flex items-center gap-2 text-slate-500">
+    <div
+      className={`relative flex h-24 flex-col justify-center rounded-2xl border border-[#E2E8F0] bg-white p-4 text-center shadow-[0_1px_3px_rgba(0,0,0,.04)] ${onClick ? "cursor-pointer" : ""}`}
+      style={{ borderTopColor: accentColor, borderTopWidth: 3 }}
+      onClick={onClick}
+    >
+      <div className="text-2xl font-extrabold text-slate-900">{value ?? "—"}</div>
+      <div className="mt-2 flex items-center justify-center gap-1 text-xs font-semibold text-slate-500">
         {icon}
-        <span className="text-xs font-semibold">{label}</span>
+        <span>{label}</span>
       </div>
-      <div className="text-2xl font-bold text-slate-900">{value ?? "—"}</div>
+      {children}
+    </div>
+  );
+}
+
+function SectionHeader({
+  icon,
+  title,
+  subtitle,
+  accentColor = BRAND.primary,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+  accentColor?: string;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg leading-none"
+          style={{ backgroundColor: `${accentColor}14`, color: accentColor }}
+        >
+          {icon}
+        </span>
+        <div>
+          <div className="text-base font-extrabold text-slate-900">{title}</div>
+          <div className="mt-1 text-[13px] leading-[1.6] text-slate-400">{subtitle}</div>
+        </div>
+      </div>
+      <div className="h-px w-full bg-[#E2E8F0]" />
     </div>
   );
 }
@@ -347,6 +419,7 @@ export default function Candidate360Page() {
       [dictName(dicts?.roles ?? [], contact.role), ...(Array.isArray(contact.sub_role) ? contact.sub_role : contact.sub_role != null ? [contact.sub_role] : []).map((id) => dictName(dicts?.subRoles ?? [], id))]
         .filter((t) => t && t !== "—").join(" · ")
     : "";
+  const roleAccentColor = getRoleAccentColor(dictName(dicts?.roles ?? [], contact?.role));
 
   // ─── actions ──────────────────────────────────────────────────────────────
 
@@ -417,7 +490,7 @@ export default function Candidate360Page() {
       ? allCities.filter((c) => c.region_id === Number(newForm.region_id))
       : allCities;
     return (
-      <div dir="rtl" className="min-h-screen bg-slate-50 p-6 font-['Heebo']">
+      <div dir="rtl" className="min-h-screen bg-[#F8FAFC] p-6 font-['Heebo']">
         <div className="mx-auto max-w-lg">
           <h1 className="mb-6 text-2xl font-bold text-slate-800">איש קשר חדש</h1>
           <Card>
@@ -508,7 +581,7 @@ export default function Candidate360Page() {
 
   if (isLoading) {
     return (
-      <div dir="rtl" className="flex min-h-screen items-center justify-center bg-slate-50 font-['Heebo']">
+      <div dir="rtl" className="flex min-h-screen items-center justify-center bg-[#F8FAFC] font-['Heebo']">
         <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
       </div>
     );
@@ -516,7 +589,7 @@ export default function Candidate360Page() {
 
   if (error || !contact) {
     return (
-      <div dir="rtl" className="min-h-screen bg-slate-50 p-6 font-['Heebo']">
+      <div dir="rtl" className="min-h-screen bg-[#F8FAFC] p-6 font-['Heebo']">
         <div className="flex flex-col items-center justify-center py-32 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
             <AlertCircle className="h-8 w-8 text-slate-400" />
@@ -534,86 +607,105 @@ export default function Candidate360Page() {
   // ─── render ───────────────────────────────────────────────────────────────
 
   return (
-    <div dir="rtl" className="min-h-screen space-y-5 bg-slate-50 p-4 font-['Heebo'] sm:p-6">
+    <div dir="rtl" className="min-h-screen space-y-8 bg-[#F8FAFC] p-4 font-['Heebo'] sm:p-6">
 
       {/* ===== HERO ===== */}
-      <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
+      <Card className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+        <div className="h-1.5 w-full" style={{ backgroundColor: roleAccentColor }} />
         <CardContent className="p-6">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex gap-4">
+          <div className="grid gap-6 lg:grid-cols-[1fr_auto] lg:items-start">
+            <div className="flex gap-6">
               <div
-                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl text-2xl font-bold"
-                style={{ backgroundColor: `${BRAND.primary}18`, color: BRAND.primary }}
+                className="flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-[20px] text-3xl font-extrabold"
+                style={{ backgroundColor: `${roleAccentColor}18`, color: roleAccentColor }}
               >
                 {(contact.full_name || contact.display_name || "?").charAt(0)}
               </div>
 
-              <div className="min-w-0">
-                <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-                  {contact.full_name || contact.display_name || "—"}
-                </h1>
-                {roleText && (
-                  <div className="mt-1 text-base font-medium text-slate-500">{roleText}</div>
-                )}
+              <div className="min-w-0 flex-1 space-y-4">
+                <div className="space-y-2">
+                  <h1 className="text-[32px] font-extrabold leading-tight text-slate-900">
+                    {contact.full_name || contact.display_name || "—"}
+                  </h1>
+                  <div className="h-1 w-16 rounded-full" style={{ backgroundColor: roleAccentColor }} />
+                  {roleText && (
+                    <div className="text-[17px] font-medium text-slate-600">{roleText}</div>
+                  )}
+                </div>
 
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Badge className={`rounded-full border px-3 py-1 text-xs shadow-none ${availabilityBadgeClass(contact.availability)}`}>
+                <div className="flex flex-wrap items-center gap-2 border-t border-[#E2E8F0] pt-4">
+                  <Badge className="h-[30px] rounded-full border px-3 text-xs font-semibold shadow-none" style={{ borderColor: `${roleAccentColor}33`, backgroundColor: `${roleAccentColor}12`, color: roleAccentColor }}>
+                    {dictName(dicts?.roles ?? [], contact.role)}
+                  </Badge>
+                  <Badge className={`h-[30px] rounded-full border px-3 text-xs font-semibold shadow-none ${availabilityBadgeClass(contact.availability)}`}>
                     {dictName(dicts?.availability ?? [], contact.availability)}
                   </Badge>
-                  <Badge className={`rounded-full border px-3 py-1 text-xs shadow-none ${checkBadgeClass(contact.check_status)}`}>
+                  <Badge className={`h-[30px] rounded-full border px-3 text-xs font-semibold shadow-none ${checkBadgeClass(contact.check_status)}`}>
                     {dictName(dicts?.checkStatuses ?? [], contact.check_status)}
                   </Badge>
-                  {(contact.city_id || contact.region_id) && (
-                    <Badge variant="outline" className="rounded-full border-slate-200 bg-slate-50 px-3 py-1 text-xs">
-                      <MapPin className="me-1.5 h-3 w-3" />
-                      {[dictName(dicts?.cities ?? [], contact.city_id), dictName(dicts?.regions ?? [], contact.region_id)]
-                        .filter((v) => v !== "—").join(" · ")}
-                    </Badge>
-                  )}
                   <Badge
-                    className={`rounded-full border px-3 py-1 text-xs shadow-none ${canOpenCv ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}
+                    className={`h-[30px] rounded-full border px-3 text-xs font-semibold shadow-none ${canOpenCv ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}
                   >
                     {canOpenCv ? "קו״ח זמין" : "ללא קו״ח"}
                   </Badge>
                   {contact.profile_type && (
-                    <Badge variant="outline" className="rounded-full border-slate-200 bg-slate-50 px-3 py-1 text-xs">
+                    <Badge variant="outline" className="h-[30px] rounded-full border-slate-200 bg-[#F8FAFC] px-3 text-xs font-semibold">
                       {dictName(dicts?.profileTypes ?? [], contact.profile_type)}
                     </Badge>
                   )}
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-4 text-sm text-slate-600">
-                  {contact.phone && (
-                    <a href={`tel:${contact.phone}`} className="flex items-center gap-1.5 hover:text-teal-600">
-                      <Phone size={14} style={{ color: BRAND.primary }} />
-                      {contact.phone}
-                    </a>
-                  )}
-                  {contact.email && (
-                    <a href={`mailto:${contact.email}`} className="flex items-center gap-1.5 hover:text-teal-600">
-                      <Mail size={14} style={{ color: BRAND.primary }} />
-                      {contact.email}
-                    </a>
-                  )}
-                  {contact.facebook_url && (
-                    <a href={contact.facebook_url} target="_blank" rel="noreferrer" className="flex items-center gap-1.5 hover:text-teal-600">
-                      <Facebook size={14} style={{ color: BRAND.primary }} />
-                      פייסבוק
-                    </a>
-                  )}
+                <div className="grid gap-4 border-t border-[#E2E8F0] pt-4 xl:grid-cols-[1fr_260px] xl:items-center">
+                  <div className="flex flex-wrap gap-4 text-sm text-slate-600">
+                    {contact.phone && (
+                      <a href={`tel:${contact.phone}`} className="flex items-center gap-2 hover:text-teal-600">
+                        <Phone size={14} style={{ color: BRAND.primary }} />
+                        {contact.phone}
+                      </a>
+                    )}
+                    {contact.email && (
+                      <a href={`mailto:${contact.email}`} className="flex items-center gap-2 hover:text-teal-600">
+                        <Mail size={14} style={{ color: BRAND.primary }} />
+                        {contact.email}
+                      </a>
+                    )}
+                    {contact.facebook_url && (
+                      <a href={contact.facebook_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 hover:text-teal-600">
+                        <Facebook size={14} style={{ color: BRAND.primary }} />
+                        פייסבוק
+                      </a>
+                    )}
+                    {(contact.city_id || contact.region_id) && (
+                      <span className="flex items-center gap-2 text-slate-600">
+                        <MapPin size={14} style={{ color: BRAND.primary }} />
+                        {[dictName(dicts?.cities ?? [], contact.city_id), dictName(dicts?.regions ?? [], contact.region_id)]
+                          .filter((v) => v !== "—").join(" · ")}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+                    <div className="mb-2 flex items-center justify-between gap-4 text-sm font-bold text-slate-900">
+                      <span>{completion}% שלמות פרופיל</span>
+                      <Sparkles className="h-4 w-4" style={{ color: BRAND.primary }} />
+                    </div>
+                    <div className="h-2 overflow-hidden rounded-full bg-[#E2E8F0]">
+                      <div className="h-full rounded-full" style={{ width: `${completion}%`, backgroundColor: BRAND.primary }} />
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" className="rounded-xl border-slate-200 bg-white" onClick={() => setAdminEditOpen(true)}>
+            <div className="flex flex-wrap gap-2 lg:max-w-[360px] lg:justify-end">
+              <Button variant="outline" className="h-10 rounded-xl border-slate-200 bg-white px-4" onClick={() => setAdminEditOpen(true)}>
                 <Pencil className="me-2 h-4 w-4" />
                 עריכת פרטים
               </Button>
 
               {contact.phone && (
                 <a href={buildWhatsAppLink(contact.phone)} target="_blank" rel="noreferrer">
-                  <Button className="rounded-xl bg-green-500 hover:bg-green-600 text-white">
+                  <Button className="h-10 rounded-xl bg-green-500 px-4 text-white hover:bg-green-600">
                     <MessageCircle className="me-2 h-4 w-4" />
                     WhatsApp
                   </Button>
@@ -622,7 +714,7 @@ export default function Candidate360Page() {
 
               {canOpenCv ? (
                 <a href={contact.cv_link ?? undefined} target="_blank" rel="noreferrer">
-                  <Button className="rounded-xl bg-blue-500 hover:bg-blue-600 text-white">
+                  <Button variant="outline" className="h-10 rounded-xl border-slate-200 bg-white px-4 text-slate-800 hover:bg-[#F8FAFC]">
                     <FileText className="me-2 h-4 w-4" />
                     קו״ח
                   </Button>
@@ -630,13 +722,13 @@ export default function Candidate360Page() {
               ) : null}
 
               <a href={`/profile/${contact.profile_token ?? resolvedId}`} target="_blank" rel="noreferrer">
-                <Button className="rounded-xl bg-teal-600 hover:bg-teal-700 text-white">
+                <Button className="h-10 rounded-xl px-4 text-white hover:opacity-90" style={{ backgroundColor: BRAND.primary }}>
                   <User2 className="me-2 h-4 w-4" />
                   פתח פרופיל
                 </Button>
               </a>
 
-              <Button className="rounded-xl bg-teal-100 hover:bg-teal-200 text-teal-800 border border-teal-300" onClick={async () => {
+              <Button variant="outline" className="h-10 rounded-xl border-slate-200 bg-white px-4 text-slate-800 hover:bg-[#F8FAFC]" onClick={async () => {
                 const { data: tokenData } = await supabase.from("contact").select("profile_token").eq("contact_id", resolvedId).single();
                 if (tokenData?.profile_token) {
                   const link = `${window.location.origin}/profile/${tokenData.profile_token}`;
@@ -696,37 +788,48 @@ export default function Candidate360Page() {
                     )}
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" className="rounded-xl border-slate-200" onClick={() => { setSelectedJobCode(""); setCreateError(""); }}>ניקוי</Button>
-                      <Button className="rounded-xl text-white" style={{ backgroundColor: BRAND.primary }} onClick={() => createApplication()}>יצירת הגשה</Button>
+                      <Button className="h-10 rounded-xl text-white" style={{ backgroundColor: BRAND.primary }} onClick={() => createApplication()}>יצירת הגשה</Button>
                     </div>
                   </div>
                 </DialogContent>
               </Dialog>
+
             </div>
           </div>
         </CardContent>
       </Card>
 
       {/* ===== KPI STRIP ===== */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 text-center">
-          <div className="text-2xl font-bold text-slate-700">{applications.length}</div>
-          <div className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-slate-700"><FileText className="h-3.5 w-3.5" />סה״כ הגשות</div>
-        </div>
-        <div className="rounded-2xl border border-orange-200 bg-orange-50 p-3 text-center">
-          <div className="text-2xl font-bold text-orange-700">{activeApplications.length}</div>
-          <div className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-orange-700"><Briefcase className="h-3.5 w-3.5" />הגשות פעילות</div>
-        </div>
-        <div className="rounded-2xl border border-purple-200 bg-purple-50 p-3 text-center">
-          <div className="text-lg font-bold text-purple-700">{formatDate(contact.last_contact_date)}</div>
-          <div className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-purple-700"><Clock3 className="h-3.5 w-3.5" />קשר אחרון</div>
-        </div>
-        <div className="relative rounded-2xl border border-blue-200 bg-blue-50 p-3 text-center cursor-pointer" onClick={() => setStatusDropdownOpen(v => !v)}>
-          <div className="text-sm font-bold text-blue-700">{dictName(dicts?.checkStatuses ?? [], contact.check_status)}</div>
-          <div className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-blue-700"><User2 className="h-3.5 w-3.5" />סטטוס בדיקה ▾</div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-5">
+        <KpiCard
+          value={applications.length}
+          label="סה״כ הגשות"
+          icon={<FileText className="h-3.5 w-3.5" />}
+          accentColor={roleAccentColor}
+        />
+        <KpiCard
+          value={activeApplications.length}
+          label="הגשות פעילות"
+          icon={<Briefcase className="h-3.5 w-3.5" />}
+          accentColor={roleAccentColor}
+        />
+        <KpiCard
+          value={<span className="text-lg">{formatDate(contact.last_contact_date)}</span>}
+          label="קשר אחרון"
+          icon={<Clock3 className="h-3.5 w-3.5" />}
+          accentColor={roleAccentColor}
+        />
+        <KpiCard
+          value={<span className="text-sm">{dictName(dicts?.checkStatuses ?? [], contact.check_status)}</span>}
+          label="סטטוס בדיקה ▾"
+          icon={<User2 className="h-3.5 w-3.5" />}
+          accentColor={roleAccentColor}
+          onClick={() => setStatusDropdownOpen(v => !v)}
+        >
           {statusDropdownOpen && (
-            <div className="absolute top-full mt-1 right-0 z-50 min-w-[160px] rounded-xl border border-slate-200 bg-white shadow-lg text-right">
+            <div className="absolute right-0 top-full z-50 mt-2 min-w-[160px] rounded-xl border border-[#E2E8F0] bg-white text-right shadow-[0_1px_3px_rgba(0,0,0,.04)]">
               {(dicts?.checkStatuses ?? []).map(s => (
-                <button key={s.id} className="block w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 text-right" onClick={async (e) => {
+                <button key={s.id} className="block w-full px-4 py-2 text-right text-sm text-slate-700 hover:bg-[#F8FAFC]" onClick={async (e) => {
                   e.stopPropagation();
                   setStatusDropdownOpen(false);
                   await updateContact(resolvedId, { check_status: s.id });
@@ -735,43 +838,39 @@ export default function Candidate360Page() {
               ))}
             </div>
           )}
-        </div>
-        <div className="rounded-2xl border border-green-200 bg-green-50 p-3 text-center">
-          <div className="text-sm font-bold text-green-700">{dictName(dicts?.availability ?? [], contact.availability)}</div>
-          <div className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-green-700"><User2 className="h-3.5 w-3.5" />זמינות</div>
-        </div>
-        <div className="rounded-2xl border border-teal-200 bg-teal-50 p-3 text-center">
-          <div className="text-2xl font-bold text-teal-700">{completion}%</div>
-          <div className="mt-1 flex items-center justify-center gap-1 text-xs font-medium text-teal-700"><Sparkles className="h-3.5 w-3.5" />שלמות פרופיל</div>
-        </div>
+        </KpiCard>
+        <KpiCard
+          value={<span className="text-sm">{dictName(dicts?.availability ?? [], contact.availability)}</span>}
+          label="זמינות"
+          icon={<User2 className="h-3.5 w-3.5" />}
+          accentColor={roleAccentColor}
+        />
       </div>
 
       {/* ===== SECTION 1 — פרטים ויצירת קשר ===== */}
-      <section className="space-y-3 mb-6">
-        <div className="sticky top-0 z-10 bg-[#008080] text-white px-4 py-2 rounded-lg text-sm font-bold">
-          פרטים ויצירת קשר
-        </div>
+      <section className="mb-8 space-y-6">
+        <SectionHeader icon="👤" title="פרטים ויצירת קשר" subtitle="סיכום מועמד, הגשות ומשרות רלוונטיות" accentColor={roleAccentColor} />
 
           {/* AI Summary */}
-          <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <CardContent className="p-5">
+          <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+            <CardContent className="p-6">
               <h3 className="mb-4 text-lg font-bold text-slate-900">סיכום תפעולי</h3>
-              <div className="grid gap-4 lg:grid-cols-[1.3fr_0.7fr]">
-                <div className="rounded-2xl border border-teal-100 bg-teal-50/40 p-5 text-sm leading-7 text-slate-900">
+              <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+                <div className="rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] p-6 text-sm leading-7 text-slate-900">
                   {aiSummary.summary || "—"}
                 </div>
                 <div className="space-y-3">
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                    <div className="mb-2 text-sm font-bold text-amber-800">סיכונים מרכזיים</div>
+                  <div className="rounded-2xl border border-[#E5E7EB] bg-[#F8FAFC] p-4">
+                    <div className="mb-2 text-sm font-bold text-slate-800">סיכונים מרכזיים</div>
                     {aiSummary.risks.length > 0 ? (
-                      <ul className="space-y-1 text-sm text-amber-800">{aiSummary.risks.map((r) => <li key={r}>• {r}</li>)}</ul>
+                      <ul className="space-y-1 text-sm text-slate-800">{aiSummary.risks.map((r) => <li key={r}>• {r}</li>)}</ul>
                     ) : (
-                      <div className="text-sm text-amber-700">לא זוהו סיכונים מהותיים כרגע.</div>
+                      <div className="text-sm text-slate-600">לא זוהו סיכונים מהותיים כרגע.</div>
                     )}
                   </div>
-                  <div className="rounded-2xl border border-teal-200 bg-teal-50 p-4">
-                    <div className="mb-2 text-sm font-bold text-teal-800">פעולה מומלצת הבאה</div>
-                    <div className="text-sm text-teal-800">{aiSummary.nextAction}</div>
+                  <div className="rounded-2xl border border-[#E2E8F0] bg-teal-50/40 p-4" style={{ borderInlineStartColor: BRAND.primary, borderInlineStartWidth: 4 }}>
+                    <div className="mb-2 text-sm font-extrabold text-teal-900">פעולה מומלצת הבאה</div>
+                    <div className="text-base font-bold leading-7 text-teal-900">{aiSummary.nextAction}</div>
                   </div>
                 </div>
               </div>
@@ -779,13 +878,13 @@ export default function Candidate360Page() {
           </Card>
 
           {/* Applications */}
-          <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-            <CardContent className="p-5">
+          <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+            <CardContent className="p-6">
               <div className="mb-4 flex items-center justify-between">
                 <h2 className="text-lg font-bold text-slate-900">הגשות ({applications.length})</h2>
                 <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
                   <DialogTrigger asChild>
-                    <Button size="sm" className="rounded-xl text-white" style={{ backgroundColor: BRAND.primary }}>
+                    <Button size="sm" className="h-10 rounded-xl text-white" style={{ backgroundColor: BRAND.primary }}>
                       <Plus className="me-1.5 h-3.5 w-3.5" />
                       הגשה חדשה
                     </Button>
@@ -803,33 +902,33 @@ export default function Candidate360Page() {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
-                        <TableRow className="bg-slate-50 hover:bg-slate-50">
-                          <TableHead className="text-right text-xs font-semibold text-slate-500">קוד / תפקיד</TableHead>
-                          <TableHead className="text-right text-xs font-semibold text-slate-500">ארגון</TableHead>
-                          <TableHead className="text-right text-xs font-semibold text-slate-500">סטטוס</TableHead>
-                          <TableHead className="text-right text-xs font-semibold text-slate-500">תאריך</TableHead>
-                          <TableHead className="text-right text-xs font-semibold text-slate-500">אזור</TableHead>
-                          <TableHead className="text-right text-xs font-semibold text-slate-500">קו"ח</TableHead>
+                        <TableRow className="h-[52px] bg-[#F8FAFC] hover:bg-[#F8FAFC]">
+                          <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">קוד / תפקיד</TableHead>
+                          <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">ארגון</TableHead>
+                          <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">סטטוס</TableHead>
+                          <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">תאריך</TableHead>
+                          <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">אזור</TableHead>
+                          <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">קו"ח</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {applications.map((app) => (
-                          <TableRow key={app.application_id} className="hover:bg-slate-50/70">
-                            <TableCell className="text-sm font-semibold text-slate-900">
+                          <TableRow key={app.application_id} className="h-[60px] hover:bg-[#F8FAFC]">
+                            <TableCell className="px-4 text-sm font-semibold text-slate-900">
                               <span className="me-1 font-mono text-xs text-slate-500">{app.job_code}</span>
                               {app.job_role || "—"}
                             </TableCell>
-                            <TableCell className="text-sm text-slate-900">{app.account_name || "—"}</TableCell>
-                            <TableCell>
-                              <Badge className={`rounded-full border px-3 py-1 text-xs shadow-none ${applicationBadgeClass(app.application_status)}`}>
+                            <TableCell className="px-4 text-sm text-slate-900">{app.account_name || "—"}</TableCell>
+                            <TableCell className="px-4">
+                              <Badge className={`h-[30px] rounded-full border px-3 text-xs shadow-none ${applicationBadgeClass(app.application_status)}`}>
                                 {dictName(dicts?.applicationStatuses ?? [], app.application_status)}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-sm text-slate-500">{formatDate(app.submission_date)}</TableCell>
-                            <TableCell className="text-sm text-slate-500">
+                            <TableCell className="px-4 text-sm text-slate-500">{formatDate(app.submission_date)}</TableCell>
+                            <TableCell className="px-4 text-sm text-slate-500">
                               {[app.job_region, app.job_city].filter(Boolean).join(" · ") || "—"}
                             </TableCell>
-                            <TableCell className="text-sm">
+                            <TableCell className="px-4 text-sm">
                               {app.has_cv && app.cv_link ? (
                                 <a
                                   href={app.cv_link}
@@ -855,14 +954,14 @@ export default function Candidate360Page() {
 
           {/* Recommended Jobs */}
           {recommendedJobs.length > 0 && (
-            <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-              <CardContent className="p-5">
+            <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+              <CardContent className="p-6">
                 <h2 className="mb-4 text-lg font-bold text-slate-900">
                   משרות מומלצות ({recommendedJobs.length})
                 </h2>
                 <div className="grid gap-4 xl:grid-cols-3">
                   {recommendedJobs.map((item) => (
-                    <div key={item.job.job_code} className="rounded-2xl border border-slate-200 p-4">
+                    <div key={item.job.job_code} className="rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
                       <div className="mb-3 flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-bold text-slate-900">{item.job.job_title}</div>
@@ -872,15 +971,15 @@ export default function Candidate360Page() {
                               .filter((t) => t && t !== "—").join(" · ")}
                           </div>
                         </div>
-                        <Badge className={`rounded-full border px-3 py-1 text-xs shadow-none ${item.score >= 70 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : item.score >= 45 ? "border-amber-200 bg-amber-50 text-amber-700" : "border-slate-200 bg-slate-100 text-slate-700"}`}>
+                        <Badge className={`h-[30px] rounded-full border px-3 text-xs shadow-none ${item.score >= 70 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : item.score >= 45 ? "border-amber-200 bg-amber-50 text-slate-600" : "border-slate-200 bg-slate-100 text-slate-700"}`}>
                           {item.score}%
                         </Badge>
                       </div>
-                      <div className="mb-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+                      <div className="mb-3 rounded-xl border border-slate-200 bg-[#F8FAFC] p-3">
                         <div className="mb-1 text-[12px] text-slate-500">למה זה מתאים</div>
                         <ul className="space-y-0.5 text-xs text-slate-900">{item.reasons.map((r) => <li key={r}>• {r}</li>)}</ul>
                       </div>
-                      <Button size="sm" className="w-full rounded-xl text-white" style={{ backgroundColor: BRAND.primary }} onClick={() => createApplication(item.job.job_code)}>
+                      <Button size="sm" className="h-10 w-full rounded-xl text-white" style={{ backgroundColor: BRAND.primary }} onClick={() => createApplication(item.job.job_code)}>
                         <Plus className="me-1.5 h-3.5 w-3.5" />
                         יצירת הגשה
                       </Button>
@@ -893,10 +992,8 @@ export default function Candidate360Page() {
       </section>
 
       {/* ===== SECTION 2 — זהות ומקצועיות ===== */}
-      <section className="space-y-3 mb-6">
-        <div className="sticky top-0 z-10 bg-[#008080] text-white px-4 py-2 rounded-lg text-sm font-bold">
-          זהות ומקצועיות
-        </div>
+      <section className="mb-8 space-y-6">
+        <SectionHeader icon="🧭" title="זהות ומקצועיות" subtitle="מידע מקצועי, ניסיון ופרטי רקע" accentColor={roleAccentColor} />
         {dicts && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <BlockIdentity contact={contact} dicts={dicts} />
@@ -906,10 +1003,8 @@ export default function Candidate360Page() {
       </section>
 
       {/* ===== SECTION 2b — תנאים ומדיה ===== */}
-      <section className="space-y-3 mb-6">
-        <div className="sticky top-0 z-10 bg-[#008080] text-white px-4 py-2 rounded-lg text-sm font-bold">
-          תנאים והעדפות
-        </div>
+      <section className="mb-8 space-y-6">
+        <SectionHeader icon="⚙️" title="תנאים והעדפות" subtitle="זמינות, תנאים, העדפות ומדיה" accentColor={roleAccentColor} />
         {dicts && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <BlockConditions contact={contact} dicts={dicts} />
@@ -919,18 +1014,16 @@ export default function Candidate360Page() {
       </section>
 
       {/* ===== SECTION 3 — CRM ותפעול ===== */}
-      <section className="space-y-3 mb-6">
-        <div className="sticky top-0 z-10 bg-[#008080] text-white px-4 py-2 rounded-lg text-sm font-bold">
-          CRM ותפעול
-        </div>
+      <section className="mb-8 space-y-6">
+        <SectionHeader icon="🗂️" title="CRM ותפעול" subtitle="כלי עבודה למעקב, תגיות ונתונים טכניים" accentColor={roleAccentColor} />
           <div className="space-y-5">
               {/* Org */}
               {(account || contact.linked_org_name) && (
-                <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                  <CardContent className="p-5">
+                <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+                  <CardContent className="p-6">
                     <h3 className="mb-4 text-lg font-bold text-slate-900">ארגון מקושר</h3>
                     {account ? (
-                      <Link to={`/accounts/${account.account_id}`} className="flex items-center justify-between rounded-2xl border border-slate-200 p-3.5 transition hover:bg-slate-50">
+                      <Link to={`/accounts/${account.account_id}`} className="flex items-center justify-between rounded-2xl border border-slate-200 p-3.5 transition hover:bg-[#F8FAFC]">
                         <div>
                           <div className="font-semibold text-slate-900">{account.account_name}</div>
                           {account.phone && <div className="mt-0.5 text-xs text-slate-500">{account.phone}</div>}
@@ -938,20 +1031,20 @@ export default function Candidate360Page() {
                         <Building2 className="h-4 w-4 text-slate-400" />
                       </Link>
                     ) : (
-                      <div className="text-sm text-slate-500">{contact.linked_org_name}</div>
+                      <div className="px-4 text-sm text-slate-500">{contact.linked_org_name}</div>
                     )}
                   </CardContent>
                 </Card>
               )}
 
               {/* CRM */}
-              <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <CardContent className="p-5">
+              <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+                <CardContent className="p-6">
                   <h3 className="mb-4 text-lg font-bold text-slate-900">CRM</h3>
                   <div className="divide-y divide-slate-100">
                     <LabelValue label="מקור" value={dictName(dicts?.sources ?? [], contact.source)} />
                     <LabelValue label="בדיקת תוכן" value={
-                      <Badge className={`rounded-full border px-3 py-1 text-xs shadow-none ${checkBadgeClass(contact.check_status)}`}>
+                      <Badge className={`h-[30px] rounded-full border px-3 text-xs shadow-none ${checkBadgeClass(contact.check_status)}`}>
                         {dictName(dicts?.checkStatuses ?? [], contact.check_status)}
                       </Badge>
                     } />
@@ -966,11 +1059,11 @@ export default function Candidate360Page() {
                     <Textarea
                       value={notes}
                       onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNotes(e.target.value)}
-                      className="min-h-[100px] rounded-2xl border-slate-200 bg-slate-50 text-sm"
+                      className="min-h-[100px] rounded-2xl border-slate-200 bg-[#F8FAFC] text-sm"
                       placeholder="הוסף/י הערה חופשית..."
                     />
                     <div className="mt-2 flex justify-end">
-                      <Button size="sm" className="rounded-xl text-white" style={{ backgroundColor: BRAND.primary }} onClick={saveNotes} disabled={notesSaving}>
+                      <Button size="sm" className="h-10 rounded-xl text-white" style={{ backgroundColor: BRAND.primary }} onClick={saveNotes} disabled={notesSaving}>
                         <Save className="me-1.5 h-3.5 w-3.5" />
                         {notesSaving ? "שומר..." : "שמור הערות"}
                       </Button>
@@ -980,21 +1073,21 @@ export default function Candidate360Page() {
               </Card>
 
               {/* Tags */}
-              <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <CardContent className="p-5">
+              <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+                <CardContent className="p-6">
                   <h3 className="mb-4 text-lg font-bold text-slate-900">
                     <Tag className="me-2 inline h-4 w-4" />
                     תגיות
                   </h3>
                   <div className="flex flex-wrap gap-2">
                     {tags.length > 0 ? tags.map((tag) => (
-                      <div key={tag.id} className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-900">
+                      <div key={tag.id} className="inline-flex h-[30px] items-center gap-2 rounded-full border border-[#E2E8F0] bg-white px-3 text-xs font-semibold text-slate-900">
                         {tag.tag}
                         <button type="button" onClick={() => removeTag(tag.id)} className="text-slate-400 hover:text-red-600">
                           <X className="h-3 w-3" />
                         </button>
                       </div>
-                    )) : <div className="text-sm text-slate-500">אין תגיות עדיין</div>}
+                    )) : <div className="px-4 text-sm text-slate-500">אין תגיות עדיין</div>}
                   </div>
                   <div className="mt-4 flex gap-2">
                     <Input
@@ -1002,24 +1095,24 @@ export default function Candidate360Page() {
                       onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTag(e.target.value)}
                       onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") addTag(); }}
                       placeholder="תגית חדשה..."
-                      className="rounded-xl border-slate-200 bg-slate-50"
+                      className="rounded-xl border-slate-200 bg-[#F8FAFC]"
                     />
-                    <Button variant="outline" className="rounded-xl border-slate-200" onClick={addTag}>הוסף</Button>
+                    <Button variant="outline" className="h-10 rounded-xl border-slate-200" onClick={addTag}>הוסף</Button>
                   </div>
                 </CardContent>
               </Card>
 
               {/* Metadata */}
-              <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-                <CardContent className="p-5">
-                  <h3 className="mb-3 text-base font-bold text-slate-500">מטאדאטה</h3>
-                  <div className="divide-y divide-slate-100">
-                    <LabelValue label="contact_id" value={<span className="font-mono text-xs">{contact.contact_id}</span>} />
-                    <LabelValue label="phone_norm" value={<span className="font-mono text-xs">{contact.phone_norm}</span>} />
-                    <LabelValue label="סוג פרופיל" value={dictName(dicts?.profileTypes ?? [], contact.profile_type)} />
-                    <LabelValue label="dup_email_flag" value={contact.dup_email_flag ? "כן" : "לא"} />
-                    <LabelValue label="נוצר" value={formatDateTime(contact.created_timestamp)} />
-                    <LabelValue label="עודכן" value={formatDateTime(contact.updated_timestamp)} />
+              <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+                <CardContent className="p-6">
+                  <h3 className="mb-3 text-xs font-bold text-slate-400">מטאדאטה</h3>
+                  <div className="divide-y divide-slate-100 text-xs leading-[1.6] text-slate-400">
+                    <LabelValueMuted label="contact_id" value={<span className="font-mono text-xs">{contact.contact_id}</span>} />
+                    <LabelValueMuted label="phone_norm" value={<span className="font-mono text-xs">{contact.phone_norm}</span>} />
+                    <LabelValueMuted label="סוג פרופיל" value={dictName(dicts?.profileTypes ?? [], contact.profile_type)} />
+                    <LabelValueMuted label="dup_email_flag" value={contact.dup_email_flag ? "כן" : "לא"} />
+                    <LabelValueMuted label="נוצר" value={formatDateTime(contact.created_timestamp)} />
+                    <LabelValueMuted label="עודכן" value={formatDateTime(contact.updated_timestamp)} />
                   </div>
                 </CardContent>
               </Card>
@@ -1029,7 +1122,7 @@ export default function Candidate360Page() {
       {/* Scroll to top */}
       <button
         onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        className="fixed bottom-6 left-6 z-50 bg-[#008080] text-white rounded-full w-10 h-10 shadow-lg text-lg hover:bg-teal-700 transition"
+        className="fixed bottom-6 left-6 z-50 bg-[#008080] text-white rounded-full w-10 h-10 shadow-[0_1px_3px_rgba(0,0,0,.04)] text-lg hover:bg-teal-700 transition"
       >↑</button>
 
       {/* Toast */}
