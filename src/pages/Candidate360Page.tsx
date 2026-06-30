@@ -1,4 +1,5 @@
 import type { DictItem } from "@/hooks/useContact360";
+import { useContactMutations } from "@/hooks/useContactMutations";
 import React, { useMemo, useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import {
@@ -187,6 +188,7 @@ export default function Candidate360Page() {
 
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { updateContact, insertContact } = useContactMutations();
   const { data, isLoading, error } = useContact360(resolvedId);
   const { data: dictsOnly } = useContact360Dicts();
 
@@ -215,24 +217,20 @@ export default function Candidate360Page() {
     const first = newForm.first_name.trim() || null;
     const last = newForm.last_name.trim() || null;
     const full_name = [first, last].filter(Boolean).join(" ");
-    const { data: created, error: err } = await supabase
-      .from("contact")
-      .insert({
-        first_name: first,
-        last_name: last,
-        full_name,
-        display_name: full_name,
-        phone: newForm.phone.trim() || null,
-        email: newForm.email.trim() || null,
-        role: newForm.role ? Number(newForm.role) : null,
-        sub_role: newForm.sub_roles.length > 0 ? newForm.sub_roles.map(Number) : null,
-        city_id: newForm.city_id ? Number(newForm.city_id) : null,
-        region_id: newForm.region_id ? Number(newForm.region_id) : null,
-        gender: newForm.gender ? Number(newForm.gender) : null,
-        facebook_url: newForm.facebook_url.trim() || null,
-      })
-      .select("contact_id")
-      .single();
+    const { data: created, error: err } = await insertContact({
+      first_name: first,
+      last_name: last,
+      full_name,
+      display_name: full_name,
+      phone: newForm.phone.trim() || null,
+      email: newForm.email.trim() || null,
+      role: newForm.role ? Number(newForm.role) : null,
+      sub_role: newForm.sub_roles.length > 0 ? newForm.sub_roles.map(Number) : null,
+      city_id: newForm.city_id ? Number(newForm.city_id) : null,
+      region_id: newForm.region_id ? Number(newForm.region_id) : null,
+      gender: newForm.gender ? Number(newForm.gender) : null,
+      facebook_url: newForm.facebook_url.trim() || null,
+    });
     setNewSaving(false);
     if (err || !created) { setNewError("שמירת איש הקשר נכשלה. נסי שוב."); return; }
     navigate(`/admin/contacts/${created.contact_id}`, { replace: true });
@@ -355,15 +353,11 @@ export default function Candidate360Page() {
   async function saveNotes() {
     if (!contact) return;
     setNotesSaving(true);
-    const { error: err } = await supabase
-      .from("contact")
-      .update({ notes, updated_timestamp: new Date().toISOString() })
-      .eq("contact_id", contact.contact_id);
+    const { error: err } = await updateContact(contact.contact_id, { notes, updated_timestamp: new Date().toISOString() });
     setNotesSaving(false);
     if (err) showToast("error", "שגיאה בשמירת הערות");
     else {
       showToast("success", "הערות נשמרו");
-      queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] });
     }
   }
 
@@ -735,8 +729,7 @@ export default function Candidate360Page() {
                 <button key={s.id} className="block w-full px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 text-right" onClick={async (e) => {
                   e.stopPropagation();
                   setStatusDropdownOpen(false);
-                  await supabase.from("contact").update({ check_status: s.id }).eq("contact_id", resolvedId);
-                  queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] });
+                  await updateContact(resolvedId, { check_status: s.id });
                   showToast("success", "סטטוס עודכן");
                 }}>{s.name}</button>
               ))}
@@ -1329,12 +1322,8 @@ export default function Candidate360Page() {
               onClick={async () => {
                 setAdminSaving(true);
                 try {
-                  const { error: saveError } = await supabase
-                    .from("contact")
-                    .update(adminForm)
-                    .eq("contact_id", resolvedId);
+                  const { error: saveError } = await updateContact(resolvedId, adminForm);
                   if (saveError) throw saveError;
-                  queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] });
                   setAdminEditOpen(false);
                   showToast("success", "הפרטים עודכנו בהצלחה");
                 } catch {

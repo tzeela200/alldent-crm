@@ -92,6 +92,8 @@ export interface Account {
   address: string | null
   contact_link: string | null // legacy TEXT — NOT canonical FK
   notes: string | null
+  merged_into_account_id?: number | null // → accounts.account_id (set when converted to contact + merged)
+  merged_at?: string | null
   active_job_count_auto: number
   total_jobs_count: number
   rel_role: string | null

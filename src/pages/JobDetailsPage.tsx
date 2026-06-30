@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useJobMutations } from '@/hooks/useJobMutations'
 import JobAIWriter from '@/components/admin/JobAIWriter'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Archive, Briefcase, Building2, CheckCircle2, ChevronLeft, Copy, FileText, Image as ImageIcon, MapPin, Save, Send, Sparkles, Users, XCircle } from 'lucide-react'
@@ -53,6 +54,7 @@ const PUBLIC_STATUS_PUBLISHED = 3
 const PUBLIC_STATUS_HIDDEN = 4
 
 export default function JobDetailsPage() {
+  const { updateJob } = useJobMutations()
   const { code } = useParams<{ code: string }>()
   const navigate = useNavigate()
   const [localJob, setLocalJob] = useState<any | null>(null)
@@ -241,7 +243,7 @@ export default function JobDetailsPage() {
         unpublished_at: mustHide ? new Date().toISOString() : localJob.unpublished_at,
         updated_timestamp: new Date().toISOString(),
       }
-      const { error } = await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
+      const { error } = await updateJob(localJob.job_code, patch)
       if (error) throw error
       setLocalJob((prev: any) => ({ ...prev, ...patch }))
       showToast(mustHide ? 'המשרה נשמרה והפרסום הוסתר' : 'המשרה נשמרה', 'success')
@@ -269,7 +271,7 @@ export default function JobDetailsPage() {
       unpublished_at: null,
       updated_timestamp: new Date().toISOString(),
     }
-    const { error } = await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
+    const { error } = await updateJob(localJob.job_code, patch)
     if (error) { showToast(error.message, 'error'); return }
     setLocalJob((prev: any) => ({ ...prev, ...patch }))
     setDraft((prev) => prev ? { ...prev, public_status: String(PUBLIC_STATUS_PUBLISHED) } : prev)
@@ -279,7 +281,7 @@ export default function JobDetailsPage() {
   const hidePublication = async () => {
     if (!localJob) return
     const patch = { public_status: PUBLIC_STATUS_HIDDEN, unpublished_at: new Date().toISOString(), updated_timestamp: new Date().toISOString() }
-    const { error } = await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
+    const { error } = await updateJob(localJob.job_code, patch)
     if (error) { showToast(error.message, 'error'); return }
     setLocalJob((prev: any) => ({ ...prev, ...patch }))
     setDraft((prev) => prev ? { ...prev, public_status: String(PUBLIC_STATUS_HIDDEN) } : prev)
@@ -289,7 +291,7 @@ export default function JobDetailsPage() {
   const archiveJob = async () => {
     if (!localJob) return
     const patch = { job_status: 9, public_status: PUBLIC_STATUS_HIDDEN, unpublished_at: new Date().toISOString(), updated_timestamp: new Date().toISOString() }
-    const { error } = await supabase.from('job').update(patch).eq('job_code', localJob.job_code)
+    const { error } = await updateJob(localJob.job_code, patch)
     if (error) { showToast(error.message, 'error'); return }
     setLocalJob((prev: any) => ({ ...prev, ...patch }))
     setDraft((prev) => prev ? { ...prev, job_status: '9', public_status: String(PUBLIC_STATUS_HIDDEN) } : prev)

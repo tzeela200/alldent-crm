@@ -40,6 +40,7 @@ export const accountStatusColors: Record<number, { bg: string; text: string; lab
   6: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'לא רלוונטי' },
   7: { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'פעיל' },
   8: { bg: 'bg-teal-100', text: 'text-teal-800', label: 'פעיל - VIP' },
+  11: { bg: 'bg-gray-100', text: 'text-gray-500', label: 'מוזג / כפילות' },
 }
 
 // סטטוסי בדיקה (check_status)

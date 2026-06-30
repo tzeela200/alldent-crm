@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { useJobMutations } from '@/hooks/useJobMutations'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   Briefcase,
@@ -189,6 +190,7 @@ function getInitialFilters(): FilterState {
 }
 
 export default function AdminJobsPage() {
+  const { updateJob, insertJob } = useJobMutations()
   const navigate = useNavigate()
   const [filters, setFilters] = useState<FilterState>(getInitialFilters)
   const [page, setPage] = useState(0)
@@ -588,7 +590,7 @@ export default function AdminJobsPage() {
       }
       // אם קוד משרה השתנה — עדכן גם אותו
       const newJobCode = cleanText(jobDraft.job_code)
-      const { error } = await supabase.from('job').update({ ...patch, ...(newJobCode && newJobCode !== panel.jobCode ? { job_code: newJobCode } : {}) }).eq('job_code', panel.jobCode)
+      const { error } = await updateJob(panel.jobCode, { ...patch, ...(newJobCode && newJobCode !== panel.jobCode ? { job_code: newJobCode } : {}) })
       if (error) throw error
       replaceJob(panel.jobCode, (cur) => ({ ...cur, ...patch }))
       const savedMsg = isInactive ? 'המשרה נשמרה — סטטוס פרסום הוסתר אוטומטית' : 'המשרה נשמרה בהצלחה'
@@ -618,7 +620,7 @@ export default function AdminJobsPage() {
         finalPatch.unpublished_at = new Date().toISOString()
       }
 
-      const { error } = await supabase.from('job').update(finalPatch).eq('job_code', jobCode)
+      const { error } = await updateJob(jobCode, finalPatch)
       if (error) throw error
       replaceJob(jobCode, (cur) => ({ ...cur, ...finalPatch }))
       showToast(successMessage, 'success')
@@ -670,7 +672,7 @@ export default function AdminJobsPage() {
         updated_timestamp: new Date().toISOString(),
       }
       const { account_name, account_phone, employer_contact_name, employer_contact_phone, recruiter_contact_name, recruiter_contact_phone, ...dbJob } = newJob
-      const { error } = await supabase.from('job').insert(dbJob)
+      const { error } = await insertJob(dbJob)
       if (error) throw error
       setLocalJobs((prev) => [newJob, ...prev])
       showToast(`המשרה שוכפלה: ${nextCode}`, 'success')

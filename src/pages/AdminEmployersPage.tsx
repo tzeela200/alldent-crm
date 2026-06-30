@@ -35,6 +35,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { Account, Contact } from '@/types'
 import { MergeRecordsModal } from '@/components/MergeRecordsModal'
+import { ConvertAccountToContactModal } from '@/components/ConvertAccountToContactModal'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { OrgContactPicker } from '@/components/ui/OrgContactPicker'
 import SidePanel from '@/components/ui/SidePanel'
@@ -263,6 +264,7 @@ function AccountActionsMenu({
   onWhatsapp,
   onCall,
   onProfile,
+  onConvert,
 }: {
   accountId: number
   hasPhone: boolean
@@ -272,6 +274,7 @@ function AccountActionsMenu({
   onWhatsapp: () => void
   onCall: () => void
   onProfile: () => void
+  onConvert: () => void
 }) {
   const [open, setOpen] = React.useState(false)
   const ref = React.useRef<HTMLDivElement>(null)
@@ -312,6 +315,8 @@ function AccountActionsMenu({
           {item('עריכת ארגון', onEdit)}
           {item('מעבר ל-360', onNavigate360)}
           {item('פרופיל להדפסה', onProfile)}
+          <hr className="my-1 border-slate-100" />
+          {item('הפוך לאיש קשר ומזג לארגון', onConvert)}
           <hr className="my-1 border-slate-100" />
           {item('WhatsApp', onWhatsapp, !hasPhone)}
           {item('טלפון', onCall, !hasPhone)}
@@ -373,6 +378,7 @@ export default function AdminEmployersPage({
   const [bulkValue, setBulkValue] = useState<string>('')
   const [mergeOpen, setMergeOpen] = useState(false)
   const [mergePending, setMergePending] = useState(false)
+  const [convertAccount, setConvertAccount] = useState<{ account_id: number; account_name: string | null; account_status: number | null } | null>(null)
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>({
     account_name: 260,
     primary_contact: 190,
@@ -690,6 +696,8 @@ export default function AdminEmployersPage({
     const searchDigits = normalizeDigits(filters.search)
 
     const rows = baseRows.filter((item: any) => {
+      // Hide merged/duplicate accounts (status 11) unless explicitly filtered to that status.
+      if (Number(item.account_status) === 11 && Number(filters.account_status) !== 11) return false
       if (tab === 'active' && isEmployersBoard && Number(item.account_status) !== ACTIVE_RECRUITER_STATUS_ID) return false
 
       if (search) {
@@ -1241,6 +1249,7 @@ export default function AdminEmployersPage({
                                 onWhatsapp={() => openWhatsapp(account)}
                                 onCall={() => account.phone ? (window.location.href = `tel:${account.phone}`) : showToast('אין טלפון זמין', 'error')}
                                 onProfile={() => navigate(`/employers/${account.account_id}/profile`)}
+                                onConvert={() => setConvertAccount({ account_id: Number(account.account_id), account_name: account.account_name, account_status: account.account_status })}
                               />
                             </td>
                           </tr>
@@ -1479,6 +1488,27 @@ export default function AdminEmployersPage({
             />
           )
         })()}
+
+        {/* Convert account → contact + merge into real org */}
+        {convertAccount && (
+          <ConvertAccountToContactModal
+            source={convertAccount}
+            accounts={rawAccounts.map((a) => ({ account_id: Number(a.account_id), account_name: a.account_name, account_status: a.account_status }))}
+            onClose={() => setConvertAccount(null)}
+            onDone={(msg) => {
+              setConvertAccount(null)
+              queryClient.invalidateQueries({ queryKey: ['accounts'] })
+              queryClient.invalidateQueries({ queryKey: ['contacts'] })
+              queryClient.invalidateQueries({ queryKey: ['jobs-admin-v4'] })
+              queryClient.invalidateQueries({ queryKey: ['job-detail'] })
+              queryClient.invalidateQueries({ queryKey: ['applications-for-job'] })
+              queryClient.invalidateQueries({ queryKey: ['jobs', 'account-counts'] })
+              queryClient.invalidateQueries({ queryKey: ['employer360', 'jobs'] })
+              queryClient.invalidateQueries({ queryKey: ['active_jobs_for_apply'] })
+              showToast(msg, 'success')
+            }}
+          />
+        )}
       </div>
     </Shell>
   )

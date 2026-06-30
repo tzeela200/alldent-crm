@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { useJobMutations } from '@/hooks/useJobMutations'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { normalizePhone } from '@/lib/normalizePhone'
@@ -64,6 +65,7 @@ async function fetchDict(table: string): Promise<DictItem[]> {
 }
 
 export default function RecruitmentRequestPage() {
+  const { insertJob } = useJobMutations()
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM })
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -181,7 +183,7 @@ export default function RecruitmentRequestPage() {
 
       const jobCode = `DRAFT-${Date.now()}`
 
-      const { error: insertError } = await supabase.from('job').insert({
+      const { error: insertError } = await insertJob({
         job_code: jobCode,
         job_status: 2,
         public_status: 1,

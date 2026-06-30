@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react'
+import { useJobMutations } from '@/hooks/useJobMutations'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Briefcase, Building2, CheckCircle2, ChevronLeft, FileText, Image as ImageIcon, MapPin, Save, XCircle } from 'lucide-react'
@@ -94,6 +95,7 @@ const JOB_STATUS_DRAFT = 1
 const PUBLIC_STATUS_HIDDEN = 4
 
 export default function CreateJobWizardPage() {
+  const { insertJob } = useJobMutations()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const accountIdFromUrl = searchParams.get('account_id') || ''
@@ -284,7 +286,7 @@ export default function CreateJobWizardPage() {
         updated_timestamp: new Date().toISOString(),
       }
 
-      const { error } = await supabase.from('job').insert(payload)
+      const { error } = await insertJob(payload)
       if (error) throw error
       showToast('המשרה נשמרה כטיוטה מוסתרת', 'success')
       navigate(`/admin/jobs/${encodeURIComponent(normalized)}`)

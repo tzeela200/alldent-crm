@@ -1,4 +1,5 @@
 ﻿import React, { useEffect, useMemo, useState } from 'react'
+import { useContactMutations } from '@/hooks/useContactMutations'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -150,6 +151,7 @@ const DEFAULT_COLUMNS = [
 ] as const
 
 export default function AdminContactsPage() {
+  const { updateContact, bulkUpdateContacts } = useContactMutations()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [filters, setFilters] = useState<ExtendedFilters>({})
@@ -481,12 +483,8 @@ export default function AdminContactsPage() {
     if (!selectedRows.length || !bulkField || bulkValue === null || bulkValue === '') return
     setBulkPending(true)
     try {
-      const { error } = await supabase
-        .from('contact')
-        .update({ [bulkField]: bulkValue })
-        .in('contact_id', selectedRows)
+      const { error } = await bulkUpdateContacts(selectedRows, { [bulkField]: bulkValue })
       if (error) throw error
-      queryClient.invalidateQueries({ queryKey: ['contacts-v2'] })
       showToast(`${selectedRows.length} רשומות עודכנו בהצלחה`, 'success')
       setBulkUpdateOpen(false)
       setBulkField('')
@@ -563,12 +561,8 @@ export default function AdminContactsPage() {
     if (!selectedContact) return
     setSavePending(true)
     try {
-      const { error } = await supabase
-        .from('contact')
-        .update(editDraft)
-        .eq('contact_id', selectedContact.contact_id)
+      const { error } = await updateContact(selectedContact.contact_id, editDraft)
       if (error) throw error
-      queryClient.invalidateQueries({ queryKey: ['contacts-v2'] })
       showToast('נשמר בהצלחה', 'success')
       setIsEditing(false)
     } catch {
