@@ -43,9 +43,15 @@ function dictName(list: DictItem[], id: unknown): string {
   return list.find((d) => d.id === Number(id))?.name ?? "—";
 }
 
+function dictNames(list: DictItem[], values: unknown): string {
+  if (!Array.isArray(values) || values.length === 0) return "—";
+  const names = values.map((v) => dictName(list, v)).filter((n) => n !== "—");
+  return names.length ? names.join(", ") : "—";
+}
+
 const COMPLETION_FIELDS = [
   "full_name", "professional_title", "phone", "email",
-  "role", "experience", "availability", "region_id",
+  "role", "experience", "candidate_availability_ids", "region_id",
   "personal_summary", "languages", "systems_used",
   "academic_education", "salary_expectation_monthly",
 ];
@@ -72,21 +78,24 @@ function parseEmployers(v: unknown): Employer[] {
 // ─── progress circle ────────────────────────────────────────────────────────
 
 function ProgressCircle({ pct }: { pct: number }) {
-  const r = 30;
+  const r = 28;
   const c = 2 * Math.PI * r;
   const offset = c - (pct / 100) * c;
   return (
-    <svg width="76" height="76" className="shrink-0">
-      <circle cx="38" cy="38" r={r} fill="none" stroke="#e2e8f0" strokeWidth="6" />
-      <circle
-        cx="38" cy="38" r={r} fill="none" stroke="#008080" strokeWidth="6"
-        strokeDasharray={c} strokeDashoffset={offset}
-        strokeLinecap="round" transform="rotate(-90 38 38)"
-      />
-      <text x="38" y="43" textAnchor="middle" className="text-sm font-bold fill-slate-800">
-        {pct}%
-      </text>
-    </svg>
+    <div className="flex flex-col items-center gap-1 shrink-0">
+      <svg width="68" height="68" className="shrink-0">
+        <circle cx="34" cy="34" r={r} fill="none" stroke="#E2E8F0" strokeWidth="5" />
+        <circle
+          cx="34" cy="34" r={r} fill="none" stroke="#008080" strokeWidth="5"
+          strokeDasharray={c} strokeDashoffset={offset}
+          strokeLinecap="round" transform="rotate(-90 34 34)"
+        />
+        <text x="34" y="39" textAnchor="middle" className="text-sm font-bold fill-slate-800">
+          {pct}%
+        </text>
+      </svg>
+      <span className="text-[11px] font-medium text-slate-400">פרופיל הושלם</span>
+    </div>
   );
 }
 
@@ -94,7 +103,6 @@ function ProgressCircle({ pct }: { pct: number }) {
 
 function Section({
   title,
-  icon,
   children,
   editField,
   onEdit,
@@ -106,17 +114,18 @@ function Section({
   onEdit?: (field: string) => void;
 }) {
   return (
-    <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <Card className="card rounded-2xl border border-slate-200 bg-white shadow-sm">
       <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-            {icon}
-            {title}
-          </h3>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <h3 className="text-[15px] font-bold text-slate-900 tracking-tight">{title}</h3>
+            <div className="h-[2px] w-8 rounded-full bg-[#008080]" />
+          </div>
           {editField && onEdit && (
             <button
               onClick={() => onEdit(editField)}
               className="text-slate-400 hover:text-[#008080] transition no-print"
+              aria-label={`ערוך ${title}`}
             >
               <Edit2 className="h-4 w-4" />
             </button>
@@ -186,10 +195,11 @@ export default function CandidateProfilePage() {
   const name = profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "—";
   const titleText = profile.professional_title || dictName(dicts?.roles ?? [], profile.role);
   const cityText = dictName(dicts?.cities ?? [], profile.city_id);
-  const availText = dictName(dicts?.availability ?? [], profile.availability);
+  const availText = dictNames(dicts?.availability ?? [], profile.candidate_availability_ids);
   const subRoleNames = Array.isArray(profile.sub_role)
-    ? profile.sub_role.map((id) => dictName(dicts?.subRoles ?? [], id)).filter((n) => n !== "—").join(", ")
-    : "—";
+    ? profile.sub_role.map((id) => dictName(dicts?.subRoles ?? [], id)).filter((n) => n !== "—")
+    : [];
+  const hasContactInfo = Boolean(cityText !== "—" || profile.phone || profile.email || profile.facebook_url);
   const initial = name.charAt(0);
 
   // ─── render ─────────────────────────────────────────────────────────────
@@ -203,10 +213,10 @@ export default function CandidateProfilePage() {
           nav, header, .sidebar { display: none !important; }
           @page { size: A4 portrait; margin: 12mm 15mm; }
           body { background: white !important; font-size: 11pt; }
-          .profile-container { max-width: 100% !important; padding: 0 !important; }
+          .profile-container { max-width: 100% !important; padding: 0 !important; background: white !important; }
           .hero-strip { background: #008080 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           .teal-accent { color: #008080 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .card { break-inside: avoid; page-break-inside: avoid; }
+          .card { break-inside: avoid; page-break-inside: avoid; box-shadow: none !important; }
           .alldent-footer { position: fixed; bottom: 8mm; width: 100%; text-align: center; font-size: 8pt; color: #666; }
         }
       `}</style>
@@ -214,48 +224,38 @@ export default function CandidateProfilePage() {
       <div className="mx-auto max-w-4xl p-6">
         {/* ───── HERO ───── */}
         <div className="hero-strip h-1.5 rounded-t-2xl bg-[#008080]" />
-        <Card className="rounded-t-none rounded-b-2xl border border-t-0 border-slate-200 bg-white shadow-sm mb-6">
+        <Card className="card rounded-t-none rounded-b-2xl border border-t-0 border-slate-200 bg-white shadow-sm mb-6">
           <CardContent className="p-6">
             <div className="flex items-start gap-5">
               {/* Avatar */}
               <div className="relative shrink-0">
-                <div className="flex h-[76px] w-[76px] items-center justify-center rounded-xl border-2 border-[#008080] bg-teal-50 text-2xl font-bold text-[#008080]">
+                <div className="flex h-[76px] w-[76px] items-center justify-center rounded-2xl border-2 border-[#008080] bg-teal-50 text-2xl font-bold text-[#008080]">
                   {initial}
                 </div>
               </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <h1 className="text-2xl font-extrabold text-slate-900">{name}</h1>
-                <div className="text-base font-medium teal-accent" style={{ color: "#008080" }}>
+                <h1 className="text-[26px] font-extrabold leading-tight text-slate-900">{name}</h1>
+                <div className="text-base font-semibold teal-accent mt-0.5" style={{ color: "#008080" }}>
                   {titleText}
                 </div>
-                {subRoleNames !== "—" && (
-                  <div className="text-sm text-slate-500 mt-0.5">{subRoleNames}</div>
+                {subRoleNames.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {subRoleNames.map((n) => (
+                      <Badge key={n} className="rounded-full border border-teal-200 bg-teal-50 text-teal-700 px-2.5 py-0.5 text-[11px] font-medium shadow-none">
+                        {n}
+                      </Badge>
+                    ))}
+                  </div>
                 )}
-                <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-slate-600">
-                  {cityText !== "—" && (
-                    <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{cityText}</span>
-                  )}
-                  {profile.phone && (
-                    <span className="flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{profile.phone}</span>
-                  )}
-                  {profile.email && (
-                    <span className="flex items-center gap-1"><Mail className="h-3.5 w-3.5" />{profile.email}</span>
-                  )}
-                  {profile.facebook_url && (
-                    <a href={profile.facebook_url} target="_blank" rel="noreferrer" className="flex items-center gap-1 hover:text-[#008080]">
-                      <Facebook className="h-3.5 w-3.5" />
-                    </a>
-                  )}
-                </div>
-                <div className="flex items-center gap-2 mt-3">
-                  {availText !== "—" && (
-                    <Badge className="rounded-full border border-teal-200 bg-teal-50 text-teal-700 px-3 py-1 text-xs shadow-none">
+                {availText !== "—" && (
+                  <div className="mt-3">
+                    <Badge className="rounded-full border border-slate-200 bg-slate-50 text-slate-600 px-3 py-1 text-xs shadow-none">
                       {availText}
                     </Badge>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
 
               {/* Progress */}
@@ -280,14 +280,13 @@ export default function CandidateProfilePage() {
           </CardContent>
         </Card>
 
-        {/* ───── CONTENT — two columns ───── */}
+        {/* ───── CONTENT — two columns (main column appears right in RTL) ───── */}
         <div className="grid gap-6 lg:grid-cols-[1fr_240px]">
-          {/* LEFT COLUMN */}
+          {/* MAIN COLUMN */}
           <div className="space-y-6">
             {/* Professional Summary */}
             <Section
               title="פרופיל מקצועי"
-              icon={<User2 className="h-4 w-4 teal-accent" style={{ color: "#008080" }} />}
               editField="personal_summary"
               onEdit={setEditingField}
             >
@@ -310,7 +309,6 @@ export default function CandidateProfilePage() {
             {/* Employment History */}
             <Section
               title="ניסיון תעסוקתי"
-              icon={<FileText className="h-4 w-4 teal-accent" style={{ color: "#008080" }} />}
               editField="previous_employers"
               onEdit={setEditingField}
             >
@@ -321,19 +319,21 @@ export default function CandidateProfilePage() {
                 </div>
               )}
               {employers.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-5">
                   {employers.map((emp, i) => (
-                    <div key={i} className="border-r-2 border-[#008080] pr-4">
-                      <div className="flex items-start justify-between">
-                        <div className="text-sm font-bold text-slate-900">{emp.name || "—"}</div>
+                    <div key={i} className="relative border-r-2 border-[#008080] pr-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-bold text-slate-900">{emp.name || "—"}</div>
+                          {emp.role && <div className="text-sm text-[#008080] font-medium mt-0.5">{emp.role}</div>}
+                        </div>
                         {emp.years && (
-                          <Badge className="rounded-full border border-slate-200 bg-slate-50 text-slate-600 px-2 py-0.5 text-xs shadow-none">
+                          <Badge className="shrink-0 rounded-full border border-slate-200 bg-slate-50 text-slate-600 px-2.5 py-0.5 text-xs font-medium shadow-none">
                             {emp.years}
                           </Badge>
                         )}
                       </div>
-                      {emp.role && <div className="text-sm text-[#008080] mt-0.5">{emp.role}</div>}
-                      {emp.description && <p className="text-sm text-slate-600 mt-1 leading-6">{emp.description}</p>}
+                      {emp.description && <p className="text-sm text-slate-600 mt-1.5 leading-6">{emp.description}</p>}
                     </div>
                   ))}
                 </div>
@@ -360,7 +360,6 @@ export default function CandidateProfilePage() {
             {/* Education */}
             <Section
               title="השכלה והסמכות"
-              icon={<FileText className="h-4 w-4 teal-accent" style={{ color: "#008080" }} />}
               editField="academic_education"
               onEdit={setEditingField}
             >
@@ -395,14 +394,52 @@ export default function CandidateProfilePage() {
             </Section>
           </div>
 
-          {/* RIGHT COLUMN */}
+          {/* SIDEBAR (visually on the left under RTL) */}
           <div className="space-y-6">
+            {/* Contact info */}
+            {hasContactInfo && (
+              <Section title="פרטי קשר">
+                <div className="space-y-2.5 text-sm">
+                  {cityText !== "—" && (
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span>{cityText}</span>
+                    </div>
+                  )}
+                  {profile.phone && (
+                    <div className="flex items-center gap-2 text-slate-700">
+                      <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span dir="ltr">{profile.phone}</span>
+                    </div>
+                  )}
+                  {profile.email && (
+                    <div className="flex items-center gap-2 text-slate-700 min-w-0">
+                      <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span dir="ltr" className="truncate">{profile.email}</span>
+                    </div>
+                  )}
+                  {profile.facebook_url && (
+                    <a href={profile.facebook_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-700 hover:text-[#008080]">
+                      <Facebook className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                      <span>פייסבוק ↗</span>
+                    </a>
+                  )}
+                </div>
+              </Section>
+            )}
+
             {/* Skills */}
-            <Section title="כישורים" icon={<Sparkles className="h-4 w-4 teal-accent" style={{ color: "#008080" }} />}>
-              {profile.languages && (
+            <Section title="כישורים">
+              {Array.isArray(profile.languages) && profile.languages.length > 0 && (
                 <div className="mb-3">
-                  <div className="text-xs font-bold text-slate-500 mb-1">שפות</div>
-                  <div className="text-sm text-slate-700">{profile.languages}</div>
+                  <div className="text-xs font-bold text-slate-500 mb-2">שפות</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {profile.languages.map((lid) => (
+                      <Badge key={lid} className="rounded-full border border-slate-200 bg-slate-50 text-slate-600 px-2 py-0.5 text-xs shadow-none">
+                        {dictName(dicts?.languages ?? [], lid)}
+                      </Badge>
+                    ))}
+                  </div>
                 </div>
               )}
               {profile.additional_skills_notes && (
@@ -423,13 +460,13 @@ export default function CandidateProfilePage() {
                   </div>
                 </div>
               )}
-              {!profile.languages && !profile.additional_skills_notes && (
+              {!(Array.isArray(profile.languages) && profile.languages.length > 0) && !profile.additional_skills_notes && !(Array.isArray(profile.systems_used) && profile.systems_used.length > 0) && (
                 <p className="text-sm text-slate-400">לא הוזן עדיין.</p>
               )}
             </Section>
 
             {/* Availability & Preferences */}
-            <Section title="זמינות והעדפות" icon={<MapPin className="h-4 w-4 teal-accent" style={{ color: "#008080" }} />}>
+            <Section title="זמינות והעדפות">
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-500">זמינות</span>
@@ -461,7 +498,7 @@ export default function CandidateProfilePage() {
                 )}
                 {Array.isArray(profile.preferred_regions) && profile.preferred_regions.length > 0 && (
                   <div>
-                    <span className="text-slate-500">אזורים מועדפים</span>
+                    <span className="text-slate-500">אזורים רלוונטיים לעבודה</span>
                     <div className="text-slate-700 mt-0.5">
                       {profile.preferred_regions.map((id) => dictName(dicts?.regions ?? [], id)).join(", ")}
                     </div>
@@ -472,20 +509,23 @@ export default function CandidateProfilePage() {
 
             {/* Documents */}
             {(profile.cv_link || profile.portfolio_url || profile.recommendations_url) && (
-              <Section title="מסמכים" icon={<FileText className="h-4 w-4 teal-accent" style={{ color: "#008080" }} />}>
+              <Section title="מסמכים">
                 <div className="space-y-2">
                   {profile.cv_link && (
-                    <a href={profile.cv_link} target="_blank" rel="noreferrer" className="block text-sm font-semibold text-[#008080] hover:underline">
+                    <a href={profile.cv_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-semibold text-[#008080] hover:underline">
+                      <FileText className="h-3.5 w-3.5 shrink-0" />
                       קורות חיים ↗
                     </a>
                   )}
                   {profile.portfolio_url && (
-                    <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="block text-sm font-semibold text-[#008080] hover:underline">
+                    <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-semibold text-[#008080] hover:underline">
+                      <FileText className="h-3.5 w-3.5 shrink-0" />
                       פורטפוליו ↗
                     </a>
                   )}
                   {profile.recommendations_url && (
-                    <a href={profile.recommendations_url} target="_blank" rel="noreferrer" className="block text-sm font-semibold text-[#008080] hover:underline">
+                    <a href={profile.recommendations_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-semibold text-[#008080] hover:underline">
+                      <FileText className="h-3.5 w-3.5 shrink-0" />
                       המלצות ↗
                     </a>
                   )}

@@ -16,7 +16,7 @@ function dictName(list: { id: number; name: string }[], id: unknown): string {
 function LV({ label, value }: { label: string; value?: React.ReactNode }) {
   if (value == null || value === "" || value === "—") return null;
   return (
-    <div className="flex items-start justify-between gap-4 py-2 border-b border-slate-100 last:border-0">
+    <div className="flex items-start justify-between gap-2 py-1.5 border-b border-slate-100 last:border-0">
       <span className="text-sm text-slate-500 shrink-0">{label}</span>
       <span className="text-sm font-medium text-slate-800 text-right">{value}</span>
     </div>

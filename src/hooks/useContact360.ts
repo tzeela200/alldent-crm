@@ -33,6 +33,8 @@ export interface Contact360Dicts {
   mobility: DictItem[];
   systems: DictItem[];
   procedures: DictItem[];
+  salaryTypes: DictItem[];
+  workStatuses: DictItem[];
 }
 
 export interface ContactRow {
@@ -48,10 +50,12 @@ export interface ContactRow {
   second_email: string | null;
   role: number | null;
   sub_role: number[] | null;
-  availability: number | null;
   experience: number | null;
-  preferred_scope: string | null;
-  languages: string | null;
+  preferred_scope: number[] | null;
+  languages: number[] | null;
+  candidate_availability_ids: number[] | null;
+  candidate_salary_type_ids: number[] | null;
+  work_status: number | null;
   region_id: number | null;
   city_id: number | null;
   cv_link: string | null;
@@ -75,7 +79,7 @@ export interface ContactRow {
   created_timestamp: string | null;
   updated_timestamp: string | null;
   gender: number | null;
-  license_no: number | null;
+  license_no: string | null;
   linked_org_name: string | null;
   dup_email_flag: boolean | null;
   professional_title: string | null;
@@ -99,7 +103,11 @@ export interface ContactRow {
   portfolio_url: string | null;
   recommendations_url: string | null;
   profile_token: string | null;
+  preferred_all_country: boolean | null;
+  locality_type: string | null;
+  work_schedule_text: string | null;
 }
+
 
 export interface ApplicationRow {
   application_id: number;
@@ -142,8 +150,14 @@ export interface JobRow {
   job_title: string;
   job_status: number | null;
   job_role: number | null;
-  job_sub_role: string | null;
-  scope: string | null;
+  job_sub_role: number[] | null;
+  scope: number[] | null;
+  work_schedule_text?: string | null;
+  systems_used?: number[] | null;
+  required_languages?: number[] | null;
+  salary_type_ids?: number[] | null;
+  tax_type_id?: number | null;
+  mobility_id?: number | null;
   required_experience: number | null;
   region_id: number | null;
   city_id: number | null;
@@ -163,12 +177,16 @@ async function fetchContact360(contactId: number) {
   if (contactRes.error) throw contactRes.error;
   const contact = contactRes.data as ContactRow;
 
+  const applicationsQuery = supabase
+    .from("applications")
+    .select("*")
+    .order("submission_date", { ascending: false });
+  const scopedApplicationsQuery = contact.phone_norm
+    ? applicationsQuery.or(`candidate_link.eq.${contact.contact_id},phone_norm.eq.${contact.phone_norm}`)
+    : applicationsQuery.eq("candidate_link", contact.contact_id);
+
   const [applicationsRes, tagsRes, accountRes, jobsRes] = await Promise.all([
-    supabase
-      .from("applications")
-      .select("*")
-      .or(`candidate_link.eq.${contact.contact_id},phone_norm.eq.${contact.phone_norm}`)
-      .order("submission_date", { ascending: false }),
+    scopedApplicationsQuery,
     supabase
       .from("contact_tags")
       .select("*")
@@ -183,7 +201,7 @@ async function fetchContact360(contactId: number) {
       : Promise.resolve({ data: null, error: null }),
     supabase
       .from("job")
-      .select("job_code, job_title, job_status, job_role, job_sub_role, scope, required_experience, region_id, city_id, account_link, accounts(account_name)")
+      .select("job_code, job_title, job_status, job_role, job_sub_role, scope, required_experience, region_id, city_id, account_link, work_schedule_text, systems_used, required_languages, salary_type_ids, tax_type_id, mobility_id, accounts(account_name)")
       .eq("job_status", 3),
   ]);
 
@@ -225,6 +243,8 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     mobilityRes,
     systemsRes,
     proceduresRes,
+    salaryTypesRes,
+    workStatusesRes,
   ] = await Promise.all([
     supabase.from("dict_roles").select("id, name").order("id"),
     supabase.from("dict_sub_roles").select("id, name, role_id").order("id"),
@@ -244,6 +264,8 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     supabase.from("dict_mobility").select("id, name").order("id"),
     supabase.from("dict_systems").select("id, name").order("name"),
     supabase.from("dict_procedures").select("id, name").order("name"),
+    supabase.from("dict_salary_types").select("id, name").order("id"),
+    supabase.from("dict_contact_work_statuses").select("id, name").order("sort_order"),
   ]);
 
   return {
@@ -265,6 +287,8 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     mobility: (mobilityRes.data ?? []) as DictItem[],
     systems: (systemsRes.data ?? []) as DictItem[],
     procedures: (proceduresRes.data ?? []) as DictItem[],
+    salaryTypes: (salaryTypesRes.data ?? []) as DictItem[],
+    workStatuses: (workStatusesRes.data ?? []) as DictItem[],
   };
 }
 
