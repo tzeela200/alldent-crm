@@ -1,6 +1,6 @@
 import React, { useMemo, useState, useEffect } from "react";
 import { Link, useParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useAccountMutations } from "@/hooks/useAccountMutations";
 import {
   ArrowRight,
@@ -390,7 +390,6 @@ const ACCOUNT_SELECT = "account_id, account_name, bus_id, account_status, accoun
 
 export default function EmployerProfilePage() {
   const { id } = useParams<{ id: string }>();
-  const queryClient = useQueryClient();
   const accountId = asNumber(id);
 
   const [editOpen, setEditOpen] = useState(false);
@@ -455,10 +454,7 @@ export default function EmployerProfilePage() {
 
   const systemsMap = useMemo(() => mapFromRows(systems), [systems]);
 
-  const handleEditSaved = () => {
-    void queryClient.invalidateQueries({ queryKey: ["employer-profile", accountId] });
-    void queryClient.invalidateQueries({ queryKey: ["employer360", "account", accountId] });
-  };
+  const handleEditSaved = () => {};
 
   const openEdit = (section: EditSection = "general") => {
     setEditSection(section);

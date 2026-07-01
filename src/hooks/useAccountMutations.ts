@@ -5,13 +5,17 @@ const ACCOUNT_QUERY_KEYS = [
   ['accounts', 'admin-board'],
   ['contacts', 'account-links'],
   ['jobs', 'account-counts'],
-  ['employer360', 'account'],   // prefix match — covers all ['employer360','account', <any accountId>]
-  ['employer-profile'],          // prefix match — covers all ['employer-profile', <any accountId>]
+  ['employer360', 'account'],
+  ['employer-profile'],
 ] as const
 
-async function invalidateAllAccountQueries(queryClient: ReturnType<typeof useQueryClient>) {
+async function invalidateAllAccountQueries(
+  queryClient: ReturnType<typeof useQueryClient>
+) {
   await Promise.all(
-    ACCOUNT_QUERY_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
+    ACCOUNT_QUERY_KEYS.map((queryKey) =>
+      queryClient.invalidateQueries({ queryKey: [...queryKey] })
+    )
   )
 }
 
@@ -36,7 +40,11 @@ export function useAccountMutations() {
     return { error }
   }
 
-  async function mergeAccountsRpc(args: { master_id: number; dup_ids: number[]; overrides: Record<string, unknown> }) {
+  async function mergeAccountsRpc(args: {
+    master_id: number
+    dup_ids: number[]
+    overrides: Record<string, unknown>
+  }) {
     const { error } = await supabase.rpc('merge_accounts', args)
     if (!error) await invalidateAllAccountQueries(queryClient)
     return { error }

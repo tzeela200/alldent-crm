@@ -1913,11 +1913,7 @@ export default function Employer360Page() {
     setEditOpen(true);
   }, []);
 
-  const handleEditSaved = useCallback(() => {
-    if (accountId) {
-      void queryClient.invalidateQueries({ queryKey: ["employer360", "account", accountId] });
-    }
-  }, [accountId, queryClient]);
+  const handleEditSaved = useCallback(() => {}, []);
 
   useEffect(() => {
     if (!accountId || previewMode) return;
