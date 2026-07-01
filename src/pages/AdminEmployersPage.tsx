@@ -103,9 +103,12 @@ type EmployerDraft = {
   phone: string
   second_phone: string
   email: string
+  second_email: string
   billing_email: string
   address: string
   website_url: string
+  facebook_url: string
+  linkedin_url: string
   region_id: number | null
   city_id: number | null
   team_size: string
@@ -168,7 +171,7 @@ function getEmployerStatusBadge(statusId: number | null | undefined, label: stri
 
 const ALL_COLUMNS = [
   { key: 'account_name', label: 'שם ארגון' },
-  { key: 'primary_contact', label: 'שם מעסיק' },
+  { key: 'primary_contact', label: 'מעסיק ראשי' },
   { key: 'account_type', label: 'סוג ארגון' },
   { key: 'account_status', label: 'סטטוס ארגון' },
   { key: 'phone', label: 'נייד / טלפון' },
@@ -181,7 +184,7 @@ const ALL_COLUMNS = [
   { key: 'unique_candidates', label: 'מועמדים ייחודיים' },
   { key: 'new_apps', label: 'הגשות חדשות' },
   { key: 'transferred', label: 'הועבר למעסיק' },
-  { key: 'contacts', label: 'אנשי קשר' },
+  { key: 'contacts', label: 'אנשי קשר משויכים' },
   { key: 'follow_up', label: 'פולו־אפ' },
 ] as const
 
@@ -211,9 +214,12 @@ const EMPTY_DRAFT: EmployerDraft = {
   phone: '',
   second_phone: '',
   email: '',
+  second_email: '',
   billing_email: '',
   address: '',
   website_url: '',
+  facebook_url: '',
+  linkedin_url: '',
   region_id: null,
   city_id: null,
   team_size: '',
@@ -428,7 +434,7 @@ export default function AdminEmployersPage({
       while (true) {
         const { data, error } = await supabase
           .from('contact')
-          .select('contact_id,full_name,display_name,phone,phone_norm,email,account_link,role')
+          .select('contact_id,full_name,display_name,phone,phone_norm,email,account_link,role,profile_type')
           .order('contact_id')
           .range(from, from + PAGE - 1)
         if (error) throw error
@@ -629,9 +635,8 @@ export default function AdminEmployersPage({
         .map((item) => item.full_name || item.display_name || item.email || item.phone_norm || item.phone)
         .filter(Boolean)
         .join(' · ')
-      // account.contact_link is unused (null for all employers); fall back to the first linked contact.
-      const employerContact =
-        linkedContacts.find((c) => String(c.contact_id) === String(account.contact_link)) ?? linkedContacts[0]
+      // מעסיק ראשי = contact עם profile_type=2 בלבד. אם אין — מציגים "—".
+      const employerContact = linkedContacts.find((c) => Number(c.profile_type) === 2) ?? null
       const primaryEmployerName = employerContact?.full_name || employerContact?.display_name || '—'
       const jobCityIds = Array.from(new Set(relatedJobs.map((job) => Number(job.city_id || 0)).filter(Boolean)))
       const jobRegionIds = Array.from(new Set(relatedJobs.map((job) => Number(job.region_id || 0)).filter(Boolean)))
@@ -815,9 +820,12 @@ export default function AdminEmployersPage({
       phone: selectedAccount.phone ?? '',
       second_phone: (selectedAccount as any).second_phone ?? '',
       email: selectedAccount.email ?? '',
+      second_email: (selectedAccount as any).second_email ?? '',
       billing_email: (selectedAccount as any).billing_email ?? '',
       address: selectedAccount.address ?? '',
       website_url: (selectedAccount as any).website_url ?? '',
+      facebook_url: (selectedAccount as any).facebook_url ?? '',
+      linkedin_url: (selectedAccount as any).linkedin_url ?? '',
       region_id: selectedAccount.region_id ?? null,
       city_id: selectedAccount.city_id ?? null,
       team_size: (selectedAccount as any).team_size == null ? '' : String((selectedAccount as any).team_size),
@@ -868,7 +876,7 @@ export default function AdminEmployersPage({
   const exportCsv = () => {
     const rows = filteredRows.map((item) => ({
       'שם ארגון': item.account_name ?? '',
-      'שם מעסיק': item.primaryEmployerName ?? '',
+      'מעסיק ראשי': item.primaryEmployerName ?? '',
       'סוג ארגון': accountTypeName(item.account_type),
       'סטטוס ארגון': accountStatusName(item.account_status),
       טלפון: item.phone ?? '',
@@ -920,9 +928,12 @@ export default function AdminEmployersPage({
         phone: draft.phone.trim() || null,
         second_phone: draft.second_phone.trim() || null,
         email: draft.email.trim() || null,
+        second_email: draft.second_email.trim() || null,
         billing_email: draft.billing_email.trim() || null,
         address: draft.address.trim() || null,
         website_url: draft.website_url.trim() || null,
+        facebook_url: draft.facebook_url.trim() || null,
+        linkedin_url: draft.linkedin_url.trim() || null,
         region_id: draft.region_id,
         city_id: draft.city_id,
         team_size: draft.team_size ? Number(draft.team_size) : null,
@@ -1422,8 +1433,11 @@ export default function AdminEmployersPage({
                   <TextField label="טלפון" value={draft.phone} onChange={(value) => setDraft((prev) => ({ ...prev, phone: value }))} />
                   <TextField label="טלפון נוסף" value={draft.second_phone} onChange={(value) => setDraft((prev) => ({ ...prev, second_phone: value }))} />
                   <TextField label="מייל" value={draft.email} onChange={(value) => setDraft((prev) => ({ ...prev, email: value }))} />
+                  <TextField label="מייל נוסף" value={draft.second_email} onChange={(value) => setDraft((prev) => ({ ...prev, second_email: value }))} />
                   <TextField label="מייל לחשבונית" value={draft.billing_email} onChange={(value) => setDraft((prev) => ({ ...prev, billing_email: value }))} />
                   <TextField label="אתר" value={draft.website_url} onChange={(value) => setDraft((prev) => ({ ...prev, website_url: value }))} />
+                  <TextField label="פייסבוק (URL)" value={draft.facebook_url} onChange={(value) => setDraft((prev) => ({ ...prev, facebook_url: value }))} />
+                  <TextField label="לינקדאין (URL)" value={draft.linkedin_url} onChange={(value) => setDraft((prev) => ({ ...prev, linkedin_url: value }))} />
                 </SectionCard>
                 <SectionCard title="מיקום">
                   <SelectLikeField label="אזור" value={String(draft.region_id ?? '')} onChange={(value) => setDraft((prev) => ({ ...prev, region_id: value ? Number(value) : null, city_id: null }))} options={regions.map((item) => ({ value: String(item.id), label: item.name }))} />
