@@ -111,6 +111,23 @@ const AVAILABLE_TAGS = [
   'בוגר-הדסה',
 ]
 
+const TAG_COLOR_MAP: Record<string, string> = {
+  'VIP':                    'bg-purple-50 text-purple-700',
+  'זמינות-מיידית':          'bg-green-50 text-green-700',
+  'מחפש-אקטיבי':            'bg-teal-50 text-teal-700',
+  'מחפש-פסיבי':             'bg-sky-50 text-sky-700',
+  'אין-קו"ח':               'bg-red-50 text-red-600',
+  'ציפיות-שכר-גבוהות':      'bg-orange-50 text-orange-700',
+  'פוטנציאל-גבוה':           'bg-emerald-50 text-emerald-700',
+  'ללא-ניסיון':              'bg-slate-100 text-slate-600',
+  'מגורים-קרובים':           'bg-blue-50 text-blue-700',
+  'דגל-אדום-מבריז':          'bg-red-100 text-red-700',
+  'בוגר-הדסה':              'bg-violet-50 text-violet-700',
+}
+function tagClass(tag: string) {
+  return TAG_COLOR_MAP[tag] ?? 'bg-teal-50 text-teal-700'
+}
+
 const KPI_ROLE_GROUPS: KpiRoleCard[] = [
   { key: 'assistant',  label: 'סייעות',      tone: 'assistant',  roleIds: [9], value: 0 },
   { key: 'hygienist',  label: 'שינניות',      tone: 'hygienist',  roleIds: [10], value: 0 },
@@ -273,6 +290,16 @@ export default function AdminContactsPage() {
   const socialStatusOptions = DICT_SOCIAL_STATUSES
   const profileTypeOptions = DICT_PROFILE_TYPES
 
+  const { data: languageDict = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_languages'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_languages').select('id,name').order('name')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
   const { data: contactTagsData = [] } = useQuery<{ contact_id: number; tag: string }[]>({
     queryKey: ['contact_tags', selectedId],
     queryFn: async () => {
@@ -297,6 +324,11 @@ export default function AdminContactsPage() {
 
   const roleName = (id: number | null | undefined) => roleOptions.find((r) => r.id === id)?.name ?? '—'
   const subRoleName = (id: number | null | undefined) => DICT_SUB_ROLES.find((r) => r.id === id)?.name ?? '—'
+  // DB column is bigint[]; the shared Contact type still says string for legacy reasons — read defensively.
+  const languagesName = (value: unknown): string => {
+    if (!Array.isArray(value) || value.length === 0) return '—'
+    return value.map((id) => languageDict.find((l) => l.id === Number(id))?.name ?? String(id)).join(', ')
+  }
   const regionName = (id: number | null | undefined) => regionOptions.find((r) => r.id === id)?.name ?? '—'
   const cityName = (id: number | null | undefined) => cityOptions.find((r) => r.id === id)?.name ?? '—'
   const availabilityName = (id: number | null | undefined) => availabilityOptions.find((r) => r.id === id)?.name ?? '—'
@@ -1209,10 +1241,10 @@ export default function AdminContactsPage() {
                           disabled={!selectedContact.email}
                         />
                         <QuickLinkButton
-                          href={selectedContact.facebook_url ?? undefined}
+                          href={selectedContact.facebook_url ?? (selectedContact.facebook_id ? `https://www.facebook.com/profile.php?id=${selectedContact.facebook_id}` : undefined)}
                           icon={<Facebook className="h-4 w-4" />}
                           label="פייסבוק"
-                          disabled={!selectedContact.facebook_url}
+                          disabled={!selectedContact.facebook_url && !selectedContact.facebook_id}
                         />
                         <QuickLinkButton
                           href={selectedContact.cv_link ?? undefined}
@@ -1223,7 +1255,7 @@ export default function AdminContactsPage() {
                         <QuickActionButton
                           icon={<Plus className="h-4 w-4" />}
                           label="צור הגשה"
-                          onClick={() => showToast('פתיחת יצירת הגשה', 'info')}
+                          onClick={() => navigate(`/admin/contacts/${selectedContact.contact_id}`)}
                         />
                         <QuickActionButton
                           icon={<WandSparkles className="h-4 w-4" />}
@@ -1287,9 +1319,9 @@ export default function AdminContactsPage() {
                 <SectionCard title="תגיות" compact>
                   <div className="flex flex-wrap gap-2">
                     {panelTags.map((tag) => (
-                      <span key={tag} className="inline-flex items-center gap-1.5 rounded-md bg-teal-50 px-2.5 py-1 text-[12px] font-semibold text-teal-700">
+                      <span key={tag} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-semibold ${tagClass(tag)}`}>
                         {tag}
-                        <button type="button" onClick={() => handleRemoveTag(tag)} className="text-teal-400 hover:text-teal-700">×</button>
+                        <button type="button" onClick={() => handleRemoveTag(tag)} className="opacity-60 hover:opacity-100">×</button>
                       </span>
                     ))}
                     <div className="relative">
@@ -1412,7 +1444,7 @@ export default function AdminContactsPage() {
                       { label: 'ניסיון', value: experienceName(selectedContact.experience) },
                       { label: 'זמינות', value: availabilityName(selectedContact.availability) },
                       { label: 'היקף מועדף', value: selectedContact.preferred_scope },
-                      { label: 'שפות', value: selectedContact.languages },
+                      { label: 'שפות', value: languagesName(selectedContact.languages) },
                       { label: 'מעסיק נוכחי', value: selectedContact.current_employer },
                       { label: 'ציפיית שכר שעתי', value: formatCurrency(selectedContact.salary_expectation_hourly) },
                       { label: 'ציפיית שכר חודשית', value: formatCurrency(selectedContact.salary_expectation_monthly) },
@@ -2271,7 +2303,5 @@ function buildCsv(rows: Record<string, string | number>[]) {
 
   return lines.join('\n')
 }
-
-
 
 

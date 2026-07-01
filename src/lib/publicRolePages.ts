@@ -61,9 +61,9 @@ const ROLE_ROOT_COLORS: Array<[string, string]> = [
   ['מומח',   '#086df4'],
   ['שינ',    '#d10383'],
   ['סייע',   '#774196'],
-  ['מזכיר',  '#ff751f'],
-  ['ניהול',  '#076911'],
-  ['מנהל',   '#076911'],
+  ['מזכיר',  '#076911'],
+  ['ניהול',  '#ff751f'],
+  ['מנהל',   '#ff751f'],
   ['טכנא',   '#d4a800'],
 ]
 
@@ -122,7 +122,7 @@ export const PUBLIC_ROLE_PAGES: Record<RolePageSlug, PublicRolePage> = {
     badge: 'לוח משרות דנטלי',
     image: '/images/page-heroes/secretaries.jpg',
     imageAlt: 'משרות למזכירות רפואיות',
-    color: '#ff751f',
+    color: '#076911',
     searchRoot: 'מזכיר',
   },
   'management-sales': {
@@ -131,7 +131,7 @@ export const PUBLIC_ROLE_PAGES: Record<RolePageSlug, PublicRolePage> = {
     badge: 'לוח משרות דנטלי',
     image: '/images/page-heroes/managers.jpg',
     imageAlt: 'משרות לניהול מרפאה',
-    color: '#076911',
+    color: '#ff751f',
     searchRoot: 'ניהול',
   },
   technicians: {

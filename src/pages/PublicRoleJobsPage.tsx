@@ -48,8 +48,8 @@ function RoleNavPill({
 export default function PublicRoleJobsPage() {
   const { slug } = useParams<{ slug: string }>()
   const navigate = useNavigate()
-  const rolePage = slug ? getRolePage(slug) : undefined
 
+  const rolePage = slug ? getRolePage(slug) : undefined
   if (!rolePage || !slug) return <Navigate to="/jobs" replace />
 
   const roleIds = SLUG_TO_JOB_ROLE_IDS[slug as RolePageSlug]
@@ -128,6 +128,7 @@ export default function PublicRoleJobsPage() {
           >
             הכל
           </button>
+
           {ALL_ROLE_NAV.map(r => (
             <RoleNavPill
               key={r.slug}
@@ -163,6 +164,7 @@ export default function PublicRoleJobsPage() {
           </div>
         )}
       </section>
+
     </div>
   )
 }

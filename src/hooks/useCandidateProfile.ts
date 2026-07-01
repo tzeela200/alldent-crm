@@ -7,7 +7,7 @@ import type { ContactRow } from "@/hooks/useContact360";
 export const CANDIDATE_PUBLIC_FIELDS = [
   "first_name", "last_name", "full_name", "display_name",
   "professional_title", "phone", "second_phone", "email", "second_email",
-  "role", "sub_role", "experience", "availability",
+  "role", "sub_role", "experience", "candidate_availability_ids",
   "preferred_scope", "preferred_regions", "preferred_cities",
   "languages", "region_id", "city_id",
   "personal_summary", "ai_profile_summary",

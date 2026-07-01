@@ -278,6 +278,16 @@ export default function AdminCandidatesPage() {
     staleTime: 5 * 60_000,
   })
 
+  const { data: languageOptions = [] } = useQuery<DictItem[]>({
+    queryKey: ['dict_languages'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_languages').select('id,name').order('name')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 10 * 60_000,
+  })
+
   const { data: cityOptions = [] } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
     queryKey: ['dict_cities-all'],
     queryFn: async () => {
@@ -481,6 +491,11 @@ export default function AdminCandidatesPage() {
   const cityName = (id: number | null | undefined) => cityOptions.find((r) => r.id === id)?.name ?? '—'
   const availabilityName = (id: number | null | undefined) => dictLabel(availabilityOptions, id)
   const experienceName = (id: number | null | undefined) => DICT_EXPERIENCE.find((r) => r.id === id)?.name ?? '—'
+  // DB column is bigint[]; the shared Contact type still says string for legacy reasons — read defensively.
+  const languagesName = (value: unknown): string => {
+    if (!Array.isArray(value) || value.length === 0) return '—'
+    return value.map((id) => languageOptions.find((l) => l.id === Number(id))?.name ?? String(id)).join(', ')
+  }
   const socialStatusName = (id: number | null | undefined) => DICT_SOCIAL_STATUSES.find((r) => r.id === id)?.name ?? '—'
   const workStatusName = (id: number | null | undefined) => dictLabel(workStatusOptions, id)
 
@@ -688,7 +703,7 @@ export default function AdminCandidatesPage() {
       זמינות: availabilityName(candidate.availability),
       'סטטוס תעסוקה': workStatusName((candidate as any).work_status),
       'היקף מועדף': candidate.preferred_scope ?? '—',
-      שפות: candidate.languages ?? '—',
+      שפות: languagesName(candidate.languages),
       'עיר מועמד': cityName(candidate.city_id),
       'אזור מועמד': regionName(candidate.region_id),
       'יש קו"ח': candidate.derived.hasCv ? 'כן' : 'לא',
@@ -1150,7 +1165,7 @@ export default function AdminCandidatesPage() {
                             )}
                             {visibleColumns.includes('languages') && (
                               <td className="px-3 py-3">
-                                <div className="max-w-[180px] whitespace-normal">{candidate.languages ?? '—'}</div>
+                                <div className="max-w-[180px] whitespace-normal">{languagesName(candidate.languages)}</div>
                               </td>
                             )}
                             {visibleColumns.includes('city') && (

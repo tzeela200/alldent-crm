@@ -24,8 +24,8 @@ const FIXED_FILTERS = [
   { label: 'רופאי שיניים',  filterValue: 'רופא',   slug: 'dentists',    color: '#0cc0df' },
   { label: 'שיננית',        filterValue: 'שינ',    slug: 'hygienists',  color: '#d10383' },
   { label: 'סייעת',         filterValue: 'סייע',   slug: 'assistants',  color: '#774196' },
-  { label: 'מזכירות',       filterValue: 'מזכיר',  slug: 'secretaries', color: '#ff751f' },
-  { label: 'ניהול',         filterValue: 'ניהול',  slug: 'management-sales', color: '#076911' },
+  { label: 'מזכירות',       filterValue: 'מזכיר',  slug: 'secretaries', color: '#076911' },
+  { label: 'ניהול',         filterValue: 'ניהול',  slug: 'management-sales', color: '#ff751f' },
   { label: 'טכנאי שיניים',  filterValue: 'טכנא',  slug: 'technicians', color: '#d4a800' },
 ]
 
@@ -35,8 +35,8 @@ const HERO_ROLES = [
   { key: 'specialists', he: 'מומחים',  color: '#086df4' },
   { key: 'hygienists',  he: 'שינניות', color: '#d10383' },
   { key: 'assistants',  he: 'סייעות',  color: '#774196' },
-  { key: 'secretaries', he: 'מזכירות', color: '#ff751f' },
-  { key: 'managers',    he: 'ניהול',   color: '#076911' },
+  { key: 'secretaries', he: 'מזכירות', color: '#076911' },
+  { key: 'managers',    he: 'ניהול',   color: '#ff751f' },
   { key: 'technicians', he: 'טכנאים',  color: '#c8a000' },
 ]
 
