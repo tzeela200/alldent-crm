@@ -1,4 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useJobMutations } from '@/hooks/useJobMutations'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -37,7 +38,9 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/timeAgo'
 import type { Job, DictItem } from '@/types'
-import { RoleBadge } from '@/components/admin/RoleBadge'
+import { RoleBadge, getRoleColorHex } from '@/components/admin/RoleBadge'
+import { RegionBadge } from '@/components/admin/RegionBadge'
+import { getRegionColor } from '@/lib/regionColors'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { ContactPicker } from '@/components/ui/ContactPicker'
@@ -381,18 +384,77 @@ export default function AdminJobsPage() {
     return Number.isFinite(numeric) && numeric > 0 ? [numeric] : []
   }
 
+  // פרדיקט סינון יחיד לשימוש חוזר. options.ignoreAccount מדלג על תנאי הארגון
+  // כדי שרשימת הארגונים (dropdown) תשקף את שאר הפילטרים הפעילים (cascade כמו עיר←אזור).
+  const matchesFilters = (job: any, options?: { ignoreAccount?: boolean }): boolean => {
+    const search = String(filters.search ?? '').trim().toLowerCase()
+    if (search) {
+      const haystack = [job.job_code, job.job_title, job.account_name, job.employer_contact_name, jobCityName(job), roleName(job.job_role)]
+        .map((item) => String(item ?? '').toLowerCase())
+        .join(' ')
+      if (!haystack.includes(search)) return false
+    }
+    if (filters.job_status && Number(job.job_status) !== Number(filters.job_status)) return false
+    if (filters.public_status && Number(job.public_status) !== Number(filters.public_status)) return false
+    if (filters.job_role && Number(job.job_role) !== Number(filters.job_role)) return false
+    if (filters.region_id && Number(job.region_id) !== Number(filters.region_id)) return false
+    if (filters.city_id && Number(job.city_id) !== Number(filters.city_id)) return false
+    if (!options?.ignoreAccount && filters.account_link && Number(job.account_link) !== Number(filters.account_link)) return false
+    if (filters.required_experience && Number(job.required_experience) !== Number(filters.required_experience)) return false
+    if (filters.scope?.length) {
+      const jobScopeIds = normalizeIds(job.scope)
+      if (!filters.scope.some((id) => jobScopeIds.includes(Number(id)))) return false
+    }
+    if (filters.job_sub_role?.length) {
+      const jobSubRoleIds = normalizeIds(job.job_sub_role)
+      if (!filters.job_sub_role.some((id) => jobSubRoleIds.includes(Number(id)))) return false
+    }
+    if (filters.applicants_state === 'with' && Number(job.total_applicants ?? 0) <= 0) return false
+    if (filters.applicants_state === 'without' && Number(job.total_applicants ?? 0) > 0) return false
+    return true
+  }
+
+  // ערך בר-מיון לכל עמודה — עמודות מילון ממוינות לפי השם המתורגם, לא לפי ה-ID.
+  const sortValue = (field: string, job: any): string | number => {
+    switch (field) {
+      case 'job_role': return roleName(job.job_role)
+      case 'job_status': return statusName(job.job_status)
+      case 'public_status': return publicStatusName(job.public_status)
+      case 'city_id': return jobCityName(job)
+      case 'region_id': return jobRegionName(job)
+      case 'scope': return normalizeIds(job.scope).map(scopeName).sort((a, b) => a.localeCompare(b, 'he'))[0] ?? ''
+      case 'job_sub_role': return normalizeIds(job.job_sub_role).map(subRoleName).sort((a, b) => a.localeCompare(b, 'he'))[0] ?? ''
+      case 'account_name': return String(job.account_name ?? '')
+      case 'employer_name': return String(job.employer_contact_name ?? '')
+      case 'recruiter_name': return String(job.recruiter_contact_name ?? '')
+      case 'total_applicants': return Number(job.total_applicants ?? 0)
+      case 'last_publish_date': return job.last_publish_date ? new Date(job.last_publish_date).getTime() : 0
+      case 'updated_timestamp': return job.updated_timestamp ? new Date(job.updated_timestamp).getTime() : 0
+      default: return String(job[field] ?? '')
+    }
+  }
+
   const accountOptions = useMemo(() => {
     const map = new Map<number, { label: string; count: number }>()
     localJobs.forEach((job) => {
       const accountId = Number(job.account_link)
       if (!accountId || !job.account_name) return
+      if (!matchesFilters(job, { ignoreAccount: true })) return
       const current = map.get(accountId)
       map.set(accountId, { label: String(job.account_name), count: (current?.count ?? 0) + 1 })
     })
     return Array.from(map.entries())
       .sort((a, b) => a[1].label.localeCompare(b[1].label, 'he'))
       .map(([value, meta]) => ({ value: String(value), label: `${meta.label} (${meta.count})` }))
-  }, [localJobs])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localJobs, filters, cities, roles])
+
+  // אם הארגון שנבחר יצא מרשימת האפשרויות אחרי שינוי פילטר אחר — לנקות את הבחירה.
+  useEffect(() => {
+    if (filters.account_link && !accountOptions.some((opt) => Number(opt.value) === Number(filters.account_link))) {
+      setFilters((prev) => ({ ...prev, account_link: undefined }))
+    }
+  }, [accountOptions, filters.account_link])
 
   const subRoleOptions = useMemo(() => {
     if (!filters.job_role) return []
@@ -419,41 +481,21 @@ export default function AdminJobsPage() {
   }, [cities, jobDraft.region_id])
 
   const filteredJobs = useMemo(() => {
-    const result = localJobs.filter((job) => {
-      const search = String(filters.search ?? '').trim().toLowerCase()
-      const haystack = [job.job_code, job.job_title, job.account_name, job.employer_contact_name, jobCityName(job), roleName(job.job_role)]
-        .map((item) => String(item ?? '').toLowerCase())
-        .join(' ')
-      if (search && !haystack.includes(search)) return false
-      if (filters.job_status && Number(job.job_status) !== Number(filters.job_status)) return false
-      if (filters.public_status && Number(job.public_status) !== Number(filters.public_status)) return false
-      if (filters.job_role && Number(job.job_role) !== Number(filters.job_role)) return false
-      if (filters.region_id && Number(job.region_id) !== Number(filters.region_id)) return false
-      if (filters.city_id && Number(job.city_id) !== Number(filters.city_id)) return false
-      if (filters.account_link && Number(job.account_link) !== Number(filters.account_link)) return false
-      if (filters.required_experience && Number(job.required_experience) !== Number(filters.required_experience)) return false
-      if (filters.scope?.length) {
-        const jobScopeIds = normalizeIds(job.scope)
-        if (!filters.scope.some((id) => jobScopeIds.includes(Number(id)))) return false
-      }
-      if (filters.job_sub_role?.length) {
-        const jobSubRoleIds = normalizeIds(job.job_sub_role)
-        if (!filters.job_sub_role.some((id) => jobSubRoleIds.includes(Number(id)))) return false
-      }
-      if (filters.applicants_state === 'with' && Number(job.total_applicants ?? 0) <= 0) return false
-      if (filters.applicants_state === 'without' && Number(job.total_applicants ?? 0) > 0) return false
-      return true
-    })
+    const result = localJobs.filter((job) => matchesFilters(job))
 
     if (sortField) {
       result.sort((a, b) => {
-        const av = String(a[sortField] ?? '')
-        const bv = String(b[sortField] ?? '')
-        return sortDir === 'asc' ? av.localeCompare(bv, 'he') : bv.localeCompare(av, 'he')
+        const av = sortValue(sortField, a)
+        const bv = sortValue(sortField, b)
+        let cmp: number
+        if (typeof av === 'number' && typeof bv === 'number') cmp = av - bv
+        else cmp = String(av).localeCompare(String(bv), 'he')
+        return sortDir === 'asc' ? cmp : -cmp
       })
     }
     return result
-  }, [localJobs, filters, sortField, sortDir, cities, roles])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [localJobs, filters, sortField, sortDir, cities, roles, regions, jobStatuses, publicStatuses, scopes, subRoles])
 
   const totalPages = Math.max(1, Math.ceil(filteredJobs.length / PAGE_SIZE))
   const pageData = filteredJobs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
@@ -768,14 +810,14 @@ export default function AdminJobsPage() {
             {/* שורה עליונה — מספרים גדולים */}
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
               <KpiCard label="סה״כ משרות" value={kpis.total} hint="לפי הסינון הנוכחי" />
-              <KpiCard label="משרות פעילות" value={kpis.active} hint="job_status = פעילה" tone="success" onClick={() => setFilters((prev) => ({ ...prev, job_status: JOB_STATUS_IDS.active }))} />
-              <KpiCard label="מפורסמות" value={kpis.published} hint="public_status = מפורסמת" onClick={() => setFilters((prev) => ({ ...prev, public_status: PUBLIC_STATUS_IDS.published }))} />
-              <KpiCard label="ללא מועמדים" value={kpis.withoutApplicants} hint="דורש בדיקה" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, applicants_state: 'without' }))} />
+              <KpiCard label="משרות פעילות" value={kpis.active} hint="פעילות כרגע" tone="success" onClick={() => setFilters((prev) => ({ ...prev, job_status: JOB_STATUS_IDS.active }))} />
+              <KpiCard label="מפורסמות" value={kpis.published} hint="גלויות באתר הציבורי" onClick={() => setFilters((prev) => ({ ...prev, public_status: PUBLIC_STATUS_IDS.published }))} />
+              <KpiCard label="ללא מועמדים" value={kpis.withoutApplicants} hint="דורש טיפול" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, applicants_state: 'without' }))} />
             </div>
             {/* שורה תחתונה — חתכים רוחביים */}
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              <ListKpiCard title="משרות פעילות לפי תפקיד" items={kpis.byRole} empty="אין פעילות" onItemClick={(id) => setFilters((prev) => ({ ...prev, job_role: Number(id), job_sub_role: undefined }))} />
-              <ListKpiCard title="משרות פעילות לפי אזור" items={kpis.byRegion} empty="אין פעילות" onItemClick={(id) => setFilters((prev) => ({ ...prev, region_id: Number(id), city_id: undefined }))} />
+              <ListKpiCard title="משרות פעילות לפי תפקיד" items={kpis.byRole} empty="אין פעילות" colorFor={(id) => getRoleColorHex(id)} onItemClick={(id) => setFilters((prev) => ({ ...prev, job_role: Number(id), job_sub_role: undefined }))} />
+              <ListKpiCard title="משרות פעילות לפי אזור" items={kpis.byRegion} empty="אין פעילות" colorFor={(id) => getRegionColor(id).hex} onItemClick={(id) => setFilters((prev) => ({ ...prev, region_id: Number(id), city_id: undefined }))} />
             </div>
           </section>
 
@@ -837,20 +879,20 @@ export default function AdminJobsPage() {
                       <tr className="border-b border-[#D9D9D9] text-[13px] font-bold text-[#6B6B6B]">
                         <th className="w-10 px-3 py-3"><input type="checkbox" checked={pageFullySelected} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
                         {visibleColumns.includes('job_code') && <SortableTh label="קוד" sortKey="job_code" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
-                        {visibleColumns.includes('job_role') && <PlainTh label="תפקיד" />}
-                        {visibleColumns.includes('job_status') && <PlainTh label="סטטוס משרה" />}
-                        {visibleColumns.includes('city_id') && <PlainTh label="עיר" />}
-                        {visibleColumns.includes('region_id') && <PlainTh label="אזור" />}
-                        {visibleColumns.includes('scope') && <PlainTh label="היקף" />}
+                        {visibleColumns.includes('job_role') && <SortableTh label="תפקיד" sortKey="job_role" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('job_status') && <SortableTh label="סטטוס משרה" sortKey="job_status" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('city_id') && <SortableTh label="עיר" sortKey="city_id" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('region_id') && <SortableTh label="אזור" sortKey="region_id" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('scope') && <SortableTh label="היקף" sortKey="scope" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('job_title') && <SortableTh label="כותרת" sortKey="job_title" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
-                        {visibleColumns.includes('job_sub_role') && <PlainTh label="תתי־תפקידים" />}
-                        {visibleColumns.includes('account_name') && <PlainTh label="ארגון" />}
-                        {visibleColumns.includes('employer_name') && <PlainTh label="מעסיק" />}
-                        {visibleColumns.includes('recruiter_name') && <PlainTh label="מגייס" />}
-                        {visibleColumns.includes('public_status') && <PlainTh label="סטטוס פרסום" />}
-                        {visibleColumns.includes('total_applicants') && <PlainTh label="מועמדים" />}
-                        {visibleColumns.includes('last_publish_date') && <PlainTh label="פרסום אחרון" />}
-                        {visibleColumns.includes('updated_timestamp') && <PlainTh label="עודכן" />}
+                        {visibleColumns.includes('job_sub_role') && <SortableTh label="תתי־תפקידים" sortKey="job_sub_role" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('account_name') && <SortableTh label="ארגון" sortKey="account_name" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('employer_name') && <SortableTh label="מעסיק" sortKey="employer_name" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('recruiter_name') && <SortableTh label="מגייס" sortKey="recruiter_name" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('public_status') && <SortableTh label="סטטוס פרסום" sortKey="public_status" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('total_applicants') && <SortableTh label="מועמדים" sortKey="total_applicants" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('last_publish_date') && <SortableTh label="פרסום אחרון" sortKey="last_publish_date" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('updated_timestamp') && <SortableTh label="עודכן" sortKey="updated_timestamp" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         <th className="w-14 px-3 py-3 text-center">פעולות</th>
                       </tr>
                     </thead>
@@ -878,7 +920,7 @@ export default function AdminJobsPage() {
                               </td>
                             )}
                             {visibleColumns.includes('city_id') && <td className="px-3 py-3">{jobCityName(job)}</td>}
-                            {visibleColumns.includes('region_id') && <td className="px-3 py-3">{jobRegionName(job)}</td>}
+                            {visibleColumns.includes('region_id') && <td className="px-3 py-3"><RegionBadge regionId={Number(job.region_id)} label={jobRegionName(job)} /></td>}
                             {visibleColumns.includes('scope') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.scope)} labelById={scopeName} empty="—" /></td>}
                             {visibleColumns.includes('job_title') && <td className="max-w-[230px] px-3 py-3 font-semibold text-[#2D2D2D]">{job.job_title ?? '—'}</td>}
                             {visibleColumns.includes('job_sub_role') && <td className="px-3 py-3"><BadgeList ids={normalizeIds(job.job_sub_role)} labelById={subRoleName} empty="—" /></td>}
@@ -1137,17 +1179,30 @@ function KpiCard({ label, value, hint, tone = 'default', onClick }: { label: str
   )
 }
 
-function ListKpiCard({ title, items, empty, onItemClick }: { title: string; items: Array<{ id: number; name: string; count: number }>; empty: string; onItemClick: (id: number) => void }) {
+function ListKpiCard({ title, items, empty, onItemClick, colorFor }: { title: string; items: Array<{ id: number; name: string; count: number }>; empty: string; onItemClick: (id: number) => void; colorFor?: (id: number) => string }) {
+  const max = items.reduce((acc, item) => Math.max(acc, item.count), 0) || 1
   return (
     <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-4 shadow-sm">
       <div className="mb-3 text-[13px] font-bold text-[#2D2D2D]">{title}</div>
-      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
-        {items.length ? items.map((item) => (
-          <button key={item.id} type="button" onClick={() => onItemClick(item.id)} className="flex items-center justify-between rounded-xl px-3 py-2 text-[12px] hover:bg-[#F3F4F6] border border-[#F3F4F6]">
-            <span className="truncate text-[#2D2D2D] font-medium">{item.name}</span>
-            <span className="mr-2 rounded-[6px] bg-[#E6F3F3] px-2 py-0.5 font-bold text-[#008080]">{item.count}</span>
-          </button>
-        )) : <div className="col-span-full text-[12px] text-[#6B6B6B]">{empty}</div>}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {items.length ? items.map((item) => {
+          const color = colorFor?.(item.id) ?? '#008080'
+          const pct = Math.round((item.count / max) * 100)
+          return (
+            <button key={item.id} type="button" onClick={() => onItemClick(item.id)} className="group flex flex-col gap-1.5 rounded-xl border border-[#F3F4F6] px-3 py-2 text-right transition hover:bg-[#FAFAF7]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2 text-[12px] font-medium text-[#2D2D2D]">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="truncate">{item.name}</span>
+                </span>
+                <span className="shrink-0 text-[13px] font-bold text-[#2D2D2D]">{item.count}</span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-[#F3F4F6]">
+                <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(pct, 6)}%`, backgroundColor: color }} />
+              </div>
+            </button>
+          )
+        }) : <div className="col-span-full text-[12px] text-[#6B6B6B]">{empty}</div>}
       </div>
     </div>
   )
@@ -1173,10 +1228,6 @@ function SortableTh({ label, sortKey, sortBy, sortDir, onSort }: { label: string
   )
 }
 
-function PlainTh({ label }: { label: string }) {
-  return <th className="whitespace-nowrap px-3 py-3 select-none">{label}</th>
-}
-
 function RowActionsMenu({
   jobCode,
   pending,
@@ -1198,25 +1249,83 @@ function RowActionsMenu({
   onWhatsApp: () => void
   onArchive: () => void
 }) {
+  const [open, setOpen] = useState(false)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
+
+  const MENU_WIDTH = 192 // w-48
+  const MENU_HEIGHT = 320 // הערכה גסה לצורך flip
+
+  const reposition = () => {
+    const btn = buttonRef.current
+    if (!btn) return
+    const rect = btn.getBoundingClientRect()
+    // RTL: מיישרים לפי הקצה השמאלי של הכפתור; אם חורג משמאל — צמוד לקצה החלון.
+    let left = rect.left
+    if (left + MENU_WIDTH > window.innerWidth - 8) left = window.innerWidth - MENU_WIDTH - 8
+    if (left < 8) left = 8
+    // flip כלפי מעלה אם אין מקום מלמטה.
+    const openUp = rect.bottom + MENU_HEIGHT > window.innerHeight && rect.top > MENU_HEIGHT
+    const top = openUp ? rect.top - 8 - Math.min(MENU_HEIGHT, rect.top - 8) : rect.bottom + 8
+    setCoords({ top, left })
+  }
+
+  useLayoutEffect(() => {
+    if (!open) return
+    reposition()
+    const onScroll = () => setOpen(false)
+    const onResize = () => setOpen(false)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return
+      setOpen(false)
+    }
+    window.addEventListener('scroll', onScroll, true)
+    window.addEventListener('resize', onResize)
+    window.addEventListener('keydown', onKey)
+    document.addEventListener('mousedown', onDocClick)
+    return () => {
+      window.removeEventListener('scroll', onScroll, true)
+      window.removeEventListener('resize', onResize)
+      window.removeEventListener('keydown', onKey)
+      document.removeEventListener('mousedown', onDocClick)
+    }
+  }, [open])
+
+  const run = (fn: () => void) => { setOpen(false); fn() }
+
   return (
-    <details className="relative flex justify-center">
-      <summary
+    <div className="flex justify-center">
+      <button
+        ref={buttonRef}
+        type="button"
         title={`פעולות למשרה ${jobCode}`}
-        className="inline-flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-[10px] border border-[#D9D9D9] bg-white text-[#6B6B6B] shadow-[3px_3px_6px_rgba(0,0,0,0.08)] transition-all hover:text-[#008080] hover:shadow-[1px_1px_3px_rgba(0,0,0,0.10)]"
+        onClick={() => setOpen((prev) => !prev)}
+        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-[#D9D9D9] bg-white text-[#6B6B6B] shadow-[3px_3px_6px_rgba(0,0,0,0.08)] transition-all hover:text-[#008080] hover:shadow-[1px_1px_3px_rgba(0,0,0,0.10)]"
       >
         {pending ? <Clock3 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
-      </summary>
-      <div className="absolute left-0 top-full z-50 mt-2 w-48 overflow-hidden rounded-[16px] border border-[#D9D9D9] bg-white p-1.5 text-right shadow-lg">
-        <RowActionItem icon={<Eye className="h-4 w-4" />} label="צפייה בפאנל" onClick={onView} />
-        <RowActionItem icon={<Edit2 className="h-4 w-4" />} label="עריכה מלאה" onClick={onEdit} />
-        <RowActionItem icon={<Copy className="h-4 w-4" />} label="שכפול" onClick={onDuplicate} disabled={pending} />
-        <RowActionItem icon={<Send className="h-4 w-4" />} label="פרסום" onClick={onPublish} disabled={pending} />
-        <RowActionItem icon={<Sparkles className="h-4 w-4" />} label="Smart Match" onClick={onSmartMatch} />
-        <RowActionItem icon={<MessageCircle className="h-4 w-4" />} label="וואטסאפ" onClick={onWhatsApp} />
-        <div className="my-1 border-t border-[#F3F4F6]" />
-        <RowActionItem icon={<Archive className="h-4 w-4" />} label="ארכוב" onClick={onArchive} disabled={pending} danger />
-      </div>
-    </details>
+      </button>
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          dir="rtl"
+          style={{ position: 'fixed', top: coords.top, left: coords.left, width: MENU_WIDTH }}
+          className="z-[9999] overflow-hidden rounded-[16px] border border-[#D9D9D9] bg-white p-1.5 text-right shadow-xl"
+        >
+          <RowActionItem icon={<Eye className="h-4 w-4" />} label="צפייה בפאנל" onClick={() => run(onView)} />
+          <RowActionItem icon={<Edit2 className="h-4 w-4" />} label="עריכה מלאה" onClick={() => run(onEdit)} />
+          <RowActionItem icon={<Copy className="h-4 w-4" />} label="שכפול" onClick={() => run(onDuplicate)} disabled={pending} />
+          <RowActionItem icon={<Send className="h-4 w-4" />} label="פרסום" onClick={() => run(onPublish)} disabled={pending} />
+          <RowActionItem icon={<Sparkles className="h-4 w-4" />} label="Smart Match" onClick={() => run(onSmartMatch)} />
+          <RowActionItem icon={<MessageCircle className="h-4 w-4" />} label="וואטסאפ" onClick={() => run(onWhatsApp)} />
+          <div className="my-1 border-t border-[#F3F4F6]" />
+          <RowActionItem icon={<Archive className="h-4 w-4" />} label="ארכוב" onClick={() => run(onArchive)} disabled={pending} danger />
+        </div>,
+        document.body,
+      )}
+    </div>
   )
 }
 
