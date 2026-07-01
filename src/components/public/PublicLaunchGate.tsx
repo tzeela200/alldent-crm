@@ -21,6 +21,9 @@ export function PublicLaunchGate({ children }: PublicLaunchGateProps) {
     "/login",
     "/auth",
     "/dashboard",
+    "/candidate",
+    "/profile",
+    "/employer-profile",
   ];
 
   const isPrivateRoute = allowedPrivateRoutes.some((route) =>

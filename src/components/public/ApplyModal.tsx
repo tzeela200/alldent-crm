@@ -58,9 +58,15 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
 
         if (uploadError) throw uploadError
 
-        const { data: urlData } = await supabase.storage
+        const { data: urlData, error: signedUrlError } = await supabase.storage
           .from('candidate-cvs')
           .createSignedUrl(cvStoragePath, 60 * 60 * 24 * 365)
+
+        if (signedUrlError) {
+          setErrorMsg('העלאת קורות החיים הצליחה אך לא ניתן לאמת את הגישה לקובץ. נסה שנית.')
+          setStatus('error')
+          return
+        }
 
         cvLink = urlData?.signedUrl ?? null
       }

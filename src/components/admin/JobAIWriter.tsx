@@ -37,7 +37,7 @@ const EMPLOYER_PROMPTS: Record<AIField, string> = {
   work_schedule_text: 'סדר את ימי ושעות העבודה שכתב המעסיק. אל תשנה ימים או שעות. החזר רק את הטקסט.',
 }
 
-const FUNCTION_NAME = 'ai-writer'
+const FUNCTION_NAME = 'ai-job-description'
 
 async function callAIWriter(payload: {
   mode: 'admin' | 'employer'
@@ -48,14 +48,20 @@ async function callAIWriter(payload: {
 }): Promise<string> {
   console.log('[JobAIWriter] payload:', payload)
 
-  const { data, error } = await supabase.functions.invoke(FUNCTION_NAME, { body: payload })
+  const { data, error } = await supabase.functions.invoke(FUNCTION_NAME, {
+    body: {
+      description: payload.currentValue,
+      jobTitle: payload.jobContext?.title,
+      jobRole: payload.jobContext?.role,
+    },
+  })
 
   if (error) {
-    console.warn('[JobAIWriter] Edge Function not available:', error.message)
-    throw new Error('Edge Function ai-writer לא מוגדר עדיין. ראה הוראות חיבור למטה.')
+    console.warn('[JobAIWriter] Edge Function error:', error.message)
+    throw new Error('שגיאה בשירות ה-AI. נסה שנית.')
   }
 
-  const result = data?.result
+  const result = data?.improved
   if (typeof result !== 'string' || !result.trim()) {
     throw new Error('התקבלה תשובה ריקה מה-AI.')
   }
