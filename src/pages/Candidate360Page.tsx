@@ -64,8 +64,10 @@ function dictName(
   value: number | string | null | undefined,
 ): string {
   if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "string") return value;
-  return items.find((item) => item.id === Number(value))?.name ?? String(value);
+  const found = items.find((item) => Number(item.id) === Number(value));
+  if (found) return found.name;
+  if (typeof value === "string" && !/^\d+$/.test(value.trim())) return value;
+  return "—";
 }
 
 function toNumberArray(value: unknown): number[] {
@@ -97,11 +99,12 @@ function isValidHttpUrl(value?: string | null) {
   }
 }
 
-function applicationBadgeClass(value?: number | null) {
-  if (value === 8 || value === 15) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if ([4, 5, 6, 7].includes(value ?? -1)) return "border-blue-200 bg-blue-50 text-blue-700";
-  if ([1, 2, 3].includes(value ?? -1)) return "border-amber-200 bg-amber-50 text-slate-600";
-  if ([9, 10, 11, 12, 13, 14].includes(value ?? -1)) return "border-red-200 bg-red-50 text-red-700";
+function applicationBadgeClass(value?: number | string | null) {
+  const n = Number(value ?? -1);
+  if (n === 8 || n === 15) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if ([4, 5, 6, 7].includes(n)) return "border-blue-200 bg-blue-50 text-blue-700";
+  if ([1, 2, 3].includes(n)) return "border-amber-200 bg-amber-50 text-slate-600";
+  if ([9, 10, 11, 12, 13, 14].includes(n)) return "border-red-200 bg-red-50 text-red-700";
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
 
@@ -386,7 +389,9 @@ export default function Candidate360Page() {
     const allCities = dictsOnly?.cities ?? [];
     const regions = dictsOnly?.regions ?? [];
     const genders = dictsOnly?.genders ?? [];
-    const filteredCities = newForm.region_id ? allCities.filter((c) => c.region_id === Number(newForm.region_id)) : allCities;
+    const filteredCities = newForm.region_id
+      ? allCities.filter((c) => Number(c.region_id) === Number(newForm.region_id))
+      : allCities;
     return (
       <div dir="rtl" className="min-h-screen bg-[#F3F4F6] p-6 font-['Heebo']">
         <div className="mx-auto max-w-lg">

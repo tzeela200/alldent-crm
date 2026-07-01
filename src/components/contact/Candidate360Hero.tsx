@@ -42,8 +42,11 @@ function getRoleAccentColor(roleName?: string | null) {
 
 function dictName(items: { id: number; name: string }[], value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
-  if (typeof value === "string") return value;
-  return items.find((item) => item.id === Number(value))?.name ?? String(value);
+  const found = items.find((item) => Number(item.id) === Number(value));
+  if (found) return found.name;
+  // Only return the raw string if it's clearly not a numeric ID
+  if (typeof value === "string" && !/^\d+$/.test(value.trim())) return value;
+  return "—";
 }
 
 function dictNames(items: { id: number; name: string }[], values: unknown): string {
@@ -73,16 +76,18 @@ function isValidHttpUrl(s?: string | null): boolean {
 }
 
 function availabilityBadgeClass(id: number | null): string {
-  if (id === 1 || id === 2 || id === 7) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (id === 3) return "border-blue-200 bg-blue-50 text-blue-700";
-  if (id === 4) return "border-amber-200 bg-amber-50 text-amber-700";
+  const n = Number(id);
+  if (n === 1 || n === 2 || n === 7) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (n === 3) return "border-blue-200 bg-blue-50 text-blue-700";
+  if (n === 4) return "border-amber-200 bg-amber-50 text-amber-700";
   return "border-slate-200 bg-[#F3F4F6] text-slate-600";
 }
 
 function checkBadgeClass(status: number | null | undefined): string {
-  if (status === 3) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (status === 2) return "border-red-200 bg-red-50 text-red-700";
-  if (status === 4) return "border-blue-200 bg-blue-50 text-blue-700";
+  const n = Number(status);
+  if (n === 3) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (n === 2) return "border-red-200 bg-red-50 text-red-700";
+  if (n === 4) return "border-blue-200 bg-blue-50 text-blue-700";
   return "border-amber-200 bg-amber-50 text-amber-700";
 }
 

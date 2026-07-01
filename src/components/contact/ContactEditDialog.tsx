@@ -54,12 +54,14 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
     </h3>
   );
 
-  const filteredCities = (dicts?.cities ?? []).filter(
-    (c) =>
-      !adminForm.region_id ||
-      c.region_id === Number(adminForm.region_id) ||
-      Number(c.id) === Number(adminForm.city_id),
-  );
+  const filteredCities = (dicts?.cities ?? [])
+    .filter(
+      (c) =>
+        !adminForm.region_id ||
+        Number(c.region_id) === Number(adminForm.region_id) ||
+        Number(c.id) === Number(adminForm.city_id),
+    )
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), "he"));
 
   async function handleSave() {
     if (!contact) return;

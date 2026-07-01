@@ -29,10 +29,11 @@ function formatDateTime(value?: string | null) {
   return d.toLocaleDateString("he-IL");
 }
 
-function checkBadgeClass(status: number | null | undefined): string {
-  if (status === 3) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (status === 2) return "border-red-200 bg-red-50 text-red-700";
-  if (status === 4) return "border-blue-200 bg-blue-50 text-blue-700";
+function checkBadgeClass(status: number | string | null | undefined): string {
+  const n = Number(status);
+  if (n === 3) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if (n === 2) return "border-red-200 bg-red-50 text-red-700";
+  if (n === 4) return "border-blue-200 bg-blue-50 text-blue-700";
   return "border-amber-200 bg-amber-50 text-amber-700";
 }
 
