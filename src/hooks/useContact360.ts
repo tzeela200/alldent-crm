@@ -165,6 +165,16 @@ export interface JobRow {
   account_name?: string;
 }
 
+export interface LinkedJobRow {
+  job_code: string;
+  job_title: string;
+  job_status: number | null;
+  account_link: number | null;
+  account_name?: string;
+  rel_employer_contact: number | null;
+  rel_recruiter_contact: number | null;
+}
+
 async function fetchContact360(contactId: number) {
   const [
     contactRes,
@@ -185,7 +195,7 @@ async function fetchContact360(contactId: number) {
     ? applicationsQuery.or(`candidate_link.eq.${contact.contact_id},phone_norm.eq.${contact.phone_norm}`)
     : applicationsQuery.eq("candidate_link", contact.contact_id);
 
-  const [applicationsRes, tagsRes, accountRes, jobsRes] = await Promise.all([
+  const [applicationsRes, tagsRes, accountRes, jobsRes, linkedJobsRes] = await Promise.all([
     scopedApplicationsQuery,
     supabase
       .from("contact_tags")
@@ -203,6 +213,10 @@ async function fetchContact360(contactId: number) {
       .from("job")
       .select("job_code, job_title, job_status, job_role, job_sub_role, scope, required_experience, region_id, city_id, account_link, work_schedule_text, systems_used, required_languages, salary_type_ids, tax_type_id, mobility_id, accounts(account_name)")
       .eq("job_status", 3),
+    supabase
+      .from("job")
+      .select("job_code, job_title, job_status, account_link, rel_employer_contact, rel_recruiter_contact, accounts(account_name)")
+      .or(`rel_recruiter_contact.eq.${contact.contact_id},rel_employer_contact.eq.${contact.contact_id}`),
   ]);
 
   const jobs: JobRow[] = (jobsRes.data ?? []).map((j: Record<string, unknown>) => {
@@ -213,12 +227,21 @@ async function fetchContact360(contactId: number) {
     };
   });
 
+  const linkedJobs: LinkedJobRow[] = (linkedJobsRes.data ?? []).map((j: Record<string, unknown>) => {
+    const { accounts: _acc, ...rest } = j;
+    return {
+      ...(rest as Omit<LinkedJobRow, "account_name">),
+      account_name: (_acc as { account_name: string } | null)?.account_name ?? undefined,
+    };
+  });
+
   return {
     contact,
     applications: (applicationsRes.data ?? []) as ApplicationRow[],
     tags: (tagsRes.data ?? []) as ContactTagRow[],
     account: (accountRes.data ?? null) as AccountRow | null,
     jobs,
+    linkedJobs,
     dicts: dictsRes,
   };
 }
@@ -249,7 +272,7 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     supabase.from("dict_roles").select("id, name").order("id"),
     supabase.from("dict_sub_roles").select("id, name, role_id").order("id"),
     supabase.from("dict_availability").select("id, name").order("id"),
-    supabase.from("dict_cities").select("id, name, region_id").order("name").limit(2000),
+    supabase.from("dict_cities").select("id, name, region_id").order("name").limit(5000),
     supabase.from("dict_regions").select("id, name").order("id"),
     supabase.from("dict_sources").select("id, name").order("id"),
     supabase.from("dict_check_statuses").select("id, name").order("id"),

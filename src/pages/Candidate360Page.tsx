@@ -40,7 +40,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 import { supabase } from "@/lib/supabase";
 import { useContact360, useContact360Dicts } from "@/hooks/useContact360";
-import type { JobRow } from "@/hooks/useContact360";
+import type { JobRow, LinkedJobRow } from "@/hooks/useContact360";
 import { RoleSubRolePicker } from "@/components/ui/RoleSubRolePicker";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -52,6 +52,7 @@ import { Candidate360Hero } from "@/components/contact/Candidate360Hero";
 import { BlockCRM } from "@/components/contact/BlockCRM";
 import { AdminStatusBar } from "@/components/contact/AdminStatusBar";
 import { ContactEditDialog } from "@/components/contact/ContactEditDialog";
+import { BlockEmployer } from "@/components/contact/BlockEmployer";
 
 const BRAND = { primary: "#008080", pageBg: "#F3F4F6", cardBorder: "#E2E8F0" };
 
@@ -230,6 +231,7 @@ export default function Candidate360Page() {
   const tags = data?.tags ?? [];
   const account = data?.account ?? null;
   const jobs = data?.jobs ?? [];
+  const linkedJobs: LinkedJobRow[] = data?.linkedJobs ?? [];
   const dicts = data?.dicts;
 
   const activeApplications = useMemo(
@@ -714,24 +716,14 @@ export default function Candidate360Page() {
         )}
       </section>
 
-      {/* ===== ארגון מקושר ===== */}
-      {(account || contact.linked_org_name) && (
-        <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-          <CardContent className="p-6">
-            <h3 className="mb-4 text-lg font-bold text-slate-900">ארגון מקושר</h3>
-            {account ? (
-              <Link to={`/accounts/${account.account_id}`} className="flex items-center justify-between rounded-2xl border border-slate-200 p-3.5 transition hover:bg-[#F3F4F6]">
-                <div>
-                  <div className="font-semibold text-slate-900">{account.account_name}</div>
-                  {account.phone && <div className="mt-0.5 text-xs text-slate-500">{account.phone}</div>}
-                </div>
-                <Building2 className="h-4 w-4 text-slate-400" />
-              </Link>
-            ) : (
-              <div className="px-4 text-sm text-slate-500">{contact.linked_org_name}</div>
-            )}
-          </CardContent>
-        </Card>
+      {/* ===== ארגון מקושר + משרות מגייס/מעסיק ===== */}
+      {(account || contact.linked_org_name || linkedJobs.length > 0) && (
+        <BlockEmployer
+          contact={contact}
+          linkedJobs={linkedJobs}
+          dicts={dicts}
+          account={account}
+        />
       )}
 
       {/* ===== CRM + מטאדאטה ===== */}

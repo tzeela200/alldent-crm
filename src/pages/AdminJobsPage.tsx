@@ -34,7 +34,7 @@ import {
   Pagination,
   EmptyState,
 } from '@/components/layout/Shell'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/timeAgo'
 import type { Job, DictItem } from '@/types'
@@ -194,6 +194,7 @@ function getInitialFilters(): FilterState {
 
 export default function AdminJobsPage() {
   const { updateJob, insertJob } = useJobMutations()
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [filters, setFilters] = useState<FilterState>(getInitialFilters)
   const [page, setPage] = useState(0)
@@ -634,6 +635,33 @@ export default function AdminJobsPage() {
       const newJobCode = cleanText(jobDraft.job_code)
       const { error } = await updateJob(panel.jobCode, { ...patch, ...(newJobCode && newJobCode !== panel.jobCode ? { job_code: newJobCode } : {}) })
       if (error) throw error
+
+      // סנכרן מגייס/מעסיק לארגון: אם יש ארגון למשרה — קשר את איש הקשר ל-account_link + הוסף כובע
+      const jobAccountId = jobDraft.account_link ?? null
+      const contactsToSync = [
+        { id: patch.rel_employer_contact as number | null, hat: 2 },
+        { id: patch.rel_recruiter_contact as number | null, hat: 3 },
+      ].filter((c): c is { id: number; hat: number } => c.id != null)
+
+      for (const c of contactsToSync) {
+        await supabase
+          .from('rel_contact_profiles')
+          .upsert({ contact_id: c.id, profile_type_id: c.hat }, { onConflict: 'contact_id,profile_type_id' })
+        if (jobAccountId) {
+          const { data: existing } = await supabase
+            .from('contact')
+            .select('account_link')
+            .eq('contact_id', c.id)
+            .single()
+          if (!existing?.account_link) {
+            await supabase.from('contact').update({ account_link: jobAccountId }).eq('contact_id', c.id)
+          }
+        }
+      }
+      if (contactsToSync.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ['contact360'] })
+      }
+
       replaceJob(panel.jobCode, (cur) => ({ ...cur, ...patch }))
       const savedMsg = isInactive ? 'המשרה נשמרה — סטטוס פרסום הוסתר אוטומטית' : 'המשרה נשמרה בהצלחה'
       showToast(savedMsg, 'success')

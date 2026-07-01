@@ -10,7 +10,6 @@ import {
   selectValue,
   buildContactPatch,
   deriveRegionFromCity,
-  splitFullName,
   type FormState,
 } from "@/lib/contactForm";
 
@@ -32,11 +31,6 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
     if (!open || !contact) return;
     let next: FormState = { ...(contact as unknown as FormState) };
     next = deriveRegionFromCity(next, dicts?.cities ?? []);
-    if (!next.first_name && !next.last_name && next.full_name) {
-      const s = splitFullName(next.full_name as string);
-      next.first_name = s.first_name;
-      next.last_name = s.last_name;
-    }
     setAdminForm(next);
   }, [open, contact, dicts]);
 
