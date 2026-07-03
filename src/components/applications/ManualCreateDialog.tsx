@@ -68,7 +68,7 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
       if (contactSearch.length < 2) return []
       const { data } = await supabase
         .from('contact')
-        .select('contact_id, display_name, full_name, phone, phone_norm, email, role, city_id, region_id, availability, cv_link, has_cv')
+        .select('contact_id, display_name, full_name, phone, phone_norm, email, role, city_id, region_id, candidate_availability_ids, cv_link, has_cv')
         .or(
           `full_name.ilike.%${contactSearch}%,display_name.ilike.%${contactSearch}%,phone.ilike.%${contactSearch}%,phone_norm.ilike.%${contactSearch}%`
         )
@@ -153,7 +153,10 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
         candidate_notes: candidateNotes || null,
         check_status: checkStatus !== '' ? Number(checkStatus) : null,
         application_status: appStatus,
-        master_availability: String(selectedContact.availability ?? ''),
+        master_availability:
+          selectedContact.candidate_availability_ids?.[0] != null
+            ? String(selectedContact.candidate_availability_ids[0])
+            : '',
         master_role: String(selectedContact.role ?? ''),
         master_city: String(selectedContact.city_id ?? ''),
         master_region: String(selectedContact.region_id ?? ''),

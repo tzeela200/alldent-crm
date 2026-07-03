@@ -76,7 +76,7 @@ export function useApplicationRows(
       if (candidateIds.length > 0) {
         const { data: contacts } = await supabase
           .from('contact')
-          .select('contact_id, work_status, availability, profile_type, role, city_id, region_id, has_cv, cv_link, cv_received_date, display_name')
+          .select('contact_id, work_status, candidate_availability_ids, profile_type, role, city_id, region_id, has_cv, cv_link, cv_received_date, display_name')
           .in('contact_id', candidateIds)
         if (contacts) {
           const contactMap = new Map(contacts.map((c) => [c.contact_id, c]))
@@ -86,7 +86,7 @@ export function useApplicationRows(
             return {
               ...r,
               contact_work_status: c.work_status ?? null,
-              contact_availability: c.availability ?? null,
+              contact_availability: c.candidate_availability_ids?.[0] ?? null,
               contact_profile_type: c.profile_type ?? null,
               contact_role: c.role ?? null,
               contact_city_id: c.city_id ?? null,

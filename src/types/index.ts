@@ -27,7 +27,9 @@ export interface Contact {
   second_email: string | null
   role: number | null // → dict_roles
   sub_role: number | null // → dict_sub_roles
-  availability: number | null // → dict_availability
+  candidate_availability_ids: number[] | null // → dict_availability (multi-value; canonical column)
+  /** @deprecated column removed from DB (June 2026). Use candidate_availability_ids. Kept only so legacy read-sites compile; always undefined at runtime. */
+  availability?: number | null
   experience: number | null // → dict_experience
   preferred_scope: string | null
   languages: string | null
