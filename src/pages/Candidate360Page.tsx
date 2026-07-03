@@ -1,5 +1,6 @@
 import type { DictItem } from "@/hooks/useContact360";
 import { useContactMutations } from "@/hooks/useContactMutations";
+import { openApplicationCv, applicationHasCv } from "@/lib/cv";
 import React, { useMemo, useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import {
@@ -662,8 +663,8 @@ export default function Candidate360Page() {
                           <TableCell className="px-4 text-sm text-slate-500">{formatDate(app.submission_date)}</TableCell>
                           <TableCell className="px-4 text-sm text-slate-500">{formatDate(app.updated_timestamp)}</TableCell>
                           <TableCell className="px-4 text-sm">
-                            {app.has_cv && app.cv_link ? (
-                              <a href={app.cv_link} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">צפייה</a>
+                            {applicationHasCv(app) ? (
+                              <button type="button" onClick={() => openApplicationCv(app)} className="text-blue-600 hover:underline">צפייה</button>
                             ) : (
                               <span className="text-slate-300">—</span>
                             )}

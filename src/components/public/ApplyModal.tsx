@@ -43,6 +43,22 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
 
     setStatus('loading')
 
+    // Map known RPC/validation errors to friendly Hebrew; never surface raw DB text.
+    const mapError = (e: unknown): string => {
+      const raw = (e as { message?: string })?.message ?? ''
+      const table: Record<string, string> = {
+        consent_required: 'יש לאשר את שמירת הפרטים כדי להמשיך.',
+        phone_required: 'יש להזין מספר טלפון.',
+        full_name_required: 'יש להזין שם מלא.',
+        job_code_required: 'המשרה אינה זמינה כרגע.',
+        job_not_found: 'המשרה אינה זמינה כרגע.',
+      }
+      for (const key of Object.keys(table)) {
+        if (raw.includes(key)) return table[key]
+      }
+      return 'אירעה שגיאה בשליחת המועמדות. נסו שוב בעוד רגע.'
+    }
+
     try {
       let cvStoragePath: string | null = null
       let cvLink: string | null = null
@@ -58,17 +74,9 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
 
         if (uploadError) throw uploadError
 
-        const { data: urlData, error: signedUrlError } = await supabase.storage
-          .from('candidate-cvs')
-          .createSignedUrl(cvStoragePath, 60 * 60 * 24 * 365)
-
-        if (signedUrlError) {
-          setErrorMsg('העלאת קורות החיים הצליחה אך לא ניתן לאמת את הגישה לקובץ. נסה שנית.')
-          setStatus('error')
-          return
-        }
-
-        cvLink = urlData?.signedUrl ?? null
+        // Private bucket: anon can INSERT but not SELECT, so it cannot mint a signed
+        // URL. Persist only the storage path (sent to the RPC as p_cv_storage_path);
+        // an authenticated admin mints a signed URL on demand when viewing the CV.
       }
 
       const { data, error } = await supabase.rpc('submit_public_application', {
@@ -84,7 +92,7 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
 
       if (error) {
         console.error('[ApplyModal] RPC error:', error)
-        setErrorMsg(error.message ?? null)
+        setErrorMsg(mapError(error))
         setStatus('error')
         return
       }
@@ -93,6 +101,7 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
       setStatus(result === 'duplicate' ? 'duplicate' : 'success')
     } catch (err) {
       console.error('[ApplyModal] submit failed:', err)
+      setErrorMsg(mapError(err))
       setStatus('error')
     }
   }
@@ -157,10 +166,7 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
           {/* Error */}
           {status === 'error' && (
             <div className="mb-5 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-right text-[14px] leading-6 text-red-700">
-              הייתה שגיאה בשליחת המועמדות. אפשר לנסות שוב בעוד רגע.
-              {errorMsg && (
-                <p className="mt-1 font-mono text-[11px] text-red-500">{errorMsg}</p>
-              )}
+              {errorMsg ?? 'אירעה שגיאה בשליחת המועמדות. נסו שוב בעוד רגע.'}
             </div>
           )}
 

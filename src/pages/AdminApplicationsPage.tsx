@@ -19,6 +19,7 @@ import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { applicationStatusColors, checkStatusColors, jobStatusColors, getStatusBadge } from '@/lib/statusColors'
 import { formatDate } from '@/lib/timeAgo'
 import { whatsappLink } from '@/lib/normalizePhone'
+import { openApplicationCv, applicationHasCv } from '@/lib/cv'
 import { ApplicationFiltersBar } from '@/components/applications/ApplicationFiltersBar'
 import { ApplicationDetailPanel } from '@/components/applications/ApplicationDetailPanel'
 import { ManualCreateDialog } from '@/components/applications/ManualCreateDialog'
@@ -153,7 +154,7 @@ export default function AdminApplicationsPage() {
       'מקור': getDictLabel(dicts?.sources, r.source),
       'תאריך הגשה': formatDate(r.submission_date),
       'תאריך פעולה הבאה': formatDate(r.follow_up_date),
-      'עם קו"ח': r.cv_link ? 'כן' : 'לא',
+      'עם קו"ח': applicationHasCv(r) ? 'כן' : 'לא',
       'ידני': r.is_manual ? 'כן' : 'לא',
       'הערות פנימיות': r.internal_notes ?? '',
     }))
@@ -767,16 +768,14 @@ function ApplicationsTable({
                 {/* קו"ח */}
                 {col('cv') && (
                   <td className="px-3 py-3">
-                    {row.has_cv && row.cv_link ? (
-                      <a
-                        href={row.cv_link}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
+                    {applicationHasCv(row) ? (
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); openApplicationCv(row) }}
                         className="text-xs text-blue-600 hover:underline whitespace-nowrap"
                       >
                         צפייה ↗
-                      </a>
+                      </button>
                     ) : (
                       <span className="text-xs text-slate-300">—</span>
                     )}
@@ -911,17 +910,15 @@ function ApplicationsGrid({
               </p>
               <p className="text-xs text-slate-400">{formatDate(row.submission_date)}</p>
             </div>
-            {row.cv_link && (
+            {applicationHasCv(row) && (
               <div className="mt-2">
-                <a
-                  href={row.cv_link}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(e) => e.stopPropagation()}
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); openApplicationCv(row) }}
                   className="text-xs text-blue-600 hover:underline"
                 >
                   קו"ח ↗
-                </a>
+                </button>
               </div>
             )}
           </div>

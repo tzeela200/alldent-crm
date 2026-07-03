@@ -17,7 +17,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'שינניות', to: '/jobs/role/hygienists' },
       { label: 'סייעות', to: '/jobs/role/assistants' },
       { label: 'מזכירות', to: '/jobs/role/secretaries' },
-      { label: 'ניהול מרפאה', to: '/jobs/role/managers' },
+      { label: 'ניהול מרפאה', to: '/jobs/role/management-sales' },
       { label: 'טכנאי שיניים', to: '/jobs/role/technicians' },
     ],
   },

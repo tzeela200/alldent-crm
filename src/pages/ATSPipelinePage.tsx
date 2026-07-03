@@ -29,6 +29,8 @@ import {
   EmptyState,
 } from '@/components/layout/Shell'
 import { useApplications, useDicts, useJobs } from '@/hooks/useSupabaseData'
+import { openApplicationCv, applicationHasCv } from '@/lib/cv'
+import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
 import { applicationStatusColors, checkStatusColors, getStatusBadge } from '@/lib/statusColors'
 
@@ -70,6 +72,8 @@ type PipelineCardRow = {
   application_status?: number | null
   submission_date?: string | null
   cv_link?: string | null
+  cv_storage_path?: string | null
+  has_cv?: boolean | null
   candidate_notes?: string | null
   internal_notes?: string | null
   check_status?: number | null
@@ -145,6 +149,7 @@ export default function ATSPipelinePage() {
   const { data: applications = [], loading, error } = useApplications({})
   const { data: jobs = [] } = useJobs({})
   const dicts = useDicts()
+  const { updateApplication } = useApplicationMutations()
 
 
   const applicationStatuses = dicts.applicationStatuses ?? []
@@ -266,11 +271,11 @@ export default function ATSPipelinePage() {
       mapping[key].sort((a, b) => {
         const aPriority =
           (isStale(a.updated_timestamp, STALE_DAYS) ? 20 : 0) +
-          (!a.cv_link ? 10 : 0) +
+          (!applicationHasCv(a) ? 10 : 0) +
           (a.pending_employer_feedback ? 8 : 0)
         const bPriority =
           (isStale(b.updated_timestamp, STALE_DAYS) ? 20 : 0) +
-          (!b.cv_link ? 10 : 0) +
+          (!applicationHasCv(b) ? 10 : 0) +
           (b.pending_employer_feedback ? 8 : 0)
 
 
@@ -347,7 +352,11 @@ export default function ATSPipelinePage() {
 
 
     try {
-      await delay(250)
+      await updateApplication.mutateAsync({
+        applicationId: Number(row.application_id),
+        updates: { application_status: nextStatus },
+        jobCode: row.job_code,
+      })
 
 
       if (nextStatus === 12) {
@@ -355,12 +364,15 @@ export default function ATSPipelinePage() {
       } else {
         showToast('סטטוס הכרטיס עודכן', 'success')
       }
-    } catch {
+    } catch (err) {
       patchRow(Number(row.application_id), {
         application_status: previousStatus,
         updated_timestamp: row.updated_timestamp,
       })
-      showToast('שגיאה בעדכון סטטוס. בוצע rollback', 'error')
+      showToast(
+        `שגיאה בעדכון סטטוס: ${err instanceof Error ? err.message : 'שגיאה לא ידועה'}. בוצע rollback`,
+        'error',
+      )
     } finally {
       setUpdatingStatusId(null)
     }
@@ -379,14 +391,20 @@ export default function ATSPipelinePage() {
 
 
     try {
-      await delay(200)
+      await updateApplication.mutateAsync({
+        applicationId: Number(row.application_id),
+        updates: { check_status: nextCheckStatus },
+      })
       showToast('Check status עודכן', 'success')
-    } catch {
+    } catch (err) {
       patchRow(Number(row.application_id), {
         check_status: previous,
         updated_timestamp: row.updated_timestamp,
       })
-      showToast('שגיאה בעדכון check status', 'error')
+      showToast(
+        `שגיאה בעדכון check status: ${err instanceof Error ? err.message : 'שגיאה לא ידועה'}`,
+        'error',
+      )
     } finally {
       setUpdatingCheckStatusId(null)
     }
@@ -713,7 +731,7 @@ function AtsCard({
   const appBadge = getStatusBadge(applicationStatusColors, Number(row.application_status ?? 0))
   const checkBadge = getStatusBadge(checkStatusColors, Number(row.check_status ?? 0))
   const stale = isStale(row.updated_timestamp, STALE_DAYS)
-  const missingCv = !row.cv_link
+  const missingCv = !applicationHasCv(row)
   const employerFeedback = Boolean(row.pending_employer_feedback)
 
 
@@ -782,8 +800,9 @@ function AtsCard({
         />
         <QuickIconLink
           title="CV"
-          href={row.cv_link ?? ''}
-          disabled={!row.cv_link}
+          href={row.cv_link ?? '#'}
+          onClick={() => openApplicationCv(row)}
+          disabled={!applicationHasCv(row)}
           icon={<FileText className="h-4 w-4" />}
         />
         <QuickRouteLink
@@ -979,15 +998,14 @@ function DetailSheet({
 
 
           <SectionCard title="CV">
-            {row.cv_link ? (
-              <a
-                href={row.cv_link}
-                target="_blank"
-                rel="noreferrer"
+            {applicationHasCv(row) ? (
+              <button
+                type="button"
+                onClick={() => openApplicationCv(row)}
                 className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
               >
                 Open CV
-              </a>
+              </button>
             ) : (
               <div className="rounded-xl bg-amber-50 p-3 text-sm font-medium text-amber-800">
                 חסר קו"ח לפני ראיון / שליחה למעסיק
@@ -1026,7 +1044,7 @@ function DetailSheet({
                 href={buildWhatsAppLink(row.candidate_phone ?? '')}
                 disabled={!normalizeDigits(row.candidate_phone ?? '')}
               />
-              <QuickSheetButton label="Open CV" href={row.cv_link ?? ''} disabled={!row.cv_link} />
+              <QuickSheetButton label="Open CV" href={row.cv_link ?? '#'} onClick={() => openApplicationCv(row)} disabled={!applicationHasCv(row)} />
               <QuickSheetRouteButton
                 label="Open Candidate 360"
                 to={row.candidate_link ? `/candidates/${row.candidate_link}` : ''}
@@ -1104,11 +1122,13 @@ function QuickIconLink({
   href,
   disabled,
   icon,
+  onClick,
 }: {
   title: string
   href: string
   disabled?: boolean
   icon: React.ReactNode
+  onClick?: () => void
 }) {
   if (disabled) {
     return (
@@ -1125,6 +1145,7 @@ function QuickIconLink({
       href={href}
       target="_blank"
       rel="noreferrer"
+      onClick={onClick ? (e) => { e.preventDefault(); onClick() } : undefined}
       className="inline-flex h-9 items-center justify-center gap-1 rounded-xl border border-slate-200 bg-white text-xs font-semibold text-slate-700 hover:bg-slate-50"
     >
       {icon}
@@ -1171,10 +1192,12 @@ function QuickSheetButton({
   label,
   href,
   disabled,
+  onClick,
 }: {
   label: string
   href: string
   disabled?: boolean
+  onClick?: () => void
 }) {
   if (disabled) {
     return (
@@ -1194,6 +1217,7 @@ function QuickSheetButton({
       href={href}
       target="_blank"
       rel="noreferrer"
+      onClick={onClick ? (e) => { e.preventDefault(); onClick() } : undefined}
       className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
     >
       {label}

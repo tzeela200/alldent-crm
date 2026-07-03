@@ -4,7 +4,7 @@ export type RoleSlug =
   | "hygienists"
   | "assistants"
   | "secretaries"
-  | "managers"
+  | "management-sales"
   | "technicians";
 
 export type Role = {
@@ -57,7 +57,7 @@ export const ROLES: Role[] = [
     image: "/images/professions/secretaries.jpg",
   },
   {
-    slug: "managers",
+    slug: "management-sales",
     label: "ניהול מרפאה",
     longTitle: "משרות ניהול מרפאת שיניים",
     description:

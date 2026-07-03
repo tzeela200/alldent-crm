@@ -8,6 +8,7 @@ import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
 import { whatsappLink } from '@/lib/normalizePhone'
+import { openApplicationCv, applicationHasCv } from '@/lib/cv'
 import { formatDate } from '@/lib/timeAgo'
 import { applicationStatusColors, checkStatusColors, jobStatusColors, getStatusBadge } from '@/lib/statusColors'
 import { toast } from 'sonner'
@@ -197,16 +198,15 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
               {row.candidate_phone}
             </a>
           )}
-          {isValidUrl(row.cv_link) && (
-            <a
-              href={row.cv_link!}
-              target="_blank"
-              rel="noopener noreferrer"
+          {applicationHasCv(row) && (
+            <button
+              type="button"
+              onClick={() => openApplicationCv(row)}
               className="flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
             >
               <FileText className="h-3 w-3" />
               פתח קו"ח
-            </a>
+            </button>
           )}
           {row.candidate_link && (
             <a

@@ -31,6 +31,8 @@ import {
   EmptyState,
 } from '@/components/layout/Shell'
 import { useApplications, useCandidates, useDicts, useJobs } from '@/hooks/useSupabaseData'
+import { useApplicationMutations } from '@/hooks/useApplicationMutations'
+import { supabase } from '@/lib/supabase'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
 
 
@@ -150,6 +152,7 @@ export default function SmartMatchPage() {
     message: '',
   })
   const [localApplications, setLocalApplications] = useState<any[]>([])
+  const [submittingApp, setSubmittingApp] = useState(false)
   const [filters, setFilters] = useState<FiltersState>({
     minimumScore: 55,
     hasCvOnly: false,
@@ -162,6 +165,7 @@ export default function SmartMatchPage() {
   const { data: candidates = [] } = useCandidates({})
   const { data: applications = [] } = useApplications({})
   const dicts = useDicts()
+  const { createApplication } = useApplicationMutations()
 
 
   useEffect(() => {
@@ -432,7 +436,8 @@ export default function SmartMatchPage() {
   }
 
 
-  const submitCreateApplication = () => {
+  const submitCreateApplication = async () => {
+    if (submittingApp) return
     if (!selectedJob || !createApplicationState.candidateId) return
 
 
@@ -446,68 +451,124 @@ export default function SmartMatchPage() {
 
 
     const phoneNorm = normalizeDigits(candidate.phone_norm ?? candidate.phone ?? '')
-    const existingApplication = (localApplications as any[]).find(
-      (application) =>
-        String(application.job_code ?? '').toLowerCase() === String(selectedJob.job_code).toLowerCase() &&
-        normalizeDigits(application.phone_norm ?? application.candidate_phone ?? '') === phoneNorm,
-    )
+
+    setSubmittingApp(true)
+    try {
+      // ── Duplicate guard against the DB (not local state): same job + candidate/phone ──
+      const orParts = [`candidate_link.eq.${candidate.contact_id}`]
+      if (phoneNorm) orParts.push(`phone_norm.eq.${phoneNorm}`)
+      const { data: existingRows, error: dupError } = await supabase
+        .from('applications')
+        .select('application_id')
+        .eq('job_code', selectedJob.job_code)
+        .or(orParts.join(','))
+        .limit(1)
+      if (dupError) {
+        showToast(`בדיקת כפילות נכשלה: ${dupError.message}`, 'error')
+        return
+      }
+      if (existingRows && existingRows.length > 0) {
+        setDuplicateState({
+          blocked: true,
+          rowId: Number(existingRows[0].application_id),
+          message: 'כבר קיימת הגשה למועמד עבור אותה משרה. הפעולה נחסמה.',
+        })
+        showToast('נחסמה יצירת הגשה כפולה', 'error')
+        setCreateApplicationState({ open: false, candidateId: null })
+        return
+      }
 
 
-    if (existingApplication) {
-      setDuplicateState({
-        blocked: true,
-        rowId: Number(existingApplication.application_id),
-        message: 'כבר קיימת הגשה למועמד עבור אותה משרה. הפעולה נחסמה.',
+      const createdAt = new Date().toISOString()
+
+
+      // ── Real DB write via the shared createApplication hook.
+      // Only real `applications` columns are sent; display-only fields stay out of the payload. ──
+      const newId = await createApplication.mutateAsync({
+        submission_date: createdAt,
+        form_title: 'Smart Match',
+        job_code: selectedJob.job_code,
+        job_link: selectedJob.job_url ?? null,
+        account_name: selectedJob.account_name ?? null,
+        job_role: roleName(selectedJob.job_role),
+        job_city: cityName(selectedJob.city_id),
+        job_region: regionName(selectedJob.region_id),
+        candidate_phone: candidate.phone ?? candidate.phone_norm ?? null,
+        candidate_name: candidate.full_name ?? candidate.display_name ?? null,
+        candidate_email: candidate.email ?? null,
+        cv_link: candidate.cv_link ?? null,
+        candidate_link: candidate.contact_id,
+        candidate_notes: null,
+        check_status: 1,
+        application_status: 1,
+        master_availability: availabilityName(candidate.availability),
+        master_role: roleName(candidate.role),
+        master_city: cityName(candidate.city_id),
+        master_region: regionName(candidate.region_id),
+        internal_notes: 'נוצר מתוך Smart Match',
+        phone_norm: candidate.phone_norm ?? phoneNorm,
+        job_city_id: selectedJob.city_id ?? null,
+        job_region_id: selectedJob.region_id ?? null,
+        // source describes where the original lead came from — carried over from the
+        // candidate's contact.source (dict_sources). SmartMatch is not a source value;
+        // is_manual marks admin-created. Null when the candidate has no source.
+        source: candidate.source ?? null,
+        is_manual: true,
+        is_new_candidate: false,
+        account_link: selectedJob.account_link ?? null,
+        follow_up_date: null,
+        assigned_to: null,
+        has_cv: Boolean(candidate.has_cv),
+        cv_storage_path: null,
+        cv_received_date: null,
+        candidate_availability_ids: null,
+        candidate_salary_type_ids: null,
       })
-      showToast('נחסמה יצירת הגשה כפולה', 'error')
+
+
+      // ── Reflect the saved row in the local list using the REAL id returned by the DB ──
+      const nextApplication = {
+        application_id: newId,
+        record_name: `APP-${String(newId).padStart(3, '0')}`,
+        submission_date: createdAt,
+        display_date: formatDate(createdAt),
+        form_title: 'Smart Match',
+        job_code: selectedJob.job_code,
+        job_link: selectedJob.job_url ?? null,
+        account_name: selectedJob.account_name ?? null,
+        job_role: roleName(selectedJob.job_role),
+        job_city: cityName(selectedJob.city_id),
+        job_region: regionName(selectedJob.region_id),
+        candidate_phone: candidate.phone ?? candidate.phone_norm ?? null,
+        candidate_name: candidate.full_name ?? candidate.display_name ?? null,
+        candidate_email: candidate.email ?? null,
+        cv_link: candidate.cv_link ?? null,
+        candidate_link: candidate.contact_id,
+        candidate_notes: null,
+        status_in_master: null,
+        check_status: 1,
+        job_status_view: 'פעילה',
+        application_status: 1,
+        master_availability: availabilityName(candidate.availability),
+        master_role: roleName(candidate.role),
+        master_city: cityName(candidate.city_id),
+        master_region: regionName(candidate.region_id),
+        internal_notes: 'נוצר מתוך Smart Match',
+        phone_norm: candidate.phone_norm ?? phoneNorm,
+        created_timestamp: createdAt,
+        updated_timestamp: createdAt,
+      }
+
+
+      setLocalApplications((prev) => [nextApplication, ...prev])
       setCreateApplicationState({ open: false, candidateId: null })
-      return
+      showToast('ההגשה נוצרה בהצלחה', 'success')
+    } catch (err) {
+      // On failure: do NOT add to local state, do NOT close the modal — show a clear error.
+      showToast(`שגיאה ביצירת הגשה: ${err instanceof Error ? err.message : 'נסה שנית'}`, 'error')
+    } finally {
+      setSubmittingApp(false)
     }
-
-
-    const nextId =
-      (localApplications as any[]).reduce((max, row) => Math.max(max, Number(row.application_id ?? 0)), 0) + 1
-
-
-    const createdAt = new Date().toISOString()
-
-
-    const nextApplication = {
-      application_id: nextId,
-      record_name: `APP-${String(nextId).padStart(3, '0')}`,
-      submission_date: createdAt,
-      display_date: formatDate(createdAt),
-      form_title: 'Smart Match',
-      job_code: selectedJob.job_code,
-      job_link: selectedJob.job_url ?? null,
-      account_name: selectedJob.account_name ?? null,
-      job_role: roleName(selectedJob.job_role),
-      job_city: cityName(selectedJob.city_id),
-      job_region: regionName(selectedJob.region_id),
-      candidate_phone: candidate.phone ?? candidate.phone_norm ?? null,
-      candidate_name: candidate.full_name ?? candidate.display_name ?? null,
-      candidate_email: candidate.email ?? null,
-      cv_link: candidate.cv_link ?? null,
-      candidate_link: candidate.contact_id,
-      candidate_notes: null,
-      status_in_master: null,
-      check_status: 1,
-      job_status_view: 'פעילה',
-      application_status: 1,
-      master_availability: availabilityName(candidate.availability),
-      master_role: roleName(candidate.role),
-      master_city: cityName(candidate.city_id),
-      master_region: regionName(candidate.region_id),
-      internal_notes: 'נוצר מתוך Smart Match',
-      phone_norm: candidate.phone_norm ?? phoneNorm,
-      created_timestamp: createdAt,
-      updated_timestamp: createdAt,
-    }
-
-
-    setLocalApplications((prev) => [nextApplication, ...prev])
-    setCreateApplicationState({ open: false, candidateId: null })
-    showToast('ההגשה נוצרה בהצלחה', 'success')
   }
 
 
@@ -1195,9 +1256,10 @@ export default function SmartMatchPage() {
                 <button
                   type="button"
                   onClick={submitCreateApplication}
-                  className="inline-flex h-10 items-center rounded-xl bg-[#008080] px-4 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-95"
+                  disabled={submittingApp}
+                  className="inline-flex h-10 items-center rounded-xl bg-[#008080] px-4 text-[13px] font-semibold text-white shadow-sm transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  צור הגשה
+                  {submittingApp ? 'יוצר…' : 'צור הגשה'}
                 </button>
               </div>
             </div>
