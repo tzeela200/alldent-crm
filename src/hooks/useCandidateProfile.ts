@@ -51,12 +51,28 @@ async function fetchCandidateProfile(contactId: number) {
 export async function updateCandidateProfile(
   contactId: number,
   fields: Partial<CandidatePublicFields>,
+  token?: string,
 ) {
   const safe = Object.fromEntries(
     Object.entries(fields).filter(([key]) =>
       (CANDIDATE_PUBLIC_FIELDS as readonly string[]).includes(key),
     ),
   );
+
+  if (token) {
+    // Public self-edit via the token link (/profile/:token) — goes through a
+    // security-definer RPC that validates the token server-side. Not gated by
+    // table RLS, so this keeps working regardless of anon table permissions.
+    const { error } = await supabase.rpc("update_profile_by_token", {
+      p_token: token,
+      p_fields: safe,
+    });
+    if (error) throw error;
+    return;
+  }
+
+  // Admin edit (logged-in session, e.g. Candidate360Page) — direct table update,
+  // gated by the "Authenticated users full access" RLS policy on contact.
   const { error } = await supabase
     .from("contact")
     .update(safe)
@@ -75,13 +91,15 @@ export function useCandidateProfile(contactId: number) {
   });
 }
 
-export function useUpdateCandidateProfile(contactId: number) {
+export function useUpdateCandidateProfile(contactId: number, token?: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (fields: Partial<CandidatePublicFields>) =>
-      updateCandidateProfile(contactId, fields),
-    onSuccess: () =>
-      qc.invalidateQueries({ queryKey: ["candidateProfile", contactId] }),
+      updateCandidateProfile(contactId, fields, token),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["candidateProfile", contactId] });
+      if (token) qc.invalidateQueries({ queryKey: ["candidateProfileByToken", token] });
+    },
   });
 }
 

@@ -153,7 +153,7 @@ export default function CandidateProfilePage() {
 
   const { data: profile, isLoading, error } = isTokenMode ? byToken : byId;
   const contactId = profile?.contact_id ?? contactIdFromParam;
-  const updateMutation = useUpdateCandidateProfile(contactId);
+  const updateMutation = useUpdateCandidateProfile(contactId, isTokenMode ? token : undefined);
   const { data: dicts } = useContact360Dicts();
 
   const [editingField, setEditingField] = useState<string | null>(null);
@@ -556,8 +556,4 @@ export default function CandidateProfilePage() {
           currentData={profile}
           onApply={async (fields) => { await updateMutation.mutateAsync(fields); }}
           onClose={() => setShowScanner(false)}
-        />
-      )}
-    </div>
-  );
-}
+    
