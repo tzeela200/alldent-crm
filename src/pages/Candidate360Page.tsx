@@ -1,6 +1,8 @@
 import type { DictItem } from "@/hooks/useContact360";
 import { useContactMutations } from "@/hooks/useContactMutations";
 import { openApplicationCv, applicationHasCv } from "@/lib/cv";
+import ContactHistoryPanel from "@/components/admin/ContactHistoryPanel";
+import ContactMessagesPanel from "@/components/admin/ContactMessagesPanel";
 import React, { useMemo, useState, useEffect } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import {
@@ -565,6 +567,12 @@ export default function Candidate360Page() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ===== הודעות מהמועמד + היסטוריית שינויים ===== */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <ContactMessagesPanel contactId={resolvedId} />
+        <ContactHistoryPanel contactId={resolvedId} />
+      </div>
 
       {/* ===== פרטים אישיים + מדיה חברתית ===== */}
       {dicts && (

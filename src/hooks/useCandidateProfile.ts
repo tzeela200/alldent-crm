@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { ContactRow } from "@/hooks/useContact360";
+import { invalidateAllContactQueries } from "@/hooks/useContactMutations";
 
 // ─── SINGLE SOURCE OF TRUTH: public vs admin fields ─────────────────────────
 
@@ -19,6 +20,9 @@ export const CANDIDATE_PUBLIC_FIELDS = [
   "cv_link", "has_cv", "birth_year", "gender",
   "license_no", "tax_type", "tax_type_id", "mobility_id",
   "additional_skills_notes", "facebook_url",
+  "photo_url", "linkedin_url", "candidate_notes",
+  "work_status", "work_schedule_text",
+  "candidate_salary_type_ids", "preferred_all_country",
 ] as const;
 
 // Admin-only fields (never exposed to candidate):
@@ -34,16 +38,23 @@ export type CandidatePublicFields = Pick<
   (typeof CANDIDATE_PUBLIC_FIELDS)[number]
 >;
 
+// Full shape returned to the profile page: public fields + a couple of
+// read-only extras (contact_id, updated_timestamp) that the candidate cannot edit.
+export type CandidateProfileData = CandidatePublicFields & {
+  contact_id: number;
+  updated_timestamp: string | null;
+};
+
 // ─── Fetch — selects only public fields ─────────────────────────────────────
 
 async function fetchCandidateProfile(contactId: number) {
   const { data, error } = await supabase
     .from("contact")
-    .select(CANDIDATE_PUBLIC_FIELDS.join(", ") + ", contact_id")
+    .select(CANDIDATE_PUBLIC_FIELDS.join(", ") + ", contact_id, updated_timestamp")
     .eq("contact_id", contactId)
     .single();
   if (error) throw error;
-  return data as unknown as CandidatePublicFields & { contact_id: number };
+  return data as unknown as CandidateProfileData;
 }
 
 // ─── Update — strips admin fields before saving ─────────────────────────────
@@ -99,6 +110,9 @@ export function useUpdateCandidateProfile(contactId: number, token?: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["candidateProfile", contactId] });
       if (token) qc.invalidateQueries({ queryKey: ["candidateProfileByToken", token] });
+      // Propagate to every admin screen that shows this contact (list, 360, counts,
+      // dashboard) so a profile edit doesn't "talk alone".
+      void invalidateAllContactQueries(qc);
     },
   });
 }
@@ -116,10 +130,11 @@ async function fetchCandidateProfileByToken(token: string) {
     Object.entries(row).filter(
       ([key]) =>
         (CANDIDATE_PUBLIC_FIELDS as readonly string[]).includes(key) ||
-        key === "contact_id",
+        key === "contact_id" ||
+        key === "updated_timestamp", // read-only, for "last updated" footer
     ),
   );
-  return publicFields as unknown as CandidatePublicFields & { contact_id: number };
+  return publicFields as unknown as CandidateProfileData;
 }
 
 export function useCandidateProfileByToken(token: string) {

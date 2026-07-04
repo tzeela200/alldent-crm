@@ -29,6 +29,7 @@ import {
   StatusPill,
 } from '@/components/layout/Shell'
 import { useApplications, useInbox, useJobs, useCandidates, useAccounts, useDicts } from '@/hooks/useSupabaseData'
+import DashboardCandidateMessages from '@/components/admin/DashboardCandidateMessages'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
 import { applicationStatusColors, jobStatusColors, getStatusBadge } from '@/lib/statusColors'
 
@@ -485,6 +486,7 @@ export default function DashboardPage() {
           </div>
         </Toolbar>
 
+        <DashboardCandidateMessages />
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5 xl:grid-cols-10">
           <Link to="/jobs?status=active" className="block rounded-2xl transition hover:shadow-md">

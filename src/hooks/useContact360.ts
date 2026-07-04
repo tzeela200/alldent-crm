@@ -106,6 +106,10 @@ export interface ContactRow {
   preferred_all_country: boolean | null;
   locality_type: string | null;
   work_schedule_text: string | null;
+  photo_url: string | null;
+  linkedin_url: string | null;
+  candidate_notes: string | null;
+  cv_storage_path: string | null;
 }
 
 

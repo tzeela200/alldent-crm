@@ -12,6 +12,7 @@ import type { CandidatePublicFields } from "@/hooks/useCandidateProfile";
 
 interface AIDocumentScannerProps {
   contactId: number;
+  token?: string;
   currentData: CandidatePublicFields & { contact_id: number };
   onApply: (fields: Partial<CandidatePublicFields>) => Promise<void>;
   onClose: () => void;
@@ -56,16 +57,18 @@ function readFile(file: File): Promise<{ text?: string; base64?: string; mediaTy
   });
 }
 
-export default function AIDocumentScanner({ contactId, currentData, onApply, onClose }: AIDocumentScannerProps) {
+export default function AIDocumentScanner({ contactId, token, currentData, onApply, onClose }: AIDocumentScannerProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [state, setState] = useState<"idle" | "reading" | "scanning" | "preview" | "applying">("idle");
   const [fileName, setFileName] = useState("");
   const [proposed, setProposed] = useState<ProposedFields>({});
   const [checked, setChecked] = useState<Record<string, boolean>>({});
   const [error, setError] = useState("");
+  const [rawFile, setRawFile] = useState<File | null>(null);
 
   async function handleFile(file: File) {
     setFileName(file.name);
+    setRawFile(file);
     setState("reading");
     setError("");
 
@@ -102,6 +105,23 @@ export default function AIDocumentScanner({ contactId, currentData, onApply, onC
     for (const [key, val] of Object.entries(proposed)) {
       if (checked[key] && key !== "city_name") {
         (selected as Record<string, unknown>)[key] = val;
+      }
+    }
+    // Persist the original CV file so it lands in the candidate-cvs bucket and
+    // flips has_cv / cv_received_date server-side (best-effort, non-blocking).
+    if (token && rawFile) {
+      try {
+        const base64 = await new Promise<string>((resolve, reject) => {
+          const r = new FileReader();
+          r.onerror = () => reject(new Error("read_failed"));
+          r.onload = (e) => resolve((e.target?.result as string).split(",")[1]);
+          r.readAsDataURL(rawFile);
+        });
+        await supabase.functions.invoke("upload-candidate-cv", {
+          body: { token, base64, mediaType: rawFile.type, fileName: rawFile.name },
+        });
+      } catch {
+        /* CV storage is best-effort; the extracted fields still get applied */
       }
     }
     await onApply(selected);

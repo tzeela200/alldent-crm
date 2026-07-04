@@ -1,18 +1,23 @@
 import { useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 
-const CONTACT_QUERY_KEYS = [
+export const CONTACT_QUERY_KEYS = [
   ['contacts-v2'],
   ['contact360'],              // prefix match — covers all ['contact360', <any contactId>]
-  ['contacts', 'candidates'], // prefix match — covers all ['contacts', 'candidates', <any ids>]
+  ['contacts'],               // prefix match — covers ['contacts', <candidates|seekers|filters|id>, …]
+  ['contacts', 'candidates'], // (kept explicit for clarity)
   ['contacts', 'seekers'],
   ['candidate-ids'],
   ['contacts-phone-norms'],
   ['contacts-role-counts'],
   ['contacts-region-counts'],
+  ['candidateProfile'],           // candidate self-service view (admin & token)
+  ['candidateProfileByToken'],    // candidate self-service view (token link)
 ] as const
 
-async function invalidateAllContactQueries(queryClient: ReturnType<typeof useQueryClient>) {
+// Shared invalidation so every contact write path (admin edits, candidate
+// self-edits, bulk ops) refreshes the same screens instead of "talking alone".
+export async function invalidateAllContactQueries(queryClient: ReturnType<typeof useQueryClient>) {
   await Promise.all(
     CONTACT_QUERY_KEYS.map((queryKey) => queryClient.invalidateQueries({ queryKey }))
   )

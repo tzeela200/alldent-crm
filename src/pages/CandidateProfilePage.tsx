@@ -5,6 +5,7 @@ import {
   Edit2,
   Facebook,
   FileText,
+  Linkedin,
   Mail,
   MapPin,
   Phone,
@@ -16,23 +17,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 
 import {
   useCandidateProfile,
   useCandidateProfileByToken,
   useUpdateCandidateProfile,
-  CANDIDATE_PUBLIC_FIELDS,
 } from "@/hooks/useCandidateProfile";
-import type { CandidatePublicFields } from "@/hooks/useCandidateProfile";
+import type { CandidatePublicFields, CandidateProfileData } from "@/hooks/useCandidateProfile";
 import { useContact360Dicts } from "@/hooks/useContact360";
 import type { DictItem } from "@/hooks/useContact360";
-import ProfileEditForm from "@/components/candidate/ProfileEditForm";
+import ProfileSectionEditForm from "@/components/candidate/ProfileSectionEditForm";
+import type { FieldDef } from "@/components/candidate/ProfileSectionEditForm";
+import PhotoUpload from "@/components/candidate/PhotoUpload";
+import CandidateMessagesBox from "@/components/candidate/CandidateMessagesBox";
 import AIProfileWriter from "@/components/candidate/AIProfileWriter";
 import AIDocumentScanner from "@/components/candidate/AIDocumentScanner";
 
@@ -43,20 +40,19 @@ function dictName(list: DictItem[], id: unknown): string {
   return list.find((d) => d.id === Number(id))?.name ?? "—";
 }
 
-function dictNames(list: DictItem[], values: unknown): string {
-  if (!Array.isArray(values) || values.length === 0) return "—";
-  const names = values.map((v) => dictName(list, v)).filter((n) => n !== "—");
-  return names.length ? names.join(", ") : "—";
+function dictNames(list: DictItem[], values: unknown): string[] {
+  if (!Array.isArray(values) || values.length === 0) return [];
+  return values.map((v) => dictName(list, v)).filter((n) => n !== "—");
 }
 
 const COMPLETION_FIELDS = [
   "full_name", "professional_title", "phone", "email",
   "role", "experience", "candidate_availability_ids", "region_id",
   "personal_summary", "languages", "systems_used",
-  "academic_education", "salary_expectation_monthly",
+  "academic_education", "salary_expectation_monthly", "photo_url",
 ];
 
-function calcCompletion(data: CandidatePublicFields & { contact_id: number }): number {
+function calcCompletion(data: CandidateProfileData): number {
   let filled = 0;
   for (const f of COMPLETION_FIELDS) {
     const v = (data as Record<string, unknown>)[f];
@@ -73,6 +69,29 @@ function parseEmployers(v: unknown): Employer[] {
     try { return JSON.parse(v) as Employer[]; } catch { return []; }
   }
   return [];
+}
+
+// True once the profile holds enough to serve as a printable CV.
+function hasCoreCvContent(p: Record<string, unknown>): boolean {
+  const hasName = Boolean(p.full_name || (p.first_name && p.last_name) || p.display_name);
+  const hasBody = Boolean(
+    p.personal_summary ||
+    p.academic_education ||
+    p.current_employer ||
+    (Array.isArray(p.previous_employers) && p.previous_employers.length > 0),
+  );
+  return hasName && hasBody;
+}
+
+function fmtDateTime(ts: string | null): string {
+  if (!ts) return "";
+  try {
+    return new Date(ts).toLocaleString("he-IL", {
+      day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
 }
 
 // ─── progress circle ────────────────────────────────────────────────────────
@@ -99,20 +118,29 @@ function ProgressCircle({ pct }: { pct: number }) {
   );
 }
 
-// ─── section component ──────────────────────────────────────────────────────
+// ─── section wrapper with optional inline editing ───────────────────────────
 
 function Section({
   title,
+  sectionKey,
+  editingSection,
+  onEditToggle,
+  fields,
+  values,
+  onSave,
   children,
-  editField,
-  onEdit,
 }: {
   title: string;
-  icon?: React.ReactNode;
+  sectionKey?: string;
+  editingSection?: string | null;
+  onEditToggle?: (key: string | null) => void;
+  fields?: FieldDef[];
+  values?: Record<string, unknown>;
+  onSave?: (patch: Record<string, unknown>) => Promise<void>;
   children: React.ReactNode;
-  editField?: string;
-  onEdit?: (field: string) => void;
 }) {
+  const editable = Boolean(sectionKey && fields && onSave && onEditToggle);
+  const isEditing = editable && editingSection === sectionKey;
   return (
     <Card className="card rounded-2xl border border-slate-200 bg-white shadow-sm">
       <CardContent className="p-5">
@@ -121,9 +149,9 @@ function Section({
             <h3 className="text-[15px] font-bold text-slate-900 tracking-tight">{title}</h3>
             <div className="h-[2px] w-8 rounded-full bg-[#008080]" />
           </div>
-          {editField && onEdit && (
+          {editable && (
             <button
-              onClick={() => onEdit(editField)}
+              onClick={() => onEditToggle!(isEditing ? null : sectionKey!)}
               className="text-slate-400 hover:text-[#008080] transition no-print"
               aria-label={`ערוך ${title}`}
             >
@@ -131,7 +159,16 @@ function Section({
             </button>
           )}
         </div>
-        {children}
+        {isEditing ? (
+          <ProfileSectionEditForm
+            fields={fields!}
+            values={values ?? {}}
+            onSave={onSave!}
+            onCancel={() => onEditToggle!(null)}
+          />
+        ) : (
+          children
+        )}
       </CardContent>
     </Card>
   );
@@ -156,16 +193,22 @@ export default function CandidateProfilePage() {
   const updateMutation = useUpdateCandidateProfile(contactId, isTokenMode ? token : undefined);
   const { data: dicts } = useContact360Dicts();
 
-  const [editingField, setEditingField] = useState<string | null>(null);
+  const [editingSection, setEditingSection] = useState<string | null>(null);
   const [showWriter, setShowWriter] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
   const completion = useMemo(() => (profile ? calcCompletion(profile) : 0), [profile]);
   const employers = useMemo(() => parseEmployers(profile?.previous_employers), [profile?.previous_employers]);
 
-  async function handleFieldSave(field: string, value: unknown) {
-    await updateMutation.mutateAsync({ [field]: value } as Partial<CandidatePublicFields>);
-    setEditingField(null);
+  // Save one section; auto-flip has_cv once the profile can act as a CV.
+  async function handleSave(patch: Record<string, unknown>) {
+    let finalPatch = patch;
+    if (profile && !profile.has_cv) {
+      const merged = { ...(profile as Record<string, unknown>), ...patch };
+      if (hasCoreCvContent(merged)) finalPatch = { ...patch, has_cv: true };
+    }
+    await updateMutation.mutateAsync(finalPatch as Partial<CandidatePublicFields>);
+    setEditingSection(null);
   }
 
   // ─── loading / error ────────────────────────────────────────────────────
@@ -192,15 +235,43 @@ export default function CandidateProfilePage() {
 
   // ─── derived data ───────────────────────────────────────────────────────
 
-  const name = profile.full_name || [profile.first_name, profile.last_name].filter(Boolean).join(" ") || "—";
-  const titleText = profile.professional_title || dictName(dicts?.roles ?? [], profile.role);
-  const cityText = dictName(dicts?.cities ?? [], profile.city_id);
-  const availText = dictNames(dicts?.availability ?? [], profile.candidate_availability_ids);
-  const subRoleNames = Array.isArray(profile.sub_role)
-    ? profile.sub_role.map((id) => dictName(dicts?.subRoles ?? [], id)).filter((n) => n !== "—")
-    : [];
-  const hasContactInfo = Boolean(cityText !== "—" || profile.phone || profile.email || profile.facebook_url);
+  const d = dicts;
+  const name =
+    profile.full_name ||
+    [profile.first_name, profile.last_name].filter(Boolean).join(" ") ||
+    profile.display_name ||
+    "—";
+  const titleText = profile.professional_title || dictName(d?.roles ?? [], profile.role);
+  const cityText = dictName(d?.cities ?? [], profile.city_id);
+  const regionText = dictName(d?.regions ?? [], profile.region_id);
+  const availNames = dictNames(d?.availability ?? [], profile.candidate_availability_ids);
+  const availText = availNames.length ? availNames.join(", ") : "—";
+  const subRoleNames = dictNames(d?.subRoles ?? [], profile.sub_role);
+  const languageNames = dictNames(d?.languages ?? [], profile.languages);
+  const systemNames = dictNames(d?.systems ?? [], profile.systems_used);
+  const procedureNames = dictNames(d?.procedures ?? [], profile.procedures_experience);
+  const regionPrefNames = dictNames(d?.regions ?? [], profile.preferred_regions);
+  const cityPrefNames = dictNames(d?.cities ?? [], profile.preferred_cities);
+  const salaryTypeNames = dictNames(d?.salaryTypes ?? [], profile.candidate_salary_type_ids);
+  const scopeNames = dictNames(d?.scopes ?? [], profile.preferred_scope);
+  const experienceText = dictName(d?.experience ?? [], profile.experience);
+  const workStatusText = dictName(d?.workStatuses ?? [], profile.work_status);
+  const taxTypeText = dictName(d?.taxTypes ?? [], profile.tax_type_id);
+  const genderText = dictName(d?.genders ?? [], profile.gender);
+  const mobilityText = dictName(d?.mobility ?? [], profile.mobility_id);
   const initial = name.charAt(0);
+  const values = profile as unknown as Record<string, unknown>;
+
+  const hasContactInfo = Boolean(
+    cityText !== "—" || regionText !== "—" || profile.phone || profile.email ||
+    profile.second_phone || profile.second_email,
+  );
+  const hasLinks = Boolean(
+    profile.facebook_url || profile.linkedin_url || profile.portfolio_url || profile.recommendations_url,
+  );
+  const hasSkills =
+    languageNames.length > 0 || systemNames.length > 0 || procedureNames.length > 0 ||
+    Boolean(profile.additional_skills_notes);
 
   // ─── render ─────────────────────────────────────────────────────────────
 
@@ -227,16 +298,27 @@ export default function CandidateProfilePage() {
         <Card className="card rounded-t-none rounded-b-2xl border border-t-0 border-slate-200 bg-white shadow-sm mb-6">
           <CardContent className="p-6">
             <div className="flex items-start gap-5">
-              {/* Avatar */}
-              <div className="relative shrink-0">
-                <div className="flex h-[76px] w-[76px] items-center justify-center rounded-2xl border-2 border-[#008080] bg-teal-50 text-2xl font-bold text-[#008080]">
-                  {initial}
-                </div>
-              </div>
+              {/* Avatar / photo */}
+              <PhotoUpload
+                contactId={contactId}
+                token={isTokenMode ? token : undefined}
+                currentUrl={profile.photo_url}
+                initial={initial}
+                onUploaded={(url) => updateMutation.mutateAsync({ photo_url: url } as Partial<CandidatePublicFields>)}
+              />
 
               {/* Info */}
               <div className="flex-1 min-w-0">
-                <h1 className="text-[26px] font-extrabold leading-tight text-slate-900">{name}</h1>
+                <div className="flex items-start justify-between gap-2">
+                  <h1 className="text-[26px] font-extrabold leading-tight text-slate-900">{name}</h1>
+                  <button
+                    onClick={() => setEditingSection(editingSection === "header" ? null : "header")}
+                    className="text-slate-400 hover:text-[#008080] transition no-print mt-1"
+                    aria-label="ערוך פרטי זהות"
+                  >
+                    <Edit2 className="h-4 w-4" />
+                  </button>
+                </div>
                 <div className="text-base font-semibold teal-accent mt-0.5" style={{ color: "#008080" }}>
                   {titleText}
                 </div>
@@ -262,15 +344,33 @@ export default function CandidateProfilePage() {
               <ProgressCircle pct={completion} />
             </div>
 
+            {/* Header inline edit form */}
+            {editingSection === "header" && (
+              <div className="mt-4">
+                <ProfileSectionEditForm
+                  fields={[
+                    { field: "full_name", label: "שם מלא", type: "text" },
+                    { field: "professional_title", label: "כותרת מקצועית", type: "text" },
+                    { field: "role", label: "תפקיד ראשי", type: "select", options: d?.roles ?? [] },
+                    { field: "sub_role", label: "תחומי תת-תפקיד", type: "multiselect", options: d?.subRoles ?? [] },
+                    { field: "experience", label: "שנות ניסיון", type: "select", options: d?.experience ?? [] },
+                  ]}
+                  values={values}
+                  onSave={handleSave}
+                  onCancel={() => setEditingSection(null)}
+                />
+              </div>
+            )}
+
             {/* Action buttons */}
             <div className="flex flex-wrap gap-2 mt-5 no-print">
               <Button size="sm" className="rounded-xl bg-[#008080] hover:bg-teal-700 text-white" onClick={() => window.print()}>
                 <Download className="h-3.5 w-3.5 me-1.5" />
-                הורדה כ-PDF
+                הורדה / הדפסה כ-PDF
               </Button>
               <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setShowScanner(true)}>
                 <Upload className="h-3.5 w-3.5 me-1.5" />
-                העלאת מסמך
+                העלאת קורות חיים
               </Button>
               <Button size="sm" variant="outline" className="rounded-xl" onClick={() => setShowWriter(true)}>
                 <Sparkles className="h-3.5 w-3.5 me-1.5" />
@@ -281,36 +381,49 @@ export default function CandidateProfilePage() {
         </Card>
 
         {/* ───── CONTENT — two columns (main column appears right in RTL) ───── */}
-        <div className="grid gap-6 lg:grid-cols-[1fr_240px]">
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
           {/* MAIN COLUMN */}
           <div className="space-y-6">
             {/* Professional Summary */}
             <Section
               title="פרופיל מקצועי"
-              editField="personal_summary"
-              onEdit={setEditingField}
+              sectionKey="summary"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[{ field: "personal_summary", label: "פרופיל מקצועי", type: "textarea" }]}
+              values={values}
+              onSave={handleSave}
             >
               <p className="text-sm leading-7 text-slate-700 whitespace-pre-wrap">
                 {profile.personal_summary || profile.ai_profile_summary || "לא הוזן עדיין."}
               </p>
-              {editingField === "personal_summary" && (
-                <div className="mt-3">
-                  <ProfileEditForm
-                    field="personal_summary"
-                    label="פרופיל מקצועי"
-                    currentValue={profile.personal_summary}
-                    onSave={(v) => handleFieldSave("personal_summary", v)}
-                    onCancel={() => setEditingField(null)}
-                  />
-                </div>
-              )}
             </Section>
 
             {/* Employment History */}
             <Section
               title="ניסיון תעסוקתי"
-              editField="previous_employers"
-              onEdit={setEditingField}
+              sectionKey="experience"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[
+                { field: "current_employer", label: "מעסיק נוכחי", type: "text" },
+                {
+                  field: "previous_employers",
+                  label: "מקומות עבודה קודמים (פורמט JSON)",
+                  type: "textarea",
+                  placeholder: '[{"name":"...","role":"...","years":"...","description":"..."}]',
+                  dir: "ltr",
+                },
+              ]}
+              values={{ ...values, previous_employers: JSON.stringify(employers, null, 2) }}
+              onSave={async (patch) => {
+                const next = { ...patch };
+                if (typeof next.previous_employers === "string") {
+                  try { next.previous_employers = JSON.parse(next.previous_employers); }
+                  catch { /* keep raw string; server will store as-is */ }
+                }
+                await handleSave(next);
+              }}
             >
               {profile.current_employer && (
                 <div className="mb-4 rounded-xl border border-teal-100 bg-teal-50/40 p-4">
@@ -338,30 +451,23 @@ export default function CandidateProfilePage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-slate-400">לא הוזן עדיין.</p>
-              )}
-              {editingField === "previous_employers" && (
-                <div className="mt-3">
-                  <ProfileEditForm
-                    field="previous_employers"
-                    label="ניסיון תעסוקתי"
-                    currentValue={typeof profile.previous_employers === "string" ? profile.previous_employers : JSON.stringify(profile.previous_employers, null, 2)}
-                    onSave={(v) => {
-                      let parsed = v;
-                      if (typeof v === "string") { try { parsed = JSON.parse(v); } catch { /* keep as string */ } }
-                      return handleFieldSave("previous_employers", parsed);
-                    }}
-                    onCancel={() => setEditingField(null)}
-                  />
-                </div>
+                !profile.current_employer && <p className="text-sm text-slate-400">לא הוזן עדיין.</p>
               )}
             </Section>
 
             {/* Education */}
             <Section
               title="השכלה והסמכות"
-              editField="academic_education"
-              onEdit={setEditingField}
+              sectionKey="education"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[
+                { field: "academic_education", label: "השכלה אקדמית", type: "textarea" },
+                { field: "professional_courses", label: "קורסים והשתלמויות", type: "textarea" },
+                { field: "license_no", label: "מספר רישיון", type: "text" },
+              ]}
+              values={values}
+              onSave={handleSave}
             >
               <div className="space-y-3">
                 {profile.academic_education && (
@@ -372,38 +478,51 @@ export default function CandidateProfilePage() {
                 )}
                 {profile.professional_courses && (
                   <div>
-                    <div className="text-xs font-bold text-slate-500 mb-1">קורסים מקצועיים</div>
+                    <div className="text-xs font-bold text-slate-500 mb-1">קורסים והשתלמויות</div>
                     <p className="text-sm text-slate-700 whitespace-pre-wrap">{profile.professional_courses}</p>
                   </div>
                 )}
-                {!profile.academic_education && !profile.professional_courses && (
+                {profile.license_no && (
+                  <div>
+                    <div className="text-xs font-bold text-slate-500 mb-1">מספר רישיון</div>
+                    <p className="text-sm text-slate-700">{profile.license_no}</p>
+                  </div>
+                )}
+                {!profile.academic_education && !profile.professional_courses && !profile.license_no && (
                   <p className="text-sm text-slate-400">לא הוזן עדיין.</p>
                 )}
               </div>
-              {editingField === "academic_education" && (
-                <div className="mt-3">
-                  <ProfileEditForm
-                    field="academic_education"
-                    label="השכלה אקדמית"
-                    currentValue={profile.academic_education}
-                    onSave={(v) => handleFieldSave("academic_education", v)}
-                    onCancel={() => setEditingField(null)}
-                  />
-                </div>
-              )}
             </Section>
+
+            {/* Messages box — candidate only, never printed */}
+            {isTokenMode && token && <CandidateMessagesBox token={token} />}
           </div>
 
           {/* SIDEBAR (visually on the left under RTL) */}
           <div className="space-y-6">
             {/* Contact info */}
-            {hasContactInfo && (
-              <Section title="פרטי קשר">
+            <Section
+              title="פרטי קשר"
+              sectionKey="contact"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[
+                { field: "phone", label: "טלפון", type: "text", dir: "ltr" },
+                { field: "second_phone", label: "טלפון נוסף", type: "text", dir: "ltr" },
+                { field: "email", label: "אימייל", type: "text", dir: "ltr" },
+                { field: "second_email", label: "אימייל נוסף", type: "text", dir: "ltr" },
+                { field: "city_id", label: "עיר", type: "select", options: d?.cities ?? [] },
+                { field: "region_id", label: "אזור", type: "select", options: d?.regions ?? [] },
+              ]}
+              values={values}
+              onSave={handleSave}
+            >
+              {hasContactInfo ? (
                 <div className="space-y-2.5 text-sm">
-                  {cityText !== "—" && (
+                  {(cityText !== "—" || regionText !== "—") && (
                     <div className="flex items-center gap-2 text-slate-700">
                       <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      <span>{cityText}</span>
+                      <span>{[cityText, regionText].filter((t) => t !== "—").join(" · ")}</span>
                     </div>
                   )}
                   {profile.phone && (
@@ -418,126 +537,232 @@ export default function CandidateProfilePage() {
                       <span dir="ltr" className="truncate">{profile.email}</span>
                     </div>
                   )}
+                </div>
+              ) : (
+                <p className="text-sm text-slate-400">לא הוזן עדיין.</p>
+              )}
+            </Section>
+
+            {/* Links */}
+            <Section
+              title="קישורים"
+              sectionKey="links"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[
+                { field: "linkedin_url", label: "לינקדאין", type: "text", dir: "ltr" },
+                { field: "facebook_url", label: "פייסבוק", type: "text", dir: "ltr" },
+                { field: "portfolio_url", label: "תיק עבודות", type: "text", dir: "ltr" },
+                { field: "recommendations_url", label: "המלצות", type: "text", dir: "ltr" },
+              ]}
+              values={values}
+              onSave={handleSave}
+            >
+              {hasLinks ? (
+                <div className="space-y-2 text-sm">
+                  {profile.linkedin_url && (
+                    <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-700 hover:text-[#008080]">
+                      <Linkedin className="h-3.5 w-3.5 text-slate-400 shrink-0" /><span>לינקדאין ↗</span>
+                    </a>
+                  )}
                   {profile.facebook_url && (
                     <a href={profile.facebook_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-700 hover:text-[#008080]">
-                      <Facebook className="h-3.5 w-3.5 text-slate-400 shrink-0" />
-                      <span>פייסבוק ↗</span>
+                      <Facebook className="h-3.5 w-3.5 text-slate-400 shrink-0" /><span>פייסבוק ↗</span>
+                    </a>
+                  )}
+                  {profile.portfolio_url && (
+                    <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-700 hover:text-[#008080]">
+                      <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" /><span>תיק עבודות ↗</span>
+                    </a>
+                  )}
+                  {profile.recommendations_url && (
+                    <a href={profile.recommendations_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-slate-700 hover:text-[#008080]">
+                      <FileText className="h-3.5 w-3.5 text-slate-400 shrink-0" /><span>המלצות ↗</span>
                     </a>
                   )}
                 </div>
-              </Section>
-            )}
+              ) : (
+                <p className="text-sm text-slate-400">לא הוזן עדיין.</p>
+              )}
+            </Section>
 
             {/* Skills */}
-            <Section title="כישורים">
-              {Array.isArray(profile.languages) && profile.languages.length > 0 && (
-                <div className="mb-3">
-                  <div className="text-xs font-bold text-slate-500 mb-2">שפות</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {profile.languages.map((lid) => (
-                      <Badge key={lid} className="rounded-full border border-slate-200 bg-slate-50 text-slate-600 px-2 py-0.5 text-xs shadow-none">
-                        {dictName(dicts?.languages ?? [], lid)}
-                      </Badge>
-                    ))}
-                  </div>
+            <Section
+              title="כישורים ומערכות"
+              sectionKey="skills"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[
+                { field: "languages", label: "שפות", type: "multiselect", options: d?.languages ?? [] },
+                { field: "systems_used", label: "מערכות וכלים", type: "multiselect", options: d?.systems ?? [] },
+                { field: "procedures_experience", label: "פרוצדורות / תחומי ניסיון", type: "multiselect", options: d?.procedures ?? [] },
+                { field: "additional_skills_notes", label: "כישורים נוספים", type: "textarea" },
+              ]}
+              values={values}
+              onSave={handleSave}
+            >
+              {hasSkills ? (
+                <div className="space-y-3">
+                  {languageNames.length > 0 && (
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 mb-2">שפות</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {languageNames.map((n) => (
+                          <Badge key={n} className="rounded-full border border-slate-200 bg-slate-50 text-slate-600 px-2 py-0.5 text-xs shadow-none">{n}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {systemNames.length > 0 && (
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 mb-2">מערכות וכלים</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {systemNames.map((n) => (
+                          <Badge key={n} className="rounded-full border border-slate-200 bg-slate-50 text-slate-600 px-2 py-0.5 text-xs shadow-none">{n}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {procedureNames.length > 0 && (
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 mb-2">פרוצדורות / תחומי ניסיון</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {procedureNames.map((n) => (
+                          <Badge key={n} className="rounded-full border border-teal-200 bg-teal-50 text-teal-700 px-2 py-0.5 text-xs shadow-none">{n}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {profile.additional_skills_notes && (
+                    <div>
+                      <div className="text-xs font-bold text-slate-500 mb-1">כישורים נוספים</div>
+                      <div className="text-sm text-slate-700 whitespace-pre-wrap">{profile.additional_skills_notes}</div>
+                    </div>
+                  )}
                 </div>
-              )}
-              {profile.additional_skills_notes && (
-                <div className="mb-3">
-                  <div className="text-xs font-bold text-slate-500 mb-1">כישורים נוספים</div>
-                  <div className="text-sm text-slate-700 whitespace-pre-wrap">{profile.additional_skills_notes}</div>
-                </div>
-              )}
-              {Array.isArray(profile.systems_used) && profile.systems_used.length > 0 && (
-                <div className="mb-3">
-                  <div className="text-xs font-bold text-slate-500 mb-2">מערכות</div>
-                  <div className="flex flex-wrap gap-1.5">
-                    {profile.systems_used.map((sid) => (
-                      <Badge key={sid} className="rounded-full border border-slate-200 bg-slate-50 text-slate-600 px-2 py-0.5 text-xs shadow-none">
-                        {dictName(dicts?.scopes ?? [], sid) !== "—" ? dictName(dicts?.scopes ?? [], sid) : String(sid)}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {!(Array.isArray(profile.languages) && profile.languages.length > 0) && !profile.additional_skills_notes && !(Array.isArray(profile.systems_used) && profile.systems_used.length > 0) && (
+              ) : (
                 <p className="text-sm text-slate-400">לא הוזן עדיין.</p>
               )}
             </Section>
 
             {/* Availability & Preferences */}
-            <Section title="זמינות והעדפות">
+            <Section
+              title="זמינות והעדפות"
+              sectionKey="availability"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[
+                { field: "candidate_availability_ids", label: "זמינות", type: "multiselect", options: d?.availability ?? [] },
+                { field: "preferred_scope", label: "היקף משרה", type: "multiselect", options: d?.scopes ?? [] },
+                { field: "candidate_salary_type_ids", label: "סוג שכר", type: "multiselect", options: d?.salaryTypes ?? [] },
+                { field: "salary_expectation_monthly", label: "ציפיית שכר חודשי (₪)", type: "number" },
+                { field: "salary_expectation_hourly", label: "ציפיית שכר שעתי (₪)", type: "number" },
+                { field: "work_status", label: "סטטוס תעסוקתי", type: "select", options: d?.workStatuses ?? [] },
+                { field: "work_schedule_text", label: "הערות זמינות / משמרות", type: "textarea" },
+                { field: "mobility_id", label: "ניידות", type: "select", options: d?.mobility ?? [] },
+                { field: "tax_type_id", label: "סוג העסקה", type: "select", options: d?.taxTypes ?? [] },
+                { field: "preferred_regions", label: "אזורים מועדפים", type: "multiselect", options: d?.regions ?? [] },
+                { field: "preferred_cities", label: "ערים מועדפות", type: "multiselect", options: d?.cities ?? [] },
+              ]}
+              values={values}
+              onSave={handleSave}
+            >
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">זמינות</span>
-                  <span className="font-medium text-slate-900">{availText}</span>
-                </div>
-                {profile.preferred_scope && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">היקף</span>
-                    <span className="font-medium text-slate-900">{profile.preferred_scope}</span>
-                  </div>
-                )}
+                <Row label="זמינות" value={availText} />
+                {scopeNames.length > 0 && <Row label="היקף" value={scopeNames.join(", ")} />}
+                {salaryTypeNames.length > 0 && <Row label="סוג שכר" value={salaryTypeNames.join(", ")} />}
                 {profile.salary_expectation_monthly && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">שכר חודשי</span>
-                    <span className="font-medium text-slate-900">₪{profile.salary_expectation_monthly.toLocaleString()}</span>
-                  </div>
+                  <Row label="שכר חודשי" value={`₪${profile.salary_expectation_monthly.toLocaleString()}`} />
                 )}
                 {profile.salary_expectation_hourly && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">שכר שעתי</span>
-                    <span className="font-medium text-slate-900">₪{profile.salary_expectation_hourly}</span>
+                  <Row label="שכר שעתי" value={`₪${profile.salary_expectation_hourly}`} />
+                )}
+                {workStatusText !== "—" && <Row label="סטטוס" value={workStatusText} />}
+                {mobilityText !== "—" && <Row label="ניידות" value={mobilityText} />}
+                {taxTypeText !== "—" && <Row label="סוג העסקה" value={taxTypeText} />}
+                {experienceText !== "—" && <Row label="שנות ניסיון" value={experienceText} />}
+                {profile.work_schedule_text && (
+                  <div className="pt-1">
+                    <span className="text-slate-500">הערות זמינות</span>
+                    <div className="text-slate-700 mt-0.5 whitespace-pre-wrap">{profile.work_schedule_text}</div>
                   </div>
                 )}
-                {profile.mobility_id && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">ניידות</span>
-                    <span className="font-medium text-slate-900">{profile.mobility_id}</span>
-                  </div>
-                )}
-                {Array.isArray(profile.preferred_regions) && profile.preferred_regions.length > 0 && (
-                  <div>
-                    <span className="text-slate-500">אזורים רלוונטיים לעבודה</span>
+                {(regionPrefNames.length > 0 || cityPrefNames.length > 0 || profile.preferred_all_country) && (
+                  <div className="pt-1">
+                    <span className="text-slate-500">אזורים רלוונטיים</span>
                     <div className="text-slate-700 mt-0.5">
-                      {profile.preferred_regions.map((id) => dictName(dicts?.regions ?? [], id)).join(", ")}
+                      {profile.preferred_all_country
+                        ? "כל הארץ"
+                        : [...regionPrefNames, ...cityPrefNames].join(", ") || "—"}
                     </div>
                   </div>
                 )}
               </div>
             </Section>
 
+            {/* Personal */}
+            <Section
+              title="פרטים אישיים"
+              sectionKey="personal"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[
+                { field: "gender", label: "מגדר", type: "select", options: d?.genders ?? [] },
+                { field: "birth_year", label: "שנת לידה", type: "number" },
+                { field: "candidate_notes", label: "הערות / משהו נוסף שתרצה/י לספר", type: "textarea" },
+              ]}
+              values={values}
+              onSave={handleSave}
+            >
+              <div className="space-y-2 text-sm">
+                {genderText !== "—" && <Row label="מגדר" value={genderText} />}
+                {profile.birth_year && <Row label="שנת לידה" value={String(profile.birth_year)} />}
+                {profile.candidate_notes && (
+                  <div className="pt-1">
+                    <span className="text-slate-500">הערות</span>
+                    <div className="text-slate-700 mt-0.5 whitespace-pre-wrap">{profile.candidate_notes}</div>
+                  </div>
+                )}
+                {genderText === "—" && !profile.birth_year && !profile.candidate_notes && (
+                  <p className="text-sm text-slate-400">לא הוזן עדיין.</p>
+                )}
+              </div>
+            </Section>
+
             {/* Documents */}
-            {(profile.cv_link || profile.portfolio_url || profile.recommendations_url) && (
-              <Section title="מסמכים">
+            <Section
+              title="מסמכים"
+              sectionKey="documents"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[{ field: "cv_link", label: "קישור לקורות חיים", type: "text", dir: "ltr" }]}
+              values={values}
+              onSave={handleSave}
+            >
+              {profile.cv_link || profile.has_cv ? (
                 <div className="space-y-2">
                   {profile.cv_link && (
                     <a href={profile.cv_link} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-semibold text-[#008080] hover:underline">
-                      <FileText className="h-3.5 w-3.5 shrink-0" />
-                      קורות חיים ↗
+                      <FileText className="h-3.5 w-3.5 shrink-0" />קורות חיים ↗
                     </a>
                   )}
-                  {profile.portfolio_url && (
-                    <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-semibold text-[#008080] hover:underline">
-                      <FileText className="h-3.5 w-3.5 shrink-0" />
-                      פורטפוליו ↗
-                    </a>
-                  )}
-                  {profile.recommendations_url && (
-                    <a href={profile.recommendations_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm font-semibold text-[#008080] hover:underline">
-                      <FileText className="h-3.5 w-3.5 shrink-0" />
-                      המלצות ↗
-                    </a>
+                  {!profile.cv_link && profile.has_cv && (
+                    <p className="text-xs text-slate-500">קורות חיים במערכת ✓</p>
                   )}
                 </div>
-              </Section>
-            )}
+              ) : (
+                <p className="text-sm text-slate-400">לא הוזן עדיין.</p>
+              )}
+            </Section>
           </div>
         </div>
 
         {/* ───── FOOTER ───── */}
         <div className="mt-10 py-4 text-center text-xs text-slate-400 alldent-footer">
-          ALLDENT · פלטפורמת הגיוס הדנטלית המובילה בישראל · נוצר על ידי AllDent
+          <div>ALLDENT · פלטפורמת הגיוס הדנטלית המובילה בישראל · נוצר על ידי AllDent</div>
+          {profile.updated_timestamp && (
+            <div className="mt-1">עודכן לאחרונה: {fmtDateTime(profile.updated_timestamp)}</div>
+          )}
         </div>
       </div>
 
@@ -546,18 +771,32 @@ export default function CandidateProfilePage() {
         <AIProfileWriter
           contactId={contactId}
           currentData={profile}
-          onApply={async (fields) => { await updateMutation.mutateAsync(fields); }}
+          onApply={async (fields) => { await handleSave(fields as Record<string, unknown>); }}
           onClose={() => setShowWriter(false)}
         />
       )}
       {showScanner && profile && (
         <AIDocumentScanner
           contactId={contactId}
+          token={isTokenMode ? token : undefined}
           currentData={profile}
-          onApply={async (fields) => { await updateMutation.mutateAsync(fields); }}
+          onApply={async (fields) => {
+            // Uploading/scanning a CV means the candidate has one.
+            await handleSave({ ...(fields as Record<string, unknown>), has_cv: true });
+          }}
           onClose={() => setShowScanner(false)}
         />
       )}
+    </div>
+  );
+}
+
+// small key/value row used in the sidebar
+function Row({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex justify-between gap-3">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-medium text-slate-900 text-left">{value}</span>
     </div>
   );
 }
