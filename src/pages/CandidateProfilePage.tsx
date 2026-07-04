@@ -556,4 +556,8 @@ export default function CandidateProfilePage() {
           currentData={profile}
           onApply={async (fields) => { await updateMutation.mutateAsync(fields); }}
           onClose={() => setShowScanner(false)}
-    
+        />
+      )}
+    </div>
+  );
+}
