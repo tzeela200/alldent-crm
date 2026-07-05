@@ -99,7 +99,7 @@ export function useContacts(filters: ContactFilters = {}) {
       if (filters.sub_role) query = query.eq('sub_role', filters.sub_role)
       if (filters.region_id) query = query.eq('region_id', filters.region_id)
       if (filters.city_id) query = query.eq('city_id', filters.city_id)
-      if (filters.availability) query = query.eq('availability', filters.availability)
+      if (filters.availability) query = query.contains('candidate_availability_ids', [filters.availability])
       if (filters.experience) query = query.eq('experience', filters.experience)
       if (filters.source) query = query.eq('source', filters.source)
       if (filters.check_status) query = query.eq('check_status', filters.check_status)
@@ -157,7 +157,7 @@ export function useContact(contactId: number | undefined) {
 export function useCandidates(filters: ContactFilters = {}) {
   const result = useContacts({ ...filters, profile_type: filters.profile_type ?? undefined })
   const data = useMemo(
-    () => result.data.filter((c) => c.availability != null || c.profile_type === 1),
+    () => result.data.filter((c) => (Array.isArray(c.candidate_availability_ids) && c.candidate_availability_ids.length > 0) || c.profile_type === 1),
     [result.data]
   )
   return { data, total: data.length, isLoading: result.isLoading, loading: result.isLoading, error: result.error }

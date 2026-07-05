@@ -10,6 +10,7 @@ import {
   Download,
   Edit2,
   Eye,
+  MoreHorizontal,
   Phone,
   Plus,
   RefreshCw,
@@ -35,6 +36,14 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { SortableTh } from '@/components/ui/SortableTh'
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from '@/components/ui/dropdown-menu'
+import { formatPhone as libFormatPhone } from '@/lib/normalizePhone'
 import {
   DICT_CHECK_STATUSES,
   DICT_EXPERIENCE,
@@ -110,7 +119,8 @@ const PAGE_SIZE = 20
 
 const ALL_COLUMNS = [
   { key: 'name', label: 'שם' },
-  { key: 'phone', label: 'טלפון' },
+  { key: 'phone', label: 'נייד' },
+  { key: 'email', label: 'אימייל' },
   { key: 'role', label: 'תפקיד מועמד' },
   { key: 'sub_role', label: 'תת־תפקיד' },
   { key: 'experience', label: 'ניסיון' },
@@ -130,6 +140,7 @@ const ALL_COLUMNS = [
 const DEFAULT_COLUMNS = [
   'name',
   'phone',
+  'email',
   'role',
   'experience',
   'availability',
@@ -146,12 +157,10 @@ function normalizeDigits(value?: string | null) {
   return String(value ?? '').replace(/\D/g, '')
 }
 
+// Israeli phone display (handles the DB 972XXXXXXXXX format → 05X-XXXXXXX)
 function formatPhone(value?: string | null) {
-  const digits = normalizeDigits(value)
-  if (!digits) return '—'
-  if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
-  if (digits.length === 9) return `${digits.slice(0, 2)}-${digits.slice(2, 5)}-${digits.slice(5)}`
-  return digits
+  const out = libFormatPhone(value)
+  return out || '—'
 }
 
 function formatDate(value?: string | null) {
@@ -231,6 +240,18 @@ export default function AdminCandidatesPage() {
   const [bulkTagAction, setBulkTagAction] = useState<BulkTagAction>('')
   const [bulkTagValue, setBulkTagValue] = useState<string>('')
   const [visibleColumns, setVisibleColumns] = useState<string[]>([...DEFAULT_COLUMNS])
+  const [sortBy, setSortBy] = useState<string | null>(null)
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+
+  const onSort = (key: string) => {
+    if (sortBy === key) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(key)
+      setSortDir('asc')
+    }
+    setPage(0)
+  }
 
   // ── Tab A: active candidates from rel_contact_profiles ──────────────────
   const { data: candidateIds = [] } = useQuery<number[]>({
@@ -433,9 +454,10 @@ export default function AdminCandidatesPage() {
       const highSalary = (hourlySalary !== null && hourlySalary >= 250) || (monthlySalary !== null && monthlySalary >= 13000)
       const followUpDue = isDue(candidate.next_follow_up)
       const recentActivity = isRecent(candidate.last_contact_date, 14) || isRecent(candidate.updated_timestamp, 14)
-      const activeSearch = [1, 2, 3].includes(Number(candidate.availability ?? 0)) || mergedTagNames.includes('מחפש-אקטיבי')
-      const passiveSearch = Number(candidate.availability) === 4 || mergedTagNames.includes('מחפש-פסיבי')
-      const immediateAvailability = Number(candidate.availability) === 1 || mergedTagNames.includes('זמינות-מיידית')
+      const availIds = candidate.candidate_availability_ids ?? []
+      const activeSearch = availIds.some((id) => [1, 2, 3].includes(id)) || mergedTagNames.includes('מחפש-אקטיבי')
+      const passiveSearch = availIds.includes(4) || mergedTagNames.includes('מחפש-פסיבי')
+      const immediateAvailability = availIds.includes(1) || mergedTagNames.includes('זמינות-מיידית')
       const totalAppsCount = appCounts.total || Number(candidate.prev_applications_count ?? 0)
       const hasApplications = totalAppsCount > 0
       const highPotential =
@@ -490,6 +512,12 @@ export default function AdminCandidatesPage() {
   const regionName = (id: number | null | undefined) => regionOptions.find((r) => r.id === id)?.name ?? '—'
   const cityName = (id: number | null | undefined) => cityOptions.find((r) => r.id === id)?.name ?? '—'
   const availabilityName = (id: number | null | undefined) => dictLabel(availabilityOptions, id)
+  // candidate_availability_ids is multi-value (dict_availability); join to a readable list.
+  const availabilityNames = (ids: number[] | null | undefined): string => {
+    if (!Array.isArray(ids) || ids.length === 0) return '—'
+    const names = ids.map((id) => dictLabel(availabilityOptions, id)).filter((n) => n !== '—')
+    return names.length ? names.join(', ') : '—'
+  }
   const experienceName = (id: number | null | undefined) => DICT_EXPERIENCE.find((r) => r.id === id)?.name ?? '—'
   // DB column is bigint[]; the shared Contact type still says string for legacy reasons — read defensively.
   const languagesName = (value: unknown): string => {
@@ -526,7 +554,7 @@ export default function AdminCandidatesPage() {
         if (!filters.sub_role_ids.some((id) => cSubs.includes(id))) return false
       }
       if (filters.experience && candidate.experience !== filters.experience) return false
-      if (filters.availability && candidate.availability !== filters.availability) return false
+      if (filters.availability && !(candidate.candidate_availability_ids ?? []).includes(filters.availability)) return false
       if (filters.preferred_scope && String(candidate.preferred_scope ?? '') !== filters.preferred_scope) return false
       if (filters.region_id && candidate.region_id !== filters.region_id) return false
       if (filters.city_id && candidate.city_id !== filters.city_id) return false
@@ -561,8 +589,36 @@ export default function AdminCandidatesPage() {
     })
   }, [allCandidates, filters, activeTab])
 
-  const totalPages = Math.max(1, Math.ceil(filteredCandidates.length / PAGE_SIZE))
-  const pageData = filteredCandidates.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const sortedCandidates = useMemo(() => {
+    if (!sortBy) return filteredCandidates
+    const getVal = (c: (typeof filteredCandidates)[number]): string | number => {
+      switch (sortBy) {
+        case 'name': return c.full_name ?? c.display_name ?? ''
+        case 'phone': return (c as any).phone_norm ?? (c as any).phone ?? ''
+        case 'email': return c.email ?? ''
+        case 'role': return roleName(c.role)
+        case 'experience': return Number(c.experience ?? 0)
+        case 'work_status': return workStatusName((c as any).work_status)
+        case 'scope': return String(c.preferred_scope ?? '')
+        case 'city': return cityName(c.city_id)
+        case 'region': return regionName(c.region_id)
+        case 'cv': return c.derived.hasCv ? 1 : 0
+        case 'salary': return Number(c.salary_expectation_hourly ?? c.salary_expectation_monthly ?? 0)
+        case 'active_apps': return c.derived.activeAppsCount
+        case 'prev_apps': return c.derived.totalAppsCount
+        default: return ''
+      }
+    }
+    const dir = sortDir === 'asc' ? 1 : -1
+    return [...filteredCandidates].sort((a, b) => {
+      const va = getVal(a), vb = getVal(b)
+      if (typeof va === 'number' && typeof vb === 'number') return (va - vb) * dir
+      return String(va).localeCompare(String(vb), 'he') * dir
+    })
+  }, [filteredCandidates, sortBy, sortDir])
+
+  const totalPages = Math.max(1, Math.ceil(sortedCandidates.length / PAGE_SIZE))
+  const pageData = sortedCandidates.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const selectedCandidate = useMemo(
     () => allCandidates.find((item) => item.contact_id === sheet.contactId) ?? null,
@@ -700,7 +756,7 @@ export default function AdminCandidatesPage() {
       'תפקיד מועמד': roleName(candidate.role),
       'תת־תפקיד': subRoleName(candidate.sub_role),
       ניסיון: experienceName(candidate.experience),
-      זמינות: availabilityName(candidate.availability),
+      זמינות: availabilityNames(candidate.candidate_availability_ids),
       'סטטוס תעסוקה': workStatusName((candidate as any).work_status),
       'היקף מועדף': candidate.preferred_scope ?? '—',
       שפות: languagesName(candidate.languages),
@@ -1078,22 +1134,23 @@ export default function AdminCandidatesPage() {
                             className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
                           />
                         </th>
-                        {visibleColumns.includes('name') && <th className="px-3 py-3">שם</th>}
-                        {visibleColumns.includes('phone') && <th className="px-3 py-3">טלפון</th>}
-                        {visibleColumns.includes('role') && <th className="px-3 py-3">תפקיד מועמד</th>}
+                        {visibleColumns.includes('name') && <SortableTh label="שם" sortKey="name" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
+                        {visibleColumns.includes('phone') && <SortableTh label="נייד" sortKey="phone" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
+                        {visibleColumns.includes('email') && <SortableTh label="אימייל" sortKey="email" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
+                        {visibleColumns.includes('role') && <SortableTh label="תפקיד מועמד" sortKey="role" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
                         {visibleColumns.includes('sub_role') && <th className="px-3 py-3">תת־תפקיד</th>}
-                        {visibleColumns.includes('experience') && <th className="px-3 py-3">ניסיון</th>}
+                        {visibleColumns.includes('experience') && <SortableTh label="ניסיון" sortKey="experience" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
                         {visibleColumns.includes('availability') && <th className="px-3 py-3">זמינות</th>}
-                        {visibleColumns.includes('work_status') && <th className="px-3 py-3">סטטוס תעסוקה</th>}
+                        {visibleColumns.includes('work_status') && <SortableTh label="סטטוס תעסוקה" sortKey="work_status" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
                         {visibleColumns.includes('scope') && <th className="px-3 py-3">היקף מועדף</th>}
                         {visibleColumns.includes('languages') && <th className="px-3 py-3">שפות</th>}
-                        {visibleColumns.includes('city') && <th className="px-3 py-3">עיר מועמד</th>}
-                        {visibleColumns.includes('region') && <th className="px-3 py-3">אזור מועמד</th>}
-                        {visibleColumns.includes('cv') && <th className="px-3 py-3">קו"ח</th>}
+                        {visibleColumns.includes('city') && <SortableTh label="עיר מועמד" sortKey="city" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
+                        {visibleColumns.includes('region') && <SortableTh label="אזור מועמד" sortKey="region" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
+                        {visibleColumns.includes('cv') && <SortableTh label={'קו"ח'} sortKey="cv" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
                         {visibleColumns.includes('tags') && <th className="px-3 py-3">תגיות</th>}
-                        {visibleColumns.includes('salary') && <th className="px-3 py-3">ציפיות שכר</th>}
-                        {visibleColumns.includes('active_apps') && <th className="px-3 py-3">הגשות פעילות</th>}
-                        {visibleColumns.includes('prev_apps') && <th className="px-3 py-3">הגשות קודמות</th>}
+                        {visibleColumns.includes('salary') && <SortableTh label="ציפיות שכר" sortKey="salary" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
+                        {visibleColumns.includes('active_apps') && <SortableTh label="הגשות פעילות" sortKey="active_apps" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
+                        {visibleColumns.includes('prev_apps') && <SortableTh label="הגשות קודמות" sortKey="prev_apps" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
                         <th className="px-3 py-3 text-center">פעולות</th>
                       </tr>
                     </thead>
@@ -1126,7 +1183,6 @@ export default function AdminCandidatesPage() {
                                   </div>
                                   <div className="flex flex-wrap gap-1.5">
                                     {candidate.derived.highPotential && <SignalChip tone="accent">פוטנציאל גבוה</SignalChip>}
-                                    {candidate.derived.noCvSignal && <SignalChip tone="warning">ללא קו"ח</SignalChip>}
                                     {candidate.derived.partialLocation && <SignalChip tone="muted">מיקום חלקי</SignalChip>}
                                   </div>
                                 </div>
@@ -1135,6 +1191,11 @@ export default function AdminCandidatesPage() {
                             {visibleColumns.includes('phone') && (
                               <td className="px-3 py-3">
                                 <div className="font-semibold text-slate-700">{pn ? formatPhone(pn) : '—'}</div>
+                              </td>
+                            )}
+                            {visibleColumns.includes('email') && (
+                              <td className="px-3 py-3">
+                                <span dir="ltr" className="text-slate-600">{candidate.email || '—'}</span>
                               </td>
                             )}
                             {visibleColumns.includes('role') && (
@@ -1150,9 +1211,17 @@ export default function AdminCandidatesPage() {
                             )}
                             {visibleColumns.includes('availability') && (
                               <td className="px-3 py-3">
-                                <StatusBadge tone={availabilityTone(candidate.availability)}>
-                                  {availabilityName(candidate.availability)}
-                                </StatusBadge>
+                                {(candidate.candidate_availability_ids ?? []).length ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {(candidate.candidate_availability_ids ?? []).map((id) => (
+                                      <StatusBadge key={id} tone={availabilityTone(id)}>
+                                        {availabilityName(id)}
+                                      </StatusBadge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
                               </td>
                             )}
                             {visibleColumns.includes('work_status') && (
@@ -1216,32 +1285,41 @@ export default function AdminCandidatesPage() {
                               </td>
                             )}
                             <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-1">
-                                <IconAction
-                                  title="פתיחת 360"
-                                  icon={<Eye className="h-4 w-4" />}
-                                  asLink={`/admin/candidates/${candidate.contact_id}`}
-                                />
-                                <IconAction
-                                  title="וואטסאפ"
-                                  icon={<Phone className="h-4 w-4" />}
-                                  disabled={!candidate.derived.hasPhone}
-                                  onClick={() => {
-                                    const n = normalizeDigits(pn ?? phone)
-                                    if (!n) return
-                                    window.open(`https://wa.me/${n}`, '_blank')
-                                  }}
-                                />
-                                <IconAction
-                                  title="יצירת הגשה"
-                                  icon={<Briefcase className="h-4 w-4" />}
-                                  onClick={() => openCreateApplication(candidate.contact_id)}
-                                />
-                                <IconAction
-                                  title="סמארט מאץ׳"
-                                  icon={<WandSparkles className="h-4 w-4" />}
-                                  onClick={() => showToast('פתיחת Smart Match', 'info')}
-                                />
+                              <div className="flex justify-center">
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild>
+                                    <button
+                                      type="button"
+                                      title="פעולות"
+                                      className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#D9D9D9] bg-white text-[#6B6B6B] transition hover:text-[#008080] hover:shadow-sm"
+                                    >
+                                      <MoreHorizontal className="h-5 w-5" />
+                                    </button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent>
+                                    <DropdownMenuItem asChild>
+                                      <Link to={`/admin/candidates/${candidate.contact_id}`}>
+                                        <Eye className="h-4 w-4" /> פתיחת 360
+                                      </Link>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      disabled={!candidate.derived.hasPhone}
+                                      onSelect={() => {
+                                        const n = normalizeDigits(pn ?? phone)
+                                        if (!n) return
+                                        window.open(`https://wa.me/${n}`, '_blank')
+                                      }}
+                                    >
+                                      <Phone className="h-4 w-4" /> וואטסאפ
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => openCreateApplication(candidate.contact_id)}>
+                                      <Briefcase className="h-4 w-4" /> יצירת הגשה
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={() => showToast('פתיחת Smart Match', 'info')}>
+                                      <WandSparkles className="h-4 w-4" /> סמארט מאץ׳
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               </div>
                             </td>
                           </tr>
@@ -1276,7 +1354,7 @@ export default function AdminCandidatesPage() {
                         </h2>
                         <div className="mt-1 flex flex-wrap gap-2">
                           <RoleBadge label={roleName(selectedCandidate.role)} roleId={Number(selectedCandidate.role)} />
-                          <LightChip>{availabilityName(selectedCandidate.availability)}</LightChip>
+                          <LightChip>{availabilityNames(selectedCandidate.candidate_availability_ids)}</LightChip>
                           <LightChip>{workStatusName((selectedCandidate as any).work_status)}</LightChip>
                         </div>
                       </div>
@@ -1319,7 +1397,7 @@ export default function AdminCandidatesPage() {
                   <QuickGrid
                     items={[
                       { label: 'תפקיד מועמד', value: roleName(selectedCandidate.role) },
-                      { label: 'זמינות', value: availabilityName(selectedCandidate.availability) },
+                      { label: 'זמינות', value: availabilityNames(selectedCandidate.candidate_availability_ids) },
                       { label: 'סטטוס תעסוקה', value: workStatusName((selectedCandidate as any).work_status) },
                       { label: 'ניסיון', value: experienceName(selectedCandidate.experience) },
                       { label: 'שכר', value: formatSalary((selectedCandidate as any).salary_expectation_hourly, (selectedCandidate as any).salary_expectation_monthly) },
@@ -1601,16 +1679,6 @@ function RoleBadge({ label, roleId }: { label: string; roleId: number }) {
   if (roleId === 5) classes = 'bg-green-50 text-green-700'
   if (roleId === 6) classes = 'bg-amber-50 text-amber-700'
   return <span className={`rounded-md px-2.5 py-1 text-[12px] font-semibold ${classes}`}>{label}</span>
-}
-
-function IconAction({ title, icon, onClick, disabled, asLink }: { title: string; icon: React.ReactNode; onClick?: () => void; disabled?: boolean; asLink?: string }) {
-  const className = 'inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50'
-  if (asLink) return <Link to={asLink} className={className} title={title} aria-label={title}>{icon}</Link>
-  return (
-    <button type="button" title={title} aria-label={title} onClick={onClick} disabled={disabled} className={className}>
-      {icon}
-    </button>
-  )
 }
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
