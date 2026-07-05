@@ -109,7 +109,7 @@ export default function App() {
       {/* ─── Profile routes (no layout) ─── */}
       <Route path="/candidate/:contactId" element={<CandidateProfilePage />} />
       <Route path="/profile/:token" element={<CandidateProfilePage />} />
-      <Route path="/employer-profile/:id" element={<EmployerProfilePage />} />
+      <Route path="/employer-profile/:id" element={<AuthGuard><EmployerProfilePage /></AuthGuard>} />
 
       {/* ─── Admin routes (with AdminLayout, auth-protected) ─── */}
       <Route path="/admin" element={<AuthGuard><AdminLayout /></AuthGuard>}>

@@ -157,19 +157,9 @@ export default function RecruitmentRequestPage() {
     try {
       const normalizedPhone = normalizePhone(form.contact_phone)
 
-      const { data: accountRows } = await supabase
-        .from('accounts')
-        .select('account_id')
-        .eq('account_name', form.company_name.trim())
-        .limit(1)
-      const accountLink = (accountRows as any)?.[0]?.account_id ?? null
-
-      const { data: matchedContact } = await supabase
-        .from('contact')
-        .select('contact_id')
-        .eq('phone_norm', normalizedPhone)
-        .maybeSingle()
-      const relEmployerContact = (matchedContact as any)?.contact_id ?? null
+      // Org/contact linking is done admin-side when the request is reviewed
+      // (the raw details are preserved in employer_notes below). No public
+      // reads of accounts/contact — keeps the tables closed to anon.
 
       const contactBlock = [
         '[בקשת גיוס — פרטי פונה]',
@@ -188,8 +178,8 @@ export default function RecruitmentRequestPage() {
         job_status: 2,
         public_status: 1,
         published_at: null,
-        account_link: accountLink,
-        rel_employer_contact: relEmployerContact,
+        account_link: null,
+        rel_employer_contact: null,
         job_role: Number(form.job_role) || null,
         job_sub_role: form.job_sub_role.length ? form.job_sub_role : [],
         region_id: Number(form.region_id) || null,

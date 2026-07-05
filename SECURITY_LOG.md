@@ -4,6 +4,22 @@
 
 ---
 
+## 05/07/2026 — הקשחת RLS: סגירת חשיפת anon ב-accounts ו-contact
+
+**הממצא (חמור):** לטבלאות `accounts` ו-`contact` היו מדיניות RLS פתוחות ל-anon (מבקר לא מחובר) עם `qual=true`:
+- `accounts`: anon יכל לקרוא את כל 966 הארגונים (כולל `notes`, `billing_email`, `all_applicants_names`), לעדכן וליצור.
+- `contact`: anon יכל לקרוא את כל ה-PII של המועמדים, **ולעדכן כל איש קשר** — עקיפה של אבטחת הטוקן.
+
+**התיקון (2 שלבים, DDL על prod):**
+- **שלב 1 — כתיבה:** DROP `allow_update_accounts_anon`, `allow_insert_accounts_anon`, `allow_update_contact_anon`, `allow_insert_contact_anon_authenticated`. (מחוברים נשמרים ע"י policy "Authenticated users..."; זרימות ציבוריות עוברות RPCs SECURITY DEFINER.)
+- **שלב 2 — קריאה:** DROP `allow_select_accounts_anon`, `allow_select_contact_anon`. הותאמו 2 הדפים הציבוריים היחידים שקראו ישירות: `RecruitmentRequestPage` (הוסר חיפוש accounts/contact — השיוך נעשה בצד אדמין), ו-`EmployerProfilePage` (הועבר מאחורי `AuthGuard` — הציג נתונים פנימיים). נשמרה `Public profile by token` הממוקדת (דורשת טוקן).
+
+**אימות:** סימולציית anon → `accounts=0, contact=0` (לפני: 966 + כל המועמדים). `get_advisors`: החורים נסגרו; שאר הרשאות ה-anon הן טבלאות `dict_*` בלבד (לגיטימי — מילונים לא-רגישים לטפסים ציבוריים).
+
+**עיקרון:** להביא את accounts/contact לדפוס של `job`/`applications` — אין גישת anon ישירה; ציבורי רק דרך RPC מבוקר.
+
+---
+
 ## 05/07/2026 — פרופיל מועמד עצמי (עריכה, AI, היסטוריה, הודעות)
 
 הקשר: בניית תצוגת קורות-חיים למועמד עם עריכה מלאה, כלי AI, היסטוריית גרסאות ותיבת הודעות. כל התוספות נשמרו **בתוך** גבול האבטחה של התיקון המקורי `c16dd6c` (self-edit מאובטח בטוקן).
