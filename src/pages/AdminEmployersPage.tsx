@@ -38,6 +38,7 @@ import type { Account, Contact } from '@/types'
 import { MergeRecordsModal } from '@/components/MergeRecordsModal'
 import { ConvertAccountToContactModal } from '@/components/ConvertAccountToContactModal'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
+import { RegionBadge } from '@/components/admin/RegionBadge'
 import { OrgContactPicker } from '@/components/ui/OrgContactPicker'
 import SidePanel from '@/components/ui/SidePanel'
 
@@ -1235,7 +1236,7 @@ export default function AdminEmployersPage({
                             {visibleColumns.includes('account_status') && <td style={{ width: columnWidths.account_status }} className="px-3 py-3" onClick={(e) => e.stopPropagation()}><select dir="rtl" value={String(account.account_status ?? '')} onChange={(event) => updateAccountStatusInline(Number(account.account_id), Number(event.target.value))} className={`h-9 rounded-[8px] border px-2.5 text-[12px] font-bold outline-none ${status.bg} ${status.text} ${status.border}`}>{(isEmployersBoard ? accountStatuses.filter((item) => EMPLOYER_STATUS_IDS.includes(item.id)) : accountStatuses).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></td>}
                             {visibleColumns.includes('phone') && <td style={{ width: columnWidths.phone }} dir="ltr" className="px-4 py-3 font-mono text-[12px]">{formatPhone(account.phone)}</td>}
                             {visibleColumns.includes('email') && <td style={{ width: columnWidths.email }} dir="ltr" className="px-4 py-3 text-[12px]">{account.email ?? '—'}</td>}
-                            {visibleColumns.includes('region') && <td style={{ width: columnWidths.region }} className="px-3 py-3">{regionName(account.displayRegionId)}</td>}
+                            {visibleColumns.includes('region') && <td style={{ width: columnWidths.region }} className="px-3 py-3"><RegionBadge regionId={account.displayRegionId} label={regionName(account.displayRegionId)} /></td>}
                             {visibleColumns.includes('city') && <td style={{ width: columnWidths.city }} className="px-3 py-3">{account.locationLabel || cityName(account.displayCityId)}</td>}
                             {visibleColumns.includes('active_jobs') && <td style={{ width: columnWidths.active_jobs }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F0FDF4] px-2.5 py-1 text-[12px] font-bold text-[#16A34A]">{account.activeJobsCount}</span></td>}
                             {visibleColumns.includes('total_jobs') && <td style={{ width: columnWidths.total_jobs }} className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold text-[#2D2D2D]">{account.totalJobsCount}</span></td>}

@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
 import type { ContactRow, Contact360Dicts } from "@/hooks/useContact360";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -6,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
 import DictionaryMultiSelect from "@/components/ui/DictionaryMultiSelect";
+import { CityRegionPicker } from "@/components/ui/CityRegionPicker";
 import {
   selectValue,
   buildContactPatch,
@@ -22,6 +25,67 @@ interface Props {
 }
 
 const BRAND_PRIMARY = "#008080";
+
+// Searchable organization picker (966+ accounts → needs search, not a plain <select>).
+function AccountPicker({ value, onChange }: { value: number | null; onChange: (id: number | null) => void }) {
+  const [q, setQ] = useState("");
+  const [open, setOpen] = useState(false);
+  const { data: accounts = [] } = useQuery<{ account_id: number; account_name: string | null }[]>({
+    queryKey: ["accounts_names"],
+    queryFn: async () => {
+      const { data } = await supabase.from("accounts").select("account_id,account_name").order("account_name");
+      return data ?? [];
+    },
+    staleTime: 600_000,
+  });
+  const selected = accounts.find((a) => a.account_id === value);
+  const needle = q.trim().toLowerCase();
+  const filtered = (needle
+    ? accounts.filter((a) => (a.account_name ?? "").toLowerCase().includes(needle))
+    : accounts
+  ).slice(0, 50);
+  const inputCls =
+    "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500";
+  return (
+    <div className="relative">
+      <div className="flex items-center gap-2">
+        <input
+          className={inputCls}
+          dir="rtl"
+          placeholder="חיפוש ארגון..."
+          value={open ? q : selected?.account_name ?? ""}
+          onFocus={() => { setOpen(true); setQ(""); }}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+        />
+        {value != null && (
+          <button
+            type="button"
+            onClick={() => { onChange(null); setQ(""); }}
+            className="shrink-0 rounded-md px-2 py-1 text-slate-400 hover:text-red-600"
+            title="ביטול שיוך"
+          >
+            ×
+          </button>
+        )}
+      </div>
+      {open && filtered.length > 0 && (
+        <div className="absolute z-40 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
+          {filtered.map((a) => (
+            <button
+              key={a.account_id}
+              type="button"
+              onMouseDown={() => { onChange(a.account_id); setOpen(false); setQ(""); }}
+              className="block w-full px-3 py-2 text-right text-sm text-slate-700 hover:bg-slate-50"
+            >
+              {a.account_name ?? `#${a.account_id}`}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved }: Props) {
   const [adminForm, setAdminForm] = useState<FormState>({});
@@ -47,15 +111,6 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
       {title}
     </h3>
   );
-
-  const filteredCities = (dicts?.cities ?? [])
-    .filter(
-      (c) =>
-        !adminForm.region_id ||
-        Number(c.region_id) === Number(adminForm.region_id) ||
-        Number(c.id) === Number(adminForm.city_id),
-    )
-    .sort((a, b) => String(a.name).localeCompare(String(b.name), "he"));
 
   async function handleSave() {
     if (!contact) return;
@@ -128,44 +183,24 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
                 </div>
               ))}
 
-              {/* אזור */}
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">אזור</label>
-                <select
-                  className={selectCls}
-                  value={selectValue(adminForm.region_id)}
-                  onChange={(e) => {
-                    setAf("region_id", e.target.value ? Number(e.target.value) : null);
-                    setAf("city_id", null);
-                  }}
-                >
-                  <option value="">— בחר אזור —</option>
-                  {dicts?.regions.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
+              {/* אזור + עיר — רכיב משותף (כל הערים, חיפוש, מילוי אזור אוטומטי) */}
+              <div className="col-span-2">
+                <CityRegionPicker
+                  cityId={adminForm.city_id != null && adminForm.city_id !== "" ? Number(adminForm.city_id) : null}
+                  regionId={adminForm.region_id != null && adminForm.region_id !== "" ? Number(adminForm.region_id) : null}
+                  onRegionChange={(id) => setAf("region_id", id)}
+                  onCityChange={(id) => setAf("city_id", id)}
+                  regions={dicts?.regions}
+                />
               </div>
 
-              {/* עיר */}
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">עיר</label>
-                <select
-                  className={selectCls}
-                  value={selectValue(adminForm.city_id)}
-                  onChange={(e) => setAf("city_id", e.target.value ? Number(e.target.value) : null)}
-                  disabled={!adminForm.region_id && adminForm.city_id == null}
-                >
-                  <option value="">
-                    {adminForm.region_id ? "— בחר עיר —" : "— בחר אזור תחילה —"}
-                  </option>
-                  {filteredCities.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+              {/* ארגון מקושר */}
+              <div className="col-span-2 space-y-1">
+                <label className="text-xs text-slate-500">ארגון מקושר</label>
+                <AccountPicker
+                  value={adminForm.account_link != null && adminForm.account_link !== "" ? Number(adminForm.account_link) : null}
+                  onChange={(id) => setAf("account_link", id)}
+                />
               </div>
 
               {/* מגדר */}

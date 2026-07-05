@@ -37,6 +37,7 @@ import { supabase } from '@/lib/supabase'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { SortableTh } from '@/components/ui/SortableTh'
+import { RegionBadge } from '@/components/admin/RegionBadge'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -1241,7 +1242,7 @@ export default function AdminCandidatesPage() {
                               <td className="px-3 py-3"><LightChip>{cityName(candidate.city_id)}</LightChip></td>
                             )}
                             {visibleColumns.includes('region') && (
-                              <td className="px-3 py-3"><LightChip>{regionName(candidate.region_id)}</LightChip></td>
+                              <td className="px-3 py-3"><RegionBadge regionId={candidate.region_id} label={regionName(candidate.region_id)} /></td>
                             )}
                             {visibleColumns.includes('cv') && (
                               <td className="px-3 py-3">

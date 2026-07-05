@@ -911,7 +911,7 @@ function DetailSheet({
             <DetailsGrid
               items={[
                 { label: 'שם מועמד', value: row.candidate_name },
-                { label: 'טלפון', value: row.candidate_phone },
+                { label: 'נייד', value: row.candidate_phone },
                 { label: 'אימייל', value: row.candidate_email },
                 { label: 'Candidate 360', value: row.candidate_link ? 'זמין' : 'לא קיים' },
               ]}

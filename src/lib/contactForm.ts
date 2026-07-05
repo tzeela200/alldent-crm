@@ -78,6 +78,7 @@ export function buildContactPatch(form: FormState, original: FormState): Record<
     second_email: nullableString(form, "second_email"),
     region_id: nullableNumber(form, "region_id"),
     city_id: nullableNumber(form, "city_id"),
+    account_link: nullableNumber(form, "account_link"),
     gender: nullableNumber(form, "gender"),
     birth_year: nullableNumber(form, "birth_year"),
     role: nullableNumber(form, "role"),

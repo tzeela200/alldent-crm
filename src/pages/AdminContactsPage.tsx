@@ -52,6 +52,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import type { Contact } from '@/types'
 import { RoleBadge } from '@/components/admin/RoleBadge'
+import { RegionBadge } from '@/components/admin/RegionBadge'
 import { MergeRecordsModal } from '@/components/MergeRecordsModal'
 
 type ExtendedFilters = {
@@ -129,7 +130,7 @@ const KPI_ROLE_GROUPS: KpiRoleCard[] = [
 
 const ALL_COLUMNS = [
   { key: 'full_name', label: 'שם מלא' },
-  { key: 'phone', label: 'טלפון' },
+  { key: 'phone', label: 'נייד' },
   { key: 'email', label: 'אימייל' },
   { key: 'role', label: 'תפקיד' },
   { key: 'region', label: 'אזור' },
@@ -1004,7 +1005,7 @@ export default function AdminContactsPage() {
                           />
                         </th>
                         {visibleColumns.includes('full_name') && <SortableTh label="שם מלא" sortKey="full_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['full_name']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('phone') && <SortableTh label="טלפון" sortKey="phone" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['phone']} onResizeStart={handleResizeStart} />}
+                        {visibleColumns.includes('phone') && <SortableTh label="נייד" sortKey="phone" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['phone']} onResizeStart={handleResizeStart} />}
                         {visibleColumns.includes('email') && <SortableTh label="אימייל" sortKey="email" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['email']} onResizeStart={handleResizeStart} />}
                         {visibleColumns.includes('role') && <SortableTh label="תפקיד" sortKey="role" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['role']} onResizeStart={handleResizeStart} />}
                         {visibleColumns.includes('region') && <SortableTh label="אזור" sortKey="region" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['region']} onResizeStart={handleResizeStart} />}
@@ -1106,7 +1107,7 @@ export default function AdminContactsPage() {
 
                             {visibleColumns.includes('region') && (
                               <td className="px-3 py-3">
-                                <LightTag tone="slate">{regionName(contact.region_id)}</LightTag>
+                                <RegionBadge regionId={contact.region_id} label={regionName(contact.region_id)} />
                               </td>
                             )}
 
@@ -1267,7 +1268,7 @@ export default function AdminContactsPage() {
                         <QuickLinkButton
                           href={selectedContact.phone_norm ? `tel:${selectedContact.phone_norm}` : undefined}
                           icon={<Phone className="h-4 w-4" />}
-                          label="טלפון"
+                          label="נייד"
                           disabled={!selectedContact.phone_norm}
                         />
                         <QuickLinkButton
@@ -1390,7 +1391,7 @@ export default function AdminContactsPage() {
                         <input className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.full_name ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, full_name: e.target.value }))} />
                       </label>
                       <label className="flex flex-col gap-1">
-                        <span className="text-[12px] font-semibold text-slate-500">טלפון</span>
+                        <span className="text-[12px] font-semibold text-slate-500">נייד</span>
                         <input className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.phone ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))} />
                       </label>
                       <label className="flex flex-col gap-1">
@@ -1404,20 +1405,14 @@ export default function AdminContactsPage() {
                           {roleOptions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                         </select>
                       </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[12px] font-semibold text-slate-500">אזור</span>
-                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.region_id ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, region_id: e.target.value ? Number(e.target.value) : null }))}>
-                          <option value="">— בחר —</option>
-                          {regionOptions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                        </select>
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[12px] font-semibold text-slate-500">עיר</span>
-                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.city_id ?? ''} onChange={(e) => { const cityId = e.target.value ? Number(e.target.value) : null; const found = cityOptions.find((c) => c.id === cityId); setEditDraft((d) => ({ ...d, city_id: cityId, region_id: found?.region_id ?? d.region_id })) }}>
-                          <option value="">— בחר —</option>
-                          {cityOptions.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </label>
+                      <div className="col-span-2">
+                        <CityRegionPicker
+                          cityId={editDraft.city_id ?? null}
+                          regionId={editDraft.region_id ?? null}
+                          onRegionChange={(id) => setEditDraft((d) => ({ ...d, region_id: id }))}
+                          onCityChange={(id) => setEditDraft((d) => ({ ...d, city_id: id }))}
+                        />
+                      </div>
                       <label className="flex flex-col gap-1">
                         <span className="text-[12px] font-semibold text-slate-500">זמינות</span>
                         <DictionaryMultiSelect
@@ -1451,7 +1446,7 @@ export default function AdminContactsPage() {
                       { label: 'שם פרטי', value: selectedContact.first_name },
                       { label: 'שם משפחה', value: selectedContact.last_name },
                       {
-                        label: 'טלפון',
+                        label: 'נייד',
                         value: selectedContact.phone_norm ? formatPhone(selectedContact.phone_norm) : '—',
                       },
                       {
@@ -1763,7 +1758,7 @@ export default function AdminContactsPage() {
               nameField="full_name"
               displayFields={[
                 { key: 'full_name' as never, label: 'שם מלא' },
-                { key: 'phone' as never, label: 'טלפון', format: (v) => v ? formatPhone(String(v)) : '—' },
+                { key: 'phone' as never, label: 'נייד', format: (v) => v ? formatPhone(String(v)) : '—' },
                 { key: 'email' as never, label: 'מייל' },
                 { key: 'role' as never, label: 'תפקיד', format: (v) => roleName(v as number) },
                 { key: 'candidate_availability_ids' as never, label: 'זמינות', format: (v) => availabilityNames(v as number[]) },
