@@ -38,6 +38,7 @@ import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { SortableTh } from '@/components/ui/SortableTh'
 import { RegionBadge } from '@/components/admin/RegionBadge'
+import { RoleBadge } from '@/components/admin/RoleBadge'
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -1670,16 +1671,6 @@ function TagChip({ children }: { children: React.ReactNode }) {
 
 function LightChip({ children }: { children: React.ReactNode }) {
   return <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[12px] font-semibold text-slate-700">{children}</span>
-}
-
-function RoleBadge({ label, roleId }: { label: string; roleId: number }) {
-  let classes = 'bg-slate-100 text-slate-700'
-  if ([1, 7, 8, 9, 10, 11].includes(roleId)) classes = 'bg-blue-50 text-blue-700'
-  if (roleId === 2) classes = 'bg-pink-50 text-pink-700'
-  if (roleId === 3) classes = 'bg-violet-50 text-violet-700'
-  if (roleId === 5) classes = 'bg-green-50 text-green-700'
-  if (roleId === 6) classes = 'bg-amber-50 text-amber-700'
-  return <span className={`rounded-md px-2.5 py-1 text-[12px] font-semibold ${classes}`}>{label}</span>
 }
 
 function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
