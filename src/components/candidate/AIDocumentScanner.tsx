@@ -77,7 +77,7 @@ export default function AIDocumentScanner({ contactId, token, currentData, onApp
       setState("scanning");
 
       const { data, error: fnError } = await supabase.functions.invoke("ai-document-scanner", {
-        body: { fileText: text, base64, mediaType },
+        body: { fileText: text, base64, mediaType, token },
       });
 
       if (fnError) throw fnError;

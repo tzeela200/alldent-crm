@@ -770,6 +770,7 @@ export default function CandidateProfilePage() {
       {showWriter && profile && (
         <AIProfileWriter
           contactId={contactId}
+          token={isTokenMode ? token : undefined}
           currentData={profile}
           onApply={async (fields) => { await handleSave(fields as Record<string, unknown>); }}
           onClose={() => setShowWriter(false)}

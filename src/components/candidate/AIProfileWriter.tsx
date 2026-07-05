@@ -13,6 +13,7 @@ import type { CandidatePublicFields } from "@/hooks/useCandidateProfile";
 
 interface AIProfileWriterProps {
   contactId: number;
+  token?: string;
   currentData: CandidatePublicFields & { contact_id: number };
   onApply: (fields: Partial<CandidatePublicFields>) => Promise<void>;
   onClose: () => void;
@@ -31,7 +32,7 @@ const FIELD_LABELS: Record<string, string> = {
   languages: "שפות",
 };
 
-export default function AIProfileWriter({ contactId, currentData, onApply, onClose }: AIProfileWriterProps) {
+export default function AIProfileWriter({ contactId, token, currentData, onApply, onClose }: AIProfileWriterProps) {
   const [userInput, setUserInput] = useState("");
   const [state, setState] = useState<"idle" | "loading" | "preview" | "applying">("idle");
   const [proposed, setProposed] = useState<ProposedFields>({});
@@ -45,7 +46,7 @@ export default function AIProfileWriter({ contactId, currentData, onApply, onClo
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke("ai-profile-writer", {
-        body: { currentData, userInput: userInput.trim() },
+        body: { currentData, userInput: userInput.trim(), token },
       });
 
       if (fnError) throw fnError;
