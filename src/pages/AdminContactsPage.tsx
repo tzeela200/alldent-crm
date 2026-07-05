@@ -38,6 +38,7 @@ import { formatPhone } from '@/lib/normalizePhone'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import SidePanel from '@/components/ui/SidePanel'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { DictionaryMultiSelect } from '@/components/ui/DictionaryMultiSelect'
 import {
   DICT_AVAILABILITY,
   DICT_CHECK_STATUSES,
@@ -97,20 +98,6 @@ type KpiRoleCard = {
   roleIds: number[]
 }
 
-const AVAILABLE_TAGS = [
-  'VIP',
-  'זמינות-מיידית',
-  'מחפש-אקטיבי',
-  'מחפש-פסיבי',
-  'אין-קו"ח',
-  'ציפיות-שכר-גבוהות',
-  'פוטנציאל-גבוה',
-  'ללא-ניסיון',
-  'מגורים-קרובים',
-  'דגל-אדום-מבריז',
-  'בוגר-הדסה',
-]
-
 const TAG_COLOR_MAP: Record<string, string> = {
   'VIP':                    'bg-purple-50 text-purple-700',
   'זמינות-מיידית':          'bg-green-50 text-green-700',
@@ -127,6 +114,9 @@ const TAG_COLOR_MAP: Record<string, string> = {
 function tagClass(tag: string) {
   return TAG_COLOR_MAP[tag] ?? 'bg-teal-50 text-teal-700'
 }
+
+// A tag applied to a contact — carries the row id (for delete) and resolved name.
+type PanelTag = { id: number; tag_id: number | null; name: string }
 
 const KPI_ROLE_GROUPS: KpiRoleCard[] = [
   { key: 'assistant',  label: 'סייעות',      tone: 'assistant',  roleIds: [9], value: 0 },
@@ -176,7 +166,6 @@ export default function AdminContactsPage() {
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [selectedRows, setSelectedRows] = useState<number[]>([])
   const [toast, setToast] = useState<ToastState>({ open: false, message: '', tone: 'info' })
-  const [rowActionPending, setRowActionPending] = useState<number | null>(null)
   const [exportPending, setExportPending] = useState(false)
   const [visibleColumns, setVisibleColumns] = useState<string[]>([...DEFAULT_COLUMNS])
   const [sortBy, setSortBy] = useState<string | null>(null)
@@ -185,7 +174,7 @@ export default function AdminContactsPage() {
   const [isEditing, setIsEditing] = useState(false)
   const [editDraft, setEditDraft] = useState<Partial<Contact>>({})
   const [savePending, setSavePending] = useState(false)
-  const [panelTags, setPanelTags] = useState<string[]>([])
+  const [panelTags, setPanelTags] = useState<PanelTag[]>([])
   const [showTagDropdown, setShowTagDropdown] = useState(false)
 
   // Bulk update
@@ -193,6 +182,11 @@ export default function AdminContactsPage() {
   const [bulkField, setBulkField] = useState('')
   const [bulkValue, setBulkValue] = useState<string | number | null>(null)
   const [bulkPending, setBulkPending] = useState(false)
+
+  // Follow-up scheduler
+  const [followUpTarget, setFollowUpTarget] = useState<number | null>(null)
+  const [followUpDate, setFollowUpDate] = useState('')
+  const [followUpPending, setFollowUpPending] = useState(false)
 
   // Merge
   const [mergeOpen, setMergeOpen] = useState(false)
@@ -300,24 +294,39 @@ export default function AdminContactsPage() {
     staleTime: 600_000,
   })
 
-  const { data: contactTagsData = [] } = useQuery<{ contact_id: number; tag: string }[]>({
+  // Canonical tag dictionary (id-based) — same model as AdminCandidatesPage.
+  const { data: candidateTagOptions = [] } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_candidate_tags'],
+    queryFn: async () => {
+      const { data } = await supabase.from('dict_candidate_tags').select('id,name').eq('is_active', true).order('sort_order')
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
+  const { data: contactTagsData = [] } = useQuery<{ id: number; contact_id: number; tag: string | null; tag_id: number | null }[]>({
     queryKey: ['contact_tags', selectedId],
     queryFn: async () => {
       if (!selectedId) return []
-      const { data, error } = await supabase.from('contact_tags').select('contact_id,tag').eq('contact_id', selectedId)
+      const { data, error } = await supabase.from('contact_tags').select('id,contact_id,tag,tag_id').eq('contact_id', selectedId)
       if (error) throw error
       return data ?? []
     },
     enabled: !!selectedId,
   })
 
-  const selectedTags = useMemo(
-    () => contactTagsData,
-    [contactTagsData],
+  // Resolve display name from tag_id (dict), falling back to legacy text `tag`.
+  const selectedTags = useMemo<PanelTag[]>(
+    () => contactTagsData.map((r) => ({
+      id: r.id,
+      tag_id: r.tag_id,
+      name: r.tag_id ? (candidateTagOptions.find((o) => o.id === r.tag_id)?.name ?? r.tag ?? '') : (r.tag ?? ''),
+    })),
+    [contactTagsData, candidateTagOptions],
   )
 
   useEffect(() => {
-    setPanelTags(selectedTags.map((t) => t.tag))
+    setPanelTags(selectedTags)
     setIsEditing(false)
     setEditDraft({})
   }, [selectedId])
@@ -332,6 +341,12 @@ export default function AdminContactsPage() {
   const regionName = (id: number | null | undefined) => regionOptions.find((r) => r.id === id)?.name ?? '—'
   const cityName = (id: number | null | undefined) => cityOptions.find((r) => r.id === id)?.name ?? '—'
   const availabilityName = (id: number | null | undefined) => availabilityOptions.find((r) => r.id === id)?.name ?? '—'
+  // candidate_availability_ids is multi-value; join to a readable list of names.
+  const availabilityNames = (ids: number[] | null | undefined): string => {
+    if (!Array.isArray(ids) || ids.length === 0) return '—'
+    const names = ids.map((id) => availabilityName(id)).filter((n) => n !== '—')
+    return names.length ? names.join(', ') : '—'
+  }
   const experienceName = (id: number | null | undefined) => experienceOptions.find((r) => r.id === id)?.name ?? '—'
   const sourceName = (id: number | null | undefined) => sourceOptions.find((r) => r.id === id)?.name ?? '—'
   const checkStatusName = (id: number | null | undefined) => checkStatusOptions.find((r) => r.id === id)?.name ?? '—'
@@ -482,7 +497,7 @@ export default function AdminContactsPage() {
         תפקיד: roleName(contact.role),
         אזור: regionName(contact.region_id),
         עיר: cityName(contact.city_id),
-        זמינות: availabilityName(contact.availability),
+        זמינות: availabilityNames(contact.candidate_availability_ids),
         'קו"ח': contact.has_cv ? 'יש' : 'אין',
         'סוג פרופיל': profileTypeName(contact.profile_type),
         'ארגון מקושר': contact.linked_org_name ?? '',
@@ -515,7 +530,11 @@ export default function AdminContactsPage() {
     if (!selectedRows.length || !bulkField || bulkValue === null || bulkValue === '') return
     setBulkPending(true)
     try {
-      const { error } = await bulkUpdateContacts(selectedRows, { [bulkField]: bulkValue })
+      // availability is now a multi-value array column — wrap the chosen id.
+      const patch = bulkField === 'availability'
+        ? { candidate_availability_ids: [Number(bulkValue)] }
+        : { [bulkField]: bulkValue }
+      const { error } = await bulkUpdateContacts(selectedRows, patch)
       if (error) throw error
       showToast(`${selectedRows.length} רשומות עודכנו בהצלחה`, 'success')
       setBulkUpdateOpen(false)
@@ -552,12 +571,29 @@ export default function AdminContactsPage() {
     }
   }
 
-  const handleRowAction = async (contactId: number, message: string) => {
+  // Open the linked organization's 360 card (account_link → account id).
+  const openOrg = (accountLink: number | null | undefined) => {
+    if (!accountLink) { showToast('אין ארגון מקושר לרשומה', 'error'); return }
+    navigate(`/admin/accounts/${accountLink}`)
+  }
+
+  // Follow-up: pick a date → write contact.next_follow_up.
+  const openFollowUp = (contactId: number, current: string | null | undefined) => {
+    setFollowUpTarget(contactId)
+    setFollowUpDate(current ? String(current).slice(0, 10) : '')
+  }
+  const saveFollowUp = async () => {
+    if (!followUpTarget) return
+    setFollowUpPending(true)
     try {
-      setRowActionPending(contactId)
-      showToast(message, 'success')
+      const { error } = await updateContact(followUpTarget, { next_follow_up: followUpDate || null })
+      if (error) throw error
+      showToast('פולו־אפ נקבע', 'success')
+      setFollowUpTarget(null)
+    } catch {
+      showToast('שגיאה בקביעת פולו־אפ', 'error')
     } finally {
-      setRowActionPending(null)
+      setFollowUpPending(false)
     }
   }
 
@@ -583,7 +619,7 @@ export default function AdminContactsPage() {
       role: contact.role,
       city_id: contact.city_id,
       region_id: contact.region_id,
-      availability: contact.availability,
+      candidate_availability_ids: contact.candidate_availability_ids ?? [],
       notes: contact.notes ?? '',
     })
     setIsEditing(true)
@@ -604,23 +640,18 @@ export default function AdminContactsPage() {
     }
   }
 
-  const handleAddTag = async (tag: string) => {
-    if (!selectedId || panelTags.includes(tag)) return
-    const { error } = await supabase.from('contact_tags').insert({ contact_id: selectedId, tag })
-    if (!error) {
-      setPanelTags((prev) => [...prev, tag])
-      queryClient.invalidateQueries({ queryKey: ['contact_tags', selectedId] })
-    }
+  // Add a tag by its dictionary id (canonical id-based model).
+  const handleAddTag = async (tagId: number) => {
+    if (!selectedId || panelTags.some((t) => t.tag_id === tagId)) return
+    const { error } = await supabase.from('contact_tags').insert({ contact_id: selectedId, tag_id: tagId })
+    if (!error) queryClient.invalidateQueries({ queryKey: ['contact_tags', selectedId] })
     setShowTagDropdown(false)
   }
 
-  const handleRemoveTag = async (tag: string) => {
-    if (!selectedId) return
-    const { error } = await supabase.from('contact_tags').delete().eq('contact_id', selectedId).eq('tag', tag)
-    if (!error) {
-      setPanelTags((prev) => prev.filter((t) => t !== tag))
-      queryClient.invalidateQueries({ queryKey: ['contact_tags', selectedId] })
-    }
+  // Remove a tag by its contact_tags row id (works for id-based and legacy rows).
+  const handleRemoveTag = async (rowId: number) => {
+    const { error } = await supabase.from('contact_tags').delete().eq('id', rowId)
+    if (!error && selectedId) queryClient.invalidateQueries({ queryKey: ['contact_tags', selectedId] })
   }
 
   const selectedCount = selectedRows.length
@@ -855,7 +886,7 @@ export default function AdminContactsPage() {
                 <SelectFilter
                   value={String(filters.tags ?? '')}
                   onChange={(value) => setFilters((prev) => ({ ...prev, tags: value || undefined }))}
-                  options={AVAILABLE_TAGS.map((item) => ({ value: item, label: item }))}
+                  options={candidateTagOptions.map((o) => ({ value: String(o.id), label: o.name }))}
                   placeholder="תגיות"
                 />
                 <SelectFilter
@@ -1087,9 +1118,15 @@ export default function AdminContactsPage() {
 
                             {visibleColumns.includes('availability') && (
                               <td className="px-3 py-3">
-                                <Badge tone={availabilityTone(contact.availability)}>
-                                  {availabilityName(contact.availability)}
-                                </Badge>
+                                {(contact.candidate_availability_ids ?? []).length ? (
+                                  <div className="flex flex-wrap gap-1">
+                                    {(contact.candidate_availability_ids ?? []).map((id) => (
+                                      <Badge key={id} tone={availabilityTone(id)}>{availabilityName(id)}</Badge>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <span className="text-slate-400">—</span>
+                                )}
                               </td>
                             )}
 
@@ -1111,7 +1148,7 @@ export default function AdminContactsPage() {
                                     className="rounded-xl bg-slate-50 px-2.5 py-1 text-[12px] font-semibold text-slate-700 hover:bg-slate-100"
                                     onClick={(event) => {
                                       event.stopPropagation()
-                                      showToast(`פתיחת הארגון: ${contact.linked_org_name}`, 'info')
+                                      openOrg(contact.account_link)
                                     }}
                                   >
                                     {contact.linked_org_name}
@@ -1140,13 +1177,12 @@ export default function AdminContactsPage() {
                                 />
                                 <IconAction
                                   title="עריכה"
-                                  onClick={() => handleRowAction(contact.contact_id, 'פתיחת עריכת איש קשר')}
+                                  onClick={() => { setSelectedId(Number(contact.contact_id)); handleEditOpen(contact) }}
                                   icon={<Edit2 className="h-4 w-4" />}
-                                  pending={rowActionPending === contact.contact_id}
                                 />
                                 <IconAction
                                   title="פולו־אפ"
-                                  onClick={() => handleRowAction(contact.contact_id, 'נקבע פולו־אפ לרשומה')}
+                                  onClick={() => openFollowUp(Number(contact.contact_id), contact.next_follow_up)}
                                   icon={<Phone className="h-4 w-4" />}
                                 />
                                 <IconAction
@@ -1201,9 +1237,9 @@ export default function AdminContactsPage() {
                         <div className="mt-1 flex flex-wrap gap-2">
                           <RoleBadge label={roleName(selectedContact.role)} roleId={Number(selectedContact.role)} />
                           <LightTag tone="slate">{cityName(selectedContact.city_id)}</LightTag>
-                          <Badge tone={availabilityTone(selectedContact.availability)}>
-                            {availabilityName(selectedContact.availability)}
-                          </Badge>
+                          {(selectedContact.candidate_availability_ids ?? []).map((id) => (
+                            <Badge key={id} tone={availabilityTone(id)}>{availabilityName(id)}</Badge>
+                          ))}
                         </div>
                       </div>
 
@@ -1270,16 +1306,12 @@ export default function AdminContactsPage() {
                         <QuickActionButton
                           icon={<Phone className="h-4 w-4" />}
                           label="פולו־אפ"
-                          onClick={() => showToast('הוגדר פולו־אפ', 'success')}
+                          onClick={() => openFollowUp(Number(selectedContact.contact_id), selectedContact.next_follow_up)}
                         />
                         <QuickActionButton
                           icon={<Users className="h-4 w-4" />}
                           label="ארגון מקושר"
-                          onClick={() =>
-                            selectedContact.linked_org_name
-                              ? showToast(`פתיחת הארגון: ${selectedContact.linked_org_name}`, 'info')
-                              : showToast('אין ארגון מקושר לרשומה', 'error')
-                          }
+                          onClick={() => openOrg(selectedContact.account_link)}
                         />
                       </div>
                     </div>
@@ -1318,10 +1350,10 @@ export default function AdminContactsPage() {
               <div className="space-y-4">
                 <SectionCard title="תגיות" compact>
                   <div className="flex flex-wrap gap-2">
-                    {panelTags.map((tag) => (
-                      <span key={tag} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-semibold ${tagClass(tag)}`}>
-                        {tag}
-                        <button type="button" onClick={() => handleRemoveTag(tag)} className="opacity-60 hover:opacity-100">×</button>
+                    {panelTags.map((t) => (
+                      <span key={t.id} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-semibold ${tagClass(t.name)}`}>
+                        {t.name}
+                        <button type="button" onClick={() => handleRemoveTag(t.id)} className="opacity-60 hover:opacity-100">×</button>
                       </span>
                     ))}
                     <div className="relative">
@@ -1334,14 +1366,14 @@ export default function AdminContactsPage() {
                       </button>
                       {showTagDropdown && (
                         <div className="absolute right-0 top-full z-30 mt-1 max-h-48 w-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-md">
-                          {AVAILABLE_TAGS.filter((t) => !panelTags.includes(t)).map((tag) => (
+                          {candidateTagOptions.filter((o) => !panelTags.some((t) => t.tag_id === o.id)).map((o) => (
                             <button
-                              key={tag}
+                              key={o.id}
                               type="button"
-                              onClick={() => handleAddTag(tag)}
+                              onClick={() => handleAddTag(o.id)}
                               className="w-full px-3 py-2 text-right text-[13px] text-slate-700 hover:bg-slate-50"
                             >
-                              {tag}
+                              {o.name}
                             </button>
                           ))}
                         </div>
@@ -1388,10 +1420,12 @@ export default function AdminContactsPage() {
                       </label>
                       <label className="flex flex-col gap-1">
                         <span className="text-[12px] font-semibold text-slate-500">זמינות</span>
-                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.availability ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, availability: e.target.value ? Number(e.target.value) : null }))}>
-                          <option value="">— בחר —</option>
-                          {availabilityOptions.map((a) => <option key={a.id} value={a.id}>{a.name}</option>)}
-                        </select>
+                        <DictionaryMultiSelect
+                          options={availabilityOptions}
+                          value={editDraft.candidate_availability_ids ?? []}
+                          onChange={(ids) => setEditDraft((d) => ({ ...d, candidate_availability_ids: ids }))}
+                          placeholder="בחירת זמינויות..."
+                        />
                       </label>
                       <label className="flex flex-col gap-1">
                         <span className="text-[12px] font-semibold text-slate-500">הערות</span>
@@ -1442,7 +1476,7 @@ export default function AdminContactsPage() {
                       { label: 'סוג פרופיל', value: profileTypeName(selectedContact.profile_type) },
                       { label: 'כותרת מקצועית', value: selectedContact.professional_title },
                       { label: 'ניסיון', value: experienceName(selectedContact.experience) },
-                      { label: 'זמינות', value: availabilityName(selectedContact.availability) },
+                      { label: 'זמינות', value: availabilityNames(selectedContact.candidate_availability_ids) },
                       { label: 'היקף מועדף', value: selectedContact.preferred_scope },
                       { label: 'שפות', value: languagesName(selectedContact.languages) },
                       { label: 'מעסיק נוכחי', value: selectedContact.current_employer },
@@ -1687,6 +1721,35 @@ export default function AdminContactsPage() {
           </div>
         )}
 
+        {/* Follow-up scheduler */}
+        {followUpTarget !== null && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/40 p-4">
+            <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-md">
+              <div className="mb-5 flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[#008080]">
+                  <Phone className="h-5 w-5" />
+                </div>
+                <div className="text-[18px] font-bold text-[#0F172A]">קביעת פולו־אפ</div>
+              </div>
+              <label className="flex flex-col gap-1.5">
+                <span className="text-[13px] font-semibold text-slate-600">תאריך מעקב</span>
+                <input
+                  type="date"
+                  value={followUpDate}
+                  onChange={(e) => setFollowUpDate(e.target.value)}
+                  className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]"
+                />
+              </label>
+              <div className="mt-6 flex justify-end gap-2">
+                <ActionButton variant="ghost" onClick={() => setFollowUpTarget(null)}>ביטול</ActionButton>
+                <ActionButton variant="primary" onClick={saveFollowUp} disabled={followUpPending}>
+                  {followUpPending ? 'שומר...' : 'שמירה'}
+                </ActionButton>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Merge Dialog */}
         {mergeOpen && selectedRows.length >= 2 && (() => {
           const selectedContacts = selectedRows
@@ -1703,7 +1766,7 @@ export default function AdminContactsPage() {
                 { key: 'phone' as never, label: 'טלפון', format: (v) => v ? formatPhone(String(v)) : '—' },
                 { key: 'email' as never, label: 'מייל' },
                 { key: 'role' as never, label: 'תפקיד', format: (v) => roleName(v as number) },
-                { key: 'availability' as never, label: 'זמינות', format: (v) => availabilityName(v as number) },
+                { key: 'candidate_availability_ids' as never, label: 'זמינות', format: (v) => availabilityNames(v as number[]) },
                 { key: 'region_id' as never, label: 'אזור', format: (v) => regionName(v as number) },
                 { key: 'city_id' as never, label: 'עיר', format: (v) => cityName(v as number) },
                 { key: 'notes' as never, label: 'הערות' },
@@ -2236,7 +2299,7 @@ async function runContactsQuery(
 
   let tagContactIds: number[] | null = null
   if (filters.tags) {
-    const { data: tagRows } = await sb.from('contact_tags').select('contact_id').eq('tag', filters.tags)
+    const { data: tagRows } = await sb.from('contact_tags').select('contact_id').eq('tag_id', Number(filters.tags))
     tagContactIds = (tagRows ?? []).map((r: { contact_id: number }) => r.contact_id)
     if (!tagContactIds.length) return { contacts: [] as import('@/types').Contact[], total: 0 }
   }
@@ -2251,7 +2314,7 @@ async function runContactsQuery(
   if (filters.sub_role_ids?.length) query = (query as any).filter('sub_role', 'ov', `{${filters.sub_role_ids.join(',')}}`)
   if (filters.region_id) query = query.eq('region_id', filters.region_id)
   if (filters.city_id) query = query.eq('city_id', filters.city_id)
-  if (filters.availability) query = query.eq('availability', filters.availability)
+  if (filters.availability) query = query.contains('candidate_availability_ids', [filters.availability])
   if (filters.experience) query = query.eq('experience', filters.experience)
   if (filters.source) query = query.eq('source', filters.source)
   if (filters.profile_type) query = query.eq('profile_type', filters.profile_type)
