@@ -1,409 +1,928 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
-  MessageCircle,
+  ArrowDown,
   ArrowRight,
-  ClipboardList,
-  ShieldCheck,
-  Target,
-  Clock,
-  LockKeyhole,
+  BadgeCheck,
+  BarChart3,
   CheckCircle2,
+  ChevronDown,
+  ClipboardList,
+  FileCheck2,
   FileText,
-  SlidersHorizontal,
-  Megaphone,
   Filter,
+  LockKeyhole,
+  Megaphone,
+  ShieldCheck,
+  SlidersHorizontal,
+  Target,
+  UserCheck,
   Users,
 } from 'lucide-react'
 
-const WHATSAPP_CLASS =
-  'inline-flex min-h-[44px] items-center gap-2 rounded-[18px] bg-[#D97706] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.24)] transition-all duration-200 hover:bg-[#B45309] hover:-translate-y-0.5'
-const PRIMARY_CTA_CLASS =
-  'inline-flex min-h-[44px] items-center gap-2 rounded-[18px] bg-[#008080] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(0,128,128,0.20)] transition-all duration-200 hover:bg-[#006D6D] hover:-translate-y-0.5'
-const BACK_CTA_CLASS =
-  'inline-flex min-h-[44px] items-center gap-2 rounded-[18px] border border-white/12 bg-white/8 px-6 py-3 text-[14px] font-bold text-white shadow-sm backdrop-blur transition-all duration-200 hover:border-white/20 hover:bg-white/12'
+function WhatsAppIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M19.11 17.38c-.26-.13-1.52-.75-1.76-.84-.24-.09-.41-.13-.59.13-.17.26-.67.84-.82 1.01-.15.17-.3.2-.56.07-.26-.13-1.08-.4-2.06-1.27-.76-.68-1.27-1.52-1.42-1.78-.15-.26-.02-.4.11-.53.12-.12.26-.3.39-.45.13-.15.17-.26.26-.43.09-.17.04-.32-.02-.45-.06-.13-.59-1.42-.8-1.94-.21-.51-.43-.44-.59-.45h-.5c-.17 0-.45.06-.69.32-.24.26-.91.89-.91 2.17s.93 2.52 1.06 2.69c.13.17 1.83 2.8 4.44 3.92.62.27 1.1.43 1.48.55.62.2 1.19.17 1.64.1.5-.07 1.52-.62 1.74-1.22.22-.6.22-1.11.15-1.22-.06-.11-.24-.17-.5-.3Z" />
+      <path d="M26.68 5.34A14.87 14.87 0 0 0 16.08.95C7.85.95 1.15 7.65 1.15 15.88c0 2.63.69 5.2 2 7.46L1.02 31.1l7.95-2.08a14.9 14.9 0 0 0 7.11 1.81h.01c8.23 0 14.93-6.7 14.93-14.93a14.84 14.84 0 0 0-4.34-10.56Zm-10.6 22.98h-.01a12.4 12.4 0 0 1-6.32-1.73l-.45-.27-4.72 1.24 1.26-4.6-.3-.47a12.38 12.38 0 0 1-1.9-6.61c0-6.86 5.58-12.44 12.45-12.44 3.32 0 6.44 1.29 8.79 3.65a12.36 12.36 0 0 1 3.64 8.8c0 6.86-5.58 12.43-12.44 12.43Z" />
+    </svg>
+  )
+}
 
-const audienceCards = [
+const DISCREET_COLORS = {
+  primary: '#D9A928',
+  primaryDark: '#B88918',
+  primaryLight: '#E8CC72',
+  primarySoft: '#FBF6E4',
+  primaryBorder: 'rgba(217,169,40,0.22)',
+  teal: '#008080',
+}
+
+const HERO_HIGHLIGHTS = [
+  'ללא חשיפת שם המרפאה',
+  'סינון לפי דרישות המשרה',
+  'תהליך אישי, שקט ומבוקר',
+]
+
+const FIT_ITEMS = [
   {
     title: 'החלפת עובד קיים',
-    body: 'כאשר נדרש גיוס מבלי ליצור חשיפה מיותרת.',
+    body: 'כאשר צריך לגייס מבלי ליצור חשיפה מיותרת בתוך המרפאה או מול הצוות.',
   },
   {
-    title: 'גיוס רגיש',
-    body: 'כאשר יש צורך בתהליך דיסקרטי.',
-  },
-  {
-    title: 'שמירה על פרטיות',
-    body: 'פרסום ללא חשיפת שם המרפאה.',
+    title: 'משרה רגישה',
+    body: 'כאשר זהות המעסיק ופרטי ההתקשרות צריכים להישאר חסויים בשלב הראשון.',
   },
   {
     title: 'גיוס ממוקד',
-    body: 'קבלת מועמדים בהתאם לדרישות שהוגדרו.',
-  },
-]
-
-const processSteps = [
-  {
-    step: 'שלב 1',
-    title: 'פתיחת בקשת גיוס',
-    body: 'מילוי פרטי המשרה והדרישות.',
-    icon: FileText,
+    body: 'כאשר חשוב לקבל מועמדים לפי תנאי סף וקריטריונים שהוגדרו מראש.',
   },
   {
-    step: 'שלב 2',
-    title: 'הגדרת קריטריונים',
-    body: 'בחירת דרישות ותנאי סף.',
-    icon: SlidersHorizontal,
-  },
-  {
-    step: 'שלב 3',
-    title: 'פרסום דיסקרטי',
-    body: 'המשרה מתפרסמת ללא חשיפת המרפאה.',
-    icon: Megaphone,
-  },
-  {
-    step: 'שלב 4',
-    title: 'איסוף מועמדויות',
-    body: 'קליטת מועמדים רלוונטיים.',
-    icon: Filter,
-  },
-  {
-    step: 'שלב 5',
-    title: 'קבלת מועמדים',
-    body: 'העברת מועמדים מתאימים להמשך התהליך.',
-    icon: Users,
-  },
-]
-
-const benefitCards = [
-  {
-    icon: LockKeyhole,
-    title: 'דיסקרטיות',
-    body: 'שמירה על פרטיות המעסיק לאורך תהליך הגיוס.',
-  },
-  {
-    icon: Target,
-    title: 'מיקוד',
-    body: 'גיוס ממוקד לתפקידים דנטליים.',
-  },
-  {
-    icon: Clock,
     title: 'חיסכון בזמן',
-    body: 'תהליך מובנה וברור.',
+    body: 'כאשר רוצים לנהל את הפניות בצורה מסודרת ולהתמקד במועמדים רלוונטיים.',
   },
 ]
 
-const faqItems = [
+const PROCESS_STEPS = [
   {
-    question: 'מהו גיוס דיסקרטי?',
-    answer:
-      'משרה המתפרסמת ללא חשיפת שם המרפאה או פרטי ההתקשרות בשלב הראשוני.',
+    id: '01',
+    icon: FileText,
+    eyebrow: 'הגדרת הצורך',
+    title: 'פותחים בקשת גיוס',
+    body:
+      'ממלאים את פרטי המשרה, היקף העבודה, הדרישות, השעות, השכר וכל מידע שחשוב לתהליך.',
+    value:
+      'נקודת פתיחה מדויקת שמצמצמת פערים ומאפשרת לבנות פרסום נכון.',
   },
   {
+    id: '02',
+    icon: SlidersHorizontal,
+    eyebrow: 'דיוק הקריטריונים',
+    title: 'מגדירים תנאי סף',
+    body:
+      'מחדדים ניסיון, הסמכות, זמינות, אזור, שפות, ניידות ודרישות מקצועיות נוספות.',
+    value:
+      'יותר מיקוד ופחות פניות שאינן תואמות לצורך האמיתי של המרפאה.',
+  },
+  {
+    id: '03',
+    icon: Megaphone,
+    eyebrow: 'פרסום אנונימי',
+    title: 'המשרה עולה ללא פרטים מזהים',
+    body:
+      'שם המרפאה ופרטי ההתקשרות אינם מופיעים בפרסום בשלב הראשון.',
+    value:
+      'הגנה על פרטיות המעסיק לצד חשיפה מקצועית למועמדים רלוונטיים.',
+  },
+  {
+    id: '04',
+    icon: Filter,
+    eyebrow: 'קליטת מועמדויות',
+    title: 'המועמדים מגישים מועמדות',
+    body:
+      'המועמדים נחשפים לפרטי התפקיד, מגישים מועמדות ועונים על שאלות בהתאם למסלול.',
+    value:
+      'תהליך מסודר שמאפשר להבין מי עומד בדרישות לפני העברת הפרטים.',
+  },
+  {
+    id: '05',
+    icon: UserCheck,
+    eyebrow: 'אישור והעברת פרטים',
+    title: 'פרטי המועמד מועברים בהסכמה',
+    body:
+      'פרטי מועמד מועברים רק לאחר שהגיש מועמדות ואישר להעביר את פרטיו למעסיק.',
+    value:
+      'שקיפות מול המועמד ושמירה על פרטיות שני הצדדים.',
+  },
+  {
+    id: '06',
+    icon: Users,
+    eyebrow: 'המשך תהליך',
+    title: 'מקבלים מועמדים להמשך בחינה',
+    body:
+      'המועמדים המתאימים מועברים להמשך שיחה, ראיון וקבלת החלטה אצל המעסיק.',
+    value:
+      'המרפאה מתמקדת באנשים הרלוונטיים במקום לנהל עומס של פניות לא ממוקדות.',
+  },
+]
+
+const PRIVACY_ROWS = [
+  {
+    label: 'שם המרפאה',
+    firstStage: 'אינו מופיע בפרסום',
+    laterStage: 'נמסר בהמשך התהליך בהתאם להתקדמות',
+  },
+  {
+    label: 'פרטי התקשרות',
+    firstStage: 'אינם מוצגים לציבור',
+    laterStage: 'התקשורת מתבצעת בצורה מבוקרת',
+  },
+  {
+    label: 'פרטי המועמד',
+    firstStage: 'נשמרים במערכת',
+    laterStage: 'מועברים רק לאחר אישור המועמד',
+  },
+  {
+    label: 'דרישות המשרה',
+    firstStage: 'מוצגות באופן מקצועי וברור',
+    laterStage: 'משמשות לסינון ולהמשך הבחינה',
+  },
+]
+
+const EXPECTATION_ITEMS = [
+  {
+    icon: CheckCircle2,
+    title: 'פרסום עד 45 יום',
+    body:
+      'המשרה מתפרסמת עד 45 יום או עד לעדכון שהמשרה אינה רלוונטית — המוקדם מביניהם.',
+  },
+  {
+    icon: BarChart3,
+    title: 'סינון מועמדים והתאמה אישית',
+    body:
+      'המסלול מוגדר לעד 10 מועמדים פוטנציאליים המותאמים לדרישות המשרה.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'אפשרות להארכת הפרסום',
+    body:
+      'אם בתוך 30 יום נשלחו פחות מ־5 מועמדים, קיימת אפשרות להאריך את הפרסום ב־30 יום נוספים ללא תשלום.',
+  },
+]
+
+const FAQ_ITEMS = [
+  {
+    id: '01',
+    question: 'מהו מסלול גיוס אישי ודיסקרטי?',
+    answer:
+      'מסלול שבו המשרה מתפרסמת ללא חשיפת שם המרפאה וללא פרטי ההתקשרות בשלב הראשון, תוך ניהול מבוקר של המועמדויות.',
+  },
+  {
+    id: '02',
     question: 'האם שם המרפאה מופיע בפרסום?',
-    answer: 'לא. המשרה מוצגת ללא פרטים מזהים של המרפאה בשלב הראשון.',
+    answer:
+      'לא. שם המרפאה ופרטי ההתקשרות אינם מוצגים בפרסום הציבורי בשלב הראשון.',
   },
   {
-    question: 'כמה זמן המשרה מתפרסמת?',
+    id: '03',
+    question: 'תוך כמה זמן המשרה מתפרסמת?',
     answer:
-      'המשרה מתפרסמת לתקופה מוגדרת במסגרת המסלול ובכפוף לתהליך הגיוס.',
+      'הפרסום מתבצע בתוך עד 3 ימי עסקים ממועד פתיחת הבקשה, בכפוף לקבלת המידע הנדרש.',
   },
   {
-    question: 'איך נשמרת הדיסקרטיות?',
+    id: '04',
+    question: 'לכמה זמן המשרה מתפרסמת?',
     answer:
-      'הפרסום מתבצע ללא חשיפת שם המרפאה ופרטי הקשר עד לשלבים המתקדמים בתהליך.',
+      'המשרה מתפרסמת למשך עד 45 יום או עד לעדכון שהמשרה אינה רלוונטית — המוקדם מביניהם.',
   },
   {
-    question: 'האם ניתן ליצור קשר לפני פתיחת משרה?',
+    id: '05',
+    question: 'כמה מועמדים ניתן לקבל במסגרת המסלול?',
     answer:
-      'כן. ניתן ליצור קשר דרך WhatsApp ולקבל הסבר נוסף על המסלול.',
+      'המסלול מוגדר לעד 10 מועמדים פוטנציאליים המותאמים לדרישות המשרה.',
+  },
+  {
+    id: '06',
+    question: 'איך נשמרת פרטיות המועמד?',
+    answer:
+      'פרטי מועמד מועברים רק לאחר שהגיש מועמדות ואישר להעביר את פרטיו למעסיק.',
+  },
+  {
+    id: '07',
+    question: 'כמה עולה פתיחת המסלול?',
+    answer:
+      'דמי פתיחת המסלול הם 500 ₪ + מע״מ. דמי הפתיחה נפרדים מעמלת האיוש ואינם מותנים בכמות הפניות.',
+  },
+  {
+    id: '08',
+    question: 'מהי עמלת האיוש?',
+    answer:
+      'עמלת האיוש נקבעת לפי סוג התפקיד: רופאי שיניים, מומחים, מנהלים ותועמלנות — 4,000 ₪; סייעות ומזכירות — 3,500 ₪; שינניות וטכנאי שיניים — 3,000 ₪. המחירים אינם כוללים מע״מ.',
+  },
+  {
+    id: '09',
+    question: 'מתי משלמים את עמלת האיוש?',
+    answer:
+      'עמלת האיוש מחולקת לשני תשלומים שווים: הראשון לאחר 30 יום מתחילת העבודה והשני לאחר 60 יום. ימי חפיפה נחשבים ימי עבודה.',
+  },
+  {
+    id: '10',
+    question: 'מה קורה אם ההעסקה מסתיימת?',
+    answer:
+      'סיום בחודש הראשון אינו מחויב בעמלת איוש. סיום במהלך החודש השני מזכה בהחזר של 25% מהתשלום הראשון. לאחר 60 יום אין החזר כספי. אם ההתקשרות מסתיימת עד 3 חודשים, המשרה מתפרסמת מחדש ללא עלות למשך 45 יום נוספים.',
+  },
+  {
+    id: '11',
+    question: 'אפשר לדחות את השירות לאחר פתיחת הבקשה?',
+    answer:
+      'דמי ההקמה אינם ניתנים לביטול, אך בתוך 3 ימי עסקים ניתן לדחות את השירות ולשמור את היתרה למשך עד 12 חודשים עבור משרה עתידית.',
+  },
+  {
+    id: '12',
+    question: 'אפשר לבקש דיסקרטיות מול אדם מסוים?',
+    answer:
+      'כן. ניתן למסור שם ומספר נייד של עובד מסוים כדי שנוכל לזהות אותו ולפעול בהתאם לבקשת הדיסקרטיות.',
   },
 ]
 
-const planCards = [
-  {
-    title: 'פרסום',
-    body: 'משרה דיסקרטית ללא חשיפת המרפאה.',
-  },
-  {
-    title: 'סינון',
-    body: 'התאמה בהתאם לדרישות שהוגדרו.',
-  },
-  {
-    title: 'תהליך',
-    body: 'ניהול מסודר משלב פתיחת הבקשה ועד קבלת מועמדים.',
-  },
-]
+const WHATSAPP_CLASS =
+  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#D97706] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#B45309]'
 
-export default function EmployersDiscreetPage() {
+const PRIMARY_CTA_CLASS =
+  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#008080] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(0,128,128,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#006D6D]'
+
+function ProcessTimeline() {
+  const stepRefs = useRef<Array<HTMLDivElement | null>>([])
+  const [activeStep, setActiveStep] = useState(0)
+
+  useEffect(() => {
+    const observers: IntersectionObserver[] = []
+
+    stepRefs.current.forEach((element, index) => {
+      if (!element) return
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setActiveStep((current) => Math.max(current, index))
+          }
+        },
+        {
+          root: null,
+          threshold: 0.48,
+          rootMargin: '-12% 0px -28% 0px',
+        },
+      )
+
+      observer.observe(element)
+      observers.push(observer)
+    })
+
+    return () => observers.forEach((observer) => observer.disconnect())
+  }, [])
+
+  const progress =
+    PROCESS_STEPS.length <= 1
+      ? 100
+      : (activeStep / (PROCESS_STEPS.length - 1)) * 100
+
   return (
-    <div className="min-h-screen bg-[#f3f4f6] text-[#0f1720]" dir="rtl">
-      <section className="relative overflow-hidden bg-[#2b2b2b] px-4 pb-20 pt-8 text-white md:px-8 md:pt-10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,128,128,0.18),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(217,119,6,0.10),transparent_18%)]" />
-        <div className="pointer-events-none absolute -right-16 top-14 h-64 w-64 rounded-full bg-[#008080]/18 blur-3xl" />
-        <div className="pointer-events-none absolute -left-8 bottom-0 h-52 w-52 rounded-full bg-[#D97706]/8 blur-3xl" />
+    <section
+      id="process"
+      className="relative overflow-hidden bg-[#2D2D2D] px-4 py-20 text-white md:px-8 md:py-28"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(217,169,40,0.10),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(217,169,40,0.05),transparent_26%)]" />
 
-        <div className="relative mx-auto max-w-7xl">
-          <div className="mb-6">
-            <Link
-              to="/employers"
-              className={BACK_CTA_CLASS}
-            >
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              חזרה לפתרונות למעסיקים
-            </Link>
+      <div className="relative mx-auto max-w-6xl">
+        <div className="mx-auto max-w-4xl text-center">
+          <span className="inline-flex rounded-full border border-[#E8CC72]/28 bg-[#D9A928]/10 px-4 py-1.5 text-[13px] font-bold text-[#E8CC72]">
+            תהליך אישי, שקט ומבוקר
+          </span>
+
+          <h2 className="mt-5 text-3xl font-black tracking-tight text-[#E8CC72] md:text-5xl">
+            כך מתנהל מסלול הגיוס הדיסקרטי
+          </h2>
+
+          <p className="mx-auto mt-5 max-w-3xl text-[16px] leading-[1.95] text-white/72 md:text-[18px]">
+            בכל שלב נשמר איזון בין חשיפה מקצועית של המשרה, פרטיות המעסיק
+            והעברת מועמדים בצורה מבוקרת ובהסכמה.
+          </p>
+        </div>
+
+        <div className="relative mt-16">
+          <div className="pointer-events-none absolute bottom-0 end-1/2 top-0 hidden w-px translate-x-1/2 bg-white/10 md:block" />
+          <div
+            className="pointer-events-none absolute end-1/2 top-0 hidden w-px translate-x-1/2 bg-[#D9A928] transition-[height] duration-500 ease-out md:block"
+            style={{ height: `${progress}%` }}
+          />
+
+          <div className="space-y-16 md:space-y-24">
+            {PROCESS_STEPS.map(
+              ({ id, icon: Icon, eyebrow, title, body, value }, index) => {
+                const cardOnRight = index % 2 === 0
+                const isVisible = index <= activeStep
+                const isActive = index === activeStep
+
+                return (
+                  <div
+                    key={id}
+                    ref={(element) => {
+                      stepRefs.current[index] = element
+                    }}
+                    className="relative grid min-h-[280px] gap-5 md:grid-cols-[1fr_72px_1fr] md:items-center"
+                  >
+                    <div
+                      className={`${cardOnRight ? 'md:col-start-3' : 'md:col-start-1'} ${
+                        cardOnRight ? '' : 'md:row-start-1'
+                      }`}
+                    >
+                      <article
+                        className={`relative rounded-[24px] border p-6 text-start transition-all duration-700 ease-out md:p-7 ${
+                          isVisible
+                            ? 'translate-y-0 scale-100 opacity-100'
+                            : 'translate-y-12 scale-[0.96] opacity-0'
+                        } ${
+                          isActive
+                            ? 'border-white/20 shadow-[0_26px_62px_rgba(0,0,0,0.32)]'
+                            : 'border-white/10 shadow-[0_18px_46px_rgba(0,0,0,0.22)]'
+                        }`}
+                        style={{
+                          background: 'linear-gradient(145deg, #363636 0%, #303030 100%)',
+                        }}
+                      >
+                        <div
+                          className={`absolute top-1/2 hidden h-0 w-0 -translate-y-1/2 border-y-[10px] border-y-transparent md:block ${
+                            cardOnRight
+                              ? 'end-full border-e-[12px] border-e-[#3A3A3A]'
+                              : 'start-full border-s-[12px] border-s-[#3A3A3A]'
+                          }`}
+                        />
+
+                        <div className="flex items-start justify-between gap-5">
+                          <div>
+                            <p className="text-[12px] font-black tracking-[0.08em] text-[#E8CC72]">
+                              {eyebrow}
+                            </p>
+                            <h3 className="mt-2 text-[22px] font-black leading-[1.35]">
+                              {title}
+                            </h3>
+                          </div>
+
+                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#D9A928]/16">
+                            <Icon
+                              className="h-5 w-5 text-[#E8CC72]"
+                              aria-hidden="true"
+                            />
+                          </div>
+                        </div>
+
+                        <p className="mt-4 text-[15px] leading-[1.9] text-white/72">
+                          {body}
+                        </p>
+
+                        <div className="mt-5 rounded-[16px] border border-[#D9A928]/20 bg-[#D9A928]/8 px-4 py-3">
+                          <p className="text-[12px] font-black text-[#F3D87D]">
+                            הערך בתהליך
+                          </p>
+                          <p className="mt-1 text-[14px] leading-[1.8] text-white/82">
+                            {value}
+                          </p>
+                        </div>
+                      </article>
+                    </div>
+
+                    <div className="hidden items-center justify-center md:col-start-2 md:row-start-1 md:flex">
+                      <div
+                        className={`relative z-10 flex h-11 w-11 items-center justify-center rounded-full border text-[12px] font-black transition-all duration-500 ${
+                          isVisible
+                            ? 'scale-100 border-[#D9A928] bg-[#2D2D2D] text-[#F3D87D] shadow-[0_0_22px_rgba(217,169,40,0.28)]'
+                            : 'scale-90 border-white/15 bg-[#2D2D2D] text-white/35'
+                        }`}
+                      >
+                        {id}
+                      </div>
+                    </div>
+
+                    <div className="md:hidden">
+                      <div className="mb-4 flex items-center gap-3">
+                        <span
+                          className={`flex h-9 w-9 items-center justify-center rounded-full border text-[12px] font-black transition-all ${
+                            isVisible
+                              ? 'border-[#D9A928] text-[#D9A928]'
+                              : 'border-white/15 text-white/35'
+                          }`}
+                        >
+                          {id}
+                        </span>
+                        <span className="h-px flex-1 bg-white/10" />
+                      </div>
+                    </div>
+                  </div>
+                )
+              },
+            )}
           </div>
+        </div>
+      </div>
+    </section>
+  )
+}
 
-          <div className="grid gap-10 lg:grid-cols-[1.08fr_.92fr] lg:items-center">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[13px] font-bold text-[#ddf8f7] backdrop-blur">
-                <span className="h-2 w-2 rounded-full bg-[#20d3c2]" />
-                מסלול דיסקרטי
-              </span>
+function FAQAccordion({
+  items,
+}: {
+  items: { id: string; question: string; answer: string }[]
+}) {
+  const [openId, setOpenId] = useState(items[0]?.id ?? '')
 
-              <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1] tracking-[-0.04em] md:text-6xl">
-                גיוס דיסקרטי
-                <span className="mt-2 block text-white/72">למעסיקים בעולם הדנטל</span>
-              </h1>
+  return (
+    <div className="space-y-3" dir="rtl">
+      {items.map((item) => {
+        const isOpen = openId === item.id
+        const contentId = `discreet-faq-${item.id}`
 
-              <div className="mt-6 max-w-3xl space-y-4 text-base leading-8 text-white/75 md:text-lg">
-                <p>
-                  ישנם מצבים בהם חשוב למעסיק לנהל את תהליך הגיוס בצורה שקטה ומבוקרת.
-                </p>
-                <p>
-                  במסלול זה המשרה מתפרסמת ללא חשיפת שם המרפאה וללא פרטי ההתקשרות בשלב הראשון.
-                </p>
-                <p>
-                  המטרה היא לאפשר תהליך גיוס דיסקרטי לצד חשיפה למועמדים רלוונטיים מעולם הדנטל.
-                </p>
+        return (
+          <div
+            key={item.id}
+            className={`overflow-hidden rounded-[16px] border transition-all duration-300 ${
+              isOpen
+                ? 'bg-[#FFFBF0] shadow-[0_12px_30px_rgba(15,23,32,0.07)]'
+                : 'border-slate-200 bg-white hover:border-slate-300'
+            }`}
+            style={{
+              borderColor: isOpen
+                ? DISCREET_COLORS.primaryBorder
+                : undefined,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setOpenId(isOpen ? '' : item.id)}
+              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-start sm:px-6"
+              aria-expanded={isOpen}
+              aria-controls={contentId}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-4">
+                <span
+                  className="w-8 shrink-0 text-[13px] font-black"
+                  style={{
+                    color: isOpen
+                      ? DISCREET_COLORS.primary
+                      : '#94A3B8',
+                  }}
+                >
+                  {item.id}
+                </span>
+                <h3 className="min-w-0 flex-1 text-[15px] font-black leading-[1.55] text-[#273142] sm:text-[16px]">
+                  {item.question}
+                </h3>
               </div>
 
-              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 transition-transform duration-300 ${
+                  isOpen ? 'rotate-180' : ''
+                }`}
+                style={{
+                  color: isOpen
+                    ? DISCREET_COLORS.primary
+                    : '#94A3B8',
+                }}
+                aria-hidden="true"
+              />
+            </button>
+
+            <div
+              id={contentId}
+              className={`grid transition-all duration-300 ease-out ${
+                isOpen
+                  ? 'grid-rows-[1fr] opacity-100'
+                  : 'grid-rows-[0fr] opacity-0'
+              }`}
+            >
+              <div className="overflow-hidden">
+                <p className="border-t border-slate-100 px-5 py-5 ps-[4.25rem] text-[14px] leading-[1.9] text-[#667085] sm:px-6">
+                  {item.answer}
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function EmployersDiscreetPage() {
+  const navigate = useNavigate()
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [termsError, setTermsError] = useState(false)
+
+  const handleContinue = () => {
+    if (!termsAccepted) {
+      setTermsError(true)
+      return
+    }
+
+    navigate('/employers/recruitment-request?plan=discreet', {
+      state: { plan: 'discreet', termsAccepted: true },
+    })
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F3F4F6] text-[#0F1720]" dir="rtl">
+      <section className="relative overflow-hidden bg-[#2D2D2D] px-4 pb-16 pt-6 text-white md:px-8 md:pb-20 md:pt-8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(217,169,40,0.12),transparent_30%),linear-gradient(135deg,#232323_0%,#2D2D2D_52%,#202020_100%)]" />
+        <div className="pointer-events-none absolute end-[-5rem] top-10 h-64 w-64 rounded-full bg-[#D9A928]/12 blur-3xl" />
+
+        <div className="relative mx-auto max-w-7xl">
+          <Link
+            to="/employers"
+            className="inline-flex items-center gap-1.5 text-[13px] font-bold text-white/58 transition hover:text-white"
+          >
+            <ArrowRight
+              className="h-3.5 w-3.5 rtl:scale-x-[-1]"
+              aria-hidden="true"
+            />
+            חזרה למסלולי הגיוס
+          </Link>
+
+          <div className="mt-8 grid gap-10 lg:grid-cols-[1.12fr_0.88fr] lg:items-center">
+            <div className="text-start">
+              <span className="inline-flex items-center gap-2 rounded-full border border-[#E8CC72]/28 bg-[#D9A928]/10 px-4 py-2 text-[13px] font-bold text-[#E8CC72] backdrop-blur">
+                <span className="h-2 w-2 rounded-full bg-[#E8CC72]" />
+                Personal Recruit
+              </span>
+
+              <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1.06] tracking-[-0.04em] md:text-6xl lg:text-[64px]">
+                גיוס אישי ודיסקרטי
+                <span className="mt-2 block text-[#E8CC72]">
+                  שירות אישי, דיסקרטיות ומיקוד
+                </span>
+              </h1>
+
+              <p className="mt-6 max-w-2xl text-[17px] leading-[1.85] text-white/78 md:text-[19px]">
+                מסלול גיוס שמאפשר לפרסם משרה, לאתר מועמדים ולנהל את התהליך —
+                בלי לחשוף את שם המרפאה או את פרטי ההתקשרות בשלב הראשון.
+              </p>
+
+              <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-[14px] font-bold text-white/82">
+                {HERO_HIGHLIGHTS.map((item) => (
+                  <span key={item} className="inline-flex items-center gap-2">
+                    <CheckCircle2
+                      className="h-4 w-4 text-[#E8CC72]"
+                      aria-hidden="true"
+                    />
+                    {item}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-9">
                 <a
-                  href="https://wa.me/972533959003"
+                  href="https://wa.me/972533951003"
                   target="_blank"
                   rel="noopener noreferrer"
                   className={WHATSAPP_CLASS}
                 >
-                  <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                  דברו איתנו בוואטסאפ
-                </a>
-
-                <a href="#process" className={PRIMARY_CTA_CLASS}>
-                  <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                  לראות את שלבי התהליך
+                  <WhatsAppIcon className="h-4 w-4" />
+                  דברו איתנו ב-WhatsApp
                 </a>
               </div>
             </div>
 
-            <div className="relative">
-              <div className="rounded-[32px] border border-white/10 bg-white/6 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-md md:p-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-[12px] font-bold uppercase tracking-[0.24em] text-[#8fe7e7]">
-                      Private Recruit
-                    </p>
-                    <h3 className="mt-2 text-2xl font-black">תהליך שקט ומבוקר</h3>
-                  </div>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#008080]/20">
-                    <ShieldCheck className="h-6 w-6 text-[#7cecec]" aria-hidden="true" />
-                  </div>
-                </div>
-
-                <div className="mt-6 space-y-3">
-                  {planCards.map((item, index) => (
-                    <div
-                      key={item.title}
-                      className="flex items-start gap-3 rounded-2xl bg-white/6 px-4 py-4"
-                    >
-                      <span
-                        className={`mt-1 h-2.5 w-2.5 rounded-full ${
-                          index === 0
-                            ? 'bg-[#20d3c2]'
-                            : index === 1
-                            ? 'bg-[#f59e0b]'
-                            : 'bg-[#60a5fa]'
-                        }`}
-                      />
-                      <div>
-                        <p className="text-[14px] font-bold text-white">{item.title}</p>
-                        <p className="mt-1 text-[13px] leading-6 text-white/70">
-                          {item.body}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-5 rounded-[24px] border border-[#D97706]/20 bg-[#D97706]/10 p-5">
-                  <p className="text-[12px] font-bold text-[#ffd7a6]">שמירה על פרטיות</p>
-                  <p className="mt-3 text-2xl font-black text-white">ללא חשיפת המרפאה</p>
-                  <p className="mt-2 text-[14px] leading-7 text-white/78">
-                    המשרה מוצגת בצורה מכובדת ומקצועית, בלי לחשוף פרטים מזהים בשלב הראשוני.
+            <aside className="rounded-[28px] border border-[#D9A928]/25 bg-[#323232] p-6 text-start shadow-[0_24px_64px_rgba(0,0,0,0.34)] ring-1 ring-[#D9A928]/10 md:p-7">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[12px] font-bold text-[#E8CC72]">
+                    דמי פתיחת המסלול
+                  </p>
+                  <p className="mt-2 text-4xl font-black text-white">
+                    500 ₪
+                  </p>
+                  <p className="mt-1 text-[15px] font-bold text-white/68">
+                    + מע״מ · בנוסף למחירון הצלחת גיוס
                   </p>
                 </div>
+
+                <span className="rounded-full border border-[#D9A928]/30 bg-[#D9A928]/10 px-3 py-1.5 text-[12px] font-black text-[#E8CC72]">
+                  פרסום עד 45 יום
+                </span>
               </div>
-            </div>
+
+              <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
+                {[
+                  'סינון מועמדים והתאמה אישית',
+                  'פרסום ללא חשיפת שם המרפאה',
+                  'פרטי מועמד מועברים רק לאחר אישורו',
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-3 text-[14px] font-semibold text-white/78"
+                  >
+                    <CheckCircle2
+                      className="h-4 w-4 shrink-0 text-[#E8CC72]"
+                      aria-hidden="true"
+                    />
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 py-16 md:px-8 md:py-20">
+        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-[0_18px_50px_rgba(15,23,32,0.06)] md:p-9 text-start">
+            <span className="inline-flex rounded-full bg-[#FBF6E4] px-4 py-1.5 text-[13px] font-bold text-[#B88918]">
+              למי המסלול מתאים
+            </span>
+
+            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+              גיוס מקצועי בלי לחשוף את המרפאה בשלב הראשון
+            </h2>
+
+            <p className="mt-5 text-[16px] leading-[1.9] text-[#667085] md:text-[18px]">
+              המסלול נועד למצבים שבהם צריך לנהל את הגיוס בשקט, לשמור על פרטיות
+              ולבחון מועמדים בצורה מסודרת לפני חשיפת זהות המעסיק.
+            </p>
           </div>
 
-          <div className="mt-8 grid gap-3 md:grid-cols-4">
-            {audienceCards.map((item) => (
+          <div className="grid gap-4 sm:grid-cols-2">
+            {FIT_ITEMS.map((item, index) => (
               <div
                 key={item.title}
-                className="rounded-[22px] border border-white/10 bg-white/8 px-5 py-5 text-white backdrop-blur"
-              >
-                <p className="text-[15px] font-bold">{item.title}</p>
-                <p className="mt-2 text-[14px] leading-7 text-white/68">{item.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 py-20 md:px-8 md:py-24">
-        <div className="mx-auto max-w-6xl">
-          <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex rounded-full bg-[#E6F3F3] px-4 py-1.5 text-[13px] font-bold text-[#008080]">
-              למי זה מתאים
-            </span>
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-[#0F1720] md:text-4xl">
-              כאשר צריך לגייס בצורה שקטה, מדויקת ומבוקרת
-            </h2>
-          </div>
-
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {benefitCards.map(({ icon: Icon, title, body }, index) => (
-              <div
-                key={title}
-                className={`rounded-[28px] border p-7 shadow-[0_16px_40px_rgba(15,23,32,0.05)] ${
-                  index === 0
-                    ? 'border-[#0F1720]/10 bg-[#ffffff]'
-                    : index === 1
-                    ? 'border-[#008080]/10 bg-[#f8fbfb]'
-                    : 'border-[#D97706]/10 bg-[#fffaf4]'
+                className={`rounded-[24px] border p-5 text-start shadow-[0_12px_34px_rgba(15,23,32,0.045)] ${
+                  index === 2
+                    ? 'border-[#D97706]/12 bg-[#FFFAF4]'
+                    : 'border-[#D9A928]/18 bg-white'
                 }`}
               >
+                <h3 className="text-[20px] font-black">{item.title}</h3>
+                <p className="mt-2 text-[14px] leading-[1.8] text-[#6B7280]">
+                  {item.body}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <ProcessTimeline />
+
+      <section className="px-4 py-16 md:px-8 md:py-20">
+        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-[0_18px_50px_rgba(15,23,32,0.06)] md:p-9 text-start">
+            <span className="inline-flex rounded-full bg-[#FBF6E4] px-4 py-1.5 text-[13px] font-bold text-[#B88918]">
+              איך נשמרת הדיסקרטיות
+            </span>
+
+            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+              מה נחשף — ובאיזה שלב
+            </h2>
+
+            <div className="mt-8 overflow-hidden rounded-[22px] border border-slate-200">
+              <div className="grid grid-cols-[0.8fr_1fr_1fr] bg-[#F8FAFC]">
+                <div className="border-e border-slate-200 px-4 py-4 text-[12px] font-black text-[#64748B]">
+                  נושא
+                </div>
+                <div className="border-e border-slate-200 px-4 py-4 text-[12px] font-black text-[#64748B]">
+                  בשלב הפרסום
+                </div>
+                <div className="px-4 py-4 text-[12px] font-black text-[#B88918]">
+                  בהמשך התהליך
+                </div>
+              </div>
+
+              {PRIVACY_ROWS.map((row, index) => (
                 <div
-                  className={`mb-5 flex h-14 w-14 items-center justify-center rounded-2xl ${
-                    index === 0
-                      ? 'bg-[#EEF2F4]'
-                      : index === 1
-                      ? 'bg-[#E6F3F3]'
-                      : 'bg-[#FFF1DE]'
+                  key={row.label}
+                  className={`grid grid-cols-[0.8fr_1fr_1fr] ${
+                    index !== PRIVACY_ROWS.length - 1
+                      ? 'border-t border-slate-200'
+                      : ''
                   }`}
                 >
-                  <Icon
-                    className={`h-6 w-6 ${
-                      index === 0
-                        ? 'text-[#334155]'
-                        : index === 1
-                        ? 'text-[#008080]'
-                        : 'text-[#D97706]'
-                    }`}
-                    aria-hidden="true"
-                  />
-                </div>
-                <h3 className="text-[22px] font-black tracking-tight text-[#0F1720]">
-                  {title}
-                </h3>
-                <p className="mt-3 text-[15px] leading-7 text-[#6B7280]">{body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section
-        id="process"
-        className="relative overflow-hidden bg-[#2b2b2b] px-4 py-20 text-white md:px-8 md:py-24"
-      >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(0,128,128,0.16),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(217,119,6,0.08),transparent_16%)]" />
-        <div className="relative mx-auto max-w-7xl">
-          <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex rounded-full border border-white/10 bg-white/8 px-4 py-1.5 text-[13px] font-bold text-[#9ceceb]">
-              שלבי התהליך
-            </span>
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-white md:text-4xl">
-              כך מתנהל תהליך הגיוס הדיסקרטי
-            </h2>
-          </div>
-
-          <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-5">
-            {processSteps.map(({ step, title, body, icon: Icon }) => (
-              <div
-                key={step}
-                className="rounded-[28px] border border-white/8 bg-white/6 p-6 shadow-[0_16px_40px_rgba(0,0,0,0.18)] backdrop-blur-md"
-              >
-                <div className="flex items-center justify-between gap-3">
-                  <span className="rounded-full border border-white/10 bg-white/8 px-3 py-1 text-[12px] font-bold text-white/75">
-                    {step}
-                  </span>
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/10">
-                    <Icon className="h-5 w-5 text-[#7cecec]" aria-hidden="true" />
+                  <div className="border-e border-slate-200 bg-[#F8FAFC] px-4 py-4 text-[13px] font-bold text-[#334155]">
+                    {row.label}
                   </div>
-                </div>
-
-                <h3 className="mt-6 text-[20px] font-black tracking-tight text-white">
-                  {title}
-                </h3>
-                <p className="mt-3 text-[14px] leading-7 text-white/68">{body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 py-20 md:px-8 md:py-24">
-        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-          <div className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,32,0.06)] md:p-10">
-            <span className="inline-flex rounded-full bg-[#E6F3F3] px-4 py-1.5 text-[13px] font-bold text-[#008080]">
-              שאלות נפוצות
-            </span>
-
-            <div className="mt-6 space-y-4">
-              {faqItems.map((item) => (
-                <div
-                  key={item.question}
-                  className="rounded-[22px] border border-slate-200 bg-[#FAFBFC] p-5"
-                >
-                  <h3 className="text-[16px] font-black text-[#0F1720]">
-                    {item.question}
-                  </h3>
-                  <p className="mt-2 text-[14px] leading-7 text-[#6B7280]">
-                    {item.answer}
-                  </p>
+                  <div className="border-e border-slate-200 px-4 py-4 text-[13px] leading-[1.75] text-[#64748B]">
+                    {row.firstStage}
+                  </div>
+                  <div className="bg-[#FFFBF0] px-4 py-4 text-[13px] font-semibold leading-[1.75]">
+                    {row.laterStage}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,32,0.06)] md:p-10">
-            <span className="inline-flex rounded-full bg-[#FFF1DE] px-4 py-1.5 text-[13px] font-bold text-[#B45309]">
-              פתיחת בקשה
+          <div className="rounded-[28px] border border-[#D9A928]/20 bg-[#2D2D2D] p-7 text-white shadow-[0_18px_50px_rgba(15,23,32,0.12)] md:p-9 text-start">
+            <span className="inline-flex rounded-full border border-[#D9A928]/22 bg-[#D9A928]/12 px-4 py-1.5 text-[13px] font-bold text-[#FFD7A6]">
+              מחיר ותנאים
             </span>
 
-            <h2 className="mt-5 text-3xl font-black tracking-tight text-[#0F1720] md:text-4xl">
-              פתחו בקשת גיוס ונשמח לסייע לכם
+            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+              500 ₪ + מע״מ לפתיחת המסלול
             </h2>
 
-            <p className="mt-5 text-base leading-8 text-[#6B7280] md:text-lg">
-              פתחו בקשת גיוס ונשמח לסייע לכם לאתר את המועמדים המתאימים ביותר.
+            <p className="mt-5 text-[16px] leading-[1.9] text-white/76 md:text-[17px]">
+              דמי הפתיחה כוללים הקמת משרה ופרסום למשך עד 45 יום. במקרה של איוש
+              משולמת עמלת הצלחה בהתאם לסוג התפקיד.
             </p>
 
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <a
-                href="https://wa.me/972533959003"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={WHATSAPP_CLASS}
-              >
-                <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                דברו איתנו בוואטסאפ
-              </a>
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              {[
+                {
+                  role: 'רופאים, מומחים, מנהלים ותועמלנות',
+                  price: '4,000 ₪',
+                },
+                {
+                  role: 'סייעות ומזכירות',
+                  price: '3,500 ₪',
+                },
+                {
+                  role: 'שינניות וטכנאי שיניים',
+                  price: '3,000 ₪',
+                },
+              ].map((item) => (
+                <div
+                  key={item.role}
+                  className="rounded-[18px] border border-white/10 bg-white/6 p-4 text-[14px] leading-[1.75]"
+                >
+                  <span className="text-white/76">{item.role}: </span>
+                  <span className="font-black text-[#E8CC72]">
+                    {item.price}
+                  </span>
+                </div>
+              ))}
 
-              <Link to="/employers/recruitment-request" className={PRIMARY_CTA_CLASS}>
+              <div className="rounded-[18px] border border-white/10 bg-white/6 p-4 text-[14px] leading-[1.75] text-white/76">
+                המחירים אינם כוללים מע״מ
+              </div>
+            </div>
+
+            <div className="mt-7 space-y-4">
+              {EXPECTATION_ITEMS.map(({ icon: Icon, title, body }) => (
+                <div key={title} className="flex gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#D9A928]/16">
+                    <Icon
+                      className="h-5 w-5 text-[#E8CC72]"
+                      aria-hidden="true"
+                    />
+                  </div>
+                  <div>
+                    <h3 className="text-[15px] font-black">{title}</h3>
+                    <p className="mt-1 text-[13px] leading-[1.8] text-white/68">
+                      {body}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="faq-discreet"
+        className="bg-[#F7F7F8] px-4 py-16 md:px-8 md:py-24"
+      >
+        <div className="mx-auto max-w-6xl rounded-[32px] border border-slate-200 bg-[#EFF0F2] p-5 shadow-[0_20px_60px_rgba(15,23,32,0.06)] md:p-8 lg:p-10">
+          <div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+            <div className="relative overflow-hidden rounded-[26px] bg-transparent p-2 text-start md:p-5">
+              <div
+                className="pointer-events-none absolute -bottom-10 -start-5 select-none text-[118px] font-black leading-none opacity-[0.045] md:text-[160px]"
+                aria-hidden="true"
+              >
+                FAQ
+              </div>
+
+              <span className="relative inline-flex rounded-full bg-[#FBF6E4] px-4 py-1.5 text-[13px] font-bold text-[#B88918]">
+                שאלות ותשובות
+              </span>
+
+              <h2 className="relative mt-5 text-3xl font-black tracking-tight md:text-4xl">
+                כל מה שחשוב לדעת
+              </h2>
+
+              <p className="relative mt-4 max-w-md text-[15px] leading-[1.9] text-[#667085]">
+                פרטיות, מחיר, פרסום, מועמדים, תשלום, אחריות ודחיית השירות —
+                במקום אחד.
+              </p>
+
+              <div className="relative mt-8 space-y-3">
+                <a
+                  href="https://wa.me/972533951003"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 text-[14px] font-bold text-[#334155] transition hover:opacity-75"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
+                    <WhatsAppIcon className="h-4 w-4 text-[#B88918]" />
+                  </span>
+                  יש לכם שאלה נוספת? דברו איתנו
+                </a>
+              </div>
+            </div>
+
+            <FAQAccordion items={FAQ_ITEMS} />
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 py-16 md:px-8 md:py-20">
+        <div className="mx-auto max-w-6xl overflow-hidden rounded-[32px] border border-white/8 bg-[#2D2D2D] shadow-[0_24px_70px_rgba(0,0,0,0.18)]">
+          <div className="relative grid gap-8 p-7 text-white md:p-10 lg:grid-cols-[1fr_0.95fr] lg:items-center">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(217,169,40,0.12),transparent_34%)]" />
+
+            <div className="relative text-start">
+              <span className="inline-flex rounded-full border border-[#E8CC72]/28 bg-[#D9A928]/10 px-4 py-1.5 text-[13px] font-bold text-[#E8CC72]">
+                מתחילים מכאן
+              </span>
+
+              <h2 className="mt-5 text-3xl font-black leading-[1.15] tracking-tight md:text-4xl">
+                צריכים לגייס בשקט
+                <span className="mt-1 block text-[#E8CC72]">
+                  ולקבל מועמדים בצורה מבוקרת?
+                </span>
+              </h2>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {[
+                  'פרסום ללא שם המרפאה',
+                  'עד 45 ימי פרסום',
+                  'סינון לפי דרישות',
+                  'העברת פרטים בהסכמה',
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-3 text-[14px] font-bold text-white/80"
+                  >
+                    <CheckCircle2
+                      className="h-4 w-4 shrink-0 text-[#E8CC72]"
+                      aria-hidden="true"
+                    />
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative text-start">
+              <div className="mb-4 flex items-center gap-3 text-[13px] font-black text-white/72">
+                <ArrowDown
+                  className="h-5 w-5 animate-bounce text-[#E8CC72]"
+                  aria-hidden="true"
+                />
+                לחצו כאן כדי לפתוח את בקשת הגיוס
+              </div>
+
+              <label
+                className={`flex cursor-pointer items-start gap-2.5 rounded-[14px] border px-4 py-3 text-start transition-colors ${
+                  termsError && !termsAccepted
+                    ? 'border-red-300/60 bg-red-500/10'
+                    : 'border-white/10 bg-white/5'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(event) => {
+                    setTermsAccepted(event.target.checked)
+                    if (event.target.checked) setTermsError(false)
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-white/30 accent-[#D9A928]"
+                />
+                <span className="text-[13px] leading-[1.75] text-white/72">
+                  קראתי את תנאי המסלול, לרבות דמי הפתיחה, עמלת האיוש,
+                  משך הפרסום, מדיניות הביטול והאחריות.
+                </span>
+              </label>
+
+              {termsError && !termsAccepted && (
+                <p
+                  className="mt-3 text-[13px] font-semibold text-red-300"
+                  role="alert"
+                >
+                  יש לאשר את תנאי המסלול לפני המעבר לפתיחת המשרה.
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={handleContinue}
+                className={`${PRIMARY_CTA_CLASS} mt-5 w-full sm:w-auto`}
+              >
                 <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                פתחו בקשת גיוס
-              </Link>
+                פתיחת בקשת גיוס
+              </button>
             </div>
           </div>
         </div>
