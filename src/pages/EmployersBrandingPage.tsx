@@ -1,396 +1,789 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import {
+  ArrowDown,
   ArrowRight,
   BadgeCheck,
-  BriefcaseBusiness,
+  BarChart3,
   Building2,
-  Camera,
   CheckCircle2,
+  ChevronDown,
   ClipboardList,
   HeartHandshake,
   ImagePlus,
-  MessageCircle,
-  PlaySquare,
+  Mail,
   ShieldCheck,
   Sparkles,
-  Users,
+  Target,
 } from 'lucide-react'
 
-const HERO_HIGHLIGHTS = [
-  'עמוד מעסיק ייעודי',
-  'הצגת המרפאה והצוות',
-  'חיזוק המותג המעסיק',
-]
 
-const INCLUDED_ITEMS = [
-  {
-    icon: Building2,
-    title: 'עמוד מעסיק ייעודי',
-    body: 'עמוד ייעודי המציג את המרפאה ואת סביבת העבודה.',
-  },
-  {
-    icon: Users,
-    title: 'הצגת הצוות',
-    body: 'חשיפה של האנשים שמרכיבים את המרפאה.',
-  },
-  {
-    icon: Camera,
-    title: 'תמונות וסרטונים',
-    body: 'המחשה אמיתית של סביבת העבודה.',
-  },
-  {
-    icon: Sparkles,
-    title: 'סיפור המעסיק',
-    body: 'הצגת הערכים, התרבות הארגונית והחזון.',
-  },
-  {
-    icon: HeartHandshake,
-    title: 'יצירת אמון',
-    body: 'מועמדים מקבלים תמונה ברורה יותר על מקום העבודה.',
-  },
-  {
-    icon: BadgeCheck,
-    title: 'חיזוק המותג',
-    body: 'בנייה ארוכת טווח של תדמית המעסיק.',
-  },
+function WhatsAppIcon({ className = 'h-4 w-4' }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 32 32"
+      fill="currentColor"
+      className={className}
+      aria-hidden="true"
+    >
+      <path d="M19.11 17.38c-.26-.13-1.52-.75-1.76-.84-.24-.09-.41-.13-.59.13-.17.26-.67.84-.82 1.01-.15.17-.3.2-.56.07-.26-.13-1.08-.4-2.06-1.27-.76-.68-1.27-1.52-1.42-1.78-.15-.26-.02-.4.11-.53.12-.12.26-.3.39-.45.13-.15.17-.26.26-.43.09-.17.04-.32-.02-.45-.06-.13-.59-1.42-.8-1.94-.21-.51-.43-.44-.59-.45h-.5c-.17 0-.45.06-.69.32-.24.26-.91.89-.91 2.17s.93 2.52 1.06 2.69c.13.17 1.83 2.8 4.44 3.92.62.27 1.1.43 1.48.55.62.2 1.19.17 1.64.1.5-.07 1.52-.62 1.74-1.22.22-.6.22-1.11.15-1.22-.06-.11-.24-.17-.5-.3Z" />
+      <path d="M26.68 5.34A14.87 14.87 0 0 0 16.08.95C7.85.95 1.15 7.65 1.15 15.88c0 2.63.69 5.2 2 7.46L1.02 31.1l7.95-2.08a14.9 14.9 0 0 0 7.11 1.81h.01c8.23 0 14.93-6.7 14.93-14.93a14.84 14.84 0 0 0-4.34-10.56Zm-10.6 22.98h-.01a12.4 12.4 0 0 1-6.32-1.73l-.45-.27-4.72 1.24 1.26-4.6-.3-.47a12.38 12.38 0 0 1-1.9-6.61c0-6.86 5.58-12.44 12.45-12.44 3.32 0 6.44 1.29 8.79 3.65a12.36 12.36 0 0 1 3.64 8.8c0 6.86-5.58 12.43-12.44 12.43Z" />
+    </svg>
+  )
+}
+
+const BRANDING_COLORS = {
+  primary: '#AB134E',
+  primaryLight: '#E889AE',
+  primarySoft: '#FBEAF1',
+  primaryBorder: 'rgba(171,19,78,0.18)',
+  gold: '#D9A928',
+}
+
+const HERO_HIGHLIGHTS = [
+  'עמוד משרה מעוצב',
+  'חשיפה מלאה של המרפאה',
+  'ללא עמלת הצלחה',
 ]
 
 const FIT_ITEMS = [
   {
     title: 'מרפאות בצמיחה',
-    body: 'המגייסות באופן קבוע.',
+    body: 'למקומות שמגייסים באופן קבוע ורוצים להיראות מקצועיים ומדויקים יותר מול מועמדים.',
   },
   {
     title: 'מרפאות פרטיות',
-    body: 'המעוניינות להציג את הייחוד שלהן.',
+    body: 'למרפאות שרוצות להציג את הייחוד, הצוות, האווירה וסביבת העבודה שלהן.',
   },
   {
     title: 'גיוסים מאתגרים',
-    body: 'כאשר קשה למצוא מועמדים איכותיים.',
+    body: 'כאשר צריך ליצור חיבור ואמון חזקים יותר כבר מהחשיפה הראשונה למשרה.',
   },
   {
     title: 'בניית מוניטין',
-    body: 'למרפאות שרוצות לחזק את נראות המעסיק שלהן לאורך זמן.',
+    body: 'למעסיקים שרוצים לחזק את הנראות שלהם גם מעבר למשרה נקודתית אחת.',
+  },
+]
+
+const VALUE_STEPS = [
+  {
+    id: '01',
+    icon: ImagePlus,
+    eyebrow: 'חומרים ויזואליים',
+    title: 'נראות שיוצרת חיבור',
+    body:
+      'תמונות, סרטונים ולוגו מאפשרים למועמדים להבין לאן הם מגיעים, עם מי יעבדו ואיך נראית סביבת העבודה.',
+    value:
+      'יותר ביטחון, יותר אנושיות ופחות תחושת אי־ודאות לפני הפנייה הראשונה.',
+  },
+  {
+    id: '02',
+    icon: HeartHandshake,
+    eyebrow: 'תרבות ארגונית',
+    title: 'סיפור שנותן סיבה לבחור בכם',
+    body:
+      'הצגת החזון, הערכים, האווירה והדרך שבה הצוות עובד יחד עוזרת למועמדים להבין מה באמת מחכה להם אצלכם.',
+    value:
+      'משיכת אנשים שמתאימים לאופי המרפאה — ולא רק לדרישות התפקיד.',
+  },
+  {
+    id: '03',
+    icon: Sparkles,
+    eyebrow: 'מקצועיות וטכנולוגיה',
+    title: 'מקצועיות שמחזקת את המותג',
+    body:
+      'תחומי טיפול, ציוד, מערכות, טכנולוגיות והישגים מציגים את המרפאה כסביבת עבודה מקצועית ומתקדמת.',
+    value:
+      'משיכת מועמדים שמחפשים למידה, התפתחות וגאווה מקצועית.',
+  },
+  {
+    id: '04',
+    icon: BadgeCheck,
+    eyebrow: 'מוניטין והוכחה חברתית',
+    title: 'אמון עוד לפני השיחה',
+    body:
+      'המלצות, הישגים ומוניטין חיובי מקרינים גם על המרפאה כמעסיקה ומחזקים את תחושת היציבות והמקצועיות.',
+    value:
+      'חיזוק הביטחון של המועמד והפחתת חששות לפני יצירת הקשר.',
+  },
+  {
+    id: '05',
+    icon: Target,
+    eyebrow: 'פרטי משרה',
+    title: 'דיוק שמביא פניות רלוונטיות',
+    body:
+      'שעות, שכר, היקף משרה, מיקום, ניסיון ודרישות חובה משפיעים ישירות על סוג וכמות הפניות.',
+    value:
+      'פחות פניות לא מתאימות, פחות ראיונות מיותרים ופחות פערי ציפיות.',
+  },
+  {
+    id: '06',
+    icon: Building2,
+    eyebrow: 'חיבור למסלול אחד',
+    title: 'עמוד שמחבר בין המסר למועמד הנכון',
+    body:
+      'אנחנו מחברים את כל החומרים לעמוד שמציג לא רק את התפקיד — אלא גם את הסיבה לעבוד דווקא אצלכם.',
+    value:
+      'מסר ברור, מקצועי ומבדל שמלווה את המועמד מהחשיפה הראשונה ועד הפנייה.',
   },
 ]
 
 const COMPARISON_ROWS = [
   {
-    regular: 'התמקדות במשרה בלבד.',
+    label: 'אופן הצגת המשרה',
+    regular: 'מיקוד במשרה ובדרישות, ללא חשיפת המרפאה.',
     branding: 'הצגת המרפאה והמשרה יחד.',
   },
   {
-    regular: 'מידע בסיסי.',
-    branding: 'תוכן רחב יותר על מקום העבודה.',
+    label: 'תוכן',
+    regular: 'מידע מקצועי ממוקד על התפקיד.',
+    branding: 'תוכן על הצוות, סביבת העבודה והתרבות.',
   },
   {
-    regular: 'גיוס נקודתי.',
-    branding: 'חיזוק נראות המעסיק לאורך זמן.',
+    label: 'מדיה וקישורים',
+    regular: 'ללא מדיה ממותגת כחלק מהמסלול.',
+    branding: 'תמונות, סרטון, אתר ורשתות חברתיות.',
+  },
+  {
+    label: 'מטרת המסלול',
+    regular: 'גיוס ממוקד ודיסקרטי.',
+    branding: 'גיוס לצד חיזוק נראות המעסיק.',
+  },
+]
+
+const EXPECTATION_ITEMS = [
+  {
+    icon: CheckCircle2,
+    title: 'אין התחייבות למספר פניות',
+    body:
+      'המסלול משפר נראות, אמון ואטרקטיביות, אך אינו מבטיח מראש כמות מינימלית של פניות.',
+  },
+  {
+    icon: BarChart3,
+    title: 'התוצאה מושפעת מתנאי המשרה',
+    body:
+      'מיקום, שכר, היקף משרה, שעות עבודה, ניסיון והסמכות משפיעים על היקף הפניות.',
+  },
+  {
+    icon: ShieldCheck,
+    title: 'ניתן לבקש נתוני פרסום',
+    body:
+      'אם אין פניות, ניתן לקבל תמונת מצב על הפעילות הפרסומית שבוצעה.',
   },
 ]
 
 const FAQ_ITEMS = [
   {
-    question: 'מהו מיתוג מעסיקים?',
+    id: '01',
+    question: 'מהו מסלול מיתוג מעסיקים?',
     answer:
-      'תהליך שבו המרפאה מוצגת כמקום עבודה אטרקטיבי באמצעות תוכן, תמונות ומידע על סביבת העבודה.',
+      'מסלול גיוס שמציג לא רק את המשרה, אלא גם את המרפאה, הצוות, סביבת העבודה, הערכים והייחוד שלכם כמעסיקים.',
   },
   {
-    question: 'מה כולל עמוד המעסיק?',
+    id: '02',
+    question: 'מה כולל המסלול?',
     answer:
-      'הצגת המרפאה, הצוות, סביבת העבודה ומידע נוסף המסייע למועמדים להכיר אתכם.',
+      'המסלול כולל דף משרה מעוצב, מידע על המרפאה והמשרה, תמונות, סרטונים, קישורים לאתר ולרשתות, כתובת, פרטי קשר ותוכן שמציג את סביבת העבודה.',
   },
   {
-    question: 'האם ניתן להציג תמונות?',
-    answer: 'כן. ניתן לשלב תמונות רלוונטיות של המרפאה וסביבת העבודה.',
-  },
-  {
-    question: 'האם ניתן להציג סרטונים?',
-    answer: 'כן. ניתן לשלב סרטונים בהתאם לתהליך ההקמה של העמוד.',
-  },
-  {
-    question: 'למי מתאים המסלול?',
+    id: '03',
+    question: 'למה צריך לשלוח תמונות, סרטונים ותוכן?',
     answer:
-      'למרפאות שמעוניינות ליצור חשיפה רחבה יותר ולחזק את המותג המעסיק שלהן.',
-  },
-]
-
-const TERMS_ITEMS = [
-  {
-    icon: ImagePlus,
-    title: 'חשיפה',
-    body: 'יצירת עמוד מעסיק ייעודי.',
+      'החומרים מאפשרים למועמדים להכיר את המרפאה עוד לפני הפנייה. הם יוצרים אמון, חיבור וממחישים כיצד נראה מקום העבודה בפועל.',
   },
   {
-    icon: PlaySquare,
-    title: 'תוכן',
-    body: 'שילוב מידע, תמונות ותוכן על המרפאה.',
+    id: '04',
+    question: 'איך נראה תהליך העבודה?',
+    answer:
+      'לאחר פתיחת הבקשה ממלאים את פרטי המשרה ושולחים חומרים. צוות AllDent בונה את העמוד, ואתם מאשרים אותו לפני הפרסום.',
   },
   {
-    icon: BriefcaseBusiness,
-    title: 'תהליך עבודה',
-    body: 'איסוף חומרים, הקמת עמוד ופרסום.',
+    id: '05',
+    question: 'כמה עולה המסלול?',
+    answer:
+      'המסלול עולה 2,000 ₪ + מע״מ בתשלום חד־פעמי עבור משרה אחת, דף מעוצב ופרסום למשך עד 60 יום.',
+  },
+  {
+    id: '06',
+    question: 'האם קיימת עמלת הצלחה?',
+    answer:
+      'לא. במסלול זה אין תשלום נוסף במקרה של גיוס.',
+  },
+  {
+    id: '07',
+    question: 'איפה המשרה מתפרסמת?',
+    answer:
+      'הפרסום מתבצע בערוצים הרלוונטיים של AllDent, ובהם אתר AllDent, רשתות חברתיות, Facebook, אתרי דרושים ודיוור WhatsApp אישי.',
+  },
+  {
+    id: '08',
+    question: 'האם יש התחייבות לכמות פניות?',
+    answer:
+      'לא. כמות הפניות מושפעת גם ממיקום, שכר, היקף משרה, שעות, ניסיון ודרישות התפקיד.',
+  },
+  {
+    id: '09',
+    question: 'מה קורה אם אין פניות?',
+    answer:
+      'ניתן לבקש נתוני פרסום ולקבל תמונת מצב על הפעילות שבוצעה. קיימת מחויבות למאמץ פרסומי, אך לא לתוצאה מובטחת.',
+  },
+  {
+    id: '10',
+    question: 'אפשר לבטל או לדחות את השירות?',
+    answer:
+      'בתוך 3 ימי עסקים ניתן לדחות את השירות עד 12 חודשים או לבטל אותו בכפוף לדמי ביטול של 200 ₪ ללא מע״מ.',
+  },
+  {
+    id: '11',
+    question: 'האם ניתן לעדכן את הדף לאחר הבנייה?',
+    answer:
+      'ניתן לבצע תיקונים במסגרת שלב האישור לפני הפרסום. שינויים לאחר העלייה לאוויר יתבצעו בהתאם להיקף העדכון.',
+  },
+  {
+    id: '12',
+    question: 'למי המסלול מתאים?',
+    answer:
+      'למרפאות שרוצות למשוך מועמדים דרך הצגה מקצועית, ברורה ואמינה של מקום העבודה, ולא רק דרך מודעת דרושים בסיסית.',
   },
 ]
 
 const WHATSAPP_CLASS =
-  'inline-flex min-h-[44px] items-center gap-2 rounded-[18px] bg-[#D97706] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.24)] transition-all duration-200 hover:bg-[#B45309] hover:-translate-y-0.5'
+  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#D97706] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#B45309]'
+
 const PRIMARY_CTA_CLASS =
-  'inline-flex min-h-[44px] items-center gap-2 rounded-[18px] bg-[#008080] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(0,128,128,0.20)] transition-all duration-200 hover:bg-[#006D6D] hover:-translate-y-0.5'
+  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#008080] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(0,128,128,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#006D6D]'
+
 const BACK_CTA_CLASS =
   'inline-flex min-h-[44px] items-center gap-2 rounded-[18px] border border-white/12 bg-white/8 px-6 py-3 text-[14px] font-bold text-white shadow-sm backdrop-blur transition-all duration-200 hover:border-white/20 hover:bg-white/12'
 
-export default function EmployersBrandingPage() {
+function ValueTimeline() {
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const stepRefs = useRef<Array<HTMLDivElement | null>>([])
+  const [activeStep, setActiveStep] = useState(0)
+
+  useEffect(() => {
+    const observers: IntersectionObserver[] = []
+
+    stepRefs.current.forEach((element, index) => {
+      if (!element) return
+
+      const observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) {
+            setActiveStep((current) => Math.max(current, index))
+          }
+        },
+        {
+          root: null,
+          threshold: 0.48,
+          rootMargin: '-12% 0px -28% 0px',
+        },
+      )
+
+      observer.observe(element)
+      observers.push(observer)
+    })
+
+    return () => observers.forEach((observer) => observer.disconnect())
+  }, [])
+
+  const progress =
+    VALUE_STEPS.length <= 1
+      ? 100
+      : (activeStep / (VALUE_STEPS.length - 1)) * 100
+
   return (
-    <div className="min-h-screen bg-[#f3f4f6] text-[#0f1720]" dir="rtl">
-      <section className="relative overflow-hidden bg-[#2b2b2b] px-4 pb-20 pt-8 text-white md:px-8 md:pt-10">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,128,128,0.20),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(217,119,6,0.12),transparent_20%)]" />
-        <div className="pointer-events-none absolute -right-16 top-16 h-64 w-64 rounded-full bg-[#008080]/18 blur-3xl" />
-        <div className="pointer-events-none absolute -left-8 bottom-4 h-56 w-56 rounded-full bg-[#D97706]/10 blur-3xl" />
+    <section
+      ref={sectionRef}
+      id="strategy-value"
+      className="relative overflow-hidden bg-[#2D2D2D] px-4 py-20 text-white md:px-8 md:py-28"
+    >
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(171,19,78,0.12),transparent_30%),radial-gradient(circle_at_bottom_left,rgba(217,169,40,0.05),transparent_26%)]" />
 
-        <div className="relative mx-auto max-w-7xl">
-          <div className="mb-6">
-            <Link to="/employers" className={BACK_CTA_CLASS}>
-              <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              חזרה לפתרונות למעסיקים
-            </Link>
+      <div className="relative mx-auto max-w-6xl">
+        <div className="mx-auto max-w-4xl text-center">
+          <span
+            className="inline-flex rounded-full border px-4 py-1.5 text-[13px] font-bold"
+            style={{
+              borderColor: 'rgba(232,137,174,0.28)',
+              backgroundColor: 'rgba(171,19,78,0.14)',
+              color: BRANDING_COLORS.primaryLight,
+            }}
+          >
+            אסטרטגיית גיוס עם ערך
+          </span>
+
+          <h2 className="mt-5 text-3xl font-black tracking-tight md:text-5xl">
+            מיתוג מעסיקים הוא מסר של שקיפות, זהות ובחירה
+          </h2>
+
+          <p className="mx-auto mt-5 max-w-3xl text-[16px] leading-[1.95] text-white/72 md:text-[18px]">
+            המסלול מחבר בין משמעות לעיצוב: הוא מציג למועמדים מי אתם,
+            איך נראית סביבת העבודה ומה הערך שהם יכולים למצוא אצלכם —
+            בצורה ברורה, אמינה ומושכת.
+          </p>
+        </div>
+
+        <div className="relative mt-16">
+          <div className="pointer-events-none absolute bottom-0 end-1/2 top-0 hidden w-px translate-x-1/2 bg-white/10 md:block" />
+          <div
+            className="pointer-events-none absolute end-1/2 top-0 hidden w-px translate-x-1/2 bg-[#D9A928] transition-[height] duration-500 ease-out md:block"
+            style={{ height: `${progress}%` }}
+          />
+
+          <div className="space-y-16 md:space-y-24">
+            {VALUE_STEPS.map(
+              ({ id, icon: Icon, eyebrow, title, body, value }, index) => {
+                const cardOnRight = index % 2 === 0
+                const isVisible = index <= activeStep
+                const isActive = index === activeStep
+
+                return (
+                  <div
+                    key={id}
+                    ref={(element) => {
+                      stepRefs.current[index] = element
+                    }}
+                    className="relative grid min-h-[280px] gap-5 md:grid-cols-[1fr_72px_1fr] md:items-center"
+                  >
+                    <div
+                      className={`${cardOnRight ? 'md:col-start-3' : 'md:col-start-1'} ${
+                        cardOnRight ? '' : 'md:row-start-1'
+                      }`}
+                    >
+                      <article
+                        className={`relative rounded-[24px] border p-6 text-start transition-all duration-700 ease-out md:p-7 ${
+                          isVisible
+                            ? 'translate-y-0 scale-100 opacity-100'
+                            : 'translate-y-12 scale-[0.96] opacity-0'
+                        } ${
+                          isActive
+                            ? 'border-white/20 shadow-[0_26px_62px_rgba(0,0,0,0.32)]'
+                            : 'border-white/10 shadow-[0_18px_46px_rgba(0,0,0,0.22)]'
+                        }`}
+                        style={{
+                          background: 'linear-gradient(145deg, #363636 0%, #303030 100%)',
+                        }}
+                      >
+                        <div
+                          className={`absolute top-1/2 hidden h-0 w-0 -translate-y-1/2 border-y-[10px] border-y-transparent md:block ${
+                            cardOnRight
+                              ? 'end-full border-e-[12px] border-e-[#3A3A3A]'
+                              : 'start-full border-s-[12px] border-s-[#3A3A3A]'
+                          }`}
+                        />
+
+                        <div className="flex items-start justify-between gap-5">
+                          <div>
+                            <p
+                              className="text-[12px] font-black tracking-[0.08em]"
+                              style={{ color: BRANDING_COLORS.primaryLight }}
+                            >
+                              {eyebrow}
+                            </p>
+                            <h3 className="mt-2 text-[22px] font-black leading-[1.35]">
+                              {title}
+                            </h3>
+                          </div>
+
+                          <div
+                            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl"
+                            style={{ backgroundColor: 'rgba(171,19,78,0.20)' }}
+                          >
+                            <Icon
+                              className="h-5 w-5"
+                              style={{ color: BRANDING_COLORS.primaryLight }}
+                              aria-hidden="true"
+                            />
+                          </div>
+                        </div>
+
+                        <p className="mt-4 text-[15px] leading-[1.9] text-white/72">
+                          {body}
+                        </p>
+
+                        <div className="mt-5 rounded-[16px] border border-[#D9A928]/20 bg-[#D9A928]/8 px-4 py-3">
+                          <p className="text-[12px] font-black text-[#F3D87D]">
+                            הערך לגיוס
+                          </p>
+                          <p className="mt-1 text-[14px] leading-[1.8] text-white/82">
+                            {value}
+                          </p>
+                        </div>
+                      </article>
+                    </div>
+
+                    <div className="hidden items-center justify-center md:col-start-2 md:row-start-1 md:flex">
+                      <div
+                        className={`relative z-10 flex h-11 w-11 items-center justify-center rounded-full border text-[12px] font-black transition-all duration-500 ${
+                          isVisible
+                            ? 'scale-100 border-[#D9A928] bg-[#2D2D2D] text-[#F3D87D] shadow-[0_0_22px_rgba(217,169,40,0.28)]'
+                            : 'scale-90 border-white/15 bg-[#2D2D2D] text-white/35'
+                        }`}
+                      >
+                        {id}
+                      </div>
+                    </div>
+
+                    <div
+                      className={`md:hidden ${
+                        cardOnRight ? '' : ''
+                      }`}
+                    >
+                      <div className="mb-4 flex items-center gap-3">
+                        <span
+                          className={`flex h-9 w-9 items-center justify-center rounded-full border text-[12px] font-black transition-all ${
+                            isVisible
+                              ? 'border-[#D9A928] text-[#D9A928]'
+                              : 'border-white/15 text-white/35'
+                          }`}
+                        >
+                          {id}
+                        </span>
+                        <span className="h-px flex-1 bg-white/10" />
+                      </div>
+                    </div>
+                  </div>
+                )
+              },
+            )}
           </div>
+        </div>
 
-          <div className="grid gap-10 lg:grid-cols-[1.04fr_.96fr] lg:items-center">
-            <div>
-              <div className="flex flex-wrap gap-3">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/8 px-4 py-2 text-[13px] font-bold text-[#ddf8f7] backdrop-blur">
-                  <span className="h-2 w-2 rounded-full bg-[#20d3c2]" />
-                  Employer Branding
+        <div className="mx-auto mt-16 max-w-3xl text-center">
+          <p className="text-2xl font-black leading-[1.5] md:text-3xl">
+            אתם מביאים את הסיפור של המרפאה.
+            <span
+              className="mt-1 block"
+              style={{ color: BRANDING_COLORS.primaryLight }}
+            >
+              אנחנו הופכים אותו לאסטרטגיית גיוס.
+            </span>
+          </p>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+function FAQAccordion({
+  items,
+}: {
+  items: { id: string; question: string; answer: string }[]
+}) {
+  const [openId, setOpenId] = useState(items[0]?.id ?? '')
+
+  return (
+    <div className="space-y-3" dir="rtl">
+      {items.map((item) => {
+        const isOpen = openId === item.id
+        const contentId = `branding-faq-${item.id}`
+
+        return (
+          <div
+            key={item.id}
+            className={`overflow-hidden rounded-[16px] border transition-all duration-300 ${
+              isOpen
+                ? 'bg-white shadow-[0_12px_30px_rgba(15,23,32,0.07)]'
+                : 'border-slate-200 bg-white hover:border-slate-300'
+            }`}
+            style={{
+              borderColor: isOpen
+                ? BRANDING_COLORS.primaryBorder
+                : undefined,
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => setOpenId(isOpen ? '' : item.id)}
+              className="flex w-full items-center justify-between gap-4 px-5 py-4 text-start sm:px-6"
+              aria-expanded={isOpen}
+              aria-controls={contentId}
+            >
+              <div className="flex min-w-0 flex-1 items-center gap-4">
+                <span
+                  className="w-8 shrink-0 text-[13px] font-black"
+                  style={{
+                    color: isOpen
+                      ? BRANDING_COLORS.primary
+                      : '#94A3B8',
+                  }}
+                >
+                  {item.id}
                 </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-[#D97706]/25 bg-[#D97706]/10 px-4 py-2 text-[13px] font-bold text-[#ffd7a6] backdrop-blur">
-                  <BadgeCheck className="h-3.5 w-3.5" aria-hidden="true" />
-                  מסלול פרימיום
-                </span>
+                <h3 className="min-w-0 flex-1 text-[15px] font-black leading-[1.55] text-[#273142] sm:text-[16px]">
+                  {item.question}
+                </h3>
               </div>
 
-              <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1] tracking-[-0.04em] md:text-6xl">
+              <ChevronDown
+                className={`h-4 w-4 shrink-0 transition-transform duration-300 ${
+                  isOpen ? 'rotate-180' : ''
+                }`}
+                style={{
+                  color: isOpen
+                    ? BRANDING_COLORS.primary
+                    : '#94A3B8',
+                }}
+                aria-hidden="true"
+              />
+            </button>
+
+            <div
+              id={contentId}
+              className={`grid transition-all duration-300 ease-out ${
+                isOpen
+                  ? 'grid-rows-[1fr] opacity-100'
+                  : 'grid-rows-[0fr] opacity-0'
+              }`}
+            >
+              <div className="overflow-hidden">
+                <p className="border-t border-slate-100 px-5 py-5 ps-[4.25rem] text-[14px] leading-[1.9] text-[#667085] sm:px-6">
+                  {item.answer}
+                </p>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function EmployersBrandingPage() {
+  const navigate = useNavigate()
+  const [termsAccepted, setTermsAccepted] = useState(false)
+  const [termsError, setTermsError] = useState(false)
+
+  const handleContinue = () => {
+    if (!termsAccepted) {
+      setTermsError(true)
+      return
+    }
+
+    navigate('/employers/recruitment-request?plan=branding', {
+      state: { plan: 'branding', termsAccepted: true },
+    })
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F3F4F6] text-[#0F1720]" dir="rtl">
+      <section className="relative overflow-hidden bg-[#2D2D2D] px-4 pb-16 pt-6 text-white md:px-8 md:pb-20 md:pt-8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(171,19,78,0.14),transparent_30%),linear-gradient(135deg,#232323_0%,#2D2D2D_52%,#202020_100%)]" />
+        <div className="pointer-events-none absolute end-[-5rem] top-10 h-64 w-64 rounded-full bg-[#AB134E]/12 blur-3xl" />
+
+        <div className="relative mx-auto max-w-7xl">
+          <Link
+            to="/employers"
+            className="inline-flex items-center gap-1.5 text-[13px] font-bold text-white/58 transition hover:text-white"
+          >
+            <ArrowRight
+              className="h-3.5 w-3.5 rtl:scale-x-[-1]"
+              aria-hidden="true"
+            />
+            חזרה למסלולי הגיוס
+          </Link>
+
+          <div className="mt-8 grid gap-10 lg:grid-cols-[1.12fr_0.88fr] lg:items-center">
+            <div className="text-start">
+              <span
+                className="inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-bold backdrop-blur"
+                style={{
+                  borderColor: 'rgba(232,137,174,0.28)',
+                  backgroundColor: 'rgba(171,19,78,0.12)',
+                  color: BRANDING_COLORS.primaryLight,
+                }}
+              >
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: BRANDING_COLORS.primaryLight }}
+                />
+                Employer Branding
+              </span>
+
+              <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1.06] tracking-[-0.04em] md:text-6xl lg:text-[64px]">
                 מיתוג מעסיקים
-                <span className="mt-2 block text-[#24c7bf]">בעולם הדנטל</span>
+                <span
+                  className="mt-2 block"
+                  style={{ color: BRANDING_COLORS.primaryLight }}
+                >
+                  אסטרטגיית גיוס עם ערך
+                </span>
               </h1>
 
-              <p className="mt-6 max-w-3xl text-base leading-8 text-white/75 md:text-lg">
-                סביבת עבודה מקצועית, צוות איכותי, טכנולוגיות מתקדמות ותהליך קליטה מסודר לאנשי מקצוע דנטליים.
+              <p className="mt-6 max-w-2xl text-[17px] leading-[1.85] text-white/78 md:text-[19px]">
+                מסלול גיוס שמציג את המרפאה, הצוות וסביבת העבודה שלכם —
+                ומאפשר למועמדים להבין למה כדאי לעבוד דווקא אצלכם.
               </p>
 
-              <div className="mt-8 flex flex-wrap gap-3">
-                {HERO_HIGHLIGHTS.map((item, index) => (
-                  <div
-                    key={item}
-                    className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-[13px] font-bold backdrop-blur ${
-                      index === 2
-                        ? 'border-[#D97706]/30 bg-[#D97706]/10 text-[#ffd7a6]'
-                        : 'border-white/12 bg-white/8 text-white/88'
-                    }`}
-                  >
-                    <span
-                      className={`h-2 w-2 rounded-full ${
-                        index === 2 ? 'bg-[#f59e0b]' : 'bg-[#20d3c2]'
-                      }`}
+              <div className="mt-7 flex flex-wrap gap-x-5 gap-y-2 text-[14px] font-bold text-white/82">
+                {HERO_HIGHLIGHTS.map((item) => (
+                  <span key={item} className="inline-flex items-center gap-2">
+                    <CheckCircle2
+                      className="h-4 w-4"
+                      style={{ color: BRANDING_COLORS.primaryLight }}
+                      aria-hidden="true"
                     />
-                    <span>{item}</span>
-                  </div>
+                    {item}
+                  </span>
                 ))}
               </div>
 
-              <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <div className="mt-9">
                 <a
-                  href="https://wa.me/972533959003"
+                  href="https://wa.me/972533951003"
                   target="_blank"
                   rel="noopener noreferrer"
                   className={WHATSAPP_CLASS}
                 >
-                  <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                  דברו איתנו בוואטסאפ
-                </a>
-
-                <a href="#included" className={PRIMARY_CTA_CLASS}>
-                  <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                  לראות מה כלול במסלול
+                  <WhatsAppIcon className="h-4 w-4" />
+                  דברו איתנו ב-WhatsApp
                 </a>
               </div>
             </div>
 
-            <div className="relative">
-              <div className="rounded-[32px] border border-white/10 bg-white/6 p-5 shadow-[0_24px_70px_rgba(0,0,0,0.22)] backdrop-blur-md md:p-6">
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-[12px] font-bold uppercase tracking-[0.24em] text-[#8fe7e7]">
-                      Brand Presence
-                    </p>
-                    <h3 className="mt-2 text-2xl font-black">עמוד שמציג אתכם נכון</h3>
-                  </div>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#008080]/20">
-                    <ShieldCheck className="h-6 w-6 text-[#7cecec]" aria-hidden="true" />
-                  </div>
-                </div>
-
-                <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                  <div className="rounded-[24px] border border-white/10 bg-white/6 p-5">
-                    <p className="text-[12px] font-bold text-[#8fe7e7]">עמוד מעסיק</p>
-                    <p className="mt-3 text-xl font-black text-white">יותר ממשרה</p>
-                    <p className="mt-2 text-[14px] leading-7 text-white/72">
-                      הצגת הערכים, האווירה והיתרונות של מקום העבודה.
-                    </p>
-                  </div>
-
-                  <div className="rounded-[24px] border border-[#D97706]/20 bg-[#D97706]/10 p-5">
-                    <p className="text-[12px] font-bold text-[#ffd7a6]">מסר למועמדים</p>
-                    <p className="mt-3 text-xl font-black text-white">אמון ומשיכה</p>
-                    <p className="mt-2 text-[14px] leading-7 text-white/78">
-                      חשיפה ברורה יותר של מי אתם ולמה כדאי לעבוד אצלכם.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="mt-5 rounded-[24px] border border-white/10 bg-[#323232] p-5">
-                  <p className="text-[12px] font-bold text-[#8fe7e7]">למה זה עובד</p>
-                  <p className="mt-3 text-[15px] leading-7 text-white/75">
-                    מועמדים רואים יותר ממשרה, ומקבלים תמונה רחבה יותר של סביבת העבודה, הצוות והתרבות הארגונית עוד לפני הפנייה.
+            <aside className="rounded-[28px] border border-[#D9A928]/25 bg-[#323232] p-6 text-start shadow-[0_24px_64px_rgba(0,0,0,0.34)] ring-1 ring-[#D9A928]/10 md:p-7">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-[12px] font-bold text-[#E8CC72]">
+                    מחיר המסלול
+                  </p>
+                  <p className="mt-2 text-4xl font-black text-white">
+                    2,000 ₪
+                  </p>
+                  <p className="mt-1 text-[15px] font-bold text-white/68">
+                    + מע״מ · תשלום חד־פעמי
                   </p>
                 </div>
+
+                <span className="rounded-full border border-[#D9A928]/25 bg-[#D9A928]/10 px-3 py-1.5 text-[12px] font-black text-[#E8CC72]">
+                  ללא עמלת הצלחה
+                </span>
               </div>
-            </div>
+
+              <div className="mt-6 space-y-3 border-t border-white/10 pt-5">
+                {[
+                  'משרה אחת',
+                  'פרסום למשך עד 60 יום',
+                  'דף משרה מעוצב ומאושר לפני פרסום',
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-3 text-[14px] font-semibold text-white/78"
+                  >
+                    <CheckCircle2
+                      className="h-4 w-4 shrink-0"
+                      style={{ color: BRANDING_COLORS.primaryLight }}
+                      aria-hidden="true"
+                    />
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </aside>
           </div>
         </div>
       </section>
 
-      <section className="px-4 py-20 md:px-8 md:py-24">
-        <div className="mx-auto grid max-w-6xl gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
-          <div className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,32,0.06)] md:p-10">
-            <span className="inline-flex rounded-full bg-[#E6F3F3] px-4 py-1.5 text-[13px] font-bold text-[#008080]">
-              למה זה חשוב
+      <section className="px-4 py-16 md:px-8 md:py-20">
+        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.02fr_0.98fr] lg:items-center">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-[0_18px_50px_rgba(15,23,32,0.06)] md:p-9 text-start">
+            <span
+              className="inline-flex rounded-full px-4 py-1.5 text-[13px] font-bold"
+              style={{
+                backgroundColor: BRANDING_COLORS.primarySoft,
+                color: BRANDING_COLORS.primary,
+              }}
+            >
+              למי המסלול מתאים
             </span>
-
-            <h2 className="mt-5 text-3xl font-black tracking-tight text-[#0F1720] md:text-4xl">
-              עובדים בוחרים כיום לא רק תפקיד — אלא גם מקום עבודה
+            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+              לא רק לפרסם משרה — לבנות סיבה לבחור בכם
             </h2>
-
-            <div className="mt-6 space-y-4 text-base leading-8 text-[#4B5563] md:text-lg">
-              <p>
-                מיתוג מעסיקים מאפשר להציג את המרפאה שלכם בצורה מקצועית באמצעות תוכן, תמונות, מידע על סביבת העבודה והערכים שמובילים אתכם.
-              </p>
-              <p>
-                המטרה היא ליצור חיבור ראשוני איכותי יותר עם מועמדים ולסייע להם להבין מי אתם עוד לפני יצירת הקשר.
-              </p>
-            </div>
-
-            <div className="mt-8">
-              <Link
-                to="/jobs"
-                className="inline-flex min-h-[48px] items-center gap-2 rounded-2xl border border-slate-200 bg-[#FAFBFC] px-6 py-3 text-[14px] font-bold text-[#0F1720] transition-all duration-200 hover:bg-white"
-              >
-                צפייה במשרות פתוחות
-                <ArrowRight className="h-4 w-4" aria-hidden="true" />
-              </Link>
-            </div>
+            <p className="mt-5 text-[16px] leading-[1.9] text-[#667085] md:text-[18px]">
+              במקום להציג רק תפקיד ודרישות, המסלול מאפשר למועמדים להבין מי
+              אתם, איך נראית סביבת העבודה ומה מייחד את המרפאה שלכם כמעסיקה.
+            </p>
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
             {FIT_ITEMS.map((item, index) => (
               <div
                 key={item.title}
-                className={`rounded-[26px] border p-6 shadow-[0_16px_40px_rgba(15,23,32,0.05)] ${
-                  index === 0
-                    ? 'border-[#008080]/10 bg-[#f8fbfb]'
-                    : index === 1
-                    ? 'border-slate-200 bg-white'
-                    : index === 2
-                    ? 'border-[#D97706]/10 bg-[#fffaf4]'
-                    : 'border-slate-200 bg-white'
+                className={`rounded-[24px] border p-5 shadow-[0_12px_34px_rgba(15,23,32,0.045)] text-start ${
+                  index === 2
+                    ? 'border-[#D97706]/12 bg-[#FFFAF4]'
+                    : 'bg-white'
                 }`}
+                style={
+                  index === 2
+                    ? undefined
+                    : { borderColor: BRANDING_COLORS.primaryBorder }
+                }
               >
-                <p
-                  className={`text-[13px] font-bold ${
-                    index === 2 ? 'text-[#B45309]' : 'text-[#008080]'
-                  }`}
-                >
-                  מתאים במיוחד
+                <h3 className="text-[20px] font-black">{item.title}</h3>
+                <p className="mt-2 text-[14px] leading-[1.8] text-[#6B7280]">
+                  {item.body}
                 </p>
-                <h3 className="mt-3 text-[22px] font-black tracking-tight text-[#0F1720]">
-                  {item.title}
-                </h3>
-                <p className="mt-3 text-[15px] leading-7 text-[#6B7280]">{item.body}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section
-        id="included"
-        className="relative overflow-hidden bg-[#2b2b2b] px-4 py-20 text-white md:px-8 md:py-24"
-      >
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(0,128,128,0.16),transparent_24%),radial-gradient(circle_at_bottom_right,rgba(217,119,6,0.10),transparent_18%)]" />
-        <div className="relative mx-auto max-w-7xl">
-          <div className="mx-auto max-w-3xl text-center">
-            <span className="inline-flex rounded-full border border-white/10 bg-white/8 px-4 py-1.5 text-[13px] font-bold text-[#9ceceb]">
-              מה כולל המסלול
-            </span>
-            <h2 className="mt-4 text-3xl font-black tracking-tight text-white md:text-4xl">
-              כל מה שצריך כדי לספר את סיפור המעסיק שלכם
-            </h2>
-          </div>
+      <ValueTimeline />
 
-          <div className="mt-12 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {INCLUDED_ITEMS.map(({ icon: Icon, title, body }, index) => (
-              <div
-                key={title}
-                className="group relative overflow-hidden rounded-[28px] border border-white/8 bg-white/6 p-7 shadow-[0_16px_40px_rgba(0,0,0,0.18)] backdrop-blur-md transition-all duration-300 hover:-translate-y-1 hover:bg-white/8"
-              >
+      <section className="px-4 py-16 md:px-8 md:py-20">
+        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1fr_1fr] lg:items-start">
+          <div className="rounded-[28px] border border-slate-200 bg-white p-7 shadow-[0_18px_50px_rgba(15,23,32,0.06)] md:p-9 text-start">
+            <span
+              className="inline-flex rounded-full px-4 py-1.5 text-[13px] font-bold"
+              style={{
+                backgroundColor: BRANDING_COLORS.primarySoft,
+                color: BRANDING_COLORS.primary,
+              }}
+            >
+              השוואה מהירה
+            </span>
+            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+              למה לבחור במיתוג מעסיקים
+            </h2>
+
+            <div className="mt-8 overflow-hidden rounded-[22px] border border-slate-200">
+              <div className="grid grid-cols-[0.8fr_1fr_1fr] bg-[#F8FAFC]">
+                <div className="border-e border-slate-200 px-4 py-4 text-[12px] font-black text-[#64748B]">
+                  נושא
+                </div>
+                <div className="border-e border-slate-200 px-4 py-4 text-[12px] font-black text-[#64748B]">
+                  גיוס דיסקרטי
+                </div>
                 <div
-                  className={`pointer-events-none absolute -top-12 left-0 h-24 w-24 rounded-full blur-2xl ${
-                    index % 2 === 0 ? 'bg-[#008080]/14' : 'bg-[#D97706]/12'
-                  }`}
-                />
-                <div className="relative mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 transition-all duration-300 group-hover:scale-105">
-                  <Icon className="h-6 w-6 text-[#7cecec]" aria-hidden="true" />
-                </div>
-                <h3 className="relative text-[20px] font-black tracking-tight text-white">{title}</h3>
-                <p className="relative mt-3 text-[15px] leading-7 text-white/68">{body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="px-4 py-20 md:px-8 md:py-24">
-        <div className="mx-auto grid max-w-6xl gap-8 lg:grid-cols-[1.02fr_.98fr] lg:items-start">
-          <div className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,32,0.06)] md:p-10">
-            <span className="inline-flex rounded-full bg-[#FFF1DE] px-4 py-1.5 text-[13px] font-bold text-[#B45309]">
-              השוואה
-            </span>
-
-            <h2 className="mt-5 text-3xl font-black tracking-tight text-[#0F1720] md:text-4xl">
-              מועמדים רואים יותר ממשרה
-            </h2>
-
-            <div className="mt-8 overflow-hidden rounded-[24px] border border-slate-200">
-              <div className="grid grid-cols-2 bg-[#F8FAFC]">
-                <div className="border-l border-slate-200 px-5 py-4 text-[13px] font-black text-[#64748B]">
-                  משרה רגילה
-                </div>
-                <div className="px-5 py-4 text-[13px] font-black text-[#008080]">
+                  className="px-4 py-4 text-[12px] font-black"
+                  style={{ color: BRANDING_COLORS.primary }}
+                >
                   מיתוג מעסיקים
                 </div>
               </div>
 
               {COMPARISON_ROWS.map((row, index) => (
                 <div
-                  key={`${row.regular}-${row.branding}`}
-                  className={`grid grid-cols-2 ${
-                    index !== COMPARISON_ROWS.length - 1 ? 'border-t border-slate-200' : ''
+                  key={row.label}
+                  className={`grid grid-cols-[0.8fr_1fr_1fr] ${
+                    index !== COMPARISON_ROWS.length - 1
+                      ? 'border-t border-slate-200'
+                      : ''
                   }`}
                 >
-                  <div className="border-l border-slate-200 bg-white px-5 py-5 text-[14px] leading-7 text-[#64748B]">
+                  <div className="border-e border-slate-200 bg-[#F8FAFC] px-4 py-4 text-[13px] font-bold text-[#334155]">
+                    {row.label}
+                  </div>
+                  <div className="border-e border-slate-200 px-4 py-4 text-[13px] leading-[1.75] text-[#64748B]">
                     {row.regular}
                   </div>
-                  <div className="bg-[#F8FBFB] px-5 py-5 text-[14px] font-semibold leading-7 text-[#0F1720]">
+                  <div
+                    className="px-4 py-4 text-[13px] font-semibold leading-[1.75]"
+                    style={{ backgroundColor: '#FFF8FB' }}
+                  >
                     {row.branding}
                   </div>
                 </div>
@@ -398,23 +791,52 @@ export default function EmployersBrandingPage() {
             </div>
           </div>
 
-          <div className="rounded-[30px] border border-slate-200 bg-white p-8 shadow-[0_18px_50px_rgba(15,23,32,0.06)] md:p-10">
-            <span className="inline-flex rounded-full bg-[#E6F3F3] px-4 py-1.5 text-[13px] font-bold text-[#008080]">
-              תהליך העבודה
+          <div className="rounded-[28px] border border-[#D97706]/20 bg-[#2B2B2B] p-7 text-white shadow-[0_18px_50px_rgba(15,23,32,0.12)] md:p-9 text-start">
+            <span className="inline-flex rounded-full border border-[#D97706]/22 bg-[#D97706]/12 px-4 py-1.5 text-[13px] font-bold text-[#FFD7A6]">
+              מחיר ותנאים
             </span>
+            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+              2,000 ₪ + מע״מ, חד־פעמי
+            </h2>
+            <p className="mt-5 text-[16px] leading-[1.9] text-white/76 md:text-[17px]">
+              המחיר כולל משרה אחת, בניית דף מעוצב ופרסום למשך עד 60 יום.
+              התשלום מבוצע מראש, בתוך עד 3 ימים ממועד הבקשה.
+            </p>
 
-            <div className="mt-6 space-y-4">
-              {TERMS_ITEMS.map(({ icon: Icon, title, body }) => (
+            <div className="mt-7 grid gap-3 sm:grid-cols-2">
+              {[
+                'ללא עמלת הצלחה נוספת.',
+                'המחיר אינו תלוי בכמות הפניות.',
+                'התוכן מאושר לפני הפרסום.',
+                'אין פתיחת בקשה עבור צד שלישי.',
+              ].map((item) => (
                 <div
-                  key={title}
-                  className="flex gap-4 rounded-[22px] border border-slate-200 bg-[#FAFBFC] p-5"
+                  key={item}
+                  className="rounded-[18px] border border-white/10 bg-white/6 p-4 text-[14px] leading-[1.75] text-white/76"
                 >
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-[#E6F3F3]">
-                    <Icon className="h-5 w-5 text-[#008080]" aria-hidden="true" />
+                  {item}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-7 space-y-4">
+              {EXPECTATION_ITEMS.map(({ icon: Icon, title, body }) => (
+                <div key={title} className="flex gap-4">
+                  <div
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl"
+                    style={{ backgroundColor: 'rgba(171,19,78,0.20)' }}
+                  >
+                    <Icon
+                      className="h-5 w-5"
+                      style={{ color: BRANDING_COLORS.primaryLight }}
+                      aria-hidden="true"
+                    />
                   </div>
                   <div>
-                    <h3 className="text-[16px] font-black text-[#0F1720]">{title}</h3>
-                    <p className="mt-2 text-[14px] leading-7 text-[#6B7280]">{body}</p>
+                    <h3 className="text-[15px] font-black">{title}</h3>
+                    <p className="mt-1 text-[13px] leading-[1.8] text-white/68">
+                      {body}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -423,55 +845,162 @@ export default function EmployersBrandingPage() {
         </div>
       </section>
 
-      <section className="relative overflow-hidden bg-[#2b2b2b] px-4 py-20 text-white md:px-8 md:py-24">
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(0,128,128,0.18),transparent_24%),radial-gradient(circle_at_bottom_left,rgba(217,119,6,0.08),transparent_16%)]" />
-        <div className="relative mx-auto grid max-w-6xl gap-8 lg:grid-cols-[0.98fr_1.02fr] lg:items-start">
-          <div className="rounded-[30px] border border-white/10 bg-white/6 p-8 backdrop-blur-md md:p-10">
-            <span className="inline-flex rounded-full border border-white/10 bg-white/8 px-4 py-1.5 text-[13px] font-bold text-[#9ceceb]">
-              שאלות נפוצות
-            </span>
-
-            <div className="mt-6 space-y-4">
-              {FAQ_ITEMS.map((item) => (
-                <div
-                  key={item.question}
-                  className="rounded-[22px] border border-white/8 bg-white/6 p-5"
-                >
-                  <h3 className="text-[16px] font-black text-white">{item.question}</h3>
-                  <p className="mt-2 text-[14px] leading-7 text-white/68">{item.answer}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="rounded-[30px] border border-white/10 bg-white/6 p-8 backdrop-blur-md md:p-10">
-            <span className="inline-flex rounded-full border border-[#D97706]/20 bg-[#D97706]/10 px-4 py-1.5 text-[13px] font-bold text-[#ffd7a6]">
-              התחלה
-            </span>
-
-            <h2 className="mt-5 text-3xl font-black tracking-tight text-white md:text-4xl">
-              התחילו את תהליך מיתוג המעסיק
-            </h2>
-
-            <p className="mt-5 text-base leading-8 text-white/72 md:text-lg">
-              התחילו את תהליך מיתוג המעסיק והציגו את סביבת העבודה שלכם למועמדים פוטנציאליים.
-            </p>
-
-            <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <a
-                href="https://wa.me/972533959003"
-                target="_blank"
-                rel="noopener noreferrer"
-                className={WHATSAPP_CLASS}
+      <section
+        id="faq-branding"
+        className="px-4 py-16 md:px-8 md:py-24"
+        style={{ backgroundColor: '#F7F7F8' }}
+      >
+        <div className="mx-auto max-w-6xl rounded-[32px] border border-slate-200 bg-[#EFF0F2] p-5 shadow-[0_20px_60px_rgba(15,23,32,0.06)] md:p-8 lg:p-10">
+          <div className="grid gap-8 lg:grid-cols-[0.72fr_1.28fr] lg:items-start">
+            <div className="relative overflow-hidden rounded-[26px] bg-transparent p-2 text-start md:p-5">
+              <div
+                className="pointer-events-none absolute -bottom-10 -start-5 select-none text-[118px] font-black leading-none opacity-[0.045] md:text-[160px]"
+                aria-hidden="true"
               >
-                <MessageCircle className="h-4 w-4" aria-hidden="true" />
-                דברו איתנו בוואטסאפ
-              </a>
+                FAQ
+              </div>
 
-              <Link to="/employers/recruitment-request" className={PRIMARY_CTA_CLASS}>
+              <span
+                className="relative inline-flex rounded-full px-4 py-1.5 text-[13px] font-bold"
+                style={{
+                  backgroundColor: BRANDING_COLORS.primarySoft,
+                  color: BRANDING_COLORS.primary,
+                }}
+              >
+                שאלות ותשובות
+              </span>
+              <h2 className="relative mt-5 text-3xl font-black tracking-tight md:text-4xl">
+                כל מה שחשוב לדעת
+              </h2>
+              <p className="relative mt-4 max-w-md text-[15px] leading-[1.9] text-[#667085]">
+                מחיר, תהליך, חומרים, פרסום, ציפיות, ביטול ודחייה — במקום אחד.
+              </p>
+
+              <div className="relative mt-8 space-y-3">
+                <a
+                  href="https://wa.me/972533951003"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 text-[14px] font-bold text-[#334155] transition hover:opacity-75"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
+                    <WhatsAppIcon className="h-4 w-4" />
+                  </span>
+                  יש לכם שאלה נוספת? דברו איתנו
+                </a>
+
+                <a
+                  href="mailto:info@alldent.co.il"
+                  className="flex items-center gap-3 text-[14px] font-bold text-[#334155] transition hover:opacity-75"
+                >
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-white shadow-sm">
+                    <Mail
+                      className="h-4 w-4"
+                      style={{ color: BRANDING_COLORS.primary }}
+                      aria-hidden="true"
+                    />
+                  </span>
+                  info@alldent.co.il
+                </a>
+              </div>
+            </div>
+
+            <FAQAccordion items={FAQ_ITEMS} />
+          </div>
+        </div>
+      </section>
+
+      <section className="px-4 py-16 md:px-8 md:py-20">
+        <div className="mx-auto max-w-6xl overflow-hidden rounded-[32px] border border-white/8 bg-[#2D2D2D] shadow-[0_24px_70px_rgba(0,0,0,0.18)]">
+          <div className="relative grid gap-8 p-7 text-white md:p-10 lg:grid-cols-[1fr_0.95fr] lg:items-center">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(171,19,78,0.14),transparent_34%)]" />
+
+            <div className="relative text-start">
+              <span
+                className="inline-flex rounded-full border px-4 py-1.5 text-[13px] font-bold"
+                style={{
+                  borderColor: 'rgba(232,137,174,0.25)',
+                  backgroundColor: 'rgba(171,19,78,0.12)',
+                  color: BRANDING_COLORS.primaryLight,
+                }}
+              >
+                מתחילים מכאן
+              </span>
+
+              <h2 className="mt-5 text-3xl font-black leading-[1.15] tracking-tight md:text-4xl">
+                מוכנים להפוך את הסיפור שלכם
+                <span
+                  className="mt-1 block"
+                  style={{ color: BRANDING_COLORS.primaryLight }}
+                >
+                  לאסטרטגיית גיוס?
+                </span>
+              </h2>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                {[
+                  'דף משרה מעוצב',
+                  'פרסום עד 60 יום',
+                  'ללא עמלת הצלחה',
+                  'אישור לפני פרסום',
+                ].map((item) => (
+                  <div
+                    key={item}
+                    className="flex items-center gap-3 text-[14px] font-bold text-white/80"
+                  >
+                    <CheckCircle2
+                      className="h-4 w-4 shrink-0"
+                      style={{ color: BRANDING_COLORS.primaryLight }}
+                      aria-hidden="true"
+                    />
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="relative text-start">
+              <div className="mb-4 flex items-center gap-3 text-[13px] font-black text-white/72">
+                <ArrowDown className="h-5 w-5 animate-bounce text-[#E889AE]" aria-hidden="true" />
+                לחצו כאן כדי לפתוח את בקשת הגיוס
+              </div>
+
+              <label
+                className={`flex cursor-pointer items-start gap-2.5 rounded-[14px] border px-4 py-3 text-start transition-colors ${
+                  termsError && !termsAccepted
+                    ? 'border-red-300/60 bg-red-500/10'
+                    : 'border-white/10 bg-white/5'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  checked={termsAccepted}
+                  onChange={(event) => {
+                    setTermsAccepted(event.target.checked)
+                    if (event.target.checked) setTermsError(false)
+                  }}
+                  className="mt-1 h-4 w-4 rounded border-white/30 accent-[#AB134E]"
+                />
+                <span className="text-[13px] leading-[1.75] text-white/72">
+                  קראתי את תנאי המסלול, לרבות המחיר, משך הפרסום,
+                  מדיניות הביטול ותהליך העבודה.
+                </span>
+              </label>
+
+              {termsError && !termsAccepted && (
+                <p className="mt-3 text-[13px] font-semibold text-red-300" role="alert">
+                  יש לאשר את תנאי המסלול לפני המעבר לפתיחת המשרה.
+                </p>
+              )}
+
+              <button
+                type="button"
+                onClick={handleContinue}
+                className={`${PRIMARY_CTA_CLASS} mt-5 w-full sm:w-auto`}
+              >
                 <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                פתחו בקשת גיוס
-              </Link>
+                פתיחת בקשת גיוס
+              </button>
             </div>
           </div>
         </div>
