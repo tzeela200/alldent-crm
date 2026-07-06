@@ -101,7 +101,7 @@ function PremiumHero() {
               גיוס עובדים
             </Link>
             <a
-              href="https://wa.me/972533959003"
+              href="https://wa.me/972533951003"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-5 py-3 text-[14px] font-bold text-white shadow-[0_10px_28px_-14px_rgba(37,211,102,0.65)] transition hover:bg-[#20bd5a]"

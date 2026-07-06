@@ -14,7 +14,7 @@ export default function ClassDentalPage() {
         status="coming-soon"
       >
         <a
-          href="https://wa.me/972533959003"
+          href="https://wa.me/972533951003"
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-[#D97706] text-white text-[14px] font-bold hover:bg-[#B45309] transition-colors min-h-[44px]"

@@ -198,7 +198,7 @@ export default function DentalAssetsPage() {
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
               <a
-                href="https://wa.me/972533959003"
+                href="https://wa.me/972533951003"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-full bg-[#D97706] px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-[#B45309]"
@@ -253,7 +253,7 @@ export default function DentalAssetsPage() {
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <a
-              href="https://wa.me/972533959003"
+              href="https://wa.me/972533951003"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-full bg-[#D97706] px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-[#B45309]"
