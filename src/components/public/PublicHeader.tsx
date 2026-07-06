@@ -80,7 +80,7 @@ function DropdownItem({ item }: { item: NavItem }) {
         aria-expanded={open}
         aria-haspopup="true"
         className={[
-          'flex items-center gap-1 px-3 py-2 text-[14px] font-medium rounded-lg transition-colors',
+          'flex items-center gap-1 px-3 py-2 text-[14px] font-bold rounded-lg transition-colors',
           isActive
             ? 'text-[#008080]'
             : 'text-[#2D2D2D] hover:text-[#008080] hover:bg-[#008080]/5',
@@ -128,7 +128,7 @@ function NavLink({ item }: { item: NavItem }) {
     <Link
       to={item.to}
       className={[
-        'px-3 py-2 text-[14px] font-medium rounded-lg transition-colors',
+        'px-3 py-2 text-[14px] font-bold rounded-lg transition-colors',
         isActive
           ? 'text-[#008080]'
           : 'text-[#2D2D2D] hover:text-[#008080] hover:bg-[#008080]/5',
@@ -243,13 +243,15 @@ export function SiteHeader() {
 
           {/* CTA + HAMBURGER */}
           <div className="flex items-center gap-2">
-            <Link
-              to="/jobs"
+            <a
+              href="https://whatsapp.com/channel/0029VbAzFBc5Ejxz7zArAv0X"
+              target="_blank"
+              rel="noreferrer"
               className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-[#D97706] text-white text-[13.5px] font-bold rounded-[16px] shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#B45309] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200"
             >
               <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
-              חפש משרה
-            </Link>
+              הצטרפות לערוץ ALLDENT
+            </a>
             <button
               onClick={() => setMobileOpen((v) => !v)}
               aria-label={mobileOpen ? 'סגור תפריט' : 'פתח תפריט'}
@@ -280,14 +282,16 @@ export function SiteHeader() {
           </nav>
 
           <div className="px-5 pb-8 mt-auto">
-            <Link
-              to="/jobs"
+            <a
+              href="https://whatsapp.com/channel/0029VbAzFBc5Ejxz7zArAv0X"
+              target="_blank"
+              rel="noreferrer"
               onClick={() => setMobileOpen(false)}
               className="flex items-center justify-center gap-2 w-full py-4 bg-[#D97706] text-white text-[15px] font-bold rounded-[20px] shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#B45309] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200 min-h-[44px]"
             >
               <Briefcase className="h-4 w-4" aria-hidden="true" />
-              חפש משרה עכשיו
-            </Link>
+              הצטרפות לערוץ ALLDENT
+            </a>
           </div>
         </div>
       )}
