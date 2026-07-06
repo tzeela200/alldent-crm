@@ -4,7 +4,7 @@ import { openApplicationCv, applicationHasCv } from "@/lib/cv";
 import ContactHistoryPanel from "@/components/admin/ContactHistoryPanel";
 import ContactMessagesPanel from "@/components/admin/ContactMessagesPanel";
 import React, { useMemo, useState, useEffect } from "react";
-import { Link, useParams, useNavigate } from "react-router-dom";
+import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   AlertCircle,
   Briefcase,
@@ -160,14 +160,21 @@ export default function Candidate360Page() {
   const resolvedId = isNew ? 0 : Number(rawId);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const { updateContact, insertContact } = useContactMutations();
   const { data, isLoading, error } = useContact360(resolvedId);
   const { data: dictsOnly } = useContact360Dicts();
 
+  // הגעה מ"בקשת גיוס ציבורית" (JobDetailsPage) עם פרטי איש קשר למילוי מוקדם.
+  const prefillContact = (location.state as any)?.prefillContact as
+    | { first_name?: string; last_name?: string; phone?: string; email?: string }
+    | undefined;
+
   // ── create-new-contact form state ──
   const [newForm, setNewForm] = useState({
-    first_name: "", last_name: "", phone: "", email: "",
+    first_name: prefillContact?.first_name ?? "", last_name: prefillContact?.last_name ?? "",
+    phone: prefillContact?.phone ?? "", email: prefillContact?.email ?? "",
     role: "", sub_roles: [] as string[], city_id: "", region_id: "", gender: "", facebook_url: "",
   });
   const [newSaving, setNewSaving] = useState(false);

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useAccountMutations } from '@/hooks/useAccountMutations'
 import {
   AlertTriangle,
@@ -403,6 +403,7 @@ export default function AdminEmployersPage({
   })
 
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
   const { updateAccount, insertAccount, bulkUpdateAccounts, mergeAccountsRpc } = useAccountMutations()
 
@@ -809,7 +810,8 @@ export default function AdminEmployersPage({
 
   useEffect(() => {
     if (sheet.mode === 'create') {
-      setDraft({ ...EMPTY_DRAFT, account_status: isEmployersBoard ? ACTIVE_RECRUITER_STATUS_ID : null })
+      const prefill = (location.state as any)?.prefillAccount ?? {}
+      setDraft({ ...EMPTY_DRAFT, account_status: isEmployersBoard ? ACTIVE_RECRUITER_STATUS_ID : null, ...prefill })
       return
     }
     if (!selectedAccount) return
@@ -835,7 +837,15 @@ export default function AdminEmployersPage({
       next_follow_up: toDateInputValue((selectedAccount as any).next_follow_up),
       contact_link: String(selectedAccount.contact_link ?? ''),
     })
-  }, [isEmployersBoard, selectedAccount, sheet.mode])
+  }, [isEmployersBoard, selectedAccount, sheet.mode, location.state])
+
+  // הגעה מ"בקשת גיוס ציבורית" (JobDetailsPage) עם ארגון למילוי מוקדם — פותח את שכבת היצירה אוטומטית.
+  useEffect(() => {
+    if ((location.state as any)?.prefillAccount) {
+      setSheet({ open: true, accountId: null, mode: 'create' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const showToast = (message: string, tone: ToastTone = 'info') => setToast({ open: true, tone, message })
 

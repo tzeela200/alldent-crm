@@ -219,7 +219,7 @@ export function SelectFilter({ value, onChange, options, placeholder }: SelectFi
 interface ActionButtonProps {
   children: React.ReactNode
   onClick?: () => void
-  variant?: 'primary' | 'secondary' | 'ghost' | 'danger'
+  variant?: 'primary' | 'secondary' | 'ghost' | 'danger' | 'success'
   icon?: LucideIcon
   disabled?: boolean
   size?: 'sm' | 'md'
@@ -230,6 +230,7 @@ const buttonVariants = {
   secondary: 'border border-[#D9D9D9] bg-white text-[#2D2D2D] hover:bg-[#F3F4F6]',
   ghost:     'text-[#6B6B6B] hover:bg-[#F3F4F6]',
   danger:    'bg-[#DC2626] text-white hover:bg-[#B91C1C]',
+  success:   'bg-[#16A34A] text-white hover:bg-[#15803D] shadow-sm',
 }
 
 export function ActionButton({ children, onClick, variant = 'secondary', icon: Icon, disabled, size = 'md' }: ActionButtonProps) {

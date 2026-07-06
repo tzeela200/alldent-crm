@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useJobMutations } from '@/hooks/useJobMutations'
 import JobAIWriter from '@/components/admin/JobAIWriter'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Archive, Briefcase, Building2, CheckCircle2, ChevronLeft, Copy, FileText, Image as ImageIcon, MapPin, Save, Send, Sparkles, Users, XCircle } from 'lucide-react'
+import { Briefcase, Building2, CheckCircle2, ChevronLeft, Copy, FileText, Image as ImageIcon, MapPin, Save, Send, Sparkles, Trash2, Users } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Shell, ActionButton, EmptyState } from '@/components/layout/Shell'
 import { supabase } from '@/lib/supabase'
@@ -11,6 +11,7 @@ import JobImageUpload from '@/components/admin/JobImageUpload'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { ContactPicker } from '@/components/ui/ContactPicker'
+import RecruitmentRequestPanel from '@/components/admin/RecruitmentRequestPanel'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 type ToastTone = 'success' | 'error' | 'info'
@@ -52,6 +53,7 @@ type JobDraft = {
 const JOB_STATUS_ACTIVE = 3
 const PUBLIC_STATUS_PUBLISHED = 3
 const PUBLIC_STATUS_HIDDEN = 4
+const ACTIVE_RECRUITER_STATUS_ID = 7
 
 export default function JobDetailsPage() {
   const { updateJob } = useJobMutations()
@@ -276,16 +278,20 @@ export default function JobDetailsPage() {
     setLocalJob((prev: any) => ({ ...prev, ...patch }))
     setDraft((prev) => prev ? { ...prev, public_status: String(PUBLIC_STATUS_PUBLISHED) } : prev)
     showToast('המשרה פורסמה', 'success')
+    void activateAccountIfFromRecruitmentRequest(localJob.job_code, localJob.account_link)
   }
 
-  const hidePublication = async () => {
-    if (!localJob) return
-    const patch = { public_status: PUBLIC_STATUS_HIDDEN, unpublished_at: new Date().toISOString(), updated_timestamp: new Date().toISOString() }
-    const { error } = await updateJob(localJob.job_code, patch)
-    if (error) { showToast(error.message, 'error'); return }
-    setLocalJob((prev: any) => ({ ...prev, ...patch }))
-    setDraft((prev) => prev ? { ...prev, public_status: String(PUBLIC_STATUS_HIDDEN) } : prev)
-    showToast('המשרה הוסתרה מהציבור', 'success')
+  // משרות שהגיעו מהטופס הציבורי (יש להן שורת job_recruitment_intake) —
+  // ברגע שבאמת מתפרסמות, הארגון המקושר הופך ל"מגייס פעיל". לא חל על
+  // משרות שנוצרו ידנית באדמין לארגון קיים.
+  const activateAccountIfFromRecruitmentRequest = async (jobCode: string, accountLink: number | string | null) => {
+    if (!accountLink) return
+    const { data: intake } = await supabase.from('job_recruitment_intake').select('job_code').eq('job_code', jobCode).maybeSingle()
+    if (!intake) return
+    const { data: acc } = await supabase.from('accounts').select('account_status').eq('account_id', accountLink).maybeSingle()
+    if (acc && Number(acc.account_status) !== ACTIVE_RECRUITER_STATUS_ID) {
+      await supabase.from('accounts').update({ account_status: ACTIVE_RECRUITER_STATUS_ID }).eq('account_id', accountLink)
+    }
   }
 
   const archiveJob = async () => {
@@ -321,10 +327,24 @@ export default function JobDetailsPage() {
       <div dir="rtl" className="min-h-screen bg-[#F3F4F6] font-['Heebo'] text-[#2D2D2D]">
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_340px]">
           <main className="space-y-6">
+            <RecruitmentRequestPanel
+              jobCode={localJob.job_code}
+              showToast={showToast}
+              onLinked={(patch) => {
+                setLocalJob((prev: any) => ({ ...prev, ...patch }))
+                setDraft((prev) => prev ? {
+                  ...prev,
+                  ...(patch.account_link !== undefined ? { account_link: patch.account_link != null ? String(patch.account_link) : '' } : {}),
+                  ...(patch.rel_employer_contact !== undefined ? { rel_employer_contact: patch.rel_employer_contact != null ? String(patch.rel_employer_contact) : '' } : {}),
+                } : prev)
+                void refetch()
+              }}
+            />
+
             <section className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2"><Pill text={statusName} tone={isActive ? 'success' : 'muted'} /><Pill text={publicStatusName} tone={isPublished ? 'success' : 'muted'} /></div>
-                <div className="flex flex-wrap gap-2"><ActionButton variant="ghost" icon={Send} onClick={publishJob}>פרסום</ActionButton><ActionButton variant="ghost" icon={XCircle} onClick={hidePublication}>הסתרה</ActionButton><ActionButton variant="ghost" icon={Archive} onClick={archiveJob}>ארכוב</ActionButton></div>
+                <div className="flex flex-wrap gap-2"><ActionButton variant="success" icon={Send} onClick={publishJob}>פרסום</ActionButton><ActionButton variant="danger" icon={Trash2} onClick={archiveJob}>ארכיון</ActionButton></div>
               </div>
               <SectionTitle icon={<Briefcase className="h-5 w-5" />} title="עריכת משרה מלאה" />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -1,7 +1,7 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useJobMutations } from '@/hooks/useJobMutations'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
   Briefcase,
   Plus,
@@ -24,6 +24,7 @@ import {
   MoreHorizontal,
   ChevronDown,
   ChevronUp,
+  Bell,
 } from 'lucide-react'
 import {
   Shell,
@@ -45,6 +46,7 @@ import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { ContactPicker } from '@/components/ui/ContactPicker'
 import SidePanel from '@/components/ui/SidePanel'
+import { useReviewNeededJobsCount } from '@/hooks/useReviewNeededJobsCount'
 
 const PAGE_SIZE = 20
 
@@ -196,6 +198,8 @@ export default function AdminJobsPage() {
   const { updateJob, insertJob } = useJobMutations()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const location = useLocation()
+  const { data: pendingRecruitmentRequests = 0 } = useReviewNeededJobsCount()
   const [filters, setFilters] = useState<FilterState>(getInitialFilters)
   const [page, setPage] = useState(0)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
@@ -208,6 +212,13 @@ export default function AdminJobsPage() {
   const [jobDraft, setJobDraft] = useState<JobDraft>(EMPTY_JOB_DRAFT)
   const [savingEdit, setSavingEdit] = useState(false)
   const [localJobs, setLocalJobs] = useState<any[]>([])
+
+  // הגעה מפעמון "בקשות גיוס ממתינות" ב-Dashboard — מפעיל את הסינון שהתבקש.
+  useEffect(() => {
+    const applyFilters = (location.state as any)?.applyFilters
+    if (applyFilters) setFilters((prev) => ({ ...prev, ...applyFilters }))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const fetchDict = async (table: string): Promise<DictItem[]> => {
     const { data, error } = await supabase.from(table).select('id,name').order('id')
@@ -821,6 +832,18 @@ export default function AdminJobsPage() {
               </div>
             </div>
           </details>
+
+          {pendingRecruitmentRequests > 0 && (
+            <button
+              type="button"
+              onClick={() => setFilters((prev) => ({ ...prev, job_status: JOB_STATUS_IDS.draft }))}
+              className="relative inline-flex items-center gap-2 rounded-[10px] border border-[#F6D5A8] bg-[#FDF3E7] px-3 py-2 text-[13px] font-bold text-[#E8A85C] transition hover:bg-[#FBE7CB]"
+              title="בקשות גיוס ציבוריות הממתינות לסקירה"
+            >
+              <Bell className="h-4 w-4" />
+              {pendingRecruitmentRequests} בקשות גיוס ממתינות
+            </button>
+          )}
 
           <ActionButton variant="ghost" icon={RefreshCw} onClick={() => { refetchJobs(); showToast('הרשימה רועננה', 'success') }}>
             רענון

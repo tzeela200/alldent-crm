@@ -1,15 +1,20 @@
 import React, { useMemo, useState } from 'react'
-import { useJobMutations } from '@/hooks/useJobMutations'
+import { useSearchParams } from 'react-router-dom'
+import { useRecruitmentRequestMutations } from '@/hooks/useRecruitmentRequestMutations'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
-import { normalizePhone } from '@/lib/normalizePhone'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
-import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 
+// מיפוי אל dict_publication_tracks: 1=מסלול אנונימי (discreet), 2=מסלול מיתוג מעסיקים (branding).
+// אותה מוסכמת ה-plan param שכבר בשימוש ב-EmployersDiscreetPage/EmployersBrandingPage.
+const PLAN_TO_TRACK_ID: Record<string, number> = { discreet: 1, branding: 2 }
+const TRACK_LABEL: Record<number, string> = { 1: 'מסלול גיוס אנונימי', 2: 'מסלול מיתוג מעסיקים' }
+
 type FormState = {
   company_name: string
+  business_id: string
   contact_name: string
   contact_phone: string
   contact_email: string
@@ -35,6 +40,7 @@ type FormState = {
 
 const EMPTY_FORM: FormState = {
   company_name: '',
+  business_id: '',
   contact_name: '',
   contact_phone: '',
   contact_email: '',
@@ -65,10 +71,15 @@ async function fetchDict(table: string): Promise<DictItem[]> {
 }
 
 export default function RecruitmentRequestPage() {
-  const { insertJob } = useJobMutations()
+  const { submitRecruitmentRequest } = useRecruitmentRequestMutations()
+  const [searchParams] = useSearchParams()
+  const planParam = searchParams.get('plan')
+  const initialTrackId = planParam ? PLAN_TO_TRACK_ID[planParam] ?? null : null
+  const [trackId, setTrackId] = useState<number | null>(initialTrackId)
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM })
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [resultJobCode, setResultJobCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const { data: roles = [] } = useQuery({ queryKey: ['dict_roles'], queryFn: () => fetchDict('dict_roles'), staleTime: 600_000 })
@@ -136,6 +147,7 @@ export default function RecruitmentRequestPage() {
   const handleSubmit = async () => {
     setError(null)
 
+    if (!trackId) { setError('יש לבחור מסלול גיוס'); return }
     if (!form.company_name.trim()) { setError('שם ארגון / מרפאה הוא שדה חובה'); return }
     if (!form.contact_name.trim()) { setError('שם איש קשר הוא שדה חובה'); return }
     if (!form.contact_phone.trim()) { setError('נייד הוא שדה חובה'); return }
@@ -148,6 +160,14 @@ export default function RecruitmentRequestPage() {
     if (!form.job_requirements.trim()) { setError('דרישות התפקיד הן שדה חובה'); return }
     if (!form.required_experience) { setError('יש לבחור ניסיון נדרש'); return }
     if (!form.required_languages.length) { setError('יש לבחור לפחות שפה אחת'); return }
+    if (form.salary_expectation_hourly) {
+      const hourly = Number(form.salary_expectation_hourly)
+      if (hourly < 40 || hourly > 1000) { setError('שכר שעתי חייב להיות בין 40 ל-1,000 ₪'); return }
+    }
+    if (form.salary_expectation_monthly) {
+      const monthly = Number(form.salary_expectation_monthly)
+      if (monthly < 1000) { setError('שכר חודשי חייב להיות לפחות 1,000 ₪'); return }
+    }
     if (!form.salary_expectation_monthly && !form.salary_expectation_hourly) {
       setError('יש להזין שכר גלובלי או שכר שעתי לצורך טיפול בבקשה.')
       return
@@ -155,55 +175,37 @@ export default function RecruitmentRequestPage() {
 
     setSubmitting(true)
     try {
-      const normalizedPhone = normalizePhone(form.contact_phone)
-
-      // Org/contact linking is done admin-side when the request is reviewed
-      // (the raw details are preserved in employer_notes below). No public
-      // reads of accounts/contact — keeps the tables closed to anon.
-
-      const contactBlock = [
-        '[בקשת גיוס — פרטי פונה]',
-        `ארגון: ${form.company_name}`,
-        `איש קשר: ${form.contact_name}`,
-        `נייד: ${normalizedPhone}`,
-        `אימייל: ${form.contact_email}`,
-        '---',
-        form.employer_notes.trim(),
-      ].filter(Boolean).join('\n')
-
-      const jobCode = `DRAFT-${Date.now()}`
-
-      const { error: insertError } = await insertJob({
-        job_code: jobCode,
-        job_status: 2,
-        public_status: 1,
-        published_at: null,
-        account_link: null,
-        rel_employer_contact: null,
-        job_role: Number(form.job_role) || null,
-        job_sub_role: form.job_sub_role.length ? form.job_sub_role : [],
-        region_id: Number(form.region_id) || null,
-        city_id: Number(form.city_id) || null,
-        scope: form.scope.length ? form.scope : [],
-        job_description: form.job_description.trim() || null,
-        job_requirements: form.job_requirements.trim() || null,
+      const { data, error: rpcError } = await submitRecruitmentRequest({
+        requester_company_name: form.company_name.trim(),
+        requester_business_id: form.business_id.trim() || null,
+        requester_contact_name: form.contact_name.trim(),
+        requester_phone: form.contact_phone.trim(),
+        requester_email: form.contact_email.trim(),
+        publication_track_id: trackId,
+        job_role: Number(form.job_role),
+        job_sub_role: form.job_sub_role,
+        region_id: Number(form.region_id),
+        city_id: Number(form.city_id),
+        scope: form.scope,
+        job_description: form.job_description.trim(),
+        job_requirements: form.job_requirements.trim(),
         work_schedule_text: form.work_schedule_text.trim() || null,
-        required_experience: Number(form.required_experience) || null,
-        required_languages: form.required_languages.length ? form.required_languages : [],
-        systems_used: form.systems_used.length ? form.systems_used : [],
-        mobility_id: Number(form.mobility_id) || null,
-        tax_type_id: Number(form.tax_type_id) || null,
+        required_experience: Number(form.required_experience),
+        required_languages: form.required_languages,
+        systems_used: form.systems_used,
+        mobility_id: form.mobility_id ? Number(form.mobility_id) : null,
+        tax_type_id: form.tax_type_id ? Number(form.tax_type_id) : null,
         salary_expectation_monthly: form.salary_expectation_monthly ? Number(form.salary_expectation_monthly) : null,
         salary_expectation_hourly: form.salary_expectation_hourly ? Number(form.salary_expectation_hourly) : null,
         show_salary_public: form.show_salary_public,
-        salary_type_ids: form.salary_type_ids.length ? form.salary_type_ids : [],
-        employer_notes: contactBlock,
-        show_employer_name: false,
-        created_time: new Date().toISOString(),
-        updated_timestamp: new Date().toISOString(),
+        salary_type_ids: form.salary_type_ids,
+        employer_notes: form.employer_notes.trim() || null,
+        source_page: typeof window !== 'undefined' ? window.location.pathname : null,
+        source_url: typeof window !== 'undefined' ? window.location.href : null,
       })
 
-      if (insertError) throw insertError
+      if (rpcError) throw rpcError
+      setResultJobCode(data?.job_code ?? null)
       setSuccess(true)
     } catch {
       setError('אירעה שגיאה בשליחת הבקשה. אנא נסו שנית.')
@@ -221,6 +223,9 @@ export default function RecruitmentRequestPage() {
           </div>
           <h2 className="text-[24px] font-bold text-[#2D2D2D] mb-3">בקשת הגיוס התקבלה</h2>
           <p className="text-[#6B6B6B] text-[16px]">צוות AllDent יבדוק את הבקשה ויחזור אליכם בהקדם.</p>
+          {resultJobCode && (
+            <p className="mt-4 text-[13px] text-[#6B6B6B]" dir="ltr">מספר בקשה: {resultJobCode}</p>
+          )}
         </div>
       </div>
     )
@@ -237,10 +242,32 @@ export default function RecruitmentRequestPage() {
         </div>
 
         <div className="space-y-8">
+          {/* מסלול גיוס */}
+          <SectionCard title="מסלול גיוס *">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {([1, 2] as const).map((id) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTrackId(id)}
+                  className={`rounded-xl border px-4 py-3 text-right text-[14px] font-semibold transition ${
+                    trackId === id ? 'border-[#008080] bg-[#E6F3F3] text-[#006D6D]' : 'border-[#D9D9D9] bg-white text-[#2D2D2D] hover:border-[#008080]'
+                  }`}
+                >
+                  {TRACK_LABEL[id]}
+                </button>
+              ))}
+            </div>
+            {planParam && !trackId && (
+              <p className="mt-2 text-[12px] text-[#B45309]">פרמטר המסלול שהתקבל לא זוהה — יש לבחור מסלול ידנית.</p>
+            )}
+          </SectionCard>
+
           {/* חלק 1 — פרטי המעסיק */}
           <SectionCard title="פרטי המעסיק / הארגון">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <TextField label="שם ארגון / מרפאה *" value={form.company_name} onChange={(v) => setField('company_name', v)} className="sm:col-span-2" />
+              <TextField label="ח.פ / עוסק מורשה" value={form.business_id} onChange={(v) => setField('business_id', v)} dir="ltr" />
               <TextField label="שם איש קשר *" value={form.contact_name} onChange={(v) => setField('contact_name', v)} />
               <TextField label="נייד *" value={form.contact_phone} onChange={(v) => setField('contact_phone', v)} dir="ltr" type="tel" />
               <TextField label="אימייל *" value={form.contact_email} onChange={(v) => setField('contact_email', v)} dir="ltr" type="email" className="sm:col-span-2" />

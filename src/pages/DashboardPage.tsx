@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import {
   AlertTriangle,
   ArrowRight,
+  Bell,
   Briefcase,
   Building2,
   CalendarClock,
@@ -29,6 +30,7 @@ import {
   StatusPill,
 } from '@/components/layout/Shell'
 import { useApplications, useInbox, useJobs, useCandidates, useAccounts, useDicts } from '@/hooks/useSupabaseData'
+import { useReviewNeededJobsCount } from '@/hooks/useReviewNeededJobsCount'
 import DashboardCandidateMessages from '@/components/admin/DashboardCandidateMessages'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
 import { applicationStatusColors, jobStatusColors, getStatusBadge } from '@/lib/statusColors'
@@ -69,6 +71,7 @@ export default function DashboardPage() {
   const { data: candidates = [], loading: candidatesLoading, error: candidatesError } = useCandidates({})
   const { data: accounts = [], loading: accountsLoading, error: accountsError } = useAccounts({})
   const dicts = useDicts()
+  const { data: pendingRecruitmentRequests = 0 } = useReviewNeededJobsCount()
 
 
   const loading =
@@ -434,6 +437,18 @@ export default function DashboardPage() {
       icon={LayoutDashboard}
       actions={
         <div className="flex flex-wrap items-center gap-2">
+          {pendingRecruitmentRequests > 0 && (
+            <Link
+              to="/admin/jobs"
+              state={{ applyFilters: { job_status: 2 } }}
+              className="relative inline-flex items-center gap-2 rounded-xl border border-[#F6D5A8] bg-[#FDF3E7] px-3 py-2 text-[12px] font-bold text-[#E8A85C] transition hover:bg-[#FBE7CB]"
+              title="בקשות גיוס ציבוריות הממתינות לסקירה"
+            >
+              <Bell className="h-4 w-4" />
+              {pendingRecruitmentRequests} בקשות גיוס ממתינות
+            </Link>
+          )}
+
           <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-500 shadow-sm">
             עודכן לאחרונה: {timeAgo(lastUpdated)}
           </div>
