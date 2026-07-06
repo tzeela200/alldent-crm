@@ -14,7 +14,9 @@
       "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__apply_migration",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__list_projects",
+      "Bash(xargs grep -l \"useRecruitmentRequest\\\\|recruitment.*request\")"
     ]
   }
 }
