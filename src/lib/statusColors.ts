@@ -30,16 +30,20 @@ export const jobStatusColors: Record<number, { bg: string; text: string; label: 
   9: { bg: 'bg-slate-100', text: 'text-slate-800', label: 'ארכיון' },
 }
 
-// סטטוסי ארגון (account_status)
+// סטטוסי ארגון (account_status) — צבעים בלבד; ה-Label מגיע מהמילון החי
+// (dict_account_statuses) דרך StatusBadge. הצבעים והתוויות מיושרים ל-DB החי
+// (11 סטטוסים, אומת 2026-07-06) — לא הערכים הישנים השגויים.
 export const accountStatusColors: Record<number, { bg: string; text: string; label: string }> = {
-  1: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'פוטנציאלי' },
-  2: { bg: 'bg-green-100', text: 'text-green-800', label: 'מגייס פעיל' },
-  3: { bg: 'bg-cyan-100', text: 'text-cyan-800', label: 'הקפאה' },
-  4: { bg: 'bg-red-100', text: 'text-red-800', label: 'עזב' },
-  5: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'לטיפול' },
-  6: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'לא רלוונטי' },
-  7: { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'פעיל' },
-  8: { bg: 'bg-teal-100', text: 'text-teal-800', label: 'פעיל - VIP' },
+  1:  { bg: 'bg-gray-100', text: 'text-gray-800', label: 'פוטנציאלי – לטיפול' },
+  2:  { bg: 'bg-blue-100', text: 'text-blue-800', label: 'נשלח קישור לתהליך גיוס' },
+  3:  { bg: 'bg-cyan-100', text: 'text-cyan-800', label: 'בטיפול – לחזור במועד' },
+  4:  { bg: 'bg-amber-100', text: 'text-amber-800', label: 'נשלח נדנוד / תזכורת' },
+  5:  { bg: 'bg-orange-100', text: 'text-orange-800', label: 'לא ענה / סינון' },
+  6:  { bg: 'bg-red-100', text: 'text-red-800', label: 'לא רלוונטי / סירב' },
+  7:  { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'מגייס פעיל (לקוח)' },
+  8:  { bg: 'bg-slate-100', text: 'text-slate-800', label: 'מגייס סגור (לקוח ישן)' },
+  9:  { bg: 'bg-teal-100', text: 'text-teal-800', label: 'ארגון דנטלי' },
+  10: { bg: 'bg-green-100', text: 'text-green-800', label: 'ארגון חדש' },
   11: { bg: 'bg-gray-100', text: 'text-gray-500', label: 'מוזג / כפילות' },
 }
 

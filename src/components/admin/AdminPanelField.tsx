@@ -1,12 +1,12 @@
 import type { ReactNode } from 'react'
 
 // שדה אחיד לפאנל אדמין. עקרון מרכזי: הבלוק והכותרת נשארים באותו מקום
-// במעבר צפייה↔עריכה — רק תוכן ה-Value מתחלף (viewValue מול editValue).
-// ה-caller אחראי על ה-input/select בפועל (editValue) ועל הפורמט בתצוגה
-// (viewValue) — Field רק אוכף Label/ריווח/שגיאה/מצב-ריק אחידים.
+// במעבר צפייה↔עריכה/יצירה — רק תוכן ה-Value מתחלף.
+// שדה שאין לו renderer לעריכה נשאר מוצג כ-read-only גם במצב edit/create,
+// במקום להיעלם ולשנות את מבנה הפאנל.
 interface AdminPanelFieldProps {
   label: string
-  mode: 'view' | 'edit'
+  mode: 'view' | 'edit' | 'create'
   viewValue?: ReactNode
   editValue?: ReactNode
   htmlFor?: string
@@ -30,7 +30,12 @@ export function AdminPanelField({
   fullWidth,
   emptyLabel = '—',
 }: AdminPanelFieldProps) {
-  const isEmptyView = mode === 'view' && (viewValue == null || viewValue === '')
+  const isEmpty = viewValue == null || viewValue === ''
+  const readOnlyValue = (
+    <div className="text-[14px] font-medium text-[#2D2D2D]">
+      {isEmpty ? <span className="text-[#9CA3AF]">{emptyLabel}</span> : viewValue}
+    </div>
+  )
 
   return (
     <div className={fullWidth ? 'sm:col-span-2' : undefined}>
@@ -38,13 +43,7 @@ export function AdminPanelField({
         {label}
       </label>
       <div className={disabled ? 'pointer-events-none opacity-60' : undefined}>
-        {mode === 'view' ? (
-          <div className="text-[14px] font-medium text-[#2D2D2D]">
-            {isEmptyView ? <span className="text-[#9CA3AF]">{emptyLabel}</span> : viewValue}
-          </div>
-        ) : (
-          editValue
-        )}
+        {mode === 'view' ? readOnlyValue : editValue ?? readOnlyValue}
       </div>
       {helperText && !error && <p className="mt-1 text-[12px] text-[#9CA3AF]">{helperText}</p>}
       {error && <p className="mt-1 text-[12px] font-semibold text-[#DC2626]">{error}</p>}
