@@ -38,6 +38,30 @@ export function formatPhone(phone: string | null | undefined): string {
 }
 
 /**
+ * ליבת-חיפוש לטלפון — מחזיר את רצף הספרות המשותף שמופיע ב-phone_norm (972XXXXXXXXX)
+ * בכל פורמט קלט תקין, כך שחיפוש `phone_norm.ilike.%core%` יתפוס את כולם:
+ *   0508951003 / 050-895-1003 / +972508951003 / 972508951003 / 508951003 → "508951003"
+ * תומך גם בקלט חלקי (למשל "8951003"). מחזיר '' אם אין ספרות.
+ * מקור-אמת יחיד — להשתמש בכל מסך שמחפש לפי טלפון (במקום normalizeDigits מקומי).
+ */
+export function phoneSearchTerm(input: string | null | undefined): string {
+  if (!input) return ''
+  let core = input.replace(/\D/g, '')
+  if (!core) return ''
+  if (core.startsWith('0972')) core = core.slice(4)
+  else if (core.startsWith('972')) core = core.slice(3)
+  else if (core.startsWith('0')) core = core.slice(1)
+  return core
+}
+
+/**
+ * מחזיר רק ספרות (לשימוש בהשוואות client-side: `phoneDigits(a).includes(phoneSearchTerm(q))`).
+ */
+export function phoneDigits(phone: string | null | undefined): string {
+  return (phone ?? '').replace(/\D/g, '')
+}
+
+/**
  * יצירת לינק WhatsApp
  */
 export function whatsappLink(phone: string | null | undefined): string {

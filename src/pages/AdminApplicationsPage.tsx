@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, ChevronsUpDown, ClipboardList, Columns3, Download, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react'
-import { getRoleColor, RoleBadge } from '@/components/admin/RoleBadge'
+import { RoleBadge } from '@/components/admin/RoleBadge'
 import {
   Shell,
   Toolbar,

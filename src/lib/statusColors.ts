@@ -51,6 +51,44 @@ export const checkStatusColors: Record<number, { bg: string; text: string; label
   4: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'לא רלוונטי' },
 }
 
+// סטטוסי פרסום (public_status)
+export const publicStatusColors: Record<number, { bg: string; text: string; label: string }> = {
+  1: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'לא פורסם' },
+  2: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'ממתין לפרסום' },
+  3: { bg: 'bg-green-100', text: 'text-green-800', label: 'מפורסם' },
+  4: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'הוסר מפרסום' },
+}
+
+// סוגי הסטטוס במערכת — כדי שמזהה זהה במילונים שונים לא יקבל צבע/תווית שגויים.
+export type StatusType = 'job' | 'application' | 'account' | 'check' | 'public'
+
+// סוג סטטוס → טבלת מילון חי (מקור ה-Label)
+export const STATUS_DICT_TABLE: Record<StatusType, string> = {
+  job: 'dict_job_statuses',
+  application: 'dict_application_statuses',
+  account: 'dict_account_statuses',
+  check: 'dict_check_statuses',
+  public: 'dict_public_statuses',
+}
+
+const STATUS_COLOR_MAPS: Record<StatusType, Record<number, { bg: string; text: string; label: string }>> = {
+  job: jobStatusColors,
+  application: applicationStatusColors,
+  account: accountStatusColors,
+  check: checkStatusColors,
+  public: publicStatusColors,
+}
+
+// צבע לפי סוג+id ממקור מרכזי. Label יגיע מהמילון החי (ראו StatusBadge).
+export function getStatusColorClasses(
+  statusType: StatusType,
+  statusId: number | null | undefined
+): { bg: string; text: string; fallbackLabel: string } {
+  const entry = statusId != null ? STATUS_COLOR_MAPS[statusType]?.[Number(statusId)] : undefined
+  if (!entry) return { bg: 'bg-gray-100', text: 'text-gray-500', fallbackLabel: 'לא הוגדר' }
+  return { bg: entry.bg, text: entry.text, fallbackLabel: entry.label }
+}
+
 // פונקציית עזר כללית
 export function getStatusBadge(
   statusMap: Record<number, { bg: string; text: string; label: string }>,
