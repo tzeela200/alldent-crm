@@ -2,7 +2,6 @@ import { useState, useEffect, useRef } from 'react'
 import { motion, useInView, animate, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import PublicJobCard from '@/components/public/PublicJobCard'
-import RegionNav from '@/components/public/RegionNav'
 import { TextCascade } from '@/components/ui/TextCascade'
 import { usePublicJobs } from '@/hooks/usePublicJobs'
 import type { PublicJobFilters } from '@/services/publicJobsService'
@@ -284,9 +283,6 @@ export default function PublicJobsPage() {
           ))}
         </div>
       </div>
-
-      {/* ── REGION NAV — סייעות ומזכירות לפי אזור ── */}
-      <RegionNav />
 
       {/* ── JOB GRID ── */}
       <section className="mx-auto px-4 md:px-8 pb-32 pt-8" style={{ maxWidth: 1200 }}>

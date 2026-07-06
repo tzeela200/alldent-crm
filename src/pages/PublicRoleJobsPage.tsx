@@ -1,8 +1,12 @@
 import { useParams, Navigate, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import PublicJobCard from '@/components/public/PublicJobCard'
+import RegionNav from '@/components/public/RegionNav'
 import { usePublicJobs } from '@/hooks/usePublicJobs'
 import { getRolePage, type RolePageSlug, PUBLIC_ROLE_PAGES, SLUG_TO_JOB_ROLE_IDS } from '@/lib/publicRolePages'
+
+// רק בעמודי סייעות ומזכירות מציגים קטגוריית אזורים (ניווט אזורי).
+const ROLES_WITH_REGION_NAV = new Set(['assistants', 'secretaries'])
 
 const ALL_ROLE_NAV = [
   { slug: 'dentists',           label: 'רופאי שיניים' },
@@ -140,6 +144,9 @@ export default function PublicRoleJobsPage() {
           ))}
         </div>
       </div>
+
+      {/* ── REGION NAV — רק בסייעות/מזכירות ── */}
+      {ROLES_WITH_REGION_NAV.has(slug) && <RegionNav />}
 
       {/* ── JOB GRID ── */}
       <section style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 16px 96px' }}>
