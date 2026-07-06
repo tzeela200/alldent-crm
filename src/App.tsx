@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { ALL_ROLE_SLUGS } from '@/lib/publicRolePages'
+import { isRegionSlug } from '@/lib/publicRegionPages'
+import { resolveLegacyPath } from '@/lib/legacyRedirects'
 
 // Auth
 import { AuthProvider } from '@/contexts/AuthContext'
@@ -35,6 +37,10 @@ import { PublicLaunchGate } from '@/components/public/PublicLaunchGate'
 import PublicJobsPage from '@/pages/PublicJobsPage'
 import PublicJobPage from '@/pages/PublicJobPage'
 import PublicRoleJobsPage from '@/pages/PublicRoleJobsPage'
+import PublicRegionJobsPage from '@/pages/PublicRegionJobsPage'
+import UnderConstructionPage from '@/pages/UnderConstructionPage'
+import NotFoundPage from '@/pages/NotFoundPage'
+import JoinTalentPoolPage from '@/pages/JoinTalentPoolPage'
 import EmployersPage from '@/pages/EmployersPage'
 import EmployersDiscreetPage from '@/pages/EmployersDiscreetPage'
 import EmployersBrandingPage from '@/pages/EmployersBrandingPage'
@@ -45,17 +51,28 @@ import ClassDentalPage from '@/pages/ClassDentalPage'
 import ContactPage from '@/pages/ContactPage'
 
 
-function LegacyJobRedirect() {
+// Catch-all לכתובות שורש ישנות: קוד משרה → מפת הפניות → תוכן בהקמה → 404.
+// אף פעם לא נופל אוטומטית ל-/jobs (כלל מהמסמך).
+function LegacyCatchAll() {
   const { legacyJobCode } = useParams()
+  const decoded = decodeURIComponent(legacyJobCode ?? '')
 
-  const normalizedJobCode = legacyJobCode?.trim().toUpperCase()
-  const isLikelyJobCode = /^[A-Z]{2,5}\d{1,5}$/.test(normalizedJobCode ?? '')
+  // 1. טופס הצטרפות למאגר (כתובת עברית ייעודית)
+  if (decoded === 'הצטרפות-למאגר-הדנטלי') return <JoinTalentPoolPage />
 
-  if (!normalizedJobCode || !isLikelyJobCode) {
-    return <Navigate to="/jobs" replace />
+  // 2. קוד משרה תקין → /jobs/{UPPER}
+  const code = decoded.trim().toUpperCase()
+  if (/^[A-Z]{2,5}\d{1,5}$/.test(code)) {
+    return <Navigate to={`/jobs/${code}`} replace />
   }
 
-  return <Navigate to={`/jobs/${normalizedJobCode}`} replace />
+  // 3. מפת הפניות ישנות (יעד קבוע או "תוכן בהקמה")
+  const target = resolveLegacyPath(decoded)
+  if (target === 'construction') return <UnderConstructionPage />
+  if (target) return <Navigate to={target} replace />
+
+  // 4. אחרת — 404 מסודר
+  return <NotFoundPage />
 }
 
 // Redirects from old /jobs/role/:role pattern to clean /jobs/:slug
@@ -64,13 +81,22 @@ function RoleSlugRedirect() {
   return <Navigate to={`/jobs/${role}`} replace />
 }
 
-// Dispatch: role page or job detail based on the slug
+// Dispatch לפי סוג ה-slug: תפקיד → אזור → קוד משרה → 404.
 function JobsSlugDispatch() {
   const { slug } = useParams<{ slug: string }>()
-  if (slug && (ALL_ROLE_SLUGS as readonly string[]).includes(slug)) {
+  const decoded = slug ? decodeURIComponent(slug) : ''
+
+  if (decoded && (ALL_ROLE_SLUGS as readonly string[]).includes(decoded)) {
     return <PublicRoleJobsPage />
   }
-  return <PublicJobPage />
+  if (decoded && isRegionSlug(decoded)) {
+    return <PublicRegionJobsPage />
+  }
+  const code = decoded.trim().toUpperCase()
+  if (/^[A-Z]{2,5}\d{1,5}$/.test(code)) {
+    return <PublicJobPage />
+  }
+  return <NotFoundPage />
 }
 
 
@@ -144,16 +170,15 @@ export default function App() {
         <Route path="smart-match" element={<SmartMatchPage />} />
       </Route>
 
-      {/* ─── Legacy category URLs from old site ─── */}
-      <Route path="/dentjob" element={<Navigate to="/jobs" replace />} />
-      <Route path="/job.dentists" element={<Navigate to="/jobs/dentists" replace />} />
-      <Route path="/hygiene-job" element={<Navigate to="/jobs/hygienists" replace />} />
-      <Route path="/dental-assistant-job" element={<Navigate to="/jobs/assistants" replace />} />
-      <Route path="/Dental-secretary" element={<Navigate to="/jobs/secretaries" replace />} />
-      <Route path="/clinic-manager-job" element={<Navigate to="/jobs/management-sales" replace />} />
+      {/* ─── Legacy multi-segment technical URL ─── */}
+      <Route path="/site/f6084fc5/home" element={<Navigate to="/" replace />} />
 
-      {/* ─── Legacy job URLs from previous site ─── */}
-      <Route path="/:legacyJobCode" element={<LegacyJobRedirect />} />
+      {/* ─── Legacy root URLs (single source of truth: legacyRedirects.ts) ─── */}
+      {/* קוד משרה / קטגוריות / כתובות עבריות / תוכן בהקמה — הכול דרך LegacyCatchAll */}
+      <Route path="/:legacyJobCode" element={<LegacyCatchAll />} />
+
+      {/* ─── 404 — כתובות רב-מקטעיות לא מזוהות ─── */}
+      <Route path="*" element={<NotFoundPage />} />
     </Routes>
     </PublicLaunchGate>
     </AuthProvider>

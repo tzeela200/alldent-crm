@@ -61,6 +61,7 @@ export interface PublicJobFilters {
   role?: string
   roleIds?: number[]
   region?: string
+  regionIds?: number[]
   city?: string
   scope?: string
   experience?: string
@@ -215,7 +216,8 @@ export async function getPublicJobs(filters: PublicJobFilters = {}): Promise<Pub
 
   if (filters.roleIds?.length) query = query.in('job_role', filters.roleIds)
   else if (filters.role) query = query.ilike('job_role_name', `%${filters.role}%`)
-  if (filters.region) query = query.eq('region_name', filters.region)
+  if (filters.regionIds?.length) query = query.in('region_id', filters.regionIds)
+  else if (filters.region) query = query.eq('region_name', filters.region)
   if (filters.city) query = query.eq('city_name', filters.city)
   if (filters.experience) query = query.eq('required_experience_name', filters.experience)
   if (filters.scope) query = query.contains('scope_names', [filters.scope])
