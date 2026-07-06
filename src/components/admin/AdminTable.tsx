@@ -1,11 +1,13 @@
-import React from 'react'
-import { ChevronUp, ChevronDown } from 'lucide-react'
+import React, { type ReactNode } from 'react'
+import { SortableTh } from '@/components/ui/SortableTh'
 
 export interface AdminColumn<T = Record<string, unknown>> {
   key: string
   label: string
   sortable?: boolean
   width?: string
+  /** מונע שבירת שורה — לשימוש בטלפון/נייד/קוד משרה */
+  nowrap?: boolean
   render?: (row: T, index: number) => React.ReactNode
 }
 
@@ -20,7 +22,18 @@ interface AdminTableProps<T = Record<string, unknown>> {
   sortDir?: 'asc' | 'desc'
   onSort?: (key: string) => void
   isLoading?: boolean
+  /** true כאשר ריק בגלל חיפוש/פילטר פעיל — הודעה שונה מ-emptyMessage הגנרי */
+  hasActiveFilter?: boolean
   emptyMessage?: string
+  noResultsMessage?: string
+  /** הודעת שגיאה — אם קיימת, מוצגת במקום שורות הנתונים */
+  error?: string
+  /** משבצת Bulk actions — מוצגת מעל הטבלה כשיש selectedIds */
+  bulkActions?: ReactNode
+  /** משבצת פאג'ינציה — מוצגת מתחת לטבלה (למשל AdminTablePagination) */
+  pagination?: ReactNode
+  /** כותרת דביקה כשהטבלה בתוך container גליל גבוה */
+  stickyHeader?: boolean
 }
 
 export function AdminTable<T = Record<string, unknown>>({
@@ -34,50 +47,78 @@ export function AdminTable<T = Record<string, unknown>>({
   sortDir,
   onSort,
   isLoading,
+  hasActiveFilter,
   emptyMessage = 'אין נתונים להצגה',
+  noResultsMessage = 'לא נמצאו תוצאות התואמות את החיפוש',
+  error,
+  bulkActions,
+  pagination,
+  stickyHeader,
 }: AdminTableProps<T>) {
   const hasSelect = !!onSelectId
   const colSpan = columns.length + (hasSelect ? 1 : 0)
 
   return (
     <div className="overflow-hidden rounded-[18px] border border-[#D9D9D9] bg-white">
+      {bulkActions && selectedIds && selectedIds.length > 0 && (
+        <div className="flex items-center gap-3 border-b border-[#D9D9D9] bg-[#E6F3F3] px-4 py-2.5 text-[13px]" dir="rtl">
+          <span className="font-semibold text-[#008080]">{selectedIds.length} נבחרו</span>
+          {bulkActions}
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full text-right text-[14px]">
-          <thead>
+          <thead className={stickyHeader ? 'sticky top-0 z-10' : undefined}>
             <tr className="border-b border-[#D9D9D9] bg-[#F3F4F6]">
               {hasSelect && <th className="w-10 px-3 py-3" />}
-              {columns.map((col) => (
-                <th
-                  key={col.key}
-                  style={col.width ? { width: col.width } : undefined}
-                  onClick={col.sortable && onSort ? () => onSort(col.key) : undefined}
-                  className={`px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-[#6B6B6B] whitespace-nowrap${
-                    col.sortable ? ' cursor-pointer select-none hover:text-[#2D2D2D]' : ''
-                  }`}
-                >
-                  <span className="inline-flex items-center gap-1">
+              {columns.map((col) =>
+                col.sortable && onSort ? (
+                  <SortableTh
+                    key={col.key}
+                    label={col.label}
+                    sortKey={col.key}
+                    sortBy={sortKey ?? null}
+                    sortDir={sortDir ?? 'asc'}
+                    onSort={onSort}
+                    className="text-[14px] font-semibold text-[#6B6B6B]"
+                  />
+                ) : (
+                  <th
+                    key={col.key}
+                    style={col.width ? { width: col.width } : undefined}
+                    className="whitespace-nowrap px-3 py-3 text-[14px] font-semibold text-[#6B6B6B]"
+                  >
                     {col.label}
-                    {col.sortable && sortKey === col.key && (
-                      sortDir === 'asc'
-                        ? <ChevronUp className="h-3 w-3" />
-                        : <ChevronDown className="h-3 w-3" />
-                    )}
-                  </span>
-                </th>
-              ))}
+                  </th>
+                )
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-[#F3F4F6]">
-            {isLoading ? (
+            {error ? (
               <tr>
-                <td colSpan={colSpan} className="py-12 text-center">
-                  <div className="inline-block h-6 w-6 animate-spin rounded-full border-4 border-[#D9D9D9] border-t-[#008080]" />
+                <td colSpan={colSpan} className="py-12 text-center text-[#DC2626]">
+                  {error}
+                </td>
+              </tr>
+            ) : isLoading ? (
+              <tr>
+                <td colSpan={colSpan} className="py-0">
+                  <div className="space-y-0">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="flex h-12 items-center gap-3 border-b border-[#F3F4F6] px-3 last:border-b-0">
+                        {columns.map((col) => (
+                          <div key={col.key} className="h-3 flex-1 animate-pulse rounded bg-[#F3F4F6]" />
+                        ))}
+                      </div>
+                    ))}
+                  </div>
                 </td>
               </tr>
             ) : data.length === 0 ? (
               <tr>
                 <td colSpan={colSpan} className="py-12 text-center text-[#6B6B6B]">
-                  {emptyMessage}
+                  {hasActiveFilter ? noResultsMessage : emptyMessage}
                 </td>
               </tr>
             ) : (
@@ -103,7 +144,10 @@ export function AdminTable<T = Record<string, unknown>>({
                       </td>
                     )}
                     {columns.map((col) => (
-                      <td key={col.key} className="px-3 text-[#2D2D2D]">
+                      <td
+                        key={col.key}
+                        className={`px-3 text-[#2D2D2D]${col.nowrap ? ' whitespace-nowrap' : ''}`}
+                      >
                         {col.render
                           ? col.render(row, idx)
                           : String((row as Record<string, unknown>)[col.key] ?? '')}
@@ -116,6 +160,7 @@ export function AdminTable<T = Record<string, unknown>>({
           </tbody>
         </table>
       </div>
+      {pagination}
     </div>
   )
 }
