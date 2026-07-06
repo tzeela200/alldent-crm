@@ -13,11 +13,11 @@
     { "source": "/home",                  "destination": "/",                     "permanent": true },
     { "source": "/home-dent",             "destination": "/",                     "permanent": true },
     { "source": "/home-dent-point",       "destination": "/",                     "permanent": true },
-    { "source": "/north",                 "destination": "/jobs",                 "permanent": true },
-    { "source": "/south",                 "destination": "/jobs",                 "permanent": true },
-    { "source": "/centeral",              "destination": "/jobs",                 "permanent": true },
-    { "source": "/Jerusalem",             "destination": "/jobs",                 "permanent": true },
-    { "source": "/Sharon",                "destination": "/jobs",                 "permanent": true },
+    { "source": "/north",                 "destination": "/jobs/north",           "permanent": true },
+    { "source": "/south",                 "destination": "/jobs/south",           "permanent": true },
+    { "source": "/centeral",              "destination": "/jobs/centeral",        "permanent": true },
+    { "source": "/Jerusalem",             "destination": "/jobs/Jerusalem",       "permanent": true },
+    { "source": "/Sharon",                "destination": "/jobs/Sharon",          "permanent": true },
     { "source": "/Sharon-clinic",         "destination": "/jobs",                 "permanent": true }
   ],
   "rewrites": [
