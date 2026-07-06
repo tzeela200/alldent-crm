@@ -5,7 +5,7 @@
     { "source": "/Dental-secretary",      "destination": "/jobs/role/secretaries","permanent": true },
     { "source": "/Dental-techniques",     "destination": "/jobs/role/technicians","permanent": true },
     { "source": "/hygiene-job",           "destination": "/jobs/role/hygienists", "permanent": true },
-    { "source": "/clinic-manager-job",    "destination": "/jobs/role/managers",   "permanent": true },
+    { "source": "/clinic-manager-job",    "destination": "/jobs/management-sales","permanent": true },
     { "source": "/arc-ortho",             "destination": "/jobs/role/specialists","permanent": true },
     { "source": "/dentjob",               "destination": "/jobs",                 "permanent": true },
     { "source": "/Dental-job-Employers",  "destination": "/employers",            "permanent": true },
