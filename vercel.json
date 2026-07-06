@@ -17,8 +17,7 @@
     { "source": "/south",                 "destination": "/jobs/south",           "permanent": true },
     { "source": "/centeral",              "destination": "/jobs/centeral",        "permanent": true },
     { "source": "/Jerusalem",             "destination": "/jobs/Jerusalem",       "permanent": true },
-    { "source": "/Sharon",                "destination": "/jobs/Sharon",          "permanent": true },
-    { "source": "/Sharon-clinic",         "destination": "/jobs",                 "permanent": true }
+    { "source": "/Sharon",                "destination": "/jobs/Sharon",          "permanent": true }
   ],
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
