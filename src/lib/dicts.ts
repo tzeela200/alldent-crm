@@ -163,6 +163,13 @@ export const DICT_SOCIAL_STATUSES: DictItem[] = [
   { id: 5, name: 'נשלחו פרטים - חיפוש עבודה' },
   { id: 6, name: 'נשלחו פרטים - הצטרפות למאגר' },
   { id: 7, name: 'קיים במאגר' },
+  { id: 8, name: "פנייה במסנג'ר - טרם עניתי" },
+  { id: 9, name: 'פולואפ נדרש (Follow-up)' },
+  { id: 10, name: 'יש נייד להעביר למאגר' },
+  { id: 11, name: 'קיבל מענה כללי' },
+  { id: 12, name: 'לא רלוונטי' },
+  { id: 13, name: 'הסרה' },
+  { id: 14, name: 'חבר בפייסבוק' },
 ]
 
 /** SSOT: dict_profile_types */

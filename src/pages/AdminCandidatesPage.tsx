@@ -65,7 +65,7 @@ type ExtendedCandidateFilters = {
   experience?: number
   availability?: number
   work_status?: number
-  preferred_scope?: string
+  preferred_scope?: number
   region_id?: number
   city_id?: number
   has_cv?: 'yes' | 'no'
@@ -356,6 +356,15 @@ export default function AdminCandidatesPage() {
     staleTime: Infinity,
   })
 
+  const { data: scopeOptions = [] } = useQuery<DictItem[]>({
+    queryKey: ['dict_scopes'],
+    queryFn: async () => {
+      const { data } = await supabase.from('dict_scopes').select('id,name').order('id')
+      return data ?? []
+    },
+    staleTime: Infinity,
+  })
+
   // ── Tags ──────────────────────────────────────────────────────────────────
   const { data: allTagRows = [], isError: allTagRowsError } = useQuery<TagRow[]>({
     queryKey: ['contact_tags_all'],
@@ -462,7 +471,7 @@ export default function AdminCandidatesPage() {
       const hasApplications = totalAppsCount > 0
       const highPotential =
         mergedTagNames.includes('פוטנציאל-גבוה') ||
-        (Number(candidate.check_status) === 2 && hasCv && (activeSearch || immediateAvailability))
+        (Number(candidate.check_status) === 3 && hasCv && (activeSearch || immediateAvailability))
 
       return {
         ...candidate,
@@ -493,22 +502,12 @@ export default function AdminCandidatesPage() {
     return DICT_SUB_ROLES.filter((sr) => sr.role_id === filters.role)
   }, [filters.role])
 
-  const scopeOptions = useMemo(() => {
-    const set = new Set<string>()
-    allCandidates.forEach((c) => {
-      const scope = String(c.preferred_scope ?? '').trim()
-      if (scope) set.add(scope)
-    })
-    return Array.from(set)
-  }, [allCandidates])
-
   const filteredCityOptions = useMemo(() => {
     if (!filters.region_id) return cityOptions
     return cityOptions.filter((city) => city.region_id === filters.region_id)
   }, [cityOptions, filters.region_id])
 
   const roleName = (id: number | null | undefined) => DICT_ROLES.find((r) => r.id === id)?.name ?? '—'
-  const subRoleName = (id: number | null | undefined) => DICT_SUB_ROLES.find((r) => r.id === id)?.name ?? '—'
   const regionName = (id: number | null | undefined) => regionOptions.find((r) => r.id === id)?.name ?? '—'
   const cityName = (id: number | null | undefined) => cityOptions.find((r) => r.id === id)?.name ?? '—'
   const availabilityName = (id: number | null | undefined) => dictLabel(availabilityOptions, id)
@@ -526,6 +525,22 @@ export default function AdminCandidatesPage() {
   }
   const socialStatusName = (id: number | null | undefined) => DICT_SOCIAL_STATUSES.find((r) => r.id === id)?.name ?? '—'
   const workStatusName = (id: number | null | undefined) => dictLabel(workStatusOptions, id)
+  // DB columns sub_role / preferred_scope are int8[]; the shared Contact type still says
+  // scalar/string for legacy reasons — read defensively (mirror languagesName).
+  const toIdArray = (value: unknown): number[] =>
+    Array.isArray(value) ? value.map(Number) : value != null && value !== '' ? [Number(value)] : []
+  const subRoleNames = (value: unknown): string => {
+    const ids = toIdArray(value)
+    if (!ids.length) return '—'
+    const names = ids.map((id) => DICT_SUB_ROLES.find((r) => r.id === id)?.name ?? '—').filter((n) => n !== '—')
+    return names.length ? names.join(', ') : '—'
+  }
+  const scopeNames = (value: unknown): string => {
+    const ids = toIdArray(value)
+    if (!ids.length) return '—'
+    const names = ids.map((id) => scopeOptions.find((s) => s.id === id)?.name ?? '—').filter((n) => n !== '—')
+    return names.length ? names.join(', ') : '—'
+  }
 
   const filteredCandidates = useMemo(() => {
     return allCandidates.filter((candidate) => {
@@ -555,7 +570,7 @@ export default function AdminCandidatesPage() {
       }
       if (filters.experience && candidate.experience !== filters.experience) return false
       if (filters.availability && !(candidate.candidate_availability_ids ?? []).includes(filters.availability)) return false
-      if (filters.preferred_scope && String(candidate.preferred_scope ?? '') !== filters.preferred_scope) return false
+      if (filters.preferred_scope && !toIdArray(candidate.preferred_scope).includes(filters.preferred_scope)) return false
       if (filters.region_id && candidate.region_id !== filters.region_id) return false
       if (filters.city_id && candidate.city_id !== filters.city_id) return false
       if (filters.has_cv === 'yes' && !candidate.derived.hasCv) return false
@@ -599,7 +614,7 @@ export default function AdminCandidatesPage() {
         case 'role': return roleName(c.role)
         case 'experience': return Number(c.experience ?? 0)
         case 'work_status': return workStatusName((c as any).work_status)
-        case 'scope': return String(c.preferred_scope ?? '')
+        case 'scope': return scopeNames(c.preferred_scope)
         case 'city': return cityName(c.city_id)
         case 'region': return regionName(c.region_id)
         case 'cv': return c.derived.hasCv ? 1 : 0
@@ -703,7 +718,8 @@ export default function AdminCandidatesPage() {
       showToast('התגית כבר קיימת', 'info')
       return
     }
-    const { error } = await supabase.from('contact_tags').insert({ contact_id: contactId, tag_id: tagId })
+    // contact_tags.tag is NOT NULL (no default/trigger) — must send both tag_id and tag name.
+    const { error } = await supabase.from('contact_tags').insert({ contact_id: contactId, tag_id: tagId, tag: tagName })
     if (error) {
       showToast('שגיאה בשמירת תגית', 'error')
       return
@@ -730,20 +746,30 @@ export default function AdminCandidatesPage() {
     const tagName = candidateTagOptions.find((t) => t.id === tagId)?.name ?? ''
     if (!tagName) return
 
+    let failed = 0
     for (const contactId of selectedRows) {
       const existing = baseTagRowMap[contactId] ?? []
       if (bulkTagAction === 'add') {
         if (!existing.some((r) => r.tag_id === tagId || r.tag === tagName)) {
-          await supabase.from('contact_tags').insert({ contact_id: contactId, tag_id: tagId })
+          // tag is NOT NULL in DB — send both tag_id and tag name.
+          const { error } = await supabase.from('contact_tags').insert({ contact_id: contactId, tag_id: tagId, tag: tagName })
+          if (error) failed++
         }
       } else {
         const row = existing.find((r) => r.tag_id === tagId || r.tag === tagName)
-        if (row) await supabase.from('contact_tags').delete().eq('id', row.id)
+        if (row) {
+          const { error } = await supabase.from('contact_tags').delete().eq('id', row.id)
+          if (error) failed++
+        }
       }
     }
 
     queryClient.invalidateQueries({ queryKey: ['contact_tags_all'] })
-    showToast(bulkTagAction === 'add' ? 'התגית נוספה לרשומות המסומנות' : 'התגית הוסרה מהרשומות המסומנות', 'success')
+    if (failed > 0) {
+      showToast(`הפעולה נכשלה עבור ${failed} רשומות`, 'error')
+    } else {
+      showToast(bulkTagAction === 'add' ? 'התגית נוספה לרשומות המסומנות' : 'התגית הוסרה מהרשומות המסומנות', 'success')
+    }
     setBulkTagAction('')
     setBulkTagValue('')
   }
@@ -753,11 +779,11 @@ export default function AdminCandidatesPage() {
       שם: candidate.full_name ?? '—',
       טלפון: (candidate as any).phone_norm ?? (candidate as any).phone ?? '',
       'תפקיד מועמד': roleName(candidate.role),
-      'תת־תפקיד': subRoleName(candidate.sub_role),
+      'תת־תפקיד': subRoleNames(candidate.sub_role),
       ניסיון: experienceName(candidate.experience),
       זמינות: availabilityNames(candidate.candidate_availability_ids),
       'סטטוס תעסוקה': workStatusName((candidate as any).work_status),
-      'היקף מועדף': candidate.preferred_scope ?? '—',
+      'היקף מועדף': scopeNames(candidate.preferred_scope),
       שפות: languagesName(candidate.languages),
       'עיר מועמד': cityName(candidate.city_id),
       'אזור מועמד': regionName(candidate.region_id),
@@ -904,7 +930,7 @@ export default function AdminCandidatesPage() {
   if (visibleColumns.includes('sub_role')) {
     candidateColumns.push({
       key: 'sub_role', label: 'תת־תפקיד', minWidth: '140px',
-      render: (candidate) => subRoleName(candidate.sub_role),
+      render: (candidate) => subRoleNames(candidate.sub_role),
     })
   }
   if (visibleColumns.includes('experience')) {
@@ -934,7 +960,7 @@ export default function AdminCandidatesPage() {
   if (visibleColumns.includes('scope')) {
     candidateColumns.push({
       key: 'scope', label: 'היקף מועדף', minWidth: '120px',
-      render: (candidate) => candidate.preferred_scope ?? '—',
+      render: (candidate) => scopeNames(candidate.preferred_scope),
     })
   }
   if (visibleColumns.includes('languages')) {
@@ -1194,8 +1220,8 @@ export default function AdminCandidatesPage() {
                 />
                 <SelectFilter
                   value={String(filters.preferred_scope ?? '')}
-                  onChange={(value) => setFilters((prev) => ({ ...prev, preferred_scope: value || undefined }))}
-                  options={scopeOptions.map((item) => ({ value: item, label: item }))}
+                  onChange={(value) => setFilters((prev) => ({ ...prev, preferred_scope: value ? Number(value) : undefined }))}
+                  options={scopeOptions.map((item) => ({ value: String(item.id), label: item.name }))}
                   placeholder="היקף מועדף"
                 />
                 <CityRegionPicker
