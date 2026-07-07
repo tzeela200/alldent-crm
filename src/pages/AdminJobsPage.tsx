@@ -1,5 +1,4 @@
-import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useJobMutations } from '@/hooks/useJobMutations'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import {
@@ -16,12 +15,10 @@ import {
   Send,
   X,
   Building2,
-  Clock3,
   CheckCircle2,
   AlertTriangle,
   MessageCircle,
   Image as ImageIcon,
-  MoreHorizontal,
   ChevronDown,
   ChevronUp,
   Bell,
@@ -41,6 +38,8 @@ import { formatDate } from '@/lib/timeAgo'
 import type { Job, DictItem } from '@/types'
 import { RoleBadge, getRoleColorHex } from '@/components/admin/RoleBadge'
 import { RegionBadge } from '@/components/admin/RegionBadge'
+import { AdminActionsMenu, type AdminActionMenuItem } from '@/components/admin/AdminActionsMenu'
+import { StatusBadge } from '@/components/admin/StatusBadge'
 import { getRegionColor } from '@/lib/regionColors'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
@@ -226,7 +225,7 @@ export default function AdminJobsPage() {
     return (data ?? []) as DictItem[]
   }
 
-  const { data: allJobs = EMPTY_JOBS, refetch: refetchJobs } = useQuery<Job[]>({
+  const { data: allJobs = EMPTY_JOBS, refetch: refetchJobs, isLoading: jobsLoading, isError: jobsError } = useQuery<Job[]>({
     queryKey: ['jobs-admin-v4'],
     queryFn: async () => {
       const PAGE = 1000
@@ -250,15 +249,28 @@ export default function AdminJobsPage() {
     staleTime: 60_000,
   })
 
-  const { data: accountsList = [] } = useQuery<Array<{ account_id: number; account_name: string | null; phone: string | null; second_phone: string | null }>>({
+  const { data: accountsList = [], isError: accountsError } = useQuery<Array<{ account_id: number; account_name: string | null; phone: string | null; second_phone: string | null }>>({
     queryKey: ['accounts-for-admin-jobs-v4'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('account_id,account_name,phone,second_phone')
-        .order('account_name')
-      if (error) throw error
-      return (data ?? []) as Array<{ account_id: number; account_name: string | null; phone: string | null; second_phone: string | null }>
+      // Paging: כבר 966 ארגונים, קרוב לתקרת 1000 של Supabase — נטען בקבוצות
+      // כדי שרשימת הבחירה בפאנל תישאר מלאה גם מעל 1000.
+      const PAGE = 1000
+      const all: Array<{ account_id: number; account_name: string | null; phone: string | null; second_phone: string | null }> = []
+      let from = 0
+      while (true) {
+        const { data, error } = await supabase
+          .from('accounts')
+          .select('account_id,account_name,phone,second_phone')
+          .order('account_name')
+          .range(from, from + PAGE - 1)
+        if (error) throw error
+        const batch = (data ?? []) as Array<{ account_id: number; account_name: string | null; phone: string | null; second_phone: string | null }>
+        if (!batch.length) break
+        all.push(...batch)
+        if (batch.length < PAGE) break
+        from += PAGE
+      }
+      return all
     },
     staleTime: 300_000,
   })
@@ -272,7 +284,7 @@ export default function AdminJobsPage() {
     return [...ids]
   }, [allJobs])
 
-  const { data: contactsList = [] } = useQuery<Array<{ contact_id: number; full_name: string | null; phone_norm: string | null }>>({
+  const { data: contactsList = [], isError: contactsError } = useQuery<Array<{ contact_id: number; full_name: string | null; phone_norm: string | null }>>({
     queryKey: ['contacts-for-jobs-v2', contactIdsNeeded.join(',')],
     queryFn: async () => {
       if (!contactIdsNeeded.length) return []
@@ -287,9 +299,9 @@ export default function AdminJobsPage() {
     staleTime: 300_000,
   })
 
-  const { data: jobStatuses = [] } = useQuery<DictItem[]>({ queryKey: ['dict_job_statuses'], queryFn: () => fetchDict('dict_job_statuses'), staleTime: 600_000 })
-  const { data: publicStatuses = [] } = useQuery<DictItem[]>({ queryKey: ['dict_public_statuses'], queryFn: () => fetchDict('dict_public_statuses'), staleTime: 600_000 })
-  const { data: roles = [] } = useQuery<DictItem[]>({ queryKey: ['dict_roles'], queryFn: () => fetchDict('dict_roles'), staleTime: 600_000 })
+  const { data: jobStatuses = [], isError: jobStatusesError } = useQuery<DictItem[]>({ queryKey: ['dict_job_statuses'], queryFn: () => fetchDict('dict_job_statuses'), staleTime: 600_000 })
+  const { data: publicStatuses = [], isError: publicStatusesError } = useQuery<DictItem[]>({ queryKey: ['dict_public_statuses'], queryFn: () => fetchDict('dict_public_statuses'), staleTime: 600_000 })
+  const { data: roles = [], isError: rolesError } = useQuery<DictItem[]>({ queryKey: ['dict_roles'], queryFn: () => fetchDict('dict_roles'), staleTime: 600_000 })
   const { data: subRoles = [] } = useQuery<Array<DictItem & { role_id: number | null }>>({
     queryKey: ['dict_sub_roles'],
     queryFn: async () => {
@@ -301,8 +313,8 @@ export default function AdminJobsPage() {
   })
   const { data: scopes = [] } = useQuery<DictItem[]>({ queryKey: ['dict_scopes'], queryFn: () => fetchDict('dict_scopes'), staleTime: 600_000 })
   const { data: salaryTypes = [] } = useQuery<DictItem[]>({ queryKey: ['dict_salary_types'], queryFn: () => fetchDict('dict_salary_types'), staleTime: 600_000 })
-  const { data: regions = [] } = useQuery<DictItem[]>({ queryKey: ['dict_regions'], queryFn: () => fetchDict('dict_regions'), staleTime: 600_000 })
-  const { data: cities = [] } = useQuery<Array<DictItem & { region_id: number | null }>>({
+  const { data: regions = [], isError: regionsError } = useQuery<DictItem[]>({ queryKey: ['dict_regions'], queryFn: () => fetchDict('dict_regions'), staleTime: 600_000 })
+  const { data: cities = [], isError: citiesError } = useQuery<Array<DictItem & { region_id: number | null }>>({
     queryKey: ['dict_cities-all'],
     queryFn: async () => {
       const PAGE = 1000
@@ -322,6 +334,12 @@ export default function AdminJobsPage() {
     staleTime: 600_000,
   })
   const { data: experienceOptions = [] } = useQuery<DictItem[]>({ queryKey: ['dict_experience'], queryFn: () => fetchDict('dict_experience'), staleTime: 600_000 })
+
+  // מצב טעינה/שגיאה מאוחד למסך — נגזר מהשאילתות החיוניות.
+  const screenLoading = jobsLoading
+  const screenError =
+    jobsError || accountsError || contactsError ||
+    jobStatusesError || publicStatusesError || rolesError || regionsError || citiesError
 
   const accountsMap = useMemo(() => {
     const map = new Map<number, { name: string; phone: string | null; second_phone: string | null }>()
@@ -513,6 +531,11 @@ export default function AdminJobsPage() {
   const pageData = filteredJobs.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
   const selectedJob = localJobs.find((job) => String(job.job_code) === String(panel.jobCode)) ?? null
 
+  // Clamp: אחרי ארכוב/שינוי סטטוס/הקטנת תוצאות — לא להישאר בעמוד ריק מעבר לטווח.
+  useEffect(() => {
+    if (page > totalPages - 1) setPage(totalPages - 1)
+  }, [totalPages, page])
+
   const kpis = useMemo(() => {
     const activeJobs = filteredJobs.filter((job) => Number(job.job_status) === JOB_STATUS_IDS.active)
     const publishedJobs = filteredJobs.filter((job) => Number(job.public_status) === PUBLIC_STATUS_IDS.published)
@@ -604,17 +627,9 @@ export default function AdminJobsPage() {
     if (!panel.jobCode) return
     setSavingEdit(true)
     try {
-      // אם סטטוס משרה לא פעיל — אפס סטטוס פרסום אוטומטית
-      const INACTIVE_JOB_STATUSES = [
-        JOB_STATUS_IDS.draft,
-        JOB_STATUS_IDS.hold,
-        JOB_STATUS_IDS.filled,
-        JOB_STATUS_IDS.closedSuccess,
-        JOB_STATUS_IDS.closedOther,
-        JOB_STATUS_IDS.cancelled,
-        JOB_STATUS_IDS.archived,
-      ]
-      const isInactive = jobDraft.job_status != null && INACTIVE_JOB_STATUSES.includes(jobDraft.job_status)
+      // כלל עסקי: משרה שאינה פעילה (job_status !== 3) — פרסום מוסתר אוטומטית.
+      // כולל סטטוס 1 "חדש". חזרה ל-3 אינה מפרסמת אוטומטית.
+      const isInactive = jobDraft.job_status != null && Number(jobDraft.job_status) !== JOB_STATUS_IDS.active
       const resolvedPublicStatus = isInactive ? PUBLIC_STATUS_IDS.hidden : jobDraft.public_status
 
       const patch = {
@@ -628,13 +643,13 @@ export default function AdminJobsPage() {
         rel_recruiter_contact: jobDraft.rel_recruiter_contact,
         region_id: jobDraft.region_id,
         city_id: jobDraft.city_id,
-        scope: jobDraft.scope.length ? jobDraft.scope : null,
+        scope: jobDraft.scope, // NOT NULL בסכמה — מערך תמיד (גם ריק)
         required_experience: jobDraft.required_experience,
         address: cleanText(jobDraft.address),
         salary_expectation_hourly: toNullableNumber(jobDraft.salary_expectation_hourly),
         salary_expectation_monthly: toNullableNumber(jobDraft.salary_expectation_monthly),
         show_salary_public: jobDraft.show_salary_public,
-        salary_type_ids: jobDraft.salary_type_ids.length ? jobDraft.salary_type_ids : null,
+        salary_type_ids: jobDraft.salary_type_ids, // NOT NULL בסכמה — מערך תמיד (גם ריק)
         public_image_url: cleanText(jobDraft.public_image_url),
         job_url: cleanText(jobDraft.job_url),
         job_description: cleanText(jobDraft.job_description),
@@ -642,40 +657,60 @@ export default function AdminJobsPage() {
         notes: cleanText(jobDraft.notes),
         updated_timestamp: new Date().toISOString(),
       }
-      // אם קוד משרה השתנה — עדכן גם אותו
+      // אם קוד משרה השתנה — עדכן גם אותו. FK applications.job_code = NO ACTION:
+      // אם קיימות הגשות השמירה תיכשל וההודעה תוצג כשגיאה (ה-catch למטה).
       const newJobCode = cleanText(jobDraft.job_code)
-      const { error } = await updateJob(panel.jobCode, { ...patch, ...(newJobCode && newJobCode !== panel.jobCode ? { job_code: newJobCode } : {}) })
+      const codeChanged = Boolean(newJobCode && newJobCode !== panel.jobCode)
+      const { error } = await updateJob(panel.jobCode, { ...patch, ...(codeChanged ? { job_code: newJobCode } : {}) })
       if (error) throw error
 
-      // סנכרן מגייס/מעסיק לארגון: אם יש ארגון למשרה — קשר את איש הקשר ל-account_link + הוסף כובע
+      // סנכרן מגייס/מעסיק לארגון: כובע ב-rel_contact_profiles + קישור account_link.
+      // בודקים שגיאה בכל שלב; לא דורסים account_link אם האדם כבר משויך לארגון אחר.
       const jobAccountId = jobDraft.account_link ?? null
       const contactsToSync = [
         { id: patch.rel_employer_contact as number | null, hat: 2 },
         { id: patch.rel_recruiter_contact as number | null, hat: 3 },
       ].filter((c): c is { id: number; hat: number } => c.id != null)
 
+      let syncFailed = false
       for (const c of contactsToSync) {
-        await supabase
+        const { error: hatError } = await supabase
           .from('rel_contact_profiles')
           .upsert({ contact_id: c.id, profile_type_id: c.hat }, { onConflict: 'contact_id,profile_type_id' })
+        if (hatError) { console.error(hatError); syncFailed = true; continue }
         if (jobAccountId) {
-          const { data: existing } = await supabase
+          const { data: existing, error: readError } = await supabase
             .from('contact')
             .select('account_link')
             .eq('contact_id', c.id)
             .single()
+          if (readError) { console.error(readError); syncFailed = true; continue }
           if (!existing?.account_link) {
-            await supabase.from('contact').update({ account_link: jobAccountId }).eq('contact_id', c.id)
+            const { error: linkError } = await supabase.from('contact').update({ account_link: jobAccountId }).eq('contact_id', c.id)
+            if (linkError) { console.error(linkError); syncFailed = true }
           }
         }
       }
       if (contactsToSync.length > 0) {
-        queryClient.invalidateQueries({ queryKey: ['contact360'] })
+        // Invalidation ממוקד למסכים שבהם קשר האדם-ארגון עלול להשתנות.
+        queryClient.invalidateQueries({
+          predicate: (query) => {
+            const key = String(query.queryKey?.[0] ?? '')
+            return ['contact360', 'contacts', 'contacts-v2', 'contacts/account-links', 'employer360'].some((p) => key.startsWith(p))
+          },
+        })
       }
 
-      replaceJob(panel.jobCode, (cur) => ({ ...cur, ...patch }))
-      const savedMsg = isInactive ? 'המשרה נשמרה — סטטוס פרסום הוסתר אוטומטית' : 'המשרה נשמרה בהצלחה'
-      showToast(savedMsg, 'success')
+      // עדכון מקומי — כולל קוד חדש אם השתנה, ועדכון panel.jobCode בהתאם.
+      const localPatch = codeChanged ? { ...patch, job_code: newJobCode } : patch
+      replaceJob(panel.jobCode, (cur) => ({ ...cur, ...localPatch }))
+      if (codeChanged) setPanel((prev) => ({ ...prev, jobCode: newJobCode }))
+
+      if (syncFailed) {
+        showToast('המשרה נשמרה, אך סנכרון איש הקשר לא הושלם.', 'error')
+      } else {
+        showToast(isInactive ? 'המשרה נשמרה — סטטוס פרסום הוסתר אוטומטית' : 'המשרה נשמרה בהצלחה', 'success')
+      }
       setPanel((prev) => ({ ...prev, mode: 'view' }))
     } catch (err: any) {
       console.error(err)
@@ -808,6 +843,22 @@ export default function AdminJobsPage() {
   const selectedPageIds = pageData.map((job) => String(job.job_code))
   const pageFullySelected = selectedPageIds.length > 0 && selectedPageIds.every((id) => selectedRows.includes(id))
 
+  // בזמן טעינה/שגיאה לא מציגים אפסים סופיים אלא סימון ניטרלי.
+  const kpiValue = (v: number): number | string => (screenError ? '—' : screenLoading ? '…' : v)
+
+  const buildRowActions = (job: any, jobCode: string): AdminActionMenuItem[] => {
+    const pending = rowActionPending === jobCode
+    return [
+      { key: 'view', icon: <Eye className="h-4 w-4" />, label: 'צפייה בפאנל', onClick: () => openPanel(job, 'view') },
+      { key: 'edit', icon: <Edit2 className="h-4 w-4" />, label: 'עריכה מלאה', onClick: () => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`) },
+      { key: 'duplicate', icon: <Copy className="h-4 w-4" />, label: 'שכפול', onClick: () => duplicateJob(job), disabled: pending },
+      { key: 'publish', icon: <Send className="h-4 w-4" />, label: 'פרסום', onClick: () => publishJob(job), disabled: pending },
+      { key: 'smart-match', icon: <Sparkles className="h-4 w-4" />, label: 'Smart Match — לא מחובר', onClick: () => {}, disabled: true },
+      { key: 'whatsapp', icon: <MessageCircle className="h-4 w-4" />, label: 'וואטסאפ', onClick: () => openWhatsApp(job) },
+      { key: 'archive', icon: <Archive className="h-4 w-4" />, label: 'ארכוב', onClick: () => updateJobPatch(jobCode, { job_status: JOB_STATUS_IDS.archived, public_status: PUBLIC_STATUS_IDS.hidden, unpublished_at: new Date().toISOString() }, 'המשרה הועברה לארכיון'), disabled: pending, danger: true, separatorBefore: true },
+    ]
+  }
+
   return (
     <Shell
       title="משרות"
@@ -845,7 +896,15 @@ export default function AdminJobsPage() {
             </button>
           )}
 
-          <ActionButton variant="ghost" icon={RefreshCw} onClick={() => { refetchJobs(); showToast('הרשימה רועננה', 'success') }}>
+          <ActionButton
+            variant="ghost"
+            icon={RefreshCw}
+            onClick={async () => {
+              const result = await refetchJobs()
+              if (result.isError) showToast('שגיאה ברענון הרשימה. נסי שוב.', 'error')
+              else showToast('הרשימה רועננה', 'success')
+            }}
+          >
             רענון
           </ActionButton>
           <ActionButton variant="ghost" icon={Download} onClick={exportCsv}>ייצוא</ActionButton>
@@ -860,10 +919,10 @@ export default function AdminJobsPage() {
           <section className="space-y-3">
             {/* שורה עליונה — מספרים גדולים */}
             <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-              <KpiCard label="סה״כ משרות" value={kpis.total} hint="לפי הסינון הנוכחי" />
-              <KpiCard label="משרות פעילות" value={kpis.active} hint="פעילות כרגע" tone="success" onClick={() => setFilters((prev) => ({ ...prev, job_status: JOB_STATUS_IDS.active }))} />
-              <KpiCard label="מפורסמות" value={kpis.published} hint="גלויות באתר הציבורי" onClick={() => setFilters((prev) => ({ ...prev, public_status: PUBLIC_STATUS_IDS.published }))} />
-              <KpiCard label="ללא מועמדים" value={kpis.withoutApplicants} hint="דורש טיפול" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, applicants_state: 'without' }))} />
+              <KpiCard label="סה״כ משרות" value={kpiValue(kpis.total)} hint="לפי הסינון הנוכחי" />
+              <KpiCard label="משרות פעילות" value={kpiValue(kpis.active)} hint="פעילות כרגע" tone="success" onClick={() => setFilters((prev) => ({ ...prev, job_status: JOB_STATUS_IDS.active }))} />
+              <KpiCard label="מפורסמות" value={kpiValue(kpis.published)} hint="גלויות באתר הציבורי" onClick={() => setFilters((prev) => ({ ...prev, public_status: PUBLIC_STATUS_IDS.published }))} />
+              <KpiCard label="ללא מועמדים" value={kpiValue(kpis.withoutApplicants)} hint="דורש טיפול" tone="warning" onClick={() => setFilters((prev) => ({ ...prev, applicants_state: 'without' }))} />
             </div>
             {/* שורה תחתונה — חתכים רוחביים */}
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
@@ -898,7 +957,7 @@ export default function AdminJobsPage() {
                   cities={cities}
                   regions={regions}
                   onCityChange={(id) => setFilters((prev) => ({ ...prev, city_id: id ?? undefined }))}
-                  onRegionChange={(id) => setFilters((prev) => ({ ...prev, region_id: id ?? undefined, city_id: undefined }))}
+                  onRegionChange={(id) => setFilters((prev) => ({ ...prev, region_id: id ?? undefined }))}
                 />
                 <MultiSelectFilter values={filters.scope ?? []} onChange={(values) => setFilters((prev) => ({ ...prev, scope: values.length ? values : undefined }))} options={scopes.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="היקף משרה" />
                 <SelectFilter value={String(filters.required_experience ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, required_experience: value ? Number(value) : undefined }))} options={experienceOptions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="ניסיון נדרש" />
@@ -918,7 +977,11 @@ export default function AdminJobsPage() {
           </Toolbar>
 
           <Toolbar>
-            {localJobs.length === 0 ? (
+            {screenError ? (
+              <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8"><EmptyState icon={AlertTriangle} title="שגיאה בטעינת נתוני המשרות" description="נסי לרענן את הרשימה." /></div>
+            ) : screenLoading ? (
+              <div className="flex items-center justify-center gap-3 rounded-[18px] border border-[#D9D9D9] bg-white p-10 text-[13px] font-semibold text-[#6B6B6B]"><RefreshCw className="h-5 w-5 animate-spin text-[#008080]" />טוען משרות…</div>
+            ) : localJobs.length === 0 ? (
               <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8"><EmptyState icon={Briefcase} title="אין משרות במערכת" description="כאשר ייווצרו משרות הן יוצגו כאן." /></div>
             ) : pageData.length === 0 ? (
               <div className="rounded-[18px] border border-[#D9D9D9] bg-white p-8"><EmptyState icon={Briefcase} title="לא נמצאו תוצאות" description="שני את תנאי הסינון." /></div>
@@ -978,22 +1041,18 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('account_name') && <td className="max-w-[220px] px-3 py-3"><span className="inline-flex items-center gap-1.5 rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"><Building2 className="h-3.5 w-3.5" />{job.account_name ?? '—'}</span></td>}
                             {visibleColumns.includes('employer_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.employer_contact_name ?? '—'}</td>}
                             {visibleColumns.includes('recruiter_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.recruiter_contact_name ?? '—'}</td>}
-                            {visibleColumns.includes('public_status') && <td className="px-3 py-3"><StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} /></td>}
+                            {visibleColumns.includes('public_status') && <td className="px-3 py-3"><StatusBadge statusType="public" statusId={Number(job.public_status)} label={publicStatusName(job.public_status)} /></td>}
                             {visibleColumns.includes('total_applicants') && <td className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold">{Number(job.total_applicants ?? 0)}</span></td>}
                             {visibleColumns.includes('last_publish_date') && <td className="px-3 py-3 text-[#6B6B6B]">{job.last_publish_date ? formatDate(job.last_publish_date) : '—'}</td>}
                             {visibleColumns.includes('updated_timestamp') && <td className="px-3 py-3 text-[#6B6B6B]">{job.updated_timestamp ? formatDate(job.updated_timestamp) : '—'}</td>}
                             <td className="px-3 py-3">
-                              <RowActionsMenu
-                                jobCode={jobCode}
-                                pending={rowActionPending === jobCode}
-                                onView={() => openPanel(job, 'view')}
-                                onEdit={() => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`)}
-                                onDuplicate={() => duplicateJob(job)}
-                                onPublish={() => publishJob(job)}
-                                onSmartMatch={() => showToast('Smart Match לא מחובר למסך הזה עדיין', 'info')}
-                                onWhatsApp={() => openWhatsApp(job)}
-                                onArchive={() => updateJobPatch(jobCode, { job_status: JOB_STATUS_IDS.archived, public_status: PUBLIC_STATUS_IDS.hidden, unpublished_at: new Date().toISOString() }, 'המשרה הועברה לארכיון')}
-                              />
+                              <div onClick={(e) => e.stopPropagation()}>
+                                <AdminActionsMenu
+                                  ariaLabel={`פעולות למשרה ${jobCode}`}
+                                  pending={rowActionPending === jobCode}
+                                  items={buildRowActions(job, jobCode)}
+                                />
+                              </div>
                             </td>
                           </tr>
                         )
@@ -1096,7 +1155,7 @@ function UnifiedJobPanel({
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-[6px] bg-[#E6F3F3] px-2.5 py-1 font-mono text-[12px] font-bold text-[#008080]">{job.job_code}</span>
           <StatusPill label={statusName(job.job_status)} tone={jobStatusTone(Number(job.job_status))} />
-          <StatusPill label={publicStatusName(job.public_status)} tone={publicStatusTone(Number(job.public_status))} />
+          <StatusBadge statusType="public" statusId={Number(job.public_status)} label={publicStatusName(job.public_status)} />
         </div>
         <h2 className="text-[20px] font-bold text-[#2D2D2D] leading-snug">{job.job_title ?? 'פרטי משרה'}</h2>
         {job.account_name && <p className="text-[13px] text-[#6B6B6B]">{job.account_name}</p>}
@@ -1205,7 +1264,7 @@ function UnifiedJobPanel({
               cities={cities}
               regions={regions}
               onCityChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, city_id: id }))}
-              onRegionChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, region_id: id, city_id: null }))}
+              onRegionChange={(id) => setDraft((prev: JobDraft) => ({ ...prev, region_id: id }))}
             />
             <EditMultiSelectField label="היקף משרה" values={draft.scope} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, scope: values }))} options={scopes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
             <EditMultiSelectField label="סוג שכר" values={draft.salary_type_ids} onChange={(values: number[]) => setDraft((prev: JobDraft) => ({ ...prev, salary_type_ids: values }))} options={salaryTypes.map((item: DictItem) => ({ value: String(item.id), label: item.name }))} />
@@ -1219,7 +1278,7 @@ function UnifiedJobPanel({
   )
 }
 
-function KpiCard({ label, value, hint, tone = 'default', onClick }: { label: string; value: number; hint: string; tone?: 'default' | 'warning' | 'success'; onClick?: () => void }) {
+function KpiCard({ label, value, hint, tone = 'default', onClick }: { label: string; value: number | string; hint: string; tone?: 'default' | 'warning' | 'success'; onClick?: () => void }) {
   const cls = tone === 'success' ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#16A34A]' : tone === 'warning' ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#D97706]' : 'border-[#D9D9D9] bg-white text-[#008080]'
   return (
     <button type="button" onClick={onClick} className={`rounded-[18px] border p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${cls}`}>
@@ -1276,137 +1335,6 @@ function SortableTh({ label, sortKey, sortBy, sortDir, onSort }: { label: string
         </span>
       </span>
     </th>
-  )
-}
-
-function RowActionsMenu({
-  jobCode,
-  pending,
-  onView,
-  onEdit,
-  onDuplicate,
-  onPublish,
-  onSmartMatch,
-  onWhatsApp,
-  onArchive,
-}: {
-  jobCode: string
-  pending?: boolean
-  onView: () => void
-  onEdit: () => void
-  onDuplicate: () => void
-  onPublish: () => void
-  onSmartMatch: () => void
-  onWhatsApp: () => void
-  onArchive: () => void
-}) {
-  const [open, setOpen] = useState(false)
-  const buttonRef = useRef<HTMLButtonElement>(null)
-  const menuRef = useRef<HTMLDivElement>(null)
-  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 })
-
-  const MENU_WIDTH = 192 // w-48
-  const MENU_HEIGHT = 320 // הערכה גסה לצורך flip
-
-  const reposition = () => {
-    const btn = buttonRef.current
-    if (!btn) return
-    const rect = btn.getBoundingClientRect()
-    // RTL: מיישרים לפי הקצה השמאלי של הכפתור; אם חורג משמאל — צמוד לקצה החלון.
-    let left = rect.left
-    if (left + MENU_WIDTH > window.innerWidth - 8) left = window.innerWidth - MENU_WIDTH - 8
-    if (left < 8) left = 8
-    // flip כלפי מעלה אם אין מקום מלמטה.
-    const openUp = rect.bottom + MENU_HEIGHT > window.innerHeight && rect.top > MENU_HEIGHT
-    const top = openUp ? rect.top - 8 - Math.min(MENU_HEIGHT, rect.top - 8) : rect.bottom + 8
-    setCoords({ top, left })
-  }
-
-  useLayoutEffect(() => {
-    if (!open) return
-    reposition()
-    const onScroll = () => setOpen(false)
-    const onResize = () => setOpen(false)
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    const onDocClick = (e: MouseEvent) => {
-      const target = e.target as Node
-      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return
-      setOpen(false)
-    }
-    window.addEventListener('scroll', onScroll, true)
-    window.addEventListener('resize', onResize)
-    window.addEventListener('keydown', onKey)
-    document.addEventListener('mousedown', onDocClick)
-    return () => {
-      window.removeEventListener('scroll', onScroll, true)
-      window.removeEventListener('resize', onResize)
-      window.removeEventListener('keydown', onKey)
-      document.removeEventListener('mousedown', onDocClick)
-    }
-  }, [open])
-
-  const run = (fn: () => void) => { setOpen(false); fn() }
-
-  return (
-    <div className="flex justify-center">
-      <button
-        ref={buttonRef}
-        type="button"
-        title={`פעולות למשרה ${jobCode}`}
-        onClick={() => setOpen((prev) => !prev)}
-        className="inline-flex h-9 w-9 cursor-pointer items-center justify-center rounded-[10px] border border-[#D9D9D9] bg-white text-[#6B6B6B] shadow-[3px_3px_6px_rgba(0,0,0,0.08)] transition-all hover:text-[#008080] hover:shadow-[1px_1px_3px_rgba(0,0,0,0.10)]"
-      >
-        {pending ? <Clock3 className="h-4 w-4 animate-spin" /> : <MoreHorizontal className="h-5 w-5" />}
-      </button>
-      {open && createPortal(
-        <div
-          ref={menuRef}
-          dir="rtl"
-          style={{ position: 'fixed', top: coords.top, left: coords.left, width: MENU_WIDTH }}
-          className="z-[9999] overflow-hidden rounded-[16px] border border-[#D9D9D9] bg-white p-1.5 text-right shadow-xl"
-        >
-          <RowActionItem icon={<Eye className="h-4 w-4" />} label="צפייה בפאנל" onClick={() => run(onView)} />
-          <RowActionItem icon={<Edit2 className="h-4 w-4" />} label="עריכה מלאה" onClick={() => run(onEdit)} />
-          <RowActionItem icon={<Copy className="h-4 w-4" />} label="שכפול" onClick={() => run(onDuplicate)} disabled={pending} />
-          <RowActionItem icon={<Send className="h-4 w-4" />} label="פרסום" onClick={() => run(onPublish)} disabled={pending} />
-          <RowActionItem icon={<Sparkles className="h-4 w-4" />} label="Smart Match" onClick={() => run(onSmartMatch)} />
-          <RowActionItem icon={<MessageCircle className="h-4 w-4" />} label="וואטסאפ" onClick={() => run(onWhatsApp)} />
-          <div className="my-1 border-t border-[#F3F4F6]" />
-          <RowActionItem icon={<Archive className="h-4 w-4" />} label="ארכוב" onClick={() => run(onArchive)} disabled={pending} danger />
-        </div>,
-        document.body,
-      )}
-    </div>
-  )
-}
-
-function RowActionItem({
-  icon,
-  label,
-  onClick,
-  disabled,
-  danger,
-}: {
-  icon: React.ReactNode
-  label: string
-  onClick: () => void
-  disabled?: boolean
-  danger?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-[13px] font-semibold transition ${
-        danger
-          ? 'text-[#991B1B] hover:bg-[#FEE2E2]'
-          : 'text-[#2D2D2D] hover:bg-[#F3F4F6] hover:text-[#008080]'
-      } disabled:cursor-not-allowed disabled:opacity-50`}
-    >
-      {icon}
-      <span>{label}</span>
-    </button>
   )
 }
 
@@ -1564,42 +1492,36 @@ function namesFromIds(ids: number[], labelById: (id: number) => string) {
   return names.length ? names.join(', ') : '—'
 }
 
+type StatusTone = 'default' | 'success' | 'warning' | 'danger' | 'muted'
+
+// מיפוי tone מפורש לפי id מהמילון החי (dict_job_statuses) — לא נגזר משם הסטטוס,
+// ולא מ-statusColors.ts הגלובלי (שמיושן עבור job). סטטוס 7 "סגורה־אחר" ניטרלי.
+const JOB_STATUS_TONE: Record<number, StatusTone> = {
+  [JOB_STATUS_IDS.new]: 'default',        // 1 חדש
+  [JOB_STATUS_IDS.draft]: 'warning',      // 2 טיוטה
+  [JOB_STATUS_IDS.active]: 'success',     // 3 פעילה
+  [JOB_STATUS_IDS.hold]: 'warning',       // 4 מושהה
+  [JOB_STATUS_IDS.filled]: 'success',     // 5 מאוישת
+  [JOB_STATUS_IDS.closedSuccess]: 'muted',// 6 סגורה־הצלחה
+  [JOB_STATUS_IDS.closedOther]: 'muted',  // 7 סגורה־אחר
+  [JOB_STATUS_IDS.cancelled]: 'danger',   // 8 בוטלה
+  [JOB_STATUS_IDS.archived]: 'muted',     // 9 ארכיון
+}
+
+const STATUS_TONE_SELECT_CLASS: Record<StatusTone, string> = {
+  default: 'border-[#D9D9D9] bg-white text-[#6B6B6B] focus:ring-2 focus:ring-[#E6F3F3]',
+  success: 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534] focus:ring-2 focus:ring-[#DCFCE7]',
+  warning: 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309] focus:ring-2 focus:ring-[#FEF3C7]',
+  danger: 'border-[#FECACA] bg-[#FEE2E2] text-[#991B1B] focus:ring-2 focus:ring-[#FEE2E2]',
+  muted: 'border-[#D9D9D9] bg-[#F3F4F6] text-[#6B6B6B] focus:ring-2 focus:ring-[#E6F3F3]',
+}
+
+function jobStatusTone(status: number): StatusTone {
+  return JOB_STATUS_TONE[status] ?? 'muted'
+}
+
 function jobStatusSelectClass(status: number) {
-  if (status === JOB_STATUS_IDS.active) {
-    return 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534] focus:ring-2 focus:ring-[#DCFCE7]'
-  }
-  if (
-    status === JOB_STATUS_IDS.closedSuccess ||
-    status === JOB_STATUS_IDS.closedOther ||
-    status === JOB_STATUS_IDS.cancelled ||
-    status === JOB_STATUS_IDS.archived
-  ) {
-    return 'border-[#FECACA] bg-[#FEE2E2] text-[#991B1B] focus:ring-2 focus:ring-[#FEE2E2]'
-  }
-  if (status === JOB_STATUS_IDS.hold || status === JOB_STATUS_IDS.draft || status === JOB_STATUS_IDS.new) {
-    return 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309] focus:ring-2 focus:ring-[#FEF3C7]'
-  }
-  return 'border-[#D9D9D9] bg-white text-[#6B6B6B] focus:ring-2 focus:ring-[#E6F3F3]'
-}
-
-function jobStatusTone(status: number): 'default' | 'success' | 'warning' | 'danger' | 'muted' {
-  if (status === JOB_STATUS_IDS.active) return 'success'
-  if (status === JOB_STATUS_IDS.hold || status === JOB_STATUS_IDS.draft || status === JOB_STATUS_IDS.new) return 'warning'
-  if (
-    status === JOB_STATUS_IDS.closedSuccess ||
-    status === JOB_STATUS_IDS.closedOther ||
-    status === JOB_STATUS_IDS.cancelled ||
-    status === JOB_STATUS_IDS.archived
-  ) return 'danger'
-  if (status === JOB_STATUS_IDS.filled) return 'default'
-  return 'muted'
-}
-
-function publicStatusTone(status: number): 'default' | 'success' | 'warning' | 'danger' | 'muted' {
-  if (status === PUBLIC_STATUS_IDS.published) return 'success'
-  if (status === PUBLIC_STATUS_IDS.waitingApproval || status === PUBLIC_STATUS_IDS.draft) return 'warning'
-  if (status === PUBLIC_STATUS_IDS.hidden) return 'muted'
-  return 'muted'
+  return STATUS_TONE_SELECT_CLASS[jobStatusTone(status)]
 }
 
 function todayIsoDate() {
