@@ -6,7 +6,6 @@ import {
   AlertTriangle,
   CheckCircle2,
   ChevronDown,
-  ChevronUp,
   Columns3,
   Download,
   Edit2,
@@ -31,10 +30,8 @@ import {
   SearchBar,
   SelectFilter,
   ActionButton,
-  Pagination,
-  EmptyState,
 } from '@/components/layout/Shell'
-import { formatPhone } from '@/lib/normalizePhone'
+import { formatPhone, phoneSearchTerm, whatsappLink } from '@/lib/normalizePhone'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import SidePanel from '@/components/ui/SidePanel'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
@@ -54,6 +51,13 @@ import type { Contact } from '@/types'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { RegionBadge } from '@/components/admin/RegionBadge'
 import { MergeRecordsModal } from '@/components/MergeRecordsModal'
+import { AdminTable, type AdminColumn } from '@/components/admin/AdminTable'
+import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
+import { AdminActionsMenu, type AdminActionMenuItem } from '@/components/admin/AdminActionsMenu'
+import { AdminPanelSection } from '@/components/admin/AdminPanelSection'
+import { AdminPanelField } from '@/components/admin/AdminPanelField'
+import { AdminPanelActions } from '@/components/admin/AdminPanelActions'
+import { StatusBadge } from '@/components/admin/StatusBadge'
 
 type ExtendedFilters = {
   search?: string
@@ -119,6 +123,20 @@ function tagClass(tag: string) {
 // A tag applied to a contact — carries the row id (for delete) and resolved name.
 type PanelTag = { id: number; tag_id: number | null; name: string }
 
+type ContactRow = Contact & {
+  linked_org_name: string | null
+  localTags: string[]
+  hasBrokenCv: boolean
+  hasNoPhoneButEmail: boolean
+  isPartialProfile: boolean
+  isDuplicatePhone: boolean
+  isDuplicateEmail: boolean
+  hasWarning: boolean
+  isFollowUpDue: boolean
+  isLinked: boolean
+  linkState: 'linked' | 'unlinked'
+}
+
 const KPI_ROLE_GROUPS: KpiRoleCard[] = [
   { key: 'assistant',  label: 'סייעות',      tone: 'assistant',  roleIds: [9], value: 0 },
   { key: 'hygienist',  label: 'שינניות',      tone: 'hygienist',  roleIds: [10], value: 0 },
@@ -158,6 +176,10 @@ const DEFAULT_COLUMNS = [
   'last_contact',
 ] as const
 
+
+const panelInputClass =
+  'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-medium text-[#0F172A] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#008080]/10'
+
 export default function AdminContactsPage() {
   const { updateContact, bulkUpdateContacts } = useContactMutations()
   const navigate = useNavigate()
@@ -171,7 +193,6 @@ export default function AdminContactsPage() {
   const [visibleColumns, setVisibleColumns] = useState<string[]>([...DEFAULT_COLUMNS])
   const [sortBy, setSortBy] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const [colWidths, setColWidths] = useState<Record<string, number>>({})
   const [isEditing, setIsEditing] = useState(false)
   const [editDraft, setEditDraft] = useState<Partial<Contact>>({})
   const [savePending, setSavePending] = useState(false)
@@ -363,7 +384,7 @@ export default function AdminContactsPage() {
   }, [accountsList])
 
 
-  const enrichedContacts = useMemo(() => {
+  const enrichedContacts = useMemo<ContactRow[]>(() => {
     const rawPage = (contactsResult?.contacts ?? []) as Contact[]
     return rawPage.map((contact) => {
       const isDuplicatePhone = Boolean(contact.phone_norm && (phoneNormCountsMap.get(String(contact.phone_norm)) ?? 0) > 1)
@@ -390,24 +411,9 @@ export default function AdminContactsPage() {
     setPage(0)
   }
 
-  const handleResizeStart = (e: React.MouseEvent, key: string) => {
-    const startX = e.clientX
-    const startWidth = colWidths[key] ?? (e.currentTarget.parentElement as HTMLElement)?.offsetWidth ?? 150
-    const onMove = (me: MouseEvent) => {
-      const newWidth = Math.max(80, startWidth + (me.clientX - startX))
-      setColWidths((prev) => ({ ...prev, [key]: newWidth }))
-    }
-    const onUp = () => {
-      document.removeEventListener('mousemove', onMove)
-      document.removeEventListener('mouseup', onUp)
-    }
-    document.addEventListener('mousemove', onMove)
-    document.addEventListener('mouseup', onUp)
-  }
 
   const totalVisible = contactsResult?.total ?? 0
   const total = totalVisible
-  const totalPages = Math.max(1, Math.ceil(totalVisible / pageSize))
   const pageData = enrichedContacts
   const selectedContact = enrichedContacts.find((contact) => Number(contact.contact_id) === Number(selectedId)) ?? null
 
@@ -439,15 +445,10 @@ export default function AdminContactsPage() {
     return () => window.clearTimeout(timer)
   }, [toast.open])
 
-  const activeSubRoleOptions = useMemo(() => {
-    if (!filters.role) return DICT_SUB_ROLES
-    return DICT_SUB_ROLES.filter((sr) => sr.role_id === filters.role)
-  }, [filters.role])
-
-  const activeCityOptions = useMemo(() => {
-    if (!filters.region_id) return cityOptions
-    return cityOptions.filter((item) => Number(item.region_id) === Number(filters.region_id))
-  }, [filters.region_id, cityOptions])
+  const editCityOptions = useMemo(() => {
+    if (!editDraft.region_id) return cityOptions
+    return cityOptions.filter((item) => Number(item.region_id) === Number(editDraft.region_id))
+  }, [editDraft.region_id, cityOptions])
 
   const clearFilters = () => {
     setFilters({})
@@ -615,7 +616,7 @@ export default function AdminContactsPage() {
     if (!contact) return
     setEditDraft({
       full_name: contact.full_name ?? '',
-      phone: contact.phone ?? '',
+      phone: contact.phone ?? contact.phone_norm ?? '',
       email: contact.email ?? '',
       role: contact.role,
       city_id: contact.city_id,
@@ -624,6 +625,17 @@ export default function AdminContactsPage() {
       notes: contact.notes ?? '',
     })
     setIsEditing(true)
+  }
+
+  const closeContactPanel = () => {
+    setIsEditing(false)
+    setEditDraft({})
+    setSelectedId(null)
+  }
+
+  const cancelContactEdit = () => {
+    setIsEditing(false)
+    setEditDraft({})
   }
 
   const handleSave = async () => {
@@ -655,7 +667,247 @@ export default function AdminContactsPage() {
     if (!error && selectedId) queryClient.invalidateQueries({ queryKey: ['contact_tags', selectedId] })
   }
 
-  const selectedCount = selectedRows.length
+  const selectedPageIds = pageData.map((contact) => String(contact.contact_id))
+  const selectedIdStrings = selectedRows.map(String)
+  const allPageRowsSelected = selectedPageIds.length > 0 && selectedPageIds.every((id) => selectedIdStrings.includes(id))
+  const somePageRowsSelected = selectedPageIds.some((id) => selectedIdStrings.includes(id))
+  const hasActiveFilters = Object.values(filters).some((value) =>
+    Array.isArray(value) ? value.length > 0 : value !== undefined && value !== null && value !== '',
+  )
+
+  const contactColumns: AdminColumn<ContactRow>[] = []
+
+  if (visibleColumns.includes('full_name')) {
+    contactColumns.push({
+      key: 'full_name',
+      label: 'שם מלא',
+      sortable: true,
+      minWidth: '220px',
+      render: (contact) => {
+        const warnings = buildWarnings(contact)
+        return (
+          <div className="min-w-[210px] py-2">
+            <div className="text-[14px] font-bold text-[#0F172A]">
+              {contact.full_name ?? contact.display_name ?? '—'}
+            </div>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              {contact.isLinked ? (
+                <InlineSignal tone="success">מקושר</InlineSignal>
+              ) : (
+                <InlineSignal tone="muted">ללא שיוך</InlineSignal>
+              )}
+              {warnings.slice(0, 2).map((warning) => (
+                <InlineSignal
+                  key={`${contact.contact_id}-${warning}`}
+                  tone={warning.includes('כפילות') ? 'danger' : 'warning'}
+                >
+                  {warning}
+                </InlineSignal>
+              ))}
+            </div>
+          </div>
+        )
+      },
+    })
+  }
+
+  if (visibleColumns.includes('phone')) {
+    contactColumns.push({
+      key: 'phone',
+      label: 'נייד',
+      sortable: true,
+      nowrap: true,
+      minWidth: '140px',
+      render: (contact) => (
+        <div className="space-y-1 py-2" dir="ltr">
+          <div className="whitespace-nowrap text-left font-semibold text-slate-700">
+            {contact.phone_norm ? formatPhone(contact.phone_norm) : '—'}
+          </div>
+          {contact.second_phone && (
+            <div className="whitespace-nowrap text-left text-[12px] text-slate-500">
+              {formatPhone(contact.second_phone)}
+            </div>
+          )}
+        </div>
+      ),
+    })
+  }
+
+  if (visibleColumns.includes('email')) {
+    contactColumns.push({
+      key: 'email',
+      label: 'מייל',
+      sortable: true,
+      minWidth: '220px',
+      render: (contact) => (
+        <div className="max-w-[230px] space-y-1 py-2">
+          <div className="truncate" title={contact.email ?? undefined}>{contact.email ?? '—'}</div>
+          {contact.second_email && (
+            <div className="truncate text-[12px] text-slate-500" title={contact.second_email}>
+              {contact.second_email}
+            </div>
+          )}
+        </div>
+      ),
+    })
+  }
+
+  if (visibleColumns.includes('role')) {
+    contactColumns.push({
+      key: 'role',
+      label: 'תפקיד',
+      sortable: true,
+      minWidth: '150px',
+      render: (contact) => <RoleBadge label={roleName(contact.role)} roleId={Number(contact.role)} />,
+    })
+  }
+
+  if (visibleColumns.includes('region')) {
+    contactColumns.push({
+      key: 'region',
+      label: 'אזור',
+      sortable: true,
+      minWidth: '140px',
+      render: (contact) => <RegionBadge regionId={contact.region_id} label={regionName(contact.region_id)} />,
+    })
+  }
+
+  if (visibleColumns.includes('city')) {
+    contactColumns.push({
+      key: 'city',
+      label: 'עיר',
+      sortable: true,
+      minWidth: '130px',
+      render: (contact) => <span className="whitespace-nowrap">{cityName(contact.city_id)}</span>,
+    })
+  }
+
+  if (visibleColumns.includes('availability')) {
+    contactColumns.push({
+      key: 'availability',
+      label: 'זמינות',
+      minWidth: '180px',
+      render: (contact) => (contact.candidate_availability_ids ?? []).length ? (
+        <div className="flex flex-wrap gap-1 py-2">
+          {(contact.candidate_availability_ids ?? []).map((id) => (
+            <Badge key={id} tone={availabilityTone(id)}>{availabilityName(id)}</Badge>
+          ))}
+        </div>
+      ) : <span className="text-slate-400">—</span>,
+    })
+  }
+
+  if (visibleColumns.includes('cv')) {
+    contactColumns.push({
+      key: 'cv',
+      label: 'קו"ח',
+      minWidth: '100px',
+      render: (contact) => <CvStateBadge hasCv={Boolean(contact.has_cv)} broken={contact.hasBrokenCv} />,
+    })
+  }
+
+  if (visibleColumns.includes('profile_type')) {
+    contactColumns.push({
+      key: 'profile_type',
+      label: 'סוג פרופיל',
+      minWidth: '130px',
+      render: (contact) => profileTypeName(contact.profile_type),
+    })
+  }
+
+  if (visibleColumns.includes('linked_org')) {
+    contactColumns.push({
+      key: 'linked_org',
+      label: 'ארגון מקושר',
+      minWidth: '180px',
+      render: (contact) => contact.linked_org_name ? (
+        <button
+          type="button"
+          className="max-w-[220px] truncate rounded-xl bg-slate-50 px-2.5 py-1 text-[12px] font-semibold text-slate-700 hover:bg-slate-100"
+          title={contact.linked_org_name}
+          onClick={(event) => {
+            event.stopPropagation()
+            openOrg(contact.account_link)
+          }}
+        >
+          {contact.linked_org_name}
+        </button>
+      ) : <span className="text-slate-400">—</span>,
+    })
+  }
+
+  if (visibleColumns.includes('whatsapp')) {
+    contactColumns.push({
+      key: 'whatsapp',
+      label: 'תאריך שליחת WhatsApp',
+      minWidth: '155px',
+      nowrap: true,
+      render: (contact) => formatDate(contact.whatsapp_campaign_last_sent),
+    })
+  }
+
+  if (visibleColumns.includes('last_contact')) {
+    contactColumns.push({
+      key: 'last_contact',
+      label: 'קשר אחרון',
+      minWidth: '125px',
+      nowrap: true,
+      render: (contact) => formatDate(contact.last_contact_date),
+    })
+  }
+
+  contactColumns.push({
+    key: 'actions',
+    label: 'פעולות',
+    width: '72px',
+    headerClassName: 'text-center',
+    cellClassName: 'text-center',
+    render: (contact) => {
+      const items: AdminActionMenuItem[] = [
+        {
+          key: 'view',
+          label: 'תצוגה מהירה',
+          icon: <Eye className="h-4 w-4" />,
+          onClick: () => setSelectedId(Number(contact.contact_id)),
+        },
+        {
+          key: 'edit',
+          label: 'עריכה',
+          icon: <Edit2 className="h-4 w-4" />,
+          onClick: () => {
+            setSelectedId(Number(contact.contact_id))
+            handleEditOpen(contact)
+          },
+        },
+        {
+          key: 'follow-up',
+          label: 'קביעת פולו־אפ',
+          icon: <Phone className="h-4 w-4" />,
+          onClick: () => openFollowUp(Number(contact.contact_id), contact.next_follow_up),
+        },
+        {
+          key: 'candidate',
+          label: 'סמן כמועמד',
+          icon: <UserCheck className="h-4 w-4" />,
+          onClick: () => markAsCandidate(contact.contact_id),
+        },
+      ]
+      if (contact.isDuplicatePhone || contact.isDuplicateEmail) {
+        items.push({
+          key: 'merge',
+          label: 'סמן למיזוג',
+          icon: <Merge className="h-4 w-4" />,
+          separatorBefore: true,
+          onClick: () => toggleRowSelection(Number(contact.contact_id)),
+        })
+      }
+      return (
+        <div onClick={(event) => event.stopPropagation()}>
+          <AdminActionsMenu items={items} ariaLabel={`פעולות עבור ${contact.full_name ?? contact.display_name ?? 'איש קשר'}`} />
+        </div>
+      )
+    },
+  })
 
   return (
     <Shell
@@ -941,289 +1193,54 @@ export default function AdminContactsPage() {
             </div>
           </Toolbar>
 
-          {selectedCount > 0 && (
-            <Toolbar>
-              <div className="rounded-2xl border border-[#D97706]/20 bg-[#FFFBEB] p-4 shadow-sm">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-[8px] bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">
-                      נבחרו {selectedCount} רשומות
-                    </span>
-                    <span className="text-[13px] font-medium text-slate-600">
-                      פעולות מרובות על הרשומות המסומנות
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <SmallActionButton onClick={() => { setBulkField(''); setBulkValue(null); setBulkUpdateOpen(true) }}>
-                      ✏️ עדכון שדה
-                    </SmallActionButton>
-                    {selectedRows.length >= 2 && (
-                      <SmallActionButton onClick={() => setMergeOpen(true)}>
-                        🔀 מיזוג רשומות
-                      </SmallActionButton>
-                    )}
-                    <SmallActionButton onClick={handleExport}>
-                      ⬇️ ייצוא
-                    </SmallActionButton>
-                  </div>
-                </div>
-              </div>
-            </Toolbar>
-          )}
-
           <Toolbar>
-            {contactsFetching && pageData.length === 0 && (
-              <div className="mb-3 rounded-2xl border border-[#D9D9D9] bg-white px-5 py-4 text-right text-[13px] text-[#6B6B6B]">טוען אנשי קשר...</div>
-            )}
-            {pageData.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-                <EmptyState
-                  icon={Users}
-                  title={total === 0 ? 'מסד הנתונים ריק' : 'לא נמצאו תוצאות לאחר הסינון'}
-                  description={
-                    total === 0
-                      ? 'עדיין אין אנשי קשר במערכת.'
-                      : 'שנו את הפילטרים או נקה את הסינון כדי לראות רשומות.'
-                  }
+            <AdminTable<ContactRow>
+              columns={contactColumns}
+              data={pageData}
+              keyField="contact_id"
+              onRowClick={(contact) => setSelectedId(Number(contact.contact_id))}
+              selectedIds={selectedIdStrings}
+              onSelectId={(id) => toggleRowSelection(Number(id))}
+              allSelected={allPageRowsSelected}
+              someSelected={somePageRowsSelected}
+              onSelectAll={togglePageSelection}
+              sortKey={sortBy ?? undefined}
+              sortDir={sortDir}
+              onSort={handleSort}
+              isLoading={contactsFetching && pageData.length === 0}
+              hasActiveFilter={hasActiveFilters}
+              emptyMessage="עדיין אין אנשי קשר במערכת"
+              noResultsMessage="לא נמצאו אנשי קשר התואמים לסינון"
+              minWidth="1800px"
+              bulkActions={
+                <div className="flex flex-wrap items-center gap-2">
+                  <SmallActionButton onClick={() => { setBulkField(''); setBulkValue(null); setBulkUpdateOpen(true) }}>
+                    עדכון שדה
+                  </SmallActionButton>
+                  {selectedRows.length >= 2 && (
+                    <SmallActionButton onClick={() => setMergeOpen(true)}>
+                      מיזוג רשומות
+                    </SmallActionButton>
+                  )}
+                  <SmallActionButton onClick={handleExport}>ייצוא</SmallActionButton>
+                </div>
+              }
+              pagination={
+                <AdminTablePagination
+                  page={page + 1}
+                  pageSize={pageSize}
+                  total={totalVisible}
+                  onPageChange={(nextPage) => setPage(nextPage - 1)}
                 />
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="w-full overflow-x-auto">
-                  <table className="min-w-[1800px] w-full border-collapse">
-                    <thead className="bg-[#F9FAFB]">
-                      <tr className="border-b border-[#D9D9D9] text-right text-[12px] font-semibold text-[#6B6B6B]">
-                        <th className="px-3 py-3">
-                          <input
-                            type="checkbox"
-                            checked={
-                              pageData.length > 0 &&
-                              pageData.every((row) => selectedRows.includes(Number(row.contact_id)))
-                            }
-                            onChange={togglePageSelection}
-                            className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
-                          />
-                        </th>
-                        {visibleColumns.includes('full_name') && <SortableTh label="שם מלא" sortKey="full_name" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['full_name']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('phone') && <SortableTh label="נייד" sortKey="phone" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['phone']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('email') && <SortableTh label="אימייל" sortKey="email" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['email']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('role') && <SortableTh label="תפקיד" sortKey="role" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['role']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('region') && <SortableTh label="אזור" sortKey="region" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['region']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('city') && <SortableTh label="עיר" sortKey="city" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['city']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('availability') && <SortableTh label="זמינות" sortKey="availability" sortBy={sortBy} sortDir={sortDir} onSort={handleSort} width={colWidths['availability']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('cv') && <PlainTh label='קו"ח' colKey="cv" width={colWidths['cv']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('profile_type') && <PlainTh label="סוג פרופיל" colKey="profile_type" width={colWidths['profile_type']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('linked_org') && <PlainTh label="ארגון מקושר" colKey="linked_org" width={colWidths['linked_org']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('whatsapp') && <PlainTh label="תאריך שליחת וואטאפ" colKey="whatsapp" width={colWidths['whatsapp']} onResizeStart={handleResizeStart} />}
-                        {visibleColumns.includes('last_contact') && <PlainTh label="קשר אחרון" colKey="last_contact" width={colWidths['last_contact']} onResizeStart={handleResizeStart} />}
-                        <th className="px-3 py-3 text-center">פעולות</th>
-                      </tr>
-                    </thead>
-
-                    <tbody className="divide-y divide-[#F3F4F6] bg-white">
-                      {pageData.map((contact) => {
-                        const warnings = buildWarnings(contact)
-                        const selected = selectedRows.includes(Number(contact.contact_id))
-
-                        return (
-                          <tr
-                            key={contact.contact_id}
-                            className={`cursor-pointer text-[13px] font-medium text-[#2D2D2D] transition ${
-                              selected ? 'bg-[#F0FDFC]' : 'hover:bg-[#FAFAF7]'
-                            }`}
-                            onClick={() => setSelectedId(Number(contact.contact_id))}
-                          >
-                            <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={() => toggleRowSelection(Number(contact.contact_id))}
-                                className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
-                              />
-                            </td>
-
-                            {visibleColumns.includes('full_name') && (
-                              <td className="px-3 py-3">
-                                <div className="min-w-[220px]">
-                                  <div className="flex items-start gap-3">
-                                    <div className="space-y-1">
-                                      <div className="text-[14px] font-bold text-[#0F172A]">
-                                        {contact.full_name ?? contact.display_name ?? '—'}
-                                      </div>
-                                      <div className="flex flex-wrap gap-1.5">
-                                        {contact.isLinked ? (
-                                          <InlineSignal tone="success">מקושר</InlineSignal>
-                                        ) : (
-                                          <InlineSignal tone="muted">ללא שיוך</InlineSignal>
-                                        )}
-                                        {warnings.slice(0, 2).map((warning) => (
-                                          <InlineSignal
-                                            key={`${contact.contact_id}-${warning}`}
-                                            tone={warning.includes('כפילות') ? 'danger' : 'warning'}
-                                          >
-                                            {warning}
-                                          </InlineSignal>
-                                        ))}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </td>
-                            )}
-
-                            {visibleColumns.includes('phone') && (
-                              <td className="px-3 py-3">
-                                <div className="space-y-1">
-                                  <div className="font-semibold text-slate-700">
-                                    {contact.phone_norm ? formatPhone(contact.phone_norm) : '—'}
-                                  </div>
-                                  {contact.second_phone && (
-                                    <div className="text-[12px] text-slate-500">
-                                      {formatPhone(contact.second_phone)}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            )}
-
-                            {visibleColumns.includes('email') && (
-                              <td className="px-3 py-3">
-                                <div className="space-y-1">
-                                  <div className="max-w-[220px] truncate">{contact.email ?? '—'}</div>
-                                  {contact.second_email && (
-                                    <div className="max-w-[220px] truncate text-[12px] text-slate-500">
-                                      {contact.second_email}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            )}
-
-                            {visibleColumns.includes('role') && (
-                              <td className="px-3 py-3">
-                                <RoleBadge label={roleName(contact.role)} roleId={Number(contact.role)} />
-                              </td>
-                            )}
-
-                            {visibleColumns.includes('region') && (
-                              <td className="px-3 py-3">
-                                <RegionBadge regionId={contact.region_id} label={regionName(contact.region_id)} />
-                              </td>
-                            )}
-
-                            {visibleColumns.includes('city') && (
-                              <td className="px-3 py-3">
-                                <LightTag tone="slate">{cityName(contact.city_id)}</LightTag>
-                              </td>
-                            )}
-
-                            {visibleColumns.includes('availability') && (
-                              <td className="px-3 py-3">
-                                {(contact.candidate_availability_ids ?? []).length ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {(contact.candidate_availability_ids ?? []).map((id) => (
-                                      <Badge key={id} tone={availabilityTone(id)}>{availabilityName(id)}</Badge>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400">—</span>
-                                )}
-                              </td>
-                            )}
-
-                            {visibleColumns.includes('cv') && (
-                              <td className="px-3 py-3">
-                                <CvStateBadge hasCv={Boolean(contact.has_cv)} broken={contact.hasBrokenCv} />
-                              </td>
-                            )}
-
-                            {visibleColumns.includes('profile_type') && (
-                              <td className="px-3 py-3">{profileTypeName(contact.profile_type)}</td>
-                            )}
-
-                            {visibleColumns.includes('linked_org') && (
-                              <td className="px-3 py-3">
-                                {contact.linked_org_name ? (
-                                  <button
-                                    type="button"
-                                    className="rounded-xl bg-slate-50 px-2.5 py-1 text-[12px] font-semibold text-slate-700 hover:bg-slate-100"
-                                    onClick={(event) => {
-                                      event.stopPropagation()
-                                      openOrg(contact.account_link)
-                                    }}
-                                  >
-                                    {contact.linked_org_name}
-                                  </button>
-                                ) : (
-                                  <span className="text-slate-400">—</span>
-                                )}
-                              </td>
-                            )}
-
-                            {visibleColumns.includes('whatsapp') && (
-                              <td className="px-3 py-3">{formatDate(contact.whatsapp_campaign_last_sent)}</td>
-                            )}
-
-                            {visibleColumns.includes('last_contact') && (
-                              <td className="px-3 py-3">{formatDate(contact.last_contact_date)}</td>
-                            )}
-
-
-                            <td className="px-3 py-3" onClick={(event) => event.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-1">
-                                <IconAction
-                                  title="תצוגה מהירה"
-                                  onClick={() => setSelectedId(Number(contact.contact_id))}
-                                  icon={<Eye className="h-4 w-4" />}
-                                />
-                                <IconAction
-                                  title="עריכה"
-                                  onClick={() => { setSelectedId(Number(contact.contact_id)); handleEditOpen(contact) }}
-                                  icon={<Edit2 className="h-4 w-4" />}
-                                />
-                                <IconAction
-                                  title="פולו־אפ"
-                                  onClick={() => openFollowUp(Number(contact.contact_id), contact.next_follow_up)}
-                                  icon={<Phone className="h-4 w-4" />}
-                                />
-                                <IconAction
-                                  title="סמן כמועמד"
-                                  onClick={() => markAsCandidate(contact.contact_id)}
-                                  icon={<UserCheck className="h-4 w-4" />}
-                                />
-                                {(contact.isDuplicatePhone || contact.isDuplicateEmail) && !selectedRows.includes(Number(contact.contact_id)) ? (
-                                  <IconAction
-                                    title="מיזוג — סמן 2 רשומות"
-                                    onClick={() => toggleRowSelection(Number(contact.contact_id))}
-                                    icon={<Merge className="h-4 w-4" />}
-                                  />
-                                ) : null}
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-
-                <div className="border-t border-slate-200 bg-white px-3 py-3">
-                  <Pagination
-                    page={page}
-                    totalPages={totalPages}
-                    onPageChange={setPage}
-                    totalItems={totalVisible}
-                  />
-                </div>
-              </div>
-            )}
+              }
+            />
           </Toolbar>
         </div>
 
         {selectedContact && (
           <SidePanel
             open
-            onClose={() => setSelectedId(null)}
+            onClose={closeContactPanel}
             header={
               <div className="flex items-start justify-between gap-3 px-5 py-5">
                   <div className="flex items-start gap-4">
@@ -1250,17 +1267,15 @@ export default function AdminContactsPage() {
                           icon={<Eye className="h-4 w-4" />}
                           label="פתח כרטסת 360"
                         />
-                        <QuickActionButton
-                          icon={<Edit2 className="h-4 w-4" />}
-                          label="עריכה"
-                          onClick={() => handleEditOpen(selectedContact)}
-                        />
+                        {!isEditing && (
+                          <QuickActionButton
+                            icon={<Edit2 className="h-4 w-4" />}
+                            label="עריכה"
+                            onClick={() => handleEditOpen(selectedContact)}
+                          />
+                        )}
                         <QuickLinkButton
-                          href={
-                            selectedContact.phone_norm
-                              ? `https://wa.me/${normalizeDigits(selectedContact.phone_norm)}`
-                              : undefined
-                          }
+                          href={whatsappLink(selectedContact.phone_norm) || undefined}
                           icon={<Phone className="h-4 w-4" />}
                           label="וואטסאפ"
                           disabled={!selectedContact.phone_norm}
@@ -1320,7 +1335,7 @@ export default function AdminContactsPage() {
 
                   <button
                     type="button"
-                    onClick={() => setSelectedId(null)}
+                    onClick={closeContactPanel}
                     className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
                     aria-label="סגור"
                     title="סגור"
@@ -1330,183 +1345,225 @@ export default function AdminContactsPage() {
                 </div>
             }
             footer={
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  type="button"
-                  onClick={() => setSelectedId(null)}
-                  className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]"
-                >
-                  סגור
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/admin/contacts/${selectedContact.contact_id}`)}
-                  className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]"
-                >
-                  כרטסת 360 ←
-                </button>
-              </div>
+              <AdminPanelActions
+                mode={isEditing ? 'edit' : 'view'}
+                onClose={closeContactPanel}
+                onEdit={() => handleEditOpen(selectedContact)}
+                onCancelEdit={cancelContactEdit}
+                onSave={handleSave}
+                saving={savePending}
+                primaryAction={{
+                  label: 'כרטסת 360',
+                  onClick: () => navigate(`/admin/contacts/${selectedContact.contact_id}`),
+                }}
+              />
             }
           >
               <div className="space-y-4">
-                <SectionCard title="תגיות" compact>
-                  <div className="flex flex-wrap gap-2">
-                    {panelTags.map((t) => (
-                      <span key={t.id} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-semibold ${tagClass(t.name)}`}>
-                        {t.name}
-                        <button type="button" onClick={() => handleRemoveTag(t.id)} className="opacity-60 hover:opacity-100">×</button>
-                      </span>
-                    ))}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setShowTagDropdown((v) => !v)}
-                        className="inline-flex items-center gap-1 rounded-md border border-dashed border-slate-300 px-2.5 py-1 text-[12px] font-semibold text-slate-500 hover:border-teal-400 hover:text-teal-600"
-                      >
-                        + תגית
-                      </button>
-                      {showTagDropdown && (
-                        <div className="absolute right-0 top-full z-30 mt-1 max-h-48 w-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-md">
-                          {candidateTagOptions.filter((o) => !panelTags.some((t) => t.tag_id === o.id)).map((o) => (
-                            <button
-                              key={o.id}
-                              type="button"
-                              onClick={() => handleAddTag(o.id)}
-                              className="w-full px-3 py-2 text-right text-[13px] text-slate-700 hover:bg-slate-50"
-                            >
-                              {o.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
+                <AdminPanelSection title="תגיות">
+                  <div className="sm:col-span-2">
+                    <div className="flex flex-wrap gap-2">
+                      {panelTags.map((tag) => (
+                        <span key={tag.id} className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[12px] font-semibold ${tagClass(tag.name)}`}>
+                          {tag.name}
+                          <button
+                            type="button"
+                            aria-label={`הסרת התגית ${tag.name}`}
+                            onClick={() => handleRemoveTag(tag.id)}
+                            className="opacity-60 hover:opacity-100"
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowTagDropdown((value) => !value)}
+                          className="inline-flex items-center gap-1 rounded-md border border-dashed border-slate-300 px-2.5 py-1 text-[12px] font-semibold text-slate-500 hover:border-teal-400 hover:text-teal-600"
+                        >
+                          + תגית
+                        </button>
+                        {showTagDropdown && (
+                          <div className="absolute right-0 top-full z-30 mt-1 max-h-48 w-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-md">
+                            {candidateTagOptions
+                              .filter((option) => !panelTags.some((tag) => tag.tag_id === option.id))
+                              .map((option) => (
+                                <button
+                                  key={option.id}
+                                  type="button"
+                                  onClick={() => handleAddTag(option.id)}
+                                  className="w-full px-3 py-2 text-right text-[13px] text-slate-700 hover:bg-slate-50"
+                                >
+                                  {option.name}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </SectionCard>
+                </AdminPanelSection>
 
-                {isEditing && (
-                  <SectionCard title="עריכת פרטים">
-                    <div className="grid grid-cols-1 gap-3">
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[12px] font-semibold text-slate-500">שם מלא</span>
-                        <input className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.full_name ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, full_name: e.target.value }))} />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[12px] font-semibold text-slate-500">נייד</span>
-                        <input className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.phone ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, phone: e.target.value }))} />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[12px] font-semibold text-slate-500">אימייל</span>
-                        <input className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.email ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, email: e.target.value }))} />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[12px] font-semibold text-slate-500">תפקיד</span>
-                        <select className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.role ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, role: e.target.value ? Number(e.target.value) : null }))}>
-                          <option value="">— בחר —</option>
-                          {roleOptions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                        </select>
-                      </label>
-                      <div className="col-span-2">
-                        <CityRegionPicker
-                          cityId={editDraft.city_id ?? null}
-                          regionId={editDraft.region_id ?? null}
-                          onRegionChange={(id) => setEditDraft((d) => ({ ...d, region_id: id }))}
-                          onCityChange={(id) => setEditDraft((d) => ({ ...d, city_id: id }))}
-                        />
-                      </div>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[12px] font-semibold text-slate-500">זמינות</span>
-                        <DictionaryMultiSelect
-                          options={availabilityOptions}
-                          value={editDraft.candidate_availability_ids ?? []}
-                          onChange={(ids) => setEditDraft((d) => ({ ...d, candidate_availability_ids: ids }))}
-                          placeholder="בחירת זמינויות..."
-                        />
-                      </label>
-                      <label className="flex flex-col gap-1">
-                        <span className="text-[12px] font-semibold text-slate-500">הערות</span>
-                        <textarea rows={3} className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]" value={editDraft.notes ?? ''} onChange={(e) => setEditDraft((d) => ({ ...d, notes: e.target.value }))} />
-                      </label>
-                      <div className="flex gap-2 pt-1">
-                        <button type="button" onClick={handleSave} disabled={savePending} className="flex-1 rounded-xl bg-[#008080] px-4 py-2 text-[13px] font-bold text-white transition hover:opacity-90 disabled:opacity-50">
-                          {savePending ? 'שומר...' : 'שמור'}
-                        </button>
-                        <button type="button" onClick={() => setIsEditing(false)} className="rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-semibold text-slate-600 hover:bg-slate-50">
-                          ביטול
-                        </button>
-                      </div>
-                    </div>
-                  </SectionCard>
-                )}
-
-                <SectionCard title="זהות ותקשורת">
-                  <DetailsGrid
-                    items={[
-                      { label: 'שם מלא', value: selectedContact.full_name ?? selectedContact.display_name },
-                      { label: 'שם תצוגה', value: selectedContact.display_name },
-                      { label: 'שם פרטי', value: selectedContact.first_name },
-                      { label: 'שם משפחה', value: selectedContact.last_name },
-                      {
-                        label: 'נייד',
-                        value: selectedContact.phone_norm ? formatPhone(selectedContact.phone_norm) : '—',
-                      },
-                      {
-                        label: 'טלפון נוסף',
-                        value: selectedContact.second_phone ? formatPhone(selectedContact.second_phone) : '—',
-                      },
-                      { label: 'אימייל', value: selectedContact.email },
-                      { label: 'אימייל נוסף', value: selectedContact.second_email },
-                      { label: 'פייסבוק', value: selectedContact.facebook_name ?? selectedContact.facebook_url ?? '—' },
-                      { label: 'פייסבוק ID', value: selectedContact.facebook_id },
-                      { label: 'סטטוס חברתי', value: socialStatusName(selectedContact.social_status) },
-                      { label: 'מפתח עסקי', value: selectedContact.phone_norm },
-                    ]}
+                <AdminPanelSection title="זהות ופרטי קשר">
+                  <AdminPanelField
+                    label="שם מלא"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={selectedContact.full_name ?? selectedContact.display_name}
+                    editValue={
+                      <input
+                        id="contact-full-name"
+                        value={editDraft.full_name ?? ''}
+                        onChange={(event) => setEditDraft((draft) => ({ ...draft, full_name: event.target.value }))}
+                        className={panelInputClass}
+                      />
+                    }
+                    htmlFor="contact-full-name"
                   />
-                </SectionCard>
-
-                <SectionCard title="מקצועי">
-                  <DetailsGrid
-                    items={[
-                      { label: 'תפקיד', value: roleName(selectedContact.role) },
-                      { label: 'תת־תפקיד', value: subRoleName(selectedContact.sub_role) },
-                      { label: 'סוג פרופיל', value: profileTypeName(selectedContact.profile_type) },
-                      { label: 'כותרת מקצועית', value: selectedContact.professional_title },
-                      { label: 'ניסיון', value: experienceName(selectedContact.experience) },
-                      { label: 'זמינות', value: availabilityNames(selectedContact.candidate_availability_ids) },
-                      { label: 'היקף מועדף', value: selectedContact.preferred_scope },
-                      { label: 'שפות', value: languagesName(selectedContact.languages) },
-                      { label: 'מעסיק נוכחי', value: selectedContact.current_employer },
-                      { label: 'ציפיית שכר שעתי', value: formatCurrency(selectedContact.salary_expectation_hourly) },
-                      { label: 'ציפיית שכר חודשית', value: formatCurrency(selectedContact.salary_expectation_monthly) },
-                      { label: 'סוג מס', value: selectedContact.tax_type },
-                    ]}
+                  <AdminPanelField label="שם תצוגה" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.display_name} />
+                  <AdminPanelField label="שם פרטי" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.first_name} />
+                  <AdminPanelField label="שם משפחה" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.last_name} />
+                  <AdminPanelField
+                    label="נייד"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={selectedContact.phone_norm ? formatPhone(selectedContact.phone_norm) : null}
+                    editValue={
+                      <input
+                        id="contact-phone"
+                        dir="ltr"
+                        value={editDraft.phone ?? ''}
+                        onChange={(event) => setEditDraft((draft) => ({ ...draft, phone: event.target.value }))}
+                        className={`${panelInputClass} text-left`}
+                      />
+                    }
+                    htmlFor="contact-phone"
                   />
-                </SectionCard>
-
-                <SectionCard title="מיקום והעדפות">
-                  <DetailsGrid
-                    items={[
-                      { label: 'אזור', value: regionName(selectedContact.region_id) },
-                      { label: 'עיר', value: cityName(selectedContact.city_id) },
-                      {
-                        label: 'אזורים מועדפים',
-                        value: formatIdsToNames(selectedContact.preferred_regions, regionName),
-                      },
-                      {
-                        label: 'ערים מועדפות',
-                        value: formatIdsToNames(selectedContact.preferred_cities, cityName),
-                      },
-                      {
-                        label: 'שנת לידה',
-                        value: selectedContact.birth_year ? String(selectedContact.birth_year) : '—',
-                      },
-                      { label: 'מגדר', value: selectedContact.gender },
-                      { label: 'מספר רישיון', value: selectedContact.license_no },
-                    ]}
+                  <AdminPanelField
+                    label="נייד נוסף"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={selectedContact.second_phone ? formatPhone(selectedContact.second_phone) : null}
                   />
-                </SectionCard>
+                  <AdminPanelField
+                    label="מייל"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={selectedContact.email}
+                    editValue={
+                      <input
+                        id="contact-email"
+                        type="email"
+                        dir="ltr"
+                        value={editDraft.email ?? ''}
+                        onChange={(event) => setEditDraft((draft) => ({ ...draft, email: event.target.value }))}
+                        className={`${panelInputClass} text-left`}
+                      />
+                    }
+                    htmlFor="contact-email"
+                  />
+                  <AdminPanelField label="מייל נוסף" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.second_email} />
+                  <AdminPanelField label="פייסבוק" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.facebook_name ?? selectedContact.facebook_url} />
+                  <AdminPanelField label="סטטוס חברתי" mode={isEditing ? 'edit' : 'view'} viewValue={socialStatusName(selectedContact.social_status)} />
+                  <AdminPanelField label="מפתח עסקי" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.phone_norm} />
+                </AdminPanelSection>
 
-                <SectionCard title='קבצים'>
-                  <div className="space-y-3">
+                <AdminPanelSection title="פרטים מקצועיים">
+                  <AdminPanelField
+                    label="תפקיד"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={<RoleBadge label={roleName(selectedContact.role)} roleId={Number(selectedContact.role)} />}
+                    editValue={
+                      <select
+                        id="contact-role"
+                        value={editDraft.role ?? ''}
+                        onChange={(event) => setEditDraft((draft) => ({ ...draft, role: event.target.value ? Number(event.target.value) : null }))}
+                        className={panelInputClass}
+                      >
+                        <option value="">— בחר תפקיד —</option>
+                        {roleOptions.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
+                      </select>
+                    }
+                    htmlFor="contact-role"
+                  />
+                  <AdminPanelField label="תת־תפקיד" mode={isEditing ? 'edit' : 'view'} viewValue={subRoleName(selectedContact.sub_role)} />
+                  <AdminPanelField label="סוג פרופיל" mode={isEditing ? 'edit' : 'view'} viewValue={profileTypeName(selectedContact.profile_type)} />
+                  <AdminPanelField label="כותרת מקצועית" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.professional_title} />
+                  <AdminPanelField label="ניסיון" mode={isEditing ? 'edit' : 'view'} viewValue={experienceName(selectedContact.experience)} />
+                  <AdminPanelField
+                    label="זמינות"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={availabilityNames(selectedContact.candidate_availability_ids)}
+                    editValue={
+                      <DictionaryMultiSelect
+                        options={availabilityOptions}
+                        value={editDraft.candidate_availability_ids ?? []}
+                        onChange={(ids) => setEditDraft((draft) => ({ ...draft, candidate_availability_ids: ids }))}
+                        placeholder="בחירת זמינויות..."
+                      />
+                    }
+                  />
+                  <AdminPanelField label="היקף מועדף" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.preferred_scope} />
+                  <AdminPanelField label="שפות" mode={isEditing ? 'edit' : 'view'} viewValue={languagesName(selectedContact.languages)} />
+                  <AdminPanelField label="מעסיק נוכחי" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.current_employer} />
+                  <AdminPanelField label="ציפיית שכר שעתי" mode={isEditing ? 'edit' : 'view'} viewValue={formatCurrency(selectedContact.salary_expectation_hourly)} />
+                  <AdminPanelField label="ציפיית שכר חודשית" mode={isEditing ? 'edit' : 'view'} viewValue={formatCurrency(selectedContact.salary_expectation_monthly)} />
+                  <AdminPanelField label="סוג מס" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.tax_type} />
+                </AdminPanelSection>
+
+                <AdminPanelSection title="מיקום והעדפות">
+                  <AdminPanelField
+                    label="אזור"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={<RegionBadge regionId={selectedContact.region_id} label={regionName(selectedContact.region_id)} />}
+                    editValue={
+                      <select
+                        id="contact-region"
+                        value={editDraft.region_id ?? ''}
+                        onChange={(event) => setEditDraft((draft) => ({
+                          ...draft,
+                          region_id: event.target.value ? Number(event.target.value) : null,
+                          city_id: null,
+                        }))}
+                        className={panelInputClass}
+                      >
+                        <option value="">— בחר אזור —</option>
+                        {regionOptions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
+                      </select>
+                    }
+                    htmlFor="contact-region"
+                  />
+                  <AdminPanelField
+                    label="עיר"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={cityName(selectedContact.city_id)}
+                    editValue={
+                      <select
+                        id="contact-city"
+                        value={editDraft.city_id ?? ''}
+                        onChange={(event) => {
+                          const cityId = event.target.value ? Number(event.target.value) : null
+                          const city = cityOptions.find((option) => Number(option.id) === Number(cityId))
+                          setEditDraft((draft) => ({
+                            ...draft,
+                            city_id: cityId,
+                            region_id: city?.region_id ?? draft.region_id ?? null,
+                          }))
+                        }}
+                        className={panelInputClass}
+                      >
+                        <option value="">— בחר עיר —</option>
+                        {editCityOptions.map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
+                      </select>
+                    }
+                    htmlFor="contact-city"
+                  />
+                  <AdminPanelField label="אזורים מועדפים" mode={isEditing ? 'edit' : 'view'} viewValue={formatIdsToNames(selectedContact.preferred_regions, regionName)} />
+                  <AdminPanelField label="ערים מועדפות" mode={isEditing ? 'edit' : 'view'} viewValue={formatIdsToNames(selectedContact.preferred_cities, cityName)} />
+                  <AdminPanelField label="שנת לידה" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.birth_year ? String(selectedContact.birth_year) : null} />
+                  <AdminPanelField label="מגדר" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.gender} />
+                  <AdminPanelField label="מספר רישיון" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.license_no} />
+                </AdminPanelSection>
+
+                <AdminPanelSection title="קבצים">
+                  <div className="space-y-3 sm:col-span-2">
                     <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-[#F8FAFC] px-3 py-3">
                       <div className="space-y-1">
                         <div className="text-[14px] font-bold text-[#0F172A]">סטטוס קו"ח</div>
@@ -1520,11 +1577,9 @@ export default function AdminContactsPage() {
                       </div>
                       <CvStateBadge hasCv={Boolean(selectedContact.has_cv)} broken={selectedContact.hasBrokenCv} />
                     </div>
-
                     {selectedContact.cv_received_date && (
-                      <MetaLine label='תאריך קבלת קו"ח' value={formatDate(selectedContact.cv_received_date)} />
+                      <MetaLine label={'תאריך קבלת קו"ח'} value={formatDate(selectedContact.cv_received_date)} />
                     )}
-
                     {selectedContact.cv_link && (
                       <a
                         href={selectedContact.cv_link}
@@ -1537,82 +1592,62 @@ export default function AdminContactsPage() {
                       </a>
                     )}
                   </div>
-                </SectionCard>
+                </AdminPanelSection>
 
-                <SectionCard title="CRM">
-                  <DetailsGrid
-                    items={[
-                      { label: 'מקור', value: sourceName(selectedContact.source) },
-                      { label: 'סטטוס בדיקה', value: checkStatusName(selectedContact.check_status) },
-                      { label: 'קשר אחרון', value: formatDate(selectedContact.last_contact_date) },
-                      { label: 'פולו־אפ הבא', value: formatDate(selectedContact.next_follow_up) },
-                      {
-                        label: 'מספר הגשות קודמות',
-                        value: String(selectedContact.prev_applications_count ?? 0),
-                      },
-                      {
-                        label: 'תאריך סטטוס מועמד',
-                        value: formatDate(selectedContact.candidate_status_date),
-                      },
-                      {
-                        label: 'ווטסאפ קמפיין אחרון',
-                        value: formatDate(selectedContact.whatsapp_campaign_last_sent),
-                      },
-                      { label: 'נוצר', value: formatDate(selectedContact.created_timestamp) },
-                      { label: 'עודכן', value: formatDate(selectedContact.updated_timestamp) },
-                    ]}
+                <AdminPanelSection title="CRM">
+                  <AdminPanelField label="מקור" mode={isEditing ? 'edit' : 'view'} viewValue={sourceName(selectedContact.source)} />
+                  <AdminPanelField
+                    label="סטטוס בדיקה"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={<StatusBadge statusType="check" statusId={selectedContact.check_status} label={checkStatusName(selectedContact.check_status)} />}
                   />
-                  {selectedContact.notes && (
-                    <div className="mt-4 rounded-2xl border border-slate-200 bg-[#F8FAFC] p-4">
-                      <div className="mb-2 text-[13px] font-semibold text-slate-500">הערות</div>
-                      <div className="whitespace-pre-wrap text-[14px] font-medium text-[#0F172A]">
-                        {selectedContact.notes}
-                      </div>
-                    </div>
-                  )}
-                </SectionCard>
-
-                <SectionCard title="שיוך ארגוני">
-                  <DetailsGrid
-                    items={[
-                      {
-                        label: 'חשבון מקושר',
-                        value: selectedContact.account_link ? String(selectedContact.account_link) : '—',
-                      },
-                      { label: 'שם הארגון', value: selectedContact.linked_org_name ?? '—' },
-                      {
-                        label: 'מצב שיוך',
-                        value: selectedContact.account_link ? 'מקושר' : 'ללא שיוך ארגוני',
-                      },
-                    ]}
+                  <AdminPanelField label="קשר אחרון" mode={isEditing ? 'edit' : 'view'} viewValue={formatDate(selectedContact.last_contact_date)} />
+                  <AdminPanelField label="פולו־אפ הבא" mode={isEditing ? 'edit' : 'view'} viewValue={formatDate(selectedContact.next_follow_up)} />
+                  <AdminPanelField label="מספר הגשות קודמות" mode={isEditing ? 'edit' : 'view'} viewValue={String(selectedContact.prev_applications_count ?? 0)} />
+                  <AdminPanelField label="תאריך סטטוס מועמד" mode={isEditing ? 'edit' : 'view'} viewValue={formatDate(selectedContact.candidate_status_date)} />
+                  <AdminPanelField label="WhatsApp קמפיין אחרון" mode={isEditing ? 'edit' : 'view'} viewValue={formatDate(selectedContact.whatsapp_campaign_last_sent)} />
+                  <AdminPanelField label="נוצר" mode={isEditing ? 'edit' : 'view'} viewValue={formatDate(selectedContact.created_timestamp)} />
+                  <AdminPanelField label="עודכן" mode={isEditing ? 'edit' : 'view'} viewValue={formatDate(selectedContact.updated_timestamp)} />
+                  <AdminPanelField
+                    label="הערות"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={selectedContact.notes}
+                    editValue={
+                      <textarea
+                        id="contact-notes"
+                        rows={4}
+                        value={editDraft.notes ?? ''}
+                        onChange={(event) => setEditDraft((draft) => ({ ...draft, notes: event.target.value }))}
+                        className={`${panelInputClass} min-h-[96px] resize-y`}
+                      />
+                    }
+                    htmlFor="contact-notes"
+                    fullWidth
                   />
-                </SectionCard>
+                </AdminPanelSection>
 
-                <SectionCard title="הרחבות / AI">
-                  <div className="space-y-3">
-                    <DetailsGrid
-                      items={[
-                        {
-                          label: 'סיכום AI',
-                          value: selectedContact.ai_profile_summary ?? 'אין עדיין סיכום AI',
-                        },
-                        {
-                          label: 'נתונים מורחבים',
-                          value: selectedContact.extended_data
-                            ? JSON.stringify(selectedContact.extended_data)
-                            : 'אין נתונים מורחבים',
-                        },
-                        {
-                          label: 'מצבי אזהרה',
-                          value: buildWarnings(selectedContact).length
-                            ? buildWarnings(selectedContact).join(' | ')
-                            : 'ללא אזהרות',
-                        },
-                      ]}
-                    />
-                  </div>
-                </SectionCard>
-          </div>
+                <AdminPanelSection title="שיוך ארגוני">
+                  <AdminPanelField label="מזהה ארגון" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.account_link ? String(selectedContact.account_link) : null} />
+                  <AdminPanelField label="שם הארגון" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.linked_org_name} />
+                  <AdminPanelField label="מצב שיוך" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.account_link ? 'מקושר' : 'ללא שיוך ארגוני'} />
+                </AdminPanelSection>
+
+                <AdminPanelSection title="הרחבות ו־AI">
+                  <AdminPanelField label="סיכום AI" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.ai_profile_summary ?? 'אין עדיין סיכום AI'} fullWidth />
+                  <AdminPanelField
+                    label="נתונים מורחבים"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={selectedContact.extended_data ? JSON.stringify(selectedContact.extended_data) : 'אין נתונים מורחבים'}
+                    fullWidth
+                  />
+                  <AdminPanelField
+                    label="מצבי אזהרה"
+                    mode={isEditing ? 'edit' : 'view'}
+                    viewValue={buildWarnings(selectedContact).length ? buildWarnings(selectedContact).join(' | ') : 'ללא אזהרות'}
+                    fullWidth
+                  />
+                </AdminPanelSection>
+              </div>
           </SidePanel>
         )}
 
@@ -1965,67 +2000,6 @@ function LightTag({
 
 // RoleBadge imported from shared component above
 
-function IconAction({
-  title,
-  icon,
-  onClick,
-  pending,
-}: {
-  title: string
-  icon: React.ReactNode
-  onClick: () => void
-  pending?: boolean
-}) {
-  return (
-    <button
-      type="button"
-      title={title}
-      aria-label={title}
-      disabled={pending}
-      onClick={onClick}
-      className="rounded-[10px] border border-slate-200 bg-white p-2 text-slate-500 shadow-[3px_3px_6px_rgba(0,0,0,0.08)] transition-all hover:shadow-[1px_1px_3px_rgba(0,0,0,0.10)] hover:text-[#008080] disabled:cursor-not-allowed disabled:opacity-50"
-    >
-      {icon}
-    </button>
-  )
-}
-
-function SectionCard({
-  title,
-  children,
-  compact = false,
-}: {
-  title: string
-  children: React.ReactNode
-  compact?: boolean
-}) {
-  return (
-    <section className={`rounded-2xl border border-slate-200 bg-white shadow-sm ${compact ? 'p-4' : 'p-4'}`}>
-      <div className="mb-3 text-[16px] font-bold text-[#0F172A]">{title}</div>
-      {children}
-    </section>
-  )
-}
-
-function DetailsGrid({
-  items,
-}: {
-  items: Array<{ label: string; value?: string | null }>
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {items.map((item, index) => (
-        <div key={`${item.label}-${index}`} className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-3">
-          <div className="text-[13px] font-semibold text-slate-500">{item.label}</div>
-          <div className="mt-1 break-words text-[14px] font-bold text-[#0F172A]">
-            {item.value && String(item.value).trim() ? item.value : '—'}
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 function MetaLine({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="flex items-center justify-between gap-4 text-[13px]">
@@ -2192,85 +2166,12 @@ function formatCurrency(value?: number | null) {
   }).format(value)
 }
 
-function normalizeDigits(value?: string | null) {
-  return String(value ?? '').replace(/\D/g, '')
-}
-
 function formatIdsToNames(
   ids: number[] | null | undefined,
   getLabel: (id: number | null | undefined) => string,
 ) {
   if (!ids?.length) return '—'
   return ids.map((id) => getLabel(id)).join(', ')
-}
-
-function SortableTh({
-  label,
-  sortKey,
-  sortBy,
-  sortDir,
-  onSort,
-  width,
-  onResizeStart,
-}: {
-  label: string
-  sortKey: string
-  sortBy: string | null
-  sortDir: 'asc' | 'desc'
-  onSort: (key: string) => void
-  width?: number
-  onResizeStart?: (e: React.MouseEvent, key: string) => void
-}) {
-  const active = sortBy === sortKey
-  return (
-    <th
-      className="relative cursor-pointer select-none px-3 py-3 hover:bg-slate-100"
-      style={width ? { width, minWidth: 80 } : { minWidth: 80 }}
-      onClick={() => onSort(sortKey)}
-    >
-      <span className="flex items-center gap-1.5">
-        {label}
-        <span className={`flex flex-col ${active ? 'text-[#008080]' : 'text-slate-400'}`}>
-          <ChevronUp className={`h-3 w-3 -mb-1 ${active && sortDir === 'asc' ? 'text-[#008080]' : 'text-slate-300'}`} />
-          <ChevronDown className={`h-3 w-3 ${active && sortDir === 'desc' ? 'text-[#008080]' : 'text-slate-300'}`} />
-        </span>
-      </span>
-      {onResizeStart && (
-        <div
-          className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-[#008080]/40"
-          onClick={(e) => e.stopPropagation()}
-          onMouseDown={(e) => { e.stopPropagation(); onResizeStart(e, sortKey) }}
-        />
-      )}
-    </th>
-  )
-}
-
-function PlainTh({
-  label,
-  colKey,
-  width,
-  onResizeStart,
-}: {
-  label: string
-  colKey: string
-  width?: number
-  onResizeStart?: (e: React.MouseEvent, key: string) => void
-}) {
-  return (
-    <th
-      className="relative px-3 py-3"
-      style={width ? { width, minWidth: 80 } : { minWidth: 80 }}
-    >
-      {label}
-      {onResizeStart && (
-        <div
-          className="absolute left-0 top-0 h-full w-1.5 cursor-col-resize bg-transparent hover:bg-[#008080]/40"
-          onMouseDown={(e) => { e.stopPropagation(); onResizeStart(e, colKey) }}
-        />
-      )}
-    </th>
-  )
 }
 
 function todayIso() {
@@ -2302,8 +2203,16 @@ async function runContactsQuery(
   let query = sb.from('contact').select('*', { count: 'exact' })
 
   if (filters.search?.trim()) {
-    const q = filters.search.trim()
-    query = query.or(`full_name.ilike.%${q}%,phone.ilike.%${q}%,phone_norm.ilike.%${q}%,email.ilike.%${q}%,linked_org_name.ilike.%${q}%`)
+    const q = filters.search.trim().replace(/[,%()]/g, ' ')
+    const phoneCore = phoneSearchTerm(q)
+    const conditions = [
+      `full_name.ilike.%${q}%`,
+      `email.ilike.%${q}%`,
+      `linked_org_name.ilike.%${q}%`,
+      `phone.ilike.%${q}%`,
+    ]
+    if (phoneCore) conditions.push(`phone_norm.ilike.%${phoneCore}%`)
+    query = query.or(conditions.join(','))
   }
   if (filters.role) query = query.eq('role', filters.role)
   if (filters.sub_role_ids?.length) query = (query as any).filter('sub_role', 'ov', `{${filters.sub_role_ids.join(',')}}`)
