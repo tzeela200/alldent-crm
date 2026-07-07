@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useContactMutations } from '@/hooks/useContactMutations'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
@@ -57,7 +57,6 @@ import { AdminActionsMenu, type AdminActionMenuItem } from '@/components/admin/A
 import { AdminPanelSection } from '@/components/admin/AdminPanelSection'
 import { AdminPanelField } from '@/components/admin/AdminPanelField'
 import { AdminPanelActions } from '@/components/admin/AdminPanelActions'
-import { StatusBadge } from '@/components/admin/StatusBadge'
 
 type ExtendedFilters = {
   search?: string
@@ -123,13 +122,39 @@ function tagClass(tag: string) {
 // A tag applied to a contact — carries the row id (for delete) and resolved name.
 type PanelTag = { id: number; tag_id: number | null; name: string }
 
-type ContactRow = Contact & {
+type AdminContactRow = Omit<
+  Contact,
+  'sub_role' | 'preferred_scope' | 'languages' | 'gender' | 'tax_type' | 'facebook_id'
+> & {
+  sub_role: number[] | null
+  preferred_scope: number[]
+  languages: number[]
+  gender: number | null
+  tax_type_id: number | null
+  facebook_id: number | null
+  additional_skills_notes?: string | null
+  academic_education?: string | null
+  professional_courses?: string | null
+  portfolio_url?: string | null
+  recommendations_url?: string | null
+  personal_summary?: string | null
+  preferred_all_country?: boolean
+  locality_type?: string | null
+  work_schedule_text?: string | null
+  work_status?: number | null
+  candidate_salary_type_ids?: number[]
+  photo_url?: string | null
+  linkedin_url?: string | null
+  candidate_notes?: string | null
+  cv_storage_path?: string | null
+}
+
+type ContactRow = AdminContactRow & {
   linked_org_name: string | null
   localTags: string[]
   hasBrokenCv: boolean
   hasNoPhoneButEmail: boolean
   isPartialProfile: boolean
-  isDuplicatePhone: boolean
   isDuplicateEmail: boolean
   hasWarning: boolean
   isFollowUpDue: boolean
@@ -148,17 +173,65 @@ const KPI_ROLE_GROUPS: KpiRoleCard[] = [
 
 const ALL_COLUMNS = [
   { key: 'full_name', label: 'שם מלא' },
+  { key: 'display_name', label: 'שם תצוגה' },
+  { key: 'first_name', label: 'שם פרטי' },
+  { key: 'last_name', label: 'שם משפחה' },
   { key: 'phone', label: 'נייד' },
+  { key: 'second_phone', label: 'נייד נוסף' },
   { key: 'email', label: 'אימייל' },
+  { key: 'second_email', label: 'אימייל נוסף' },
   { key: 'role', label: 'תפקיד' },
+  { key: 'sub_role', label: 'תתי־תפקידים' },
+  { key: 'professional_title', label: 'כותרת מקצועית' },
+  { key: 'experience', label: 'ניסיון' },
+  { key: 'academic_education', label: 'השכלה אקדמית' },
+  { key: 'professional_courses', label: 'קורסים מקצועיים' },
+  { key: 'additional_skills', label: 'מיומנויות נוספות' },
+  { key: 'personal_summary', label: 'סיכום אישי' },
+  { key: 'candidate_notes', label: 'הערות מועמד' },
+  { key: 'notes', label: 'הערות CRM' },
+  { key: 'ai_profile_summary', label: 'סיכום AI' },
   { key: 'region', label: 'אזור' },
   { key: 'city', label: 'עיר' },
+  { key: 'preferred_regions', label: 'אזורים מועדפים' },
+  { key: 'preferred_cities', label: 'ערים מועדפות' },
+  { key: 'preferred_all_country', label: 'כל הארץ' },
+  { key: 'locality_type', label: 'סוג יישוב' },
   { key: 'availability', label: 'זמינות' },
-  { key: 'cv', label: 'קו"ח' },
+  { key: 'preferred_scope', label: 'היקף מועדף' },
+  { key: 'languages', label: 'שפות' },
+  { key: 'mobility', label: 'ניידות' },
+  { key: 'work_status', label: 'סטטוס תעסוקתי' },
+  { key: 'work_schedule', label: 'ימי ושעות עבודה' },
+  { key: 'systems', label: 'מערכות' },
+  { key: 'procedures', label: 'תחומי ניסיון' },
+  { key: 'salary_types', label: 'סוגי שכר' },
+  { key: 'salary_hourly', label: 'ציפיית שכר שעתי' },
+  { key: 'salary_monthly', label: 'ציפיית שכר חודשית' },
+  { key: 'gender', label: 'מגדר' },
+  { key: 'birth_year', label: 'שנת לידה' },
+  { key: 'tax_type', label: 'סוג מס' },
+  { key: 'license_no', label: 'מספר רישיון' },
+  { key: 'current_employer', label: 'מעסיק נוכחי' },
+  { key: 'previous_employers', label: 'מעסיקים קודמים' },
   { key: 'profile_type', label: 'סוג פרופיל' },
+  { key: 'source', label: 'מקור' },
+  { key: 'check_status', label: 'סטטוס בדיקה' },
+  { key: 'social_status', label: 'סטטוס חברתי' },
   { key: 'linked_org', label: 'ארגון מקושר' },
-  { key: 'whatsapp', label: 'תאריך שליחת וואטאפ' },
+  { key: 'cv', label: 'קו"ח' },
+  { key: 'cv_received', label: 'תאריך קבלת קו"ח' },
+  { key: 'photo', label: 'תמונת פרופיל' },
+  { key: 'facebook', label: 'פייסבוק' },
+  { key: 'linkedin', label: 'LinkedIn' },
+  { key: 'portfolio', label: 'תיק עבודות' },
+  { key: 'recommendations', label: 'המלצות' },
+  { key: 'next_follow_up', label: 'פולו־אפ הבא' },
+  { key: 'whatsapp', label: 'תאריך שליחת WhatsApp' },
   { key: 'last_contact', label: 'קשר אחרון' },
+  { key: 'applications_count', label: 'מספר הגשות' },
+  { key: 'created', label: 'נוצר' },
+  { key: 'updated', label: 'עודכן' },
 ] as const
 
 const DEFAULT_COLUMNS = [
@@ -194,8 +267,9 @@ export default function AdminContactsPage() {
   const [sortBy, setSortBy] = useState<string | null>(null)
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
   const [isEditing, setIsEditing] = useState(false)
-  const [editDraft, setEditDraft] = useState<Partial<Contact>>({})
+  const [editDraft, setEditDraft] = useState<Partial<AdminContactRow>>({})
   const [savePending, setSavePending] = useState(false)
+  const [refreshPending, setRefreshPending] = useState(false)
   const [panelTags, setPanelTags] = useState<PanelTag[]>([])
   const [showTagDropdown, setShowTagDropdown] = useState(false)
 
@@ -214,26 +288,23 @@ export default function AdminContactsPage() {
   const [mergeOpen, setMergeOpen] = useState(false)
   const [mergePrimaryId, setMergePrimaryId] = useState<number | null>(null)
   const [mergePending, setMergePending] = useState(false)
+  const [mergeLoadPending, setMergeLoadPending] = useState(false)
+  const [mergeRecords, setMergeRecords] = useState<AdminContactRow[]>([])
 
   const pageSize = 20
 
-  type ContactsResult = { contacts: import('@/types').Contact[]; total: number }
-  const { data: contactsResult, isFetching: contactsFetching } = useQuery<ContactsResult>({
+  type ContactsResult = { contacts: AdminContactRow[]; total: number }
+  const {
+    data: contactsResult,
+    isLoading: contactsLoading,
+    isFetching: contactsFetching,
+    isError: contactsIsError,
+    refetch: refetchContacts,
+  } = useQuery<ContactsResult>({
     queryKey: ['contacts-v2', filters, page, sortBy, sortDir],
     queryFn: () => runContactsQuery(filters, page, pageSize, sortBy, sortDir),
     placeholderData: (prev) => prev,
     staleTime: 30_000,
-  })
-
-  const { data: phoneNormCountsMap = new Map<string, number>() } = useQuery({
-    queryKey: ['contacts-phone-norms'],
-    queryFn: async () => {
-      const { data } = await supabase.from('contact').select('phone_norm').not('phone_norm', 'is', null)
-      const map = new Map<string, number>()
-      ;(data ?? []).forEach((r: { phone_norm: string }) => { map.set(r.phone_norm, (map.get(r.phone_norm) ?? 0) + 1) })
-      return map
-    },
-    staleTime: 120_000,
   })
 
   const { data: roleCounts = {} as Record<number, number> } = useQuery<Record<number, number>>({
@@ -258,7 +329,7 @@ export default function AdminContactsPage() {
     staleTime: 120_000,
   })
 
-  const { data: regionOptions = [] } = useQuery<{ id: number; name: string }[]>({
+  const { data: regionOptions = [], isError: regionsIsError } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['dict_regions'],
     queryFn: async () => {
       const { data, error } = await supabase.from('dict_regions').select('id,name').order('name')
@@ -268,7 +339,7 @@ export default function AdminContactsPage() {
     staleTime: 5 * 60_000,
   })
 
-  const { data: cityOptions = [] } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
+  const { data: cityOptions = [], isError: citiesIsError } = useQuery<{ id: number; name: string; region_id: number | null }[]>({
     queryKey: ['dict_cities-all'],
     queryFn: async () => {
       const PAGE = 1000
@@ -288,7 +359,7 @@ export default function AdminContactsPage() {
     staleTime: 5 * 60_000,
   })
 
-  const { data: accountsList = [] } = useQuery<{ account_id: number; account_name: string | null }[]>({
+  const { data: accountsList = [], isError: accountsIsError } = useQuery<{ account_id: number; account_name: string | null }[]>({
     queryKey: ['accounts_names'],
     queryFn: async () => {
       const { data, error } = await supabase.from('accounts').select('account_id,account_name')
@@ -306,7 +377,7 @@ export default function AdminContactsPage() {
   const socialStatusOptions = DICT_SOCIAL_STATUSES
   const profileTypeOptions = DICT_PROFILE_TYPES
 
-  const { data: languageDict = [] } = useQuery<{ id: number; name: string }[]>({
+  const { data: languageDict = [], isError: languagesIsError } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['dict_languages'],
     queryFn: async () => {
       const { data, error } = await supabase.from('dict_languages').select('id,name').order('name')
@@ -316,11 +387,94 @@ export default function AdminContactsPage() {
     staleTime: 600_000,
   })
 
+
+  const { data: scopeDict = [], isError: scopesIsError } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_scopes'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_scopes').select('id,name').order('id')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
+  const { data: genderDict = [], isError: gendersIsError } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_genders'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_genders').select('id,name').order('id')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
+  const { data: taxTypeDict = [], isError: taxTypesIsError } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_tax_types'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_tax_types').select('id,name').order('id')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
+
+  const { data: mobilityDict = [], isError: mobilityIsError } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_mobility'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_mobility').select('id,name').order('id')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
+  const { data: systemsDict = [], isError: systemsIsError } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_systems'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_systems').select('id,name').order('name')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
+  const { data: proceduresDict = [], isError: proceduresIsError } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_procedures'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_procedures').select('id,name').order('name')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
+  const { data: salaryTypeDict = [], isError: salaryTypesIsError } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_salary_types'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_salary_types').select('id,name').order('id')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
+  const { data: workStatusDict = [], isError: workStatusesIsError } = useQuery<{ id: number; name: string }[]>({
+    queryKey: ['dict_contact_work_statuses'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_contact_work_statuses').select('id,name').order('id')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 600_000,
+  })
+
   // Canonical tag dictionary (id-based) — same model as AdminCandidatesPage.
-  const { data: candidateTagOptions = [] } = useQuery<{ id: number; name: string }[]>({
+  const { data: candidateTagOptions = [], isError: tagsDictIsError } = useQuery<{ id: number; name: string }[]>({
     queryKey: ['dict_candidate_tags'],
     queryFn: async () => {
-      const { data } = await supabase.from('dict_candidate_tags').select('id,name').eq('is_active', true).order('sort_order')
+      const { data, error } = await supabase.from('dict_candidate_tags').select('id,name').eq('is_active', true).order('sort_order')
+      if (error) throw error
       return data ?? []
     },
     staleTime: 600_000,
@@ -354,12 +508,21 @@ export default function AdminContactsPage() {
   }, [selectedId])
 
   const roleName = (id: number | null | undefined) => roleOptions.find((r) => r.id === id)?.name ?? '—'
-  const subRoleName = (id: number | null | undefined) => DICT_SUB_ROLES.find((r) => r.id === id)?.name ?? '—'
-  // DB column is bigint[]; the shared Contact type still says string for legacy reasons — read defensively.
-  const languagesName = (value: unknown): string => {
-    if (!Array.isArray(value) || value.length === 0) return '—'
-    return value.map((id) => languageDict.find((l) => l.id === Number(id))?.name ?? String(id)).join(', ')
+  const namesFromIds = (ids: number[] | null | undefined, options: { id: number; name: string }[]): string => {
+    if (!Array.isArray(ids) || ids.length === 0) return '—'
+    const labels = ids.map((id) => options.find((option) => Number(option.id) === Number(id))?.name ?? 'לא זוהה')
+    return labels.join(', ')
   }
+  const subRoleNames = (ids: number[] | null | undefined) => namesFromIds(ids, DICT_SUB_ROLES)
+  const languagesName = (ids: number[] | null | undefined) => namesFromIds(ids, languageDict)
+  const scopeNames = (ids: number[] | null | undefined) => namesFromIds(ids, scopeDict)
+  const genderName = (id: number | null | undefined) => genderDict.find((item) => item.id === Number(id))?.name ?? '—'
+  const taxTypeName = (id: number | null | undefined) => taxTypeDict.find((item) => item.id === Number(id))?.name ?? '—'
+  const mobilityName = (id: number | null | undefined) => mobilityDict.find((item) => item.id === Number(id))?.name ?? '—'
+  const systemsNames = (ids: number[] | null | undefined) => namesFromIds(ids, systemsDict)
+  const proceduresNames = (ids: number[] | null | undefined) => namesFromIds(ids, proceduresDict)
+  const salaryTypeNames = (ids: number[] | null | undefined) => namesFromIds(ids, salaryTypeDict)
+  const workStatusName = (id: number | null | undefined) => workStatusDict.find((item) => item.id === Number(id))?.name ?? '—'
   const regionName = (id: number | null | undefined) => regionOptions.find((r) => r.id === id)?.name ?? '—'
   const cityName = (id: number | null | undefined) => cityOptions.find((r) => r.id === id)?.name ?? '—'
   const availabilityName = (id: number | null | undefined) => availabilityOptions.find((r) => r.id === id)?.name ?? '—'
@@ -385,25 +548,33 @@ export default function AdminContactsPage() {
 
 
   const enrichedContacts = useMemo<ContactRow[]>(() => {
-    const rawPage = (contactsResult?.contacts ?? []) as Contact[]
+    const rawPage = contactsResult?.contacts ?? []
     return rawPage.map((contact) => {
-      const isDuplicatePhone = Boolean(contact.phone_norm && (phoneNormCountsMap.get(String(contact.phone_norm)) ?? 0) > 1)
       const isDuplicateEmail = Boolean(contact.dup_email_flag)
       const hasBrokenCv = Boolean(contact.has_cv && (!contact.cv_link || !isValidUrl(contact.cv_link)))
       const hasNoPhoneButEmail = !contact.phone_norm && Boolean(contact.email)
       const isPartialProfile = !contact.role || !contact.city_id || !contact.region_id
-      const hasWarning = hasBrokenCv || hasNoPhoneButEmail || isPartialProfile || isDuplicatePhone || isDuplicateEmail
+      const hasWarning = hasBrokenCv || hasNoPhoneButEmail || isPartialProfile || isDuplicateEmail
       const isFollowUpDue = isDateDue(contact.next_follow_up)
       const isLinked = Boolean(contact.account_link)
       const linkState: 'linked' | 'unlinked' = isLinked ? 'linked' : 'unlinked'
       return {
         ...contact,
-        linked_org_name: contact.linked_org_name ?? (contact.account_link ? accountNameById.get(contact.account_link) ?? null : null),
+        linked_org_name: contact.account_link
+          ? (accountNameById.get(Number(contact.account_link)) || contact.linked_org_name || null)
+          : (contact.linked_org_name ?? null),
         localTags: [] as string[],
-        hasBrokenCv, hasNoPhoneButEmail, isPartialProfile, isDuplicatePhone, isDuplicateEmail, hasWarning, isFollowUpDue, isLinked, linkState,
+        hasBrokenCv,
+        hasNoPhoneButEmail,
+        isPartialProfile,
+        isDuplicateEmail,
+        hasWarning,
+        isFollowUpDue,
+        isLinked,
+        linkState,
       }
     })
-  }, [contactsResult, phoneNormCountsMap, accountNameById])
+  }, [contactsResult, accountNameById])
 
   const handleSort = (key: string) => {
     if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -416,6 +587,13 @@ export default function AdminContactsPage() {
   const total = totalVisible
   const pageData = enrichedContacts
   const selectedContact = enrichedContacts.find((contact) => Number(contact.contact_id) === Number(selectedId)) ?? null
+
+  const hasDictionaryError = regionsIsError || citiesIsError || accountsIsError || languagesIsError
+    || scopesIsError || gendersIsError || taxTypesIsError || mobilityIsError || systemsIsError
+    || proceduresIsError || salaryTypesIsError || workStatusesIsError || tagsDictIsError
+  const tableError = contactsIsError
+    ? 'שגיאה בטעינת אנשי הקשר. נסי לרענן את הרשימה.'
+    : undefined
 
   const roleKpis = useMemo<KpiRoleCard[]>(() => {
     return KPI_ROLE_GROUPS.map((group) => ({
@@ -435,7 +613,13 @@ export default function AdminContactsPage() {
 
   useEffect(() => {
     setPage(0)
+    setSelectedRows([])
   }, [filters])
+
+  useEffect(() => {
+    const totalPages = Math.max(1, Math.ceil(totalVisible / pageSize))
+    if (page > totalPages - 1) setPage(totalPages - 1)
+  }, [page, pageSize, totalVisible])
 
   useEffect(() => {
     if (!toast.open) return
@@ -444,11 +628,6 @@ export default function AdminContactsPage() {
     }, 2600)
     return () => window.clearTimeout(timer)
   }, [toast.open])
-
-  const editCityOptions = useMemo(() => {
-    if (!editDraft.region_id) return cityOptions
-    return cityOptions.filter((item) => Number(item.region_id) === Number(editDraft.region_id))
-  }, [editDraft.region_id, cityOptions])
 
   const clearFilters = () => {
     setFilters({})
@@ -481,28 +660,44 @@ export default function AdminContactsPage() {
     setToast({ open: true, message, tone })
   }
 
+  const handleRefresh = async () => {
+    setRefreshPending(true)
+    try {
+      const result = await refetchContacts()
+      if (result.error) throw result.error
+      showToast('הרשימה רועננה', 'success')
+    } catch {
+      showToast('שגיאה ברענון אנשי הקשר', 'error')
+    } finally {
+      setRefreshPending(false)
+    }
+  }
+
   const handleExport = async () => {
     try {
       setExportPending(true)
-      let rowsToExport: Contact[]
-      if (selectedRows.length) {
-        rowsToExport = enrichedContacts.filter((contact) => selectedRows.includes(Number(contact.contact_id)))
-      } else {
-        const result = await runContactsQuery(filters, 0, 99999, sortBy, sortDir)
-        rowsToExport = result.contacts
-      }
+      const rowsToExport = selectedRows.length
+        ? await fetchContactsByIds(selectedRows)
+        : await fetchAllContacts(filters, sortBy, sortDir)
 
       const rows = rowsToExport.map((contact) => ({
         'שם מלא': contact.full_name ?? contact.display_name ?? '',
         טלפון: contact.phone_norm ?? contact.phone ?? '',
         אימייל: contact.email ?? '',
         תפקיד: roleName(contact.role),
+        'תתי־תפקידים': subRoleNames(contact.sub_role),
         אזור: regionName(contact.region_id),
         עיר: cityName(contact.city_id),
         זמינות: availabilityNames(contact.candidate_availability_ids),
+        'היקף מועדף': scopeNames(contact.preferred_scope),
+        שפות: languagesName(contact.languages),
+        מגדר: genderName(contact.gender),
+        'סוג מס': taxTypeName(contact.tax_type_id),
         'קו"ח': contact.has_cv ? 'יש' : 'אין',
         'סוג פרופיל': profileTypeName(contact.profile_type),
-        'ארגון מקושר': contact.linked_org_name ?? '',
+        'ארגון מקושר': contact.account_link
+          ? (accountNameById.get(Number(contact.account_link)) || contact.linked_org_name || '')
+          : (contact.linked_org_name ?? ''),
         'תאריך שליחת וואטאפ': formatDate(contact.whatsapp_campaign_last_sent),
         'קשר אחרון': formatDate(contact.last_contact_date),
         'מספר הגשות': contact.prev_applications_count ?? 0,
@@ -520,7 +715,7 @@ export default function AdminContactsPage() {
       link.click()
       document.body.removeChild(link)
       window.URL.revokeObjectURL(url)
-      showToast('הייצוא הושלם בהצלחה', 'success')
+      showToast(`הייצוא הושלם בהצלחה (${rowsToExport.length} רשומות)`, 'success')
     } catch {
       showToast('אירעה שגיאה בייצוא', 'error')
     } finally {
@@ -532,10 +727,21 @@ export default function AdminContactsPage() {
     if (!selectedRows.length || !bulkField || bulkValue === null || bulkValue === '') return
     setBulkPending(true)
     try {
-      // availability is now a multi-value array column — wrap the chosen id.
-      const patch = bulkField === 'availability'
-        ? { candidate_availability_ids: [Number(bulkValue)] }
-        : { [bulkField]: bulkValue }
+      let patch: Record<string, unknown>
+      if (bulkField === 'availability') {
+        patch = { candidate_availability_ids: [Number(bulkValue)] }
+      } else if (bulkField === 'role') {
+        patch = { role: Number(bulkValue), sub_role: [] }
+      } else if (bulkField === 'city_id') {
+        const selectedCity = cityOptions.find((city) => Number(city.id) === Number(bulkValue))
+        if (!selectedCity) throw new Error('העיר שנבחרה אינה קיימת במילון')
+        patch = { city_id: selectedCity.id, region_id: selectedCity.region_id }
+      } else if (bulkField === 'region_id') {
+        patch = { region_id: Number(bulkValue), city_id: null }
+      } else {
+        patch = { [bulkField]: bulkValue }
+      }
+
       const { error } = await bulkUpdateContacts(selectedRows, patch)
       if (error) throw error
       showToast(`${selectedRows.length} רשומות עודכנו בהצלחה`, 'success')
@@ -543,10 +749,27 @@ export default function AdminContactsPage() {
       setBulkField('')
       setBulkValue(null)
       setSelectedRows([])
-    } catch {
-      showToast('שגיאה בעדכון הרשומות', 'error')
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'שגיאה בעדכון הרשומות', 'error')
     } finally {
       setBulkPending(false)
+    }
+  }
+
+  const openMergeDialog = async () => {
+    if (selectedRows.length < 2) return
+    setMergeLoadPending(true)
+    try {
+      const records = await fetchContactsByIds(selectedRows)
+      if (records.length !== selectedRows.length) {
+        throw new Error('לא ניתן לטעון את כל הרשומות שנבחרו למיזוג')
+      }
+      setMergeRecords(records)
+      setMergeOpen(true)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'שגיאה בטעינת הרשומות למיזוג', 'error')
+    } finally {
+      setMergeLoadPending(false)
     }
   }
 
@@ -564,6 +787,7 @@ export default function AdminContactsPage() {
       showToast('הרשומות מוזגו בהצלחה', 'success')
       setMergeOpen(false)
       setMergePrimaryId(null)
+      setMergeRecords([])
       setSelectedRows([])
       if (selectedId && dupIds.includes(selectedId)) setSelectedId(null)
     } catch {
@@ -602,9 +826,10 @@ export default function AdminContactsPage() {
   const markAsCandidate = async (contactId: number) => {
     // עיקרון No Silent Auto-Merge: רק מוסיפים כובע מועמד, לא דורסים את contact.profile_type (הזהות הראשית)
     try {
-      await supabase
+      const { error } = await supabase
         .from('rel_contact_profiles')
         .upsert({ contact_id: contactId, profile_type_id: 1 })
+      if (error) throw error
       await queryClient.invalidateQueries({ queryKey: ['candidate-ids'] })
       showToast('נוסף כובע מועמד — הזהות הראשית נשמרה', 'success')
     } catch {
@@ -619,6 +844,7 @@ export default function AdminContactsPage() {
       phone: contact.phone ?? contact.phone_norm ?? '',
       email: contact.email ?? '',
       role: contact.role,
+      sub_role: contact.sub_role ?? [],
       city_id: contact.city_id,
       region_id: contact.region_id,
       candidate_availability_ids: contact.candidate_availability_ids ?? [],
@@ -653,18 +879,37 @@ export default function AdminContactsPage() {
     }
   }
 
-  // Add a tag by its dictionary id (canonical id-based model).
+  // Add a tag by its dictionary id. The legacy text column is NOT NULL, so both values are written.
   const handleAddTag = async (tagId: number) => {
-    if (!selectedId || panelTags.some((t) => t.tag_id === tagId)) return
-    const { error } = await supabase.from('contact_tags').insert({ contact_id: selectedId, tag_id: tagId })
-    if (!error) queryClient.invalidateQueries({ queryKey: ['contact_tags', selectedId] })
+    if (!selectedId || panelTags.some((tag) => tag.tag_id === tagId)) return
+    const selectedTag = candidateTagOptions.find((tag) => tag.id === tagId)
+    if (!selectedTag) {
+      showToast('התגית שנבחרה אינה קיימת במילון', 'error')
+      return
+    }
+    const { error } = await supabase.from('contact_tags').insert({
+      contact_id: selectedId,
+      tag_id: selectedTag.id,
+      tag: selectedTag.name,
+    })
+    if (error) {
+      showToast('שגיאה בהוספת התגית', 'error')
+      return
+    }
+    await queryClient.invalidateQueries({ queryKey: ['contact_tags', selectedId] })
     setShowTagDropdown(false)
+    showToast('התגית נוספה בהצלחה', 'success')
   }
 
   // Remove a tag by its contact_tags row id (works for id-based and legacy rows).
   const handleRemoveTag = async (rowId: number) => {
     const { error } = await supabase.from('contact_tags').delete().eq('id', rowId)
-    if (!error && selectedId) queryClient.invalidateQueries({ queryKey: ['contact_tags', selectedId] })
+    if (error) {
+      showToast('שגיאה בהסרת התגית', 'error')
+      return
+    }
+    if (selectedId) await queryClient.invalidateQueries({ queryKey: ['contact_tags', selectedId] })
+    showToast('התגית הוסרה', 'success')
   }
 
   const selectedPageIds = pageData.map((contact) => String(contact.contact_id))
@@ -711,6 +956,16 @@ export default function AdminContactsPage() {
     })
   }
 
+  if (visibleColumns.includes('display_name')) {
+    contactColumns.push({ key: 'display_name', label: 'שם תצוגה', minWidth: '180px', render: (contact) => <TruncatedCell value={contact.display_name} /> })
+  }
+  if (visibleColumns.includes('first_name')) {
+    contactColumns.push({ key: 'first_name', label: 'שם פרטי', minWidth: '130px', render: (contact) => contact.first_name ?? '—' })
+  }
+  if (visibleColumns.includes('last_name')) {
+    contactColumns.push({ key: 'last_name', label: 'שם משפחה', minWidth: '130px', render: (contact) => contact.last_name ?? '—' })
+  }
+
   if (visibleColumns.includes('phone')) {
     contactColumns.push({
       key: 'phone',
@@ -733,6 +988,10 @@ export default function AdminContactsPage() {
     })
   }
 
+  if (visibleColumns.includes('second_phone')) {
+    contactColumns.push({ key: 'second_phone', label: 'נייד נוסף', minWidth: '140px', nowrap: true, render: (contact) => contact.second_phone ? formatPhone(contact.second_phone) : '—' })
+  }
+
   if (visibleColumns.includes('email')) {
     contactColumns.push({
       key: 'email',
@@ -750,6 +1009,10 @@ export default function AdminContactsPage() {
         </div>
       ),
     })
+  }
+
+  if (visibleColumns.includes('second_email')) {
+    contactColumns.push({ key: 'second_email', label: 'אימייל נוסף', minWidth: '220px', render: (contact) => <TruncatedCell value={contact.second_email} /> })
   }
 
   if (visibleColumns.includes('role')) {
@@ -856,6 +1119,136 @@ export default function AdminContactsPage() {
     })
   }
 
+  if (visibleColumns.includes('sub_role')) {
+    contactColumns.push({ key: 'sub_role', label: 'תתי־תפקידים', minWidth: '220px', render: (contact) => <TruncatedCell value={subRoleNames(contact.sub_role)} /> })
+  }
+  if (visibleColumns.includes('professional_title')) {
+    contactColumns.push({ key: 'professional_title', label: 'כותרת מקצועית', minWidth: '180px', render: (contact) => <TruncatedCell value={contact.professional_title} /> })
+  }
+  if (visibleColumns.includes('experience')) {
+    contactColumns.push({ key: 'experience', label: 'ניסיון', minWidth: '130px', render: (contact) => experienceName(contact.experience) })
+  }
+  if (visibleColumns.includes('academic_education')) {
+    contactColumns.push({ key: 'academic_education', label: 'השכלה אקדמית', minWidth: '240px', render: (contact) => <TruncatedCell value={contact.academic_education} /> })
+  }
+  if (visibleColumns.includes('professional_courses')) {
+    contactColumns.push({ key: 'professional_courses', label: 'קורסים מקצועיים', minWidth: '240px', render: (contact) => <TruncatedCell value={contact.professional_courses} /> })
+  }
+  if (visibleColumns.includes('additional_skills')) {
+    contactColumns.push({ key: 'additional_skills', label: 'מיומנויות נוספות', minWidth: '240px', render: (contact) => <TruncatedCell value={contact.additional_skills_notes} /> })
+  }
+  if (visibleColumns.includes('personal_summary')) {
+    contactColumns.push({ key: 'personal_summary', label: 'סיכום אישי', minWidth: '260px', render: (contact) => <TruncatedCell value={contact.personal_summary} /> })
+  }
+  if (visibleColumns.includes('candidate_notes')) {
+    contactColumns.push({ key: 'candidate_notes', label: 'הערות מועמד', minWidth: '260px', render: (contact) => <TruncatedCell value={contact.candidate_notes} /> })
+  }
+  if (visibleColumns.includes('notes')) {
+    contactColumns.push({ key: 'notes', label: 'הערות CRM', minWidth: '260px', render: (contact) => <TruncatedCell value={contact.notes} /> })
+  }
+  if (visibleColumns.includes('ai_profile_summary')) {
+    contactColumns.push({ key: 'ai_profile_summary', label: 'סיכום AI', minWidth: '280px', render: (contact) => <TruncatedCell value={contact.ai_profile_summary} /> })
+  }
+  if (visibleColumns.includes('preferred_regions')) {
+    contactColumns.push({ key: 'preferred_regions', label: 'אזורים מועדפים', minWidth: '220px', render: (contact) => <TruncatedCell value={formatIdsToNames(contact.preferred_regions, regionName)} /> })
+  }
+  if (visibleColumns.includes('preferred_cities')) {
+    contactColumns.push({ key: 'preferred_cities', label: 'ערים מועדפות', minWidth: '240px', render: (contact) => <TruncatedCell value={formatIdsToNames(contact.preferred_cities, cityName)} /> })
+  }
+  if (visibleColumns.includes('preferred_all_country')) {
+    contactColumns.push({ key: 'preferred_all_country', label: 'כל הארץ', minWidth: '100px', render: (contact) => contact.preferred_all_country ? 'כן' : 'לא' })
+  }
+  if (visibleColumns.includes('locality_type')) {
+    contactColumns.push({ key: 'locality_type', label: 'סוג יישוב', minWidth: '130px', render: (contact) => contact.locality_type ?? '—' })
+  }
+  if (visibleColumns.includes('preferred_scope')) {
+    contactColumns.push({ key: 'preferred_scope', label: 'היקף מועדף', minWidth: '180px', render: (contact) => <TruncatedCell value={scopeNames(contact.preferred_scope)} /> })
+  }
+  if (visibleColumns.includes('languages')) {
+    contactColumns.push({ key: 'languages', label: 'שפות', minWidth: '200px', render: (contact) => <TruncatedCell value={languagesName(contact.languages)} /> })
+  }
+  if (visibleColumns.includes('mobility')) {
+    contactColumns.push({ key: 'mobility', label: 'ניידות', minWidth: '130px', render: (contact) => mobilityName(contact.mobility_id) })
+  }
+  if (visibleColumns.includes('work_status')) {
+    contactColumns.push({ key: 'work_status', label: 'סטטוס תעסוקתי', minWidth: '160px', render: (contact) => workStatusName(contact.work_status) })
+  }
+  if (visibleColumns.includes('work_schedule')) {
+    contactColumns.push({ key: 'work_schedule', label: 'ימי ושעות עבודה', minWidth: '240px', render: (contact) => <TruncatedCell value={contact.work_schedule_text} /> })
+  }
+  if (visibleColumns.includes('systems')) {
+    contactColumns.push({ key: 'systems', label: 'מערכות', minWidth: '220px', render: (contact) => <TruncatedCell value={systemsNames(contact.systems_used)} /> })
+  }
+  if (visibleColumns.includes('procedures')) {
+    contactColumns.push({ key: 'procedures', label: 'תחומי ניסיון', minWidth: '240px', render: (contact) => <TruncatedCell value={proceduresNames(contact.procedures_experience)} /> })
+  }
+  if (visibleColumns.includes('salary_types')) {
+    contactColumns.push({ key: 'salary_types', label: 'סוגי שכר', minWidth: '180px', render: (contact) => <TruncatedCell value={salaryTypeNames(contact.candidate_salary_type_ids)} /> })
+  }
+  if (visibleColumns.includes('salary_hourly')) {
+    contactColumns.push({ key: 'salary_hourly', label: 'ציפיית שכר שעתי', minWidth: '150px', render: (contact) => formatCurrency(contact.salary_expectation_hourly) })
+  }
+  if (visibleColumns.includes('salary_monthly')) {
+    contactColumns.push({ key: 'salary_monthly', label: 'ציפיית שכר חודשית', minWidth: '170px', render: (contact) => formatCurrency(contact.salary_expectation_monthly) })
+  }
+  if (visibleColumns.includes('gender')) {
+    contactColumns.push({ key: 'gender', label: 'מגדר', minWidth: '100px', render: (contact) => genderName(contact.gender) })
+  }
+  if (visibleColumns.includes('birth_year')) {
+    contactColumns.push({ key: 'birth_year', label: 'שנת לידה', minWidth: '110px', render: (contact) => contact.birth_year ?? '—' })
+  }
+  if (visibleColumns.includes('tax_type')) {
+    contactColumns.push({ key: 'tax_type', label: 'סוג מס', minWidth: '150px', render: (contact) => taxTypeName(contact.tax_type_id) })
+  }
+  if (visibleColumns.includes('license_no')) {
+    contactColumns.push({ key: 'license_no', label: 'מספר רישיון', minWidth: '140px', render: (contact) => contact.license_no ?? '—' })
+  }
+  if (visibleColumns.includes('current_employer')) {
+    contactColumns.push({ key: 'current_employer', label: 'מעסיק נוכחי', minWidth: '180px', render: (contact) => <TruncatedCell value={contact.current_employer} /> })
+  }
+  if (visibleColumns.includes('previous_employers')) {
+    contactColumns.push({ key: 'previous_employers', label: 'מעסיקים קודמים', minWidth: '260px', render: (contact) => <TruncatedCell value={formatJsonValue(contact.previous_employers)} /> })
+  }
+  if (visibleColumns.includes('source')) {
+    contactColumns.push({ key: 'source', label: 'מקור', minWidth: '150px', render: (contact) => sourceName(contact.source) })
+  }
+  if (visibleColumns.includes('check_status')) {
+    contactColumns.push({ key: 'check_status', label: 'סטטוס בדיקה', minWidth: '160px', render: (contact) => <CheckStatusBadge statusId={contact.check_status} label={checkStatusName(contact.check_status)} /> })
+  }
+  if (visibleColumns.includes('social_status')) {
+    contactColumns.push({ key: 'social_status', label: 'סטטוס חברתי', minWidth: '190px', render: (contact) => <TruncatedCell value={socialStatusName(contact.social_status)} /> })
+  }
+  if (visibleColumns.includes('cv_received')) {
+    contactColumns.push({ key: 'cv_received', label: 'תאריך קבלת קו"ח', minWidth: '150px', render: (contact) => formatDate(contact.cv_received_date) })
+  }
+  if (visibleColumns.includes('photo')) {
+    contactColumns.push({ key: 'photo', label: 'תמונת פרופיל', minWidth: '130px', render: (contact) => <ExternalLinkCell href={contact.photo_url} label="פתיחת תמונה" /> })
+  }
+  if (visibleColumns.includes('facebook')) {
+    contactColumns.push({ key: 'facebook', label: 'פייסבוק', minWidth: '200px', render: (contact) => <ExternalLinkCell href={contact.facebook_url} label={contact.facebook_name ?? (contact.facebook_id ? String(contact.facebook_id) : null)} /> })
+  }
+  if (visibleColumns.includes('linkedin')) {
+    contactColumns.push({ key: 'linkedin', label: 'LinkedIn', minWidth: '160px', render: (contact) => <ExternalLinkCell href={contact.linkedin_url} label="פתיחת פרופיל" /> })
+  }
+  if (visibleColumns.includes('portfolio')) {
+    contactColumns.push({ key: 'portfolio', label: 'תיק עבודות', minWidth: '150px', render: (contact) => <ExternalLinkCell href={contact.portfolio_url} label="פתיחת קישור" /> })
+  }
+  if (visibleColumns.includes('recommendations')) {
+    contactColumns.push({ key: 'recommendations', label: 'המלצות', minWidth: '150px', render: (contact) => <ExternalLinkCell href={contact.recommendations_url} label="פתיחת קישור" /> })
+  }
+  if (visibleColumns.includes('next_follow_up')) {
+    contactColumns.push({ key: 'next_follow_up', label: 'פולו־אפ הבא', minWidth: '130px', render: (contact) => formatDate(contact.next_follow_up) })
+  }
+  if (visibleColumns.includes('applications_count')) {
+    contactColumns.push({ key: 'applications_count', label: 'מספר הגשות', minWidth: '120px', render: (contact) => String(contact.prev_applications_count ?? 0) })
+  }
+  if (visibleColumns.includes('created')) {
+    contactColumns.push({ key: 'created', label: 'נוצר', minWidth: '130px', render: (contact) => formatDate(contact.created_timestamp) })
+  }
+  if (visibleColumns.includes('updated')) {
+    contactColumns.push({ key: 'updated', label: 'עודכן', minWidth: '130px', render: (contact) => formatDate(contact.updated_timestamp) })
+  }
+
   contactColumns.push({
     key: 'actions',
     label: 'פעולות',
@@ -892,7 +1285,7 @@ export default function AdminContactsPage() {
           onClick: () => markAsCandidate(contact.contact_id),
         },
       ]
-      if (contact.isDuplicatePhone || contact.isDuplicateEmail) {
+      if (contact.isDuplicateEmail) {
         items.push({
           key: 'merge',
           label: 'סמן למיזוג',
@@ -912,7 +1305,7 @@ export default function AdminContactsPage() {
   return (
     <Shell
       title="אנשי קשר"
-      subtitle={`מאגר האב של כל האנשים במערכת • ${contactsFetching ? 'טוען...' : `${totalVisible} תוצאות`}`}
+      subtitle={`מאגר האב של כל האנשים במערכת • ${contactsIsError ? 'שגיאה בטעינה' : contactsFetching ? 'טוען...' : `${totalVisible} תוצאות`}`}
       icon={Users}
       actions={
         <div className="flex flex-wrap items-center gap-2">
@@ -921,7 +1314,7 @@ export default function AdminContactsPage() {
               <Columns3 className="h-4 w-4" />
               בחירת עמודות
             </summary>
-            <div className="absolute left-0 top-full z-30 mt-2 w-72 rounded-2xl border border-slate-200 bg-white p-3 shadow-md">
+            <div className="absolute left-0 top-full z-30 mt-2 max-h-[70vh] w-80 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-md">
               <div className="mb-3 text-[13px] font-bold text-slate-900">בחירת עמודות</div>
               <div className="grid gap-2">
                 {ALL_COLUMNS.map((column) => (
@@ -945,9 +1338,10 @@ export default function AdminContactsPage() {
           <ActionButton
             variant="ghost"
             icon={RefreshCw}
-            onClick={() => { queryClient.invalidateQueries({ queryKey: ['contacts-v2'] }); showToast('הרשימה רועננה', 'success') }}
+            onClick={handleRefresh}
+            disabled={refreshPending}
           >
-            רענון
+            {refreshPending ? 'מרענן...' : 'רענון'}
           </ActionButton>
           <ActionButton
             variant="ghost"
@@ -1194,6 +1588,12 @@ export default function AdminContactsPage() {
           </Toolbar>
 
           <Toolbar>
+            {hasDictionaryError && (
+              <div className="mb-3 flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[13px] font-semibold text-amber-800">
+                <AlertTriangle className="h-4 w-4" />
+                חלק מנתוני המילונים לא נטענו. אנשי הקשר מוצגים, אך ייתכן שחלק מהשמות יוצגו כחסרים.
+              </div>
+            )}
             <AdminTable<ContactRow>
               columns={contactColumns}
               data={pageData}
@@ -1207,7 +1607,8 @@ export default function AdminContactsPage() {
               sortKey={sortBy ?? undefined}
               sortDir={sortDir}
               onSort={handleSort}
-              isLoading={contactsFetching && pageData.length === 0}
+              isLoading={contactsLoading || (contactsFetching && pageData.length === 0)}
+              error={tableError}
               hasActiveFilter={hasActiveFilters}
               emptyMessage="עדיין אין אנשי קשר במערכת"
               noResultsMessage="לא נמצאו אנשי קשר התואמים לסינון"
@@ -1218,8 +1619,8 @@ export default function AdminContactsPage() {
                     עדכון שדה
                   </SmallActionButton>
                   {selectedRows.length >= 2 && (
-                    <SmallActionButton onClick={() => setMergeOpen(true)}>
-                      מיזוג רשומות
+                    <SmallActionButton onClick={openMergeDialog} disabled={mergeLoadPending}>
+                      {mergeLoadPending ? 'טוען רשומות...' : 'מיזוג רשומות'}
                     </SmallActionButton>
                   )}
                   <SmallActionButton onClick={handleExport}>ייצוא</SmallActionButton>
@@ -1311,13 +1712,19 @@ export default function AdminContactsPage() {
                         />
                         <QuickActionButton
                           icon={<WandSparkles className="h-4 w-4" />}
-                          label="סמארט מאץ׳"
-                          onClick={() => showToast('פתיחת התאמה חכמה', 'info')}
+                          label="סמארט מאץ׳ — לא מחובר"
+                          onClick={() => undefined}
+                          disabled
                         />
                         <QuickActionButton
                           icon={<Tag className="h-4 w-4" />}
                           label="תגיות"
-                          onClick={() => showToast('ניהול תגיות', 'info')}
+                          onClick={() => {
+                            setShowTagDropdown(true)
+                            window.requestAnimationFrame(() => {
+                              document.getElementById('contact-tags-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                            })
+                          }}
                         />
                         <QuickActionButton
                           icon={<Phone className="h-4 w-4" />}
@@ -1360,7 +1767,7 @@ export default function AdminContactsPage() {
             }
           >
               <div className="space-y-4">
-                <AdminPanelSection title="תגיות">
+                <div id="contact-tags-section"><AdminPanelSection title="תגיות">
                   <div className="sm:col-span-2">
                     <div className="flex flex-wrap gap-2">
                       {panelTags.map((tag) => (
@@ -1403,7 +1810,7 @@ export default function AdminContactsPage() {
                       </div>
                     </div>
                   </div>
-                </AdminPanelSection>
+                </AdminPanelSection></div>
 
                 <AdminPanelSection title="זהות ופרטי קשר">
                   <AdminPanelField
@@ -1460,30 +1867,37 @@ export default function AdminContactsPage() {
                     htmlFor="contact-email"
                   />
                   <AdminPanelField label="מייל נוסף" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.second_email} />
-                  <AdminPanelField label="פייסבוק" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.facebook_name ?? selectedContact.facebook_url} />
+                  <AdminPanelField label="פייסבוק" mode={isEditing ? 'edit' : 'view'} viewValue={<ExternalLinkCell href={selectedContact.facebook_url} label={selectedContact.facebook_name ?? (selectedContact.facebook_id ? String(selectedContact.facebook_id) : null)} />} />
+                  <AdminPanelField label="LinkedIn" mode={isEditing ? 'edit' : 'view'} viewValue={<ExternalLinkCell href={selectedContact.linkedin_url} label="פתיחת פרופיל" />} />
+                  <AdminPanelField label="תיק עבודות" mode={isEditing ? 'edit' : 'view'} viewValue={<ExternalLinkCell href={selectedContact.portfolio_url} label="פתיחת קישור" />} />
+                  <AdminPanelField label="המלצות" mode={isEditing ? 'edit' : 'view'} viewValue={<ExternalLinkCell href={selectedContact.recommendations_url} label="פתיחת קישור" />} />
                   <AdminPanelField label="סטטוס חברתי" mode={isEditing ? 'edit' : 'view'} viewValue={socialStatusName(selectedContact.social_status)} />
                   <AdminPanelField label="מפתח עסקי" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.phone_norm} />
                 </AdminPanelSection>
 
                 <AdminPanelSection title="פרטים מקצועיים">
-                  <AdminPanelField
-                    label="תפקיד"
-                    mode={isEditing ? 'edit' : 'view'}
-                    viewValue={<RoleBadge label={roleName(selectedContact.role)} roleId={Number(selectedContact.role)} />}
-                    editValue={
-                      <select
-                        id="contact-role"
-                        value={editDraft.role ?? ''}
-                        onChange={(event) => setEditDraft((draft) => ({ ...draft, role: event.target.value ? Number(event.target.value) : null }))}
-                        className={panelInputClass}
-                      >
-                        <option value="">— בחר תפקיד —</option>
-                        {roleOptions.map((role) => <option key={role.id} value={role.id}>{role.name}</option>)}
-                      </select>
-                    }
-                    htmlFor="contact-role"
-                  />
-                  <AdminPanelField label="תת־תפקיד" mode={isEditing ? 'edit' : 'view'} viewValue={subRoleName(selectedContact.sub_role)} />
+                  {isEditing ? (
+                    <div className="sm:col-span-2">
+                      <RoleSubRolePicker
+                        variant="edit"
+                        roleId={editDraft.role ?? null}
+                        subRoleIds={editDraft.sub_role ?? []}
+                        roles={roleOptions}
+                        subRoles={DICT_SUB_ROLES}
+                        onRoleChange={(roleId) => setEditDraft((draft) => ({ ...draft, role: roleId, sub_role: [] }))}
+                        onSubRoleChange={(subRoleIds) => setEditDraft((draft) => ({ ...draft, sub_role: subRoleIds }))}
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <AdminPanelField
+                        label="תפקיד"
+                        mode="view"
+                        viewValue={<RoleBadge label={roleName(selectedContact.role)} roleId={Number(selectedContact.role)} />}
+                      />
+                      <AdminPanelField label="תת־תפקיד" mode="view" viewValue={subRoleNames(selectedContact.sub_role)} />
+                    </>
+                  )}
                   <AdminPanelField label="סוג פרופיל" mode={isEditing ? 'edit' : 'view'} viewValue={profileTypeName(selectedContact.profile_type)} />
                   <AdminPanelField label="כותרת מקצועית" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.professional_title} />
                   <AdminPanelField label="ניסיון" mode={isEditing ? 'edit' : 'view'} viewValue={experienceName(selectedContact.experience)} />
@@ -1500,46 +1914,44 @@ export default function AdminContactsPage() {
                       />
                     }
                   />
-                  <AdminPanelField label="היקף מועדף" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.preferred_scope} />
+                  <AdminPanelField label="היקף מועדף" mode={isEditing ? 'edit' : 'view'} viewValue={scopeNames(selectedContact.preferred_scope)} />
                   <AdminPanelField label="שפות" mode={isEditing ? 'edit' : 'view'} viewValue={languagesName(selectedContact.languages)} />
                   <AdminPanelField label="מעסיק נוכחי" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.current_employer} />
                   <AdminPanelField label="ציפיית שכר שעתי" mode={isEditing ? 'edit' : 'view'} viewValue={formatCurrency(selectedContact.salary_expectation_hourly)} />
                   <AdminPanelField label="ציפיית שכר חודשית" mode={isEditing ? 'edit' : 'view'} viewValue={formatCurrency(selectedContact.salary_expectation_monthly)} />
-                  <AdminPanelField label="סוג מס" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.tax_type} />
+                  <AdminPanelField label="סוג מס" mode={isEditing ? 'edit' : 'view'} viewValue={taxTypeName(selectedContact.tax_type_id)} />
+                </AdminPanelSection>
+
+                <AdminPanelSection title="מידע מקצועי נוסף">
+                  <AdminPanelField label="השכלה אקדמית" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.academic_education} fullWidth />
+                  <AdminPanelField label="קורסים מקצועיים" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.professional_courses} fullWidth />
+                  <AdminPanelField label="מיומנויות נוספות" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.additional_skills_notes} fullWidth />
+                  <AdminPanelField label="מערכות" mode={isEditing ? 'edit' : 'view'} viewValue={systemsNames(selectedContact.systems_used)} />
+                  <AdminPanelField label="תחומי ניסיון" mode={isEditing ? 'edit' : 'view'} viewValue={proceduresNames(selectedContact.procedures_experience)} />
+                  <AdminPanelField label="ניידות" mode={isEditing ? 'edit' : 'view'} viewValue={mobilityName(selectedContact.mobility_id)} />
+                  <AdminPanelField label="סטטוס תעסוקתי" mode={isEditing ? 'edit' : 'view'} viewValue={workStatusName(selectedContact.work_status)} />
+                  <AdminPanelField label="סוגי שכר" mode={isEditing ? 'edit' : 'view'} viewValue={salaryTypeNames(selectedContact.candidate_salary_type_ids)} />
+                  <AdminPanelField label="ימי ושעות עבודה" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.work_schedule_text} fullWidth />
+                  <AdminPanelField label="סיכום אישי" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.personal_summary} fullWidth />
+                  <AdminPanelField label="הערות מועמד" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.candidate_notes} fullWidth />
+                  <AdminPanelField label="מעסיקים קודמים" mode={isEditing ? 'edit' : 'view'} viewValue={formatJsonValue(selectedContact.previous_employers)} fullWidth />
                 </AdminPanelSection>
 
                 <AdminPanelSection title="מיקום והעדפות">
-                  <AdminPanelField
-                    label="אזור"
-                    mode={isEditing ? 'edit' : 'view'}
-                    viewValue={<RegionBadge regionId={selectedContact.region_id} label={regionName(selectedContact.region_id)} />}
-                    editValue={
-                      <select
-                        id="contact-region"
-                        value={editDraft.region_id ?? ''}
-                        onChange={(event) => setEditDraft((draft) => ({
+                  {isEditing ? (
+                    <div className="sm:col-span-2">
+                      <CityRegionPicker
+                        variant="edit"
+                        cityId={editDraft.city_id ?? null}
+                        regionId={editDraft.region_id ?? null}
+                        cities={cityOptions}
+                        regions={regionOptions}
+                        onRegionChange={(regionId) => setEditDraft((draft) => ({
                           ...draft,
-                          region_id: event.target.value ? Number(event.target.value) : null,
-                          city_id: null,
+                          region_id: regionId,
+                          city_id: regionId === draft.region_id ? draft.city_id : null,
                         }))}
-                        className={panelInputClass}
-                      >
-                        <option value="">— בחר אזור —</option>
-                        {regionOptions.map((region) => <option key={region.id} value={region.id}>{region.name}</option>)}
-                      </select>
-                    }
-                    htmlFor="contact-region"
-                  />
-                  <AdminPanelField
-                    label="עיר"
-                    mode={isEditing ? 'edit' : 'view'}
-                    viewValue={cityName(selectedContact.city_id)}
-                    editValue={
-                      <select
-                        id="contact-city"
-                        value={editDraft.city_id ?? ''}
-                        onChange={(event) => {
-                          const cityId = event.target.value ? Number(event.target.value) : null
+                        onCityChange={(cityId) => {
                           const city = cityOptions.find((option) => Number(option.id) === Number(cityId))
                           setEditDraft((draft) => ({
                             ...draft,
@@ -1547,18 +1959,24 @@ export default function AdminContactsPage() {
                             region_id: city?.region_id ?? draft.region_id ?? null,
                           }))
                         }}
-                        className={panelInputClass}
-                      >
-                        <option value="">— בחר עיר —</option>
-                        {editCityOptions.map((city) => <option key={city.id} value={city.id}>{city.name}</option>)}
-                      </select>
-                    }
-                    htmlFor="contact-city"
-                  />
+                      />
+                    </div>
+                  ) : (
+                    <>
+                      <AdminPanelField
+                        label="אזור"
+                        mode="view"
+                        viewValue={<RegionBadge regionId={selectedContact.region_id} label={regionName(selectedContact.region_id)} />}
+                      />
+                      <AdminPanelField label="עיר" mode="view" viewValue={cityName(selectedContact.city_id)} />
+                    </>
+                  )}
                   <AdminPanelField label="אזורים מועדפים" mode={isEditing ? 'edit' : 'view'} viewValue={formatIdsToNames(selectedContact.preferred_regions, regionName)} />
                   <AdminPanelField label="ערים מועדפות" mode={isEditing ? 'edit' : 'view'} viewValue={formatIdsToNames(selectedContact.preferred_cities, cityName)} />
+                  <AdminPanelField label="מועדף כל הארץ" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.preferred_all_country ? 'כן' : 'לא'} />
+                  <AdminPanelField label="סוג יישוב" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.locality_type} />
                   <AdminPanelField label="שנת לידה" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.birth_year ? String(selectedContact.birth_year) : null} />
-                  <AdminPanelField label="מגדר" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.gender} />
+                  <AdminPanelField label="מגדר" mode={isEditing ? 'edit' : 'view'} viewValue={genderName(selectedContact.gender)} />
                   <AdminPanelField label="מספר רישיון" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.license_no} />
                 </AdminPanelSection>
 
@@ -1580,6 +1998,12 @@ export default function AdminContactsPage() {
                     {selectedContact.cv_received_date && (
                       <MetaLine label={'תאריך קבלת קו"ח'} value={formatDate(selectedContact.cv_received_date)} />
                     )}
+                    {selectedContact.cv_storage_path && (
+                      <MetaLine label={'נתיב אחסון קו"ח'} value={selectedContact.cv_storage_path} />
+                    )}
+                    {selectedContact.photo_url && (
+                      <MetaLine label="תמונת פרופיל" value={selectedContact.photo_url} />
+                    )}
                     {selectedContact.cv_link && (
                       <a
                         href={selectedContact.cv_link}
@@ -1599,7 +2023,7 @@ export default function AdminContactsPage() {
                   <AdminPanelField
                     label="סטטוס בדיקה"
                     mode={isEditing ? 'edit' : 'view'}
-                    viewValue={<StatusBadge statusType="check" statusId={selectedContact.check_status} label={checkStatusName(selectedContact.check_status)} />}
+                    viewValue={<CheckStatusBadge statusId={selectedContact.check_status} label={checkStatusName(selectedContact.check_status)} />}
                   />
                   <AdminPanelField label="קשר אחרון" mode={isEditing ? 'edit' : 'view'} viewValue={formatDate(selectedContact.last_contact_date)} />
                   <AdminPanelField label="פולו־אפ הבא" mode={isEditing ? 'edit' : 'view'} viewValue={formatDate(selectedContact.next_follow_up)} />
@@ -1781,33 +2205,28 @@ export default function AdminContactsPage() {
         )}
 
         {/* Merge Dialog */}
-        {mergeOpen && selectedRows.length >= 2 && (() => {
-          const selectedContacts = selectedRows
-            .map((id) => enrichedContacts.find((c) => Number(c.contact_id) === id))
-            .filter(Boolean) as typeof enrichedContacts
-          if (selectedContacts.length < 2) return null
-          return (
-            <MergeRecordsModal
-              records={selectedContacts as unknown as Record<string, unknown>[]}
-              idField="contact_id"
-              nameField="full_name"
-              displayFields={[
-                { key: 'full_name' as never, label: 'שם מלא' },
-                { key: 'phone' as never, label: 'נייד', format: (v) => v ? formatPhone(String(v)) : '—' },
-                { key: 'email' as never, label: 'מייל' },
-                { key: 'role' as never, label: 'תפקיד', format: (v) => roleName(v as number) },
-                { key: 'candidate_availability_ids' as never, label: 'זמינות', format: (v) => availabilityNames(v as number[]) },
-                { key: 'region_id' as never, label: 'אזור', format: (v) => regionName(v as number) },
-                { key: 'city_id' as never, label: 'עיר', format: (v) => cityName(v as number) },
-                { key: 'notes' as never, label: 'הערות' },
-              ]}
-              onConfirm={handleMerge}
-              onClose={() => { setMergeOpen(false); setMergePrimaryId(null) }}
-              pending={mergePending}
-              title="מיזוג אנשי קשר"
-            />
-          )
-        })()}
+        {mergeOpen && mergeRecords.length >= 2 && (
+          <MergeRecordsModal
+            records={mergeRecords as unknown as Record<string, unknown>[]}
+            idField="contact_id"
+            nameField="full_name"
+            displayFields={[
+              { key: 'full_name' as never, label: 'שם מלא' },
+              { key: 'phone' as never, label: 'נייד', format: (value) => value ? formatPhone(String(value)) : '—' },
+              { key: 'email' as never, label: 'מייל' },
+              { key: 'role' as never, label: 'תפקיד', format: (value) => roleName(value as number) },
+              { key: 'candidate_availability_ids' as never, label: 'זמינות', format: (value) => availabilityNames(value as number[]) },
+              { key: 'region_id' as never, label: 'אזור', format: (value) => regionName(value as number) },
+              { key: 'city_id' as never, label: 'עיר', format: (value) => cityName(value as number) },
+              { key: 'notes' as never, label: 'הערות' },
+            ]}
+            onConfirm={handleMerge}
+            onClose={() => { setMergeOpen(false); setMergePrimaryId(null); setMergeRecords([]) }}
+            pending={mergePending}
+            title="מיזוג אנשי קשר"
+          />
+        )}
+
 
         {toast.open && (
           <div className="fixed bottom-5 left-5 z-[70]">
@@ -1899,15 +2318,18 @@ function ComputedFilterCard({
 function SmallActionButton({
   children,
   onClick,
+  disabled,
 }: {
   children: React.ReactNode
   onClick: () => void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50"
+      disabled={disabled}
+      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
     >
       {children}
     </button>
@@ -1962,6 +2384,18 @@ function Badge({
   )
 }
 
+function CheckStatusBadge({ statusId, label }: { statusId: number | null | undefined; label: string }) {
+  const classes = Number(statusId) === 2
+    ? 'bg-red-50 text-red-700'
+    : Number(statusId) === 3
+      ? 'bg-green-50 text-green-700'
+      : Number(statusId) === 4
+        ? 'bg-sky-50 text-sky-700'
+        : 'bg-amber-50 text-amber-700'
+
+  return <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold ${classes}`}>{label}</span>
+}
+
 function CvStateBadge({ hasCv, broken }: { hasCv: boolean; broken: boolean }) {
   if (broken) return <Badge tone="danger">לינק שבור</Badge>
   if (hasCv) return <Badge tone="success">יש קו"ח</Badge>
@@ -2000,6 +2434,26 @@ function LightTag({
 
 // RoleBadge imported from shared component above
 
+function TruncatedCell({ value }: { value?: string | number | null }) {
+  const text = value == null || value === '' ? '—' : String(value)
+  return <span className="block max-w-[260px] truncate" title={text === '—' ? undefined : text}>{text}</span>
+}
+
+function ExternalLinkCell({ href, label }: { href?: string | null; label?: string | null }) {
+  if (!href) return <span className="text-slate-400">—</span>
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noreferrer"
+      onClick={(event) => event.stopPropagation()}
+      className="font-semibold text-[#008080] hover:underline"
+    >
+      {label || 'פתיחת קישור'}
+    </a>
+  )
+}
+
 function MetaLine({ label, value }: { label: string; value?: string | null }) {
   return (
     <div className="flex items-center justify-between gap-4 text-[13px]">
@@ -2033,16 +2487,19 @@ function QuickActionButton({
   icon,
   label,
   onClick,
+  disabled,
 }: {
   icon: React.ReactNode
   label: string
   onClick: () => void
+  disabled?: boolean
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50"
+      disabled={disabled}
+      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400"
     >
       {icon}
       {label}
@@ -2089,7 +2546,6 @@ function QuickLinkButton({
 
 function buildWarnings(contact: any) {
   const warnings: string[] = []
-  if (contact.isDuplicatePhone) warnings.push('כפילות טלפון')
   if (contact.isDuplicateEmail) warnings.push('כפילות אימייל')
   if (contact.hasBrokenCv) warnings.push('קו"ח שבור')
   if (contact.hasNoPhoneButEmail) warnings.push('אין טלפון')
@@ -2166,6 +2622,15 @@ function formatCurrency(value?: number | null) {
   }).format(value)
 }
 
+function formatJsonValue(value: Record<string, unknown> | null | undefined): string {
+  if (!value || Object.keys(value).length === 0) return '—'
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return '—'
+  }
+}
+
 function formatIdsToNames(
   ids: number[] | null | undefined,
   getLabel: (id: number | null | undefined) => string,
@@ -2197,21 +2662,35 @@ async function runContactsQuery(
   if (filters.tags) {
     const { data: tagRows } = await sb.from('contact_tags').select('contact_id').eq('tag_id', Number(filters.tags))
     tagContactIds = (tagRows ?? []).map((r: { contact_id: number }) => r.contact_id)
-    if (!tagContactIds.length) return { contacts: [] as import('@/types').Contact[], total: 0 }
+    if (!tagContactIds.length) return { contacts: [] as AdminContactRow[], total: 0 }
   }
 
   let query = sb.from('contact').select('*', { count: 'exact' })
 
   if (filters.search?.trim()) {
-    const q = filters.search.trim().replace(/[,%()]/g, ' ')
-    const phoneCore = phoneSearchTerm(q)
+    const rawSearch = filters.search.trim()
+    const q = sanitizePostgrestSearch(rawSearch)
+    const phoneCore = phoneSearchTerm(rawSearch)
+    const { data: matchingAccounts, error: matchingAccountsError } = await sb
+      .from('accounts')
+      .select('account_id')
+      .ilike('account_name', `%${rawSearch}%`)
+      .limit(200)
+    if (matchingAccountsError) throw matchingAccountsError
+
+    const accountIds = (matchingAccounts ?? [])
+      .map((account: { account_id: number }) => Number(account.account_id))
+      .filter(Number.isFinite)
+
     const conditions = [
       `full_name.ilike.%${q}%`,
+      `display_name.ilike.%${q}%`,
       `email.ilike.%${q}%`,
       `linked_org_name.ilike.%${q}%`,
       `phone.ilike.%${q}%`,
     ]
     if (phoneCore) conditions.push(`phone_norm.ilike.%${phoneCore}%`)
+    if (accountIds.length) conditions.push(`account_link.in.(${accountIds.join(',')})`)
     query = query.or(conditions.join(','))
   }
   if (filters.role) query = query.eq('role', filters.role)
@@ -2244,11 +2723,51 @@ async function runContactsQuery(
   const dbCol = sortBy ? (sortColMap[sortBy] ?? 'contact_id') : 'contact_id'
   query = query.order(dbCol, { ascending: sortBy ? sortDir === 'asc' : false, nullsFirst: false })
 
-  if (pageSize < 99999) query = query.range(page * pageSize, (page + 1) * pageSize - 1)
+  query = query.range(page * pageSize, (page + 1) * pageSize - 1)
 
   const { data, count, error } = await query
   if (error) throw error
-  return { contacts: (data ?? []) as import('@/types').Contact[], total: count ?? 0 }
+  return { contacts: (data ?? []) as AdminContactRow[], total: count ?? 0 }
+}
+
+async function fetchAllContacts(
+  filters: ExtendedFilters,
+  sortBy: string | null,
+  sortDir: 'asc' | 'desc',
+): Promise<AdminContactRow[]> {
+  const batchSize = 1000
+  const rows: AdminContactRow[] = []
+  let page = 0
+
+  while (true) {
+    const result = await runContactsQuery(filters, page, batchSize, sortBy, sortDir)
+    rows.push(...result.contacts)
+    if (result.contacts.length < batchSize || rows.length >= result.total) break
+    page += 1
+  }
+
+  return rows
+}
+
+async function fetchContactsByIds(ids: number[]): Promise<AdminContactRow[]> {
+  if (!ids.length) return []
+  const uniqueIds = Array.from(new Set(ids.map(Number).filter(Number.isFinite)))
+  const rows: AdminContactRow[] = []
+  const batchSize = 500
+
+  for (let index = 0; index < uniqueIds.length; index += batchSize) {
+    const batch = uniqueIds.slice(index, index + batchSize)
+    const { data, error } = await supabase.from('contact').select('*').in('contact_id', batch)
+    if (error) throw error
+    rows.push(...((data ?? []) as AdminContactRow[]))
+  }
+
+  const byId = new Map(rows.map((row) => [Number(row.contact_id), row]))
+  return uniqueIds.map((id) => byId.get(id)).filter((row): row is AdminContactRow => Boolean(row))
+}
+
+function sanitizePostgrestSearch(value: string): string {
+  return value.replace(/[,%(){}\[\]"'\\:]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
 function buildCsv(rows: Record<string, string | number>[]) {
