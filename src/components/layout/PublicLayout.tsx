@@ -2,6 +2,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { SiteHeader } from '@/components/public/PublicHeader'
 import { SiteFooter } from '@/components/public/SiteFooter'
+import SocialShare from '@/components/public/SocialShare'
 
 export default function PublicLayout() {
   const { pathname } = useLocation()
@@ -18,6 +19,7 @@ export default function PublicLayout() {
         <Outlet />
       </main>
       <SiteFooter />
+      <SocialShare />
     </div>
   )
 }
