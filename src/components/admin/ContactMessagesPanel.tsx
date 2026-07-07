@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { MessageSquare, Send, Loader2 } from "lucide-react";
+import { AlertCircle, MessageSquare, Send, Loader2 } from "lucide-react";
 import {
   useContactMessages,
   useReplyToCandidate,
@@ -15,7 +15,7 @@ function fmt(ts: string): string {
 }
 
 export default function ContactMessagesPanel({ contactId }: { contactId: number }) {
-  const { data: messages = [], isLoading } = useContactMessages(contactId);
+  const { data: messages = [], isLoading, isError, error } = useContactMessages(contactId);
   const reply = useReplyToCandidate(contactId);
   const markRead = useMarkCandidateMessagesRead(contactId);
   const [body, setBody] = useState("");
@@ -47,6 +47,11 @@ export default function ContactMessagesPanel({ contactId }: { contactId: number 
       <div className="p-4">
         {isLoading ? (
           <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+        ) : isError ? (
+          <div className="mb-3 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error instanceof Error ? error.message : "טעינת ההודעות נכשלה"}</span>
+          </div>
         ) : messages.length === 0 ? (
           <p className="mb-3 text-sm text-slate-400">אין הודעות עדיין.</p>
         ) : (

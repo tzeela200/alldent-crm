@@ -17,11 +17,18 @@ function dictName(items: { id: number; name: string }[], value: number | null | 
 }
 
 function checkBadgeClass(status: number | string | null | undefined): string {
-  const n = Number(status);
-  if (n === 3) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (n === 2) return "border-red-200 bg-red-50 text-red-700";
-  if (n === 4) return "border-blue-200 bg-blue-50 text-blue-700";
-  return "border-amber-200 bg-amber-50 text-amber-700";
+  switch (Number(status)) {
+    case 1:
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case 2:
+      return "border-red-200 bg-red-50 text-red-700";
+    case 3:
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case 4:
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    default:
+      return "border-slate-200 bg-slate-100 text-slate-700";
+  }
 }
 
 interface StatusItem {
@@ -30,7 +37,7 @@ interface StatusItem {
   badgeClass?: string;
 }
 
-function StatusBadge({ label, value, badgeClass }: StatusItem) {
+function LabeledBadge({ label, value, badgeClass }: StatusItem) {
   if (!value || value === "—") return null;
   return (
     <div className="flex flex-col gap-1">
@@ -76,25 +83,25 @@ export function AdminStatusBar({ contact, dicts, onEdit }: Props) {
           </Button>
         </div>
         <div className="flex flex-wrap gap-6">
-          <StatusBadge
+          <LabeledBadge
             label="סטטוס בדיקה"
             value={checkStatusName}
             badgeClass={checkBadgeClass(contact.check_status)}
           />
-          <StatusBadge
+          <LabeledBadge
             label="סטטוס תעסוקה"
             value={workStatusName}
             badgeClass="border-blue-100 bg-blue-50 text-blue-700"
           />
-          <StatusBadge
+          <LabeledBadge
             label="סטטוס קשר במדיה"
             value={socialStatusName}
           />
-          <StatusBadge
+          <LabeledBadge
             label="מקור"
             value={sourceName}
           />
-          <StatusBadge
+          <LabeledBadge
             label="סוג פרופיל"
             value={profileTypeName}
           />

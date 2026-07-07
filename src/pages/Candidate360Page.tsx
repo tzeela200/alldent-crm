@@ -1,16 +1,13 @@
-import type { DictItem } from "@/hooks/useContact360";
+import type { ApplicationRow, DictItem } from "@/hooks/useContact360";
 import { useContactMutations } from "@/hooks/useContactMutations";
 import { openApplicationCv, applicationHasCv } from "@/lib/cv";
+import { getRoleColorHex } from "@/lib/roleColors";
 import ContactHistoryPanel from "@/components/admin/ContactHistoryPanel";
 import ContactMessagesPanel from "@/components/admin/ContactMessagesPanel";
 import React, { useMemo, useState, useEffect } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   AlertCircle,
-  Briefcase,
-  Building2,
-  Clock3,
-  FileText,
   Loader2,
   Plus,
   Save,
@@ -31,21 +28,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 
 import { supabase } from "@/lib/supabase";
-import { useContact360, useContact360Dicts } from "@/hooks/useContact360";
+import { isContactNotFoundError, useContact360, useContact360Dicts } from "@/hooks/useContact360";
 import type { JobRow, LinkedJobRow } from "@/hooks/useContact360";
 import { RoleSubRolePicker } from "@/components/ui/RoleSubRolePicker";
 import { useQueryClient } from "@tanstack/react-query";
+import { AdminTable, type AdminColumn } from "@/components/admin/AdminTable";
 
 import BlockIdentity from "@/components/contact/BlockIdentity";
 import BlockProfessional from "@/components/contact/BlockProfessional";
@@ -93,22 +83,12 @@ function formatDate(value?: string | null) {
   return d.toLocaleDateString("he-IL");
 }
 
-function isValidHttpUrl(value?: string | null) {
-  if (!value) return false;
-  try {
-    const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
-function applicationBadgeClass(value?: number | string | null) {
-  const n = Number(value ?? -1);
-  if (n === 8 || n === 15) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if ([4, 5, 6, 7].includes(n)) return "border-blue-200 bg-blue-50 text-blue-700";
-  if ([1, 2, 3].includes(n)) return "border-amber-200 bg-amber-50 text-slate-600";
-  if ([9, 10, 11, 12, 13, 14].includes(n)) return "border-red-200 bg-red-50 text-red-700";
+function applicationStatusClass(value?: number | string | null) {
+  const statusId = Number(value ?? -1);
+  if ([1, 2, 3, 4, 9].includes(statusId)) return "border-amber-200 bg-amber-50 text-amber-700";
+  if ([6, 7, 8, 11].includes(statusId)) return "border-blue-200 bg-blue-50 text-blue-700";
+  if (statusId === 12) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if ([5, 10, 13, 14].includes(statusId)) return "border-red-200 bg-red-50 text-red-700";
   return "border-slate-200 bg-slate-100 text-slate-700";
 }
 
@@ -164,7 +144,7 @@ export default function Candidate360Page() {
   const queryClient = useQueryClient();
   const { updateContact, insertContact } = useContactMutations();
   const { data, isLoading, error } = useContact360(resolvedId);
-  const { data: dictsOnly } = useContact360Dicts();
+  const { data: dictsOnly, isLoading: dictsOnlyLoading, error: dictsOnlyError } = useContact360Dicts(isNew);
 
   // הגעה מ"בקשת גיוס ציבורית" (JobDetailsPage) עם פרטי איש קשר למילוי מוקדם.
   const prefillContact = (location.state as any)?.prefillContact as
@@ -221,7 +201,7 @@ export default function Candidate360Page() {
   const [toast, setToast] = useState<ToastState>(null);
   const [notes, setNotes] = useState<string>("");
   const [notesSaving, setNotesSaving] = useState(false);
-  const [newTag, setNewTag] = useState("");
+  const [selectedTagId, setSelectedTagId] = useState("");
   const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
   const [adminEditOpen, setAdminEditOpen] = useState(false);
 
@@ -314,7 +294,7 @@ export default function Candidate360Page() {
       dictName(dicts.cities, contact.city_id) !== "—" ? `באזור ${dictName(dicts.cities, contact.city_id)}` : null,
     ].filter(Boolean);
     const risks: string[] = [];
-    if (!contact.has_cv || !isValidHttpUrl(contact.cv_link)) risks.push("חסר קו״ח זמין");
+    if (!applicationHasCv(contact)) risks.push("חסר קו״ח זמין");
     if (!contact.salary_expectation_hourly && !contact.salary_expectation_monthly) risks.push("חסרים נתוני שכר");
     if (!contact.role) risks.push("חסר מיפוי תפקיד");
     const nextAction = contact.next_follow_up
@@ -328,11 +308,85 @@ export default function Candidate360Page() {
     const fields = [
       contact.full_name, contact.phone, contact.phone_norm, contact.email,
       contact.role, contact.experience, contact.candidate_availability_ids, contact.region_id,
-      contact.city_id, contact.has_cv, contact.cv_link, contact.professional_title,
+      contact.city_id, applicationHasCv(contact), contact.professional_title,
       contact.current_employer, contact.preferred_scope, contact.check_status,
     ];
     return Math.round((fields.filter(Boolean).length / fields.length) * 100);
   }, [contact]);
+
+  const applicationColumns = useMemo<AdminColumn<ApplicationRow>[]>(() => [
+    {
+      key: "job",
+      label: "קוד / תפקיד",
+      minWidth: "180px",
+      render: (application) => (
+        <div className="flex items-center gap-1 text-sm font-semibold text-slate-900">
+          {application.job_code ? (
+            <Link
+              to={`/admin/jobs/${application.job_code}`}
+              className="font-mono text-xs text-[#008080] hover:underline"
+            >
+              {application.job_code}
+            </Link>
+          ) : (
+            <span className="font-mono text-xs text-slate-400">—</span>
+          )}
+          <span>{application.job_role || "—"}</span>
+        </div>
+      ),
+    },
+    {
+      key: "account_name",
+      label: "מעסיק",
+      minWidth: "150px",
+      render: (application) => application.account_name || "—",
+    },
+    {
+      key: "application_status",
+      label: "סטטוס הגשה",
+      minWidth: "150px",
+      render: (application) => (
+        <Badge className={`h-[30px] rounded-full border px-3 text-xs shadow-none ${applicationStatusClass(application.application_status)}`}>
+          {dictName(dicts?.applicationStatuses ?? [], application.application_status)}
+        </Badge>
+      ),
+    },
+    {
+      key: "submission_date",
+      label: "תאריך הגשה",
+      nowrap: true,
+      render: (application) => <span className="text-slate-500">{formatDate(application.submission_date)}</span>,
+    },
+    {
+      key: "updated_timestamp",
+      label: "עדכון אחרון",
+      nowrap: true,
+      render: (application) => <span className="text-slate-500">{formatDate(application.updated_timestamp)}</span>,
+    },
+    {
+      key: "cv",
+      label: 'קו"ח',
+      nowrap: true,
+      render: (application) => applicationHasCv(application) ? (
+        <button
+          type="button"
+          onClick={() => void openApplicationCv(application)}
+          className="text-blue-600 hover:underline"
+        >
+          צפייה
+        </button>
+      ) : (
+        <span className="text-slate-300">—</span>
+      ),
+    },
+  ], [dicts?.applicationStatuses]);
+
+  const availableCandidateTags = useMemo(() => (dicts?.candidateTags ?? []).filter((candidateTag) =>
+    !tags.some((tag) =>
+      Number(tag.tag_id) === candidateTag.id ||
+      (!tag.tag_id && tag.tag.trim() === candidateTag.name.trim()),
+    ),
+  ), [dicts?.candidateTags, tags]);
 
   // ── actions ──
   async function saveNotes() {
@@ -345,12 +399,32 @@ export default function Candidate360Page() {
   }
 
   async function addTag() {
-    const value = newTag.trim();
-    if (!value || !contact) return;
-    if (tags.some((t) => t.tag === value)) { setNewTag(""); return; }
-    const { error: err } = await supabase.from("contact_tags").insert({ contact_id: contact.contact_id, tag: value });
-    if (err) showToast("error", "שגיאה בהוספת תגית");
-    else { setNewTag(""); queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] }); }
+    if (!contact || !dicts || !selectedTagId) return;
+    const selectedTag = dicts.candidateTags.find((tag) => tag.id === Number(selectedTagId));
+    if (!selectedTag) {
+      showToast("error", "התגית שנבחרה אינה קיימת במילון");
+      return;
+    }
+    const duplicate = tags.some((tag) =>
+      Number(tag.tag_id) === selectedTag.id ||
+      (!tag.tag_id && tag.tag.trim() === selectedTag.name.trim()),
+    );
+    if (duplicate) {
+      showToast("error", "התגית כבר קיימת");
+      return;
+    }
+    const { error: insertError } = await supabase.from("contact_tags").insert({
+      contact_id: contact.contact_id,
+      tag_id: selectedTag.id,
+      tag: selectedTag.name,
+    });
+    if (insertError) {
+      showToast("error", `שגיאה בהוספת תגית: ${insertError.message}`);
+      return;
+    }
+    setSelectedTagId("");
+    await queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] });
+    showToast("success", "התגית נוספה");
   }
 
   async function removeTag(tagId: number) {
@@ -396,6 +470,29 @@ export default function Candidate360Page() {
 
   // ── create new contact ──
   if (isNew) {
+    if (dictsOnlyLoading) {
+      return (
+        <div dir="rtl" className="flex min-h-screen items-center justify-center bg-[#F3F4F6] font-['Heebo']">
+          <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+        </div>
+      );
+    }
+    if (dictsOnlyError) {
+      return (
+        <div dir="rtl" className="min-h-screen bg-[#F3F4F6] p-6 font-['Heebo']">
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <AlertCircle className="mb-4 h-10 w-10 text-red-500" />
+            <h2 className="text-xl font-bold text-slate-900">טעינת המילונים נכשלה</h2>
+            <p className="mt-2 max-w-xl text-sm text-red-700">
+              {dictsOnlyError instanceof Error ? dictsOnlyError.message : "לא ניתן לטעון את מסך יצירת איש הקשר"}
+            </p>
+            <Link to="/admin/contacts" className="mt-6">
+              <Button variant="outline" className="rounded-xl border-slate-200">חזרה לרשימת אנשי קשר</Button>
+            </Link>
+          </div>
+        </div>
+      );
+    }
     const selectCls = "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50";
     const roles = dictsOnly?.roles ?? [];
     const allCities = dictsOnly?.cities ?? [];
@@ -482,16 +579,24 @@ export default function Candidate360Page() {
     );
   }
 
-  if (error || !contact) {
+  if (error) {
+    const notFound = isContactNotFoundError(error);
+    const loadErrorMessage = (error as { message?: unknown }).message;
     return (
       <div dir="rtl" className="min-h-screen bg-[#F3F4F6] p-6 font-['Heebo']">
         <div className="flex flex-col items-center justify-center py-32 text-center">
-          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100">
-            <AlertCircle className="h-8 w-8 text-slate-400" />
+          <div className={`mb-4 flex h-16 w-16 items-center justify-center rounded-2xl ${notFound ? "bg-slate-100" : "bg-red-50"}`}>
+            <AlertCircle className={`h-8 w-8 ${notFound ? "text-slate-400" : "text-red-500"}`} />
           </div>
-          <h2 className="text-xl font-bold text-slate-900">איש הקשר לא נמצא</h2>
-          <p className="mt-2 text-sm text-slate-500">לא נמצא איש קשר עם מזהה {resolvedId}</p>
-          <Link to="/contacts" className="mt-6">
+          <h2 className="text-xl font-bold text-slate-900">
+            {notFound ? "איש הקשר לא נמצא" : "שגיאה בטעינת איש הקשר"}
+          </h2>
+          <p className={`mt-2 max-w-xl text-sm ${notFound ? "text-slate-500" : "text-red-700"}`}>
+            {notFound
+              ? `לא נמצא איש קשר עם מזהה ${resolvedId}`
+              : typeof loadErrorMessage === "string" ? loadErrorMessage : "לא ניתן לטעון את נתוני Contact 360"}
+          </p>
+          <Link to="/admin/contacts" className="mt-6">
             <Button variant="outline" className="rounded-xl border-slate-200">חזרה לרשימת אנשי קשר</Button>
           </Link>
         </div>
@@ -499,23 +604,23 @@ export default function Candidate360Page() {
     );
   }
 
+  if (!contact) {
+    return null;
+  }
+
   // ─── render ───────────────────────────────────────────────────────────────
 
-  const roleAccentColor = (() => {
-    const name = (dicts?.roles ?? []).find((r) => r.id === contact.role)?.name ?? "";
-    const n = name.toLowerCase();
-    if (n.includes("רופא")) return "#0cc0df";
-    if (n.includes("שיננ")) return "#d10383";
-    if (n.includes("סייע")) return "#774196";
-    if (n.includes("מזכיר")) return "#ff751f";
-    if (n.includes("ניהול") || n.includes("מנהל")) return "#076911";
-    if (n.includes("טכנ")) return "#d4a800";
-    if (n.includes("מומח")) return "#086df4";
-    return BRAND.primary;
-  })();
+  const roleAccentColor = getRoleColorHex(contact.role);
 
   return (
     <div dir="rtl" className="min-h-screen space-y-8 bg-[#F3F4F6] p-4 font-['Heebo'] sm:p-6">
+      <div className="flex justify-start">
+        <Link to="/admin/contacts">
+          <Button variant="outline" className="rounded-xl border-slate-200 bg-white">
+            חזרה לרשימת אנשי קשר
+          </Button>
+        </Link>
+      </div>
 
       {/* ===== HERO + KPI ===== */}
       <Candidate360Hero
@@ -530,15 +635,25 @@ export default function Candidate360Page() {
         onOpenCreateApp={() => setDialogOpen(true)}
         onUpdateCheckStatus={async (statusId) => {
           setStatusDropdownOpen(false);
-          await updateContact(resolvedId, { check_status: statusId });
+          const { error: updateError } = await updateContact(resolvedId, { check_status: statusId });
+          if (updateError) {
+            showToast("error", `שגיאה בעדכון הסטטוס: ${updateError.message}`);
+            return;
+          }
+          await queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] });
           showToast("success", "סטטוס עודכן");
         }}
         onCopyLink={async () => {
-          const { data: tokenData } = await supabase.from("contact").select("profile_token").eq("contact_id", resolvedId).single();
-          if (tokenData?.profile_token) {
-            const link = `${window.location.origin}/profile/${tokenData.profile_token}`;
+          if (!contact.profile_token) {
+            showToast("error", "עדיין לא קיים קישור ציבורי למועמד/ת");
+            return;
+          }
+          const link = `${window.location.origin}/profile/${encodeURIComponent(contact.profile_token)}`;
+          try {
             await navigator.clipboard.writeText(link);
             showToast("success", "הלינק הועתק ללוח");
+          } catch {
+            showToast("error", "העתקת הקישור נכשלה");
           }
         }}
         statusDropdownOpen={statusDropdownOpen}
@@ -553,24 +668,39 @@ export default function Candidate360Page() {
             <span className="text-sm font-bold text-slate-900">תגיות</span>
           </div>
           <div className="flex flex-wrap gap-2">
-            {tags.length > 0 ? tags.map((tag) => (
-              <div key={tag.id} className="inline-flex h-[28px] items-center gap-2 rounded-full border border-[#E2E8F0] bg-white px-3 text-xs font-semibold text-slate-900">
-                {tag.tag}
-                <button type="button" onClick={() => removeTag(tag.id)} className="text-slate-400 hover:text-red-600">
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            )) : <span className="text-sm text-slate-400">אין תגיות עדיין</span>}
+            {tags.length > 0 ? tags.map((tag) => {
+              const dictionaryName = tag.tag_id
+                ? dicts?.candidateTags.find((candidateTag) => candidateTag.id === Number(tag.tag_id))?.name
+                : null;
+              return (
+                <div key={tag.id} className="inline-flex h-[28px] items-center gap-2 rounded-full border border-[#E2E8F0] bg-white px-3 text-xs font-semibold text-slate-900">
+                  {dictionaryName ?? tag.tag}
+                  <button type="button" onClick={() => removeTag(tag.id)} className="text-slate-400 hover:text-red-600">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            }) : <span className="text-sm text-slate-400">אין תגיות עדיין</span>}
           </div>
           <div className="mt-3 flex gap-2">
-            <Input
-              value={newTag}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewTag(e.target.value)}
-              onKeyDown={(e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "Enter") addTag(); }}
-              placeholder="תגית חדשה..."
-              className="rounded-xl border-slate-200 bg-[#F3F4F6]"
-            />
-            <Button variant="outline" className="h-10 rounded-xl border-slate-200" onClick={addTag}>הוסף</Button>
+            <select
+              value={selectedTagId}
+              onChange={(event) => setSelectedTagId(event.target.value)}
+              className="h-10 flex-1 rounded-xl border border-slate-200 bg-[#F3F4F6] px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="">— בחירת תגית מהמילון —</option>
+              {availableCandidateTags.map((candidateTag) => (
+                <option key={candidateTag.id} value={candidateTag.id}>{candidateTag.name}</option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl border-slate-200"
+              onClick={addTag}
+              disabled={!selectedTagId}
+            >
+              הוסף
+            </Button>
           </div>
         </CardContent>
       </Card>
@@ -603,8 +733,16 @@ export default function Candidate360Page() {
         <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
           <CardContent className="p-6">
             <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
-              <div className="rounded-2xl border border-[#E5E7EB] bg-[#F3F4F6] p-6 text-sm leading-7 text-slate-900">
-                {aiSummary.summary || "—"}
+              <div className="space-y-3">
+                {contact.personal_summary && (
+                  <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5">
+                    <div className="mb-2 text-sm font-bold text-slate-800">פרופיל מקצועי</div>
+                    <div className="whitespace-pre-wrap text-sm leading-7 text-slate-900">{contact.personal_summary}</div>
+                  </div>
+                )}
+                <div className="rounded-2xl border border-[#E5E7EB] bg-[#F3F4F6] p-6 text-sm leading-7 text-slate-900">
+                  {aiSummary.summary || "—"}
+                </div>
               </div>
               <div className="space-y-3">
                 <div className="rounded-2xl border border-[#E5E7EB] bg-[#F3F4F6] p-4">
@@ -643,54 +781,13 @@ export default function Candidate360Page() {
                 </DialogTrigger>
               </Dialog>
             </div>
-            {applications.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <FileText className="mb-3 h-10 w-10 text-slate-300" />
-                <p className="text-sm font-medium text-slate-500">אין הגשות לאיש קשר זה</p>
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200">
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="h-[52px] bg-[#F3F4F6] hover:bg-[#F3F4F6]">
-                        <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">קוד / תפקיד</TableHead>
-                        <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">מעסיק</TableHead>
-                        <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">סטטוס הגשה</TableHead>
-                        <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">תאריך הגשה</TableHead>
-                        <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">עדכון אחרון</TableHead>
-                        <TableHead className="px-4 text-right text-xs font-semibold text-slate-500">קו"ח</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {applications.map((app) => (
-                        <TableRow key={app.application_id} className="h-[60px] hover:bg-[#F3F4F6]">
-                          <TableCell className="px-4 text-sm font-semibold text-slate-900">
-                            <span className="me-1 font-mono text-xs text-slate-500">{app.job_code}</span>
-                            {app.job_role || "—"}
-                          </TableCell>
-                          <TableCell className="px-4 text-sm text-slate-900">{app.account_name || "—"}</TableCell>
-                          <TableCell className="px-4">
-                            <Badge className={`h-[30px] rounded-full border px-3 text-xs shadow-none ${applicationBadgeClass(app.application_status)}`}>
-                              {dictName(dicts?.applicationStatuses ?? [], app.application_status)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="px-4 text-sm text-slate-500">{formatDate(app.submission_date)}</TableCell>
-                          <TableCell className="px-4 text-sm text-slate-500">{formatDate(app.updated_timestamp)}</TableCell>
-                          <TableCell className="px-4 text-sm">
-                            {applicationHasCv(app) ? (
-                              <button type="button" onClick={() => openApplicationCv(app)} className="text-blue-600 hover:underline">צפייה</button>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              </div>
-            )}
+            <AdminTable<ApplicationRow>
+              columns={applicationColumns}
+              data={applications}
+              keyField="application_id"
+              emptyMessage="אין הגשות לאיש קשר זה"
+              minWidth="900px"
+            />
           </CardContent>
         </Card>
 

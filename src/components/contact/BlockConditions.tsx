@@ -2,6 +2,7 @@ import React from "react";
 import type { ContactRow, Contact360Dicts } from "@/hooks/useContact360";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { RegionBadge } from "@/components/admin/RegionBadge";
 
 interface Props {
   contact: ContactRow;
@@ -51,7 +52,7 @@ function Chips({ label, values }: { label: string; values: string[] }) {
 }
 
 export default function BlockConditions({ contact, dicts }: Props) {
-  const preferredRegionNames = dictNames(dicts.regions, contact.preferred_regions);
+  const preferredRegionIds = toNumberArray(contact.preferred_regions);
   const preferredCityNames = dictNames(dicts.cities, contact.preferred_cities);
   const availabilityNames = dictNames(dicts.availability, contact.candidate_availability_ids);
   const scopeNames = dictNames(dicts.scopes, contact.preferred_scope);
@@ -72,7 +73,20 @@ export default function BlockConditions({ contact, dicts }: Props) {
         <Chips label="זמינות מועמד/ת" values={availabilityNames} />
         <Chips label="היקפי משרה רלוונטיים" values={scopeNames} />
         <Chips label="סוגי שכר רלוונטיים" values={salaryTypeNames} />
-        <Chips label="אזורים רלוונטיים לעבודה" values={preferredRegionNames} />
+        {preferredRegionIds.length > 0 && (
+          <div className="mt-3">
+            <div className="mb-2 text-sm text-slate-500">אזורים רלוונטיים לעבודה</div>
+            <div className="flex flex-wrap gap-1.5">
+              {preferredRegionIds.map((regionId) => (
+                <RegionBadge
+                  key={regionId}
+                  regionId={regionId}
+                  label={dictName(dicts.regions, regionId)}
+                />
+              ))}
+            </div>
+          </div>
+        )}
         <Chips label="ערים רלוונטיות לעבודה" values={preferredCityNames} />
       </CardContent>
     </Card>

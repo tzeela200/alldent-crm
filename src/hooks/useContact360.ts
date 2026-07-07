@@ -6,6 +6,10 @@ export interface DictItem {
   name: string;
 }
 
+export interface CandidateTagDictItem extends DictItem {
+  sort_order?: number | null;
+}
+
 export interface SubRoleItem extends DictItem {
   role_id: number | null;
 }
@@ -26,6 +30,8 @@ export interface Contact360Dicts {
   profileTypes: DictItem[];
   experience: DictItem[];
   applicationStatuses: DictItem[];
+  jobStatuses: DictItem[];
+  candidateTags: CandidateTagDictItem[];
   scopes: DictItem[];
   genders: DictItem[];
   languages: DictItem[];
@@ -86,8 +92,7 @@ export interface ContactRow {
   systems_used: number[] | null;
   procedures_experience: number[] | null;
   current_employer: string | null;
-  previous_employers: Array<{name?: string; role?: string; years?: string; description?: string}> | null;
-  tax_type: string | null;
+  previous_employers: Array<{ name?: string; role?: string; years?: string; description?: string }> | null;
   tax_type_id: number | null;
   mobility_id: number | null;
   birth_year: number | null;
@@ -112,7 +117,6 @@ export interface ContactRow {
   cv_storage_path: string | null;
 }
 
-
 export interface ApplicationRow {
   application_id: number;
   job_code: string | null;
@@ -131,11 +135,13 @@ export interface ApplicationRow {
   candidate_name: string | null;
   has_cv: boolean | null;
   cv_link: string | null;
+  cv_storage_path: string | null;
 }
 
 export interface ContactTagRow {
   id: number;
   contact_id: number;
+  tag_id: number | null;
   tag: string;
   created_at: string;
 }
@@ -179,16 +185,30 @@ export interface LinkedJobRow {
   rel_recruiter_contact: number | null;
 }
 
+export class ContactNotFoundError extends Error {
+  constructor(contactId: number) {
+    super(`Contact ${contactId} was not found`);
+    this.name = "ContactNotFoundError";
+  }
+}
+
+export function isContactNotFoundError(error: unknown): error is ContactNotFoundError {
+  return error instanceof ContactNotFoundError ||
+    (error instanceof Error && error.name === "ContactNotFoundError");
+}
+
+function throwQueryError(label: string, error: { message: string } | null): void {
+  if (error) throw new Error(`${label}: ${error.message}`);
+}
+
 async function fetchContact360(contactId: number) {
-  const [
-    contactRes,
-    dictsRes,
-  ] = await Promise.all([
-    supabase.from("contact").select("*").eq("contact_id", contactId).single(),
+  const [contactRes, dictsRes] = await Promise.all([
+    supabase.from("contact").select("*").eq("contact_id", contactId).maybeSingle(),
     fetchAllDicts(),
   ]);
 
-  if (contactRes.error) throw contactRes.error;
+  throwQueryError("טעינת איש הקשר נכשלה", contactRes.error);
+  if (!contactRes.data) throw new ContactNotFoundError(contactId);
   const contact = contactRes.data as ContactRow;
 
   const applicationsQuery = supabase
@@ -203,7 +223,7 @@ async function fetchContact360(contactId: number) {
     scopedApplicationsQuery,
     supabase
       .from("contact_tags")
-      .select("*")
+      .select("id, contact_id, tag_id, tag, created_at")
       .eq("contact_id", contact.contact_id)
       .order("created_at", { ascending: true }),
     contact.account_link
@@ -211,7 +231,7 @@ async function fetchContact360(contactId: number) {
           .from("accounts")
           .select("account_id, account_name, region_id, city_id, phone, email")
           .eq("account_id", contact.account_link)
-          .single()
+          .maybeSingle()
       : Promise.resolve({ data: null, error: null }),
     supabase
       .from("job")
@@ -223,19 +243,25 @@ async function fetchContact360(contactId: number) {
       .or(`rel_recruiter_contact.eq.${contact.contact_id},rel_employer_contact.eq.${contact.contact_id}`),
   ]);
 
+  throwQueryError("טעינת ההגשות נכשלה", applicationsRes.error);
+  throwQueryError("טעינת התגיות נכשלה", tagsRes.error);
+  throwQueryError("טעינת הארגון המקושר נכשלה", accountRes.error);
+  throwQueryError("טעינת המשרות הפעילות נכשלה", jobsRes.error);
+  throwQueryError("טעינת המשרות המקושרות נכשלה", linkedJobsRes.error);
+
   const jobs: JobRow[] = (jobsRes.data ?? []).map((j: Record<string, unknown>) => {
-    const { accounts: _acc, ...rest } = j;
+    const { accounts: accountData, ...rest } = j;
     return {
       ...(rest as Omit<JobRow, "account_name">),
-      account_name: (_acc as { account_name: string } | null)?.account_name ?? undefined,
+      account_name: (accountData as { account_name: string } | null)?.account_name ?? undefined,
     };
   });
 
   const linkedJobs: LinkedJobRow[] = (linkedJobsRes.data ?? []).map((j: Record<string, unknown>) => {
-    const { accounts: _acc, ...rest } = j;
+    const { accounts: accountData, ...rest } = j;
     return {
       ...(rest as Omit<LinkedJobRow, "account_name">),
-      account_name: (_acc as { account_name: string } | null)?.account_name ?? undefined,
+      account_name: (accountData as { account_name: string } | null)?.account_name ?? undefined,
     };
   });
 
@@ -263,6 +289,8 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     profileRes,
     expRes,
     appStatusRes,
+    jobStatusRes,
+    candidateTagsRes,
     scopesRes,
     gendersRes,
     languagesRes,
@@ -284,6 +312,13 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     supabase.from("dict_profile_types").select("id, name").order("id"),
     supabase.from("dict_experience").select("id, name").order("id"),
     supabase.from("dict_application_statuses").select("id, name").order("id"),
+    supabase.from("dict_job_statuses").select("id, name").order("id"),
+    supabase
+      .from("dict_candidate_tags")
+      .select("id, name, sort_order")
+      .eq("is_active", true)
+      .order("sort_order")
+      .order("id"),
     supabase.from("dict_scopes").select("id, name").order("id"),
     supabase.from("dict_genders").select("id, name").order("id"),
     supabase.from("dict_languages").select("id, name").order("name"),
@@ -294,6 +329,29 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     supabase.from("dict_salary_types").select("id, name").order("id"),
     supabase.from("dict_contact_work_statuses").select("id, name").order("sort_order"),
   ]);
+
+  throwQueryError("טעינת מילון תפקידים נכשלה", rolesRes.error);
+  throwQueryError("טעינת מילון תתי־תפקידים נכשלה", subRolesRes.error);
+  throwQueryError("טעינת מילון זמינות נכשלה", availRes.error);
+  throwQueryError("טעינת מילון ערים נכשלה", citiesRes.error);
+  throwQueryError("טעינת מילון אזורים נכשלה", regionsRes.error);
+  throwQueryError("טעינת מילון מקורות נכשלה", sourcesRes.error);
+  throwQueryError("טעינת מילון סטטוסי בדיקה נכשלה", checkRes.error);
+  throwQueryError("טעינת מילון סטטוסי מדיה נכשלה", socialRes.error);
+  throwQueryError("טעינת מילון סוגי פרופיל נכשלה", profileRes.error);
+  throwQueryError("טעינת מילון ניסיון נכשלה", expRes.error);
+  throwQueryError("טעינת מילון סטטוסי הגשה נכשלה", appStatusRes.error);
+  throwQueryError("טעינת מילון סטטוסי משרה נכשלה", jobStatusRes.error);
+  throwQueryError("טעינת מילון תגיות מועמד נכשלה", candidateTagsRes.error);
+  throwQueryError("טעינת מילון היקפים נכשלה", scopesRes.error);
+  throwQueryError("טעינת מילון מגדרים נכשלה", gendersRes.error);
+  throwQueryError("טעינת מילון שפות נכשלה", languagesRes.error);
+  throwQueryError("טעינת מילון סוגי מס נכשלה", taxTypesRes.error);
+  throwQueryError("טעינת מילון ניידות נכשלה", mobilityRes.error);
+  throwQueryError("טעינת מילון מערכות נכשלה", systemsRes.error);
+  throwQueryError("טעינת מילון פרוצדורות נכשלה", proceduresRes.error);
+  throwQueryError("טעינת מילון סוגי שכר נכשלה", salaryTypesRes.error);
+  throwQueryError("טעינת מילון סטטוסי תעסוקה נכשלה", workStatusesRes.error);
 
   return {
     roles: (rolesRes.data ?? []) as DictItem[],
@@ -307,6 +365,8 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     profileTypes: (profileRes.data ?? []) as DictItem[],
     experience: (expRes.data ?? []) as DictItem[],
     applicationStatuses: (appStatusRes.data ?? []) as DictItem[],
+    jobStatuses: (jobStatusRes.data ?? []) as DictItem[],
+    candidateTags: (candidateTagsRes.data ?? []) as CandidateTagDictItem[],
     scopes: (scopesRes.data ?? []) as DictItem[],
     genders: (gendersRes.data ?? []) as DictItem[],
     languages: (languagesRes.data ?? []) as DictItem[],
@@ -319,10 +379,11 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
   };
 }
 
-export function useContact360Dicts() {
+export function useContact360Dicts(enabled = true) {
   return useQuery({
     queryKey: ["contact360dicts"],
     queryFn: fetchAllDicts,
+    enabled,
     staleTime: 5 * 60_000,
   });
 }

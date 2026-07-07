@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { History, RotateCcw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
+import { AlertCircle, History, RotateCcw, Loader2, ChevronDown, ChevronUp } from "lucide-react";
 import { useContactHistory, useRestoreField } from "@/hooks/useContactHistory";
 
 const FIELD_LABELS: Record<string, string> = {
@@ -40,7 +40,7 @@ function fmt(ts: string): string {
 const SOURCE_LABEL: Record<string, string> = { admin: "מנהל", candidate: "מועמד", system: "מערכת" };
 
 export default function ContactHistoryPanel({ contactId }: { contactId: number }) {
-  const { data: history = [], isLoading } = useContactHistory(contactId);
+  const { data: history = [], isLoading, isError, error } = useContactHistory(contactId);
   const restore = useRestoreField(contactId);
   const [open, setOpen] = useState(false);
   const [restoring, setRestoring] = useState<string | null>(null);
@@ -75,6 +75,11 @@ export default function ContactHistoryPanel({ contactId }: { contactId: number }
         <div className="border-t border-slate-100 p-4">
           {isLoading ? (
             <div className="flex justify-center py-4"><Loader2 className="h-5 w-5 animate-spin text-slate-400" /></div>
+          ) : isError ? (
+            <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{error instanceof Error ? error.message : "טעינת היסטוריית השינויים נכשלה"}</span>
+            </div>
           ) : history.length === 0 ? (
             <p className="text-sm text-slate-400">אין שינויים מתועדים.</p>
           ) : (

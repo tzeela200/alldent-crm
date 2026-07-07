@@ -18,7 +18,7 @@ export const CANDIDATE_PUBLIC_FIELDS = [
   "salary_expectation_hourly", "salary_expectation_monthly",
   "portfolio_url", "recommendations_url",
   "cv_link", "has_cv", "birth_year", "gender",
-  "license_no", "tax_type", "tax_type_id", "mobility_id",
+  "license_no", "tax_type_id", "mobility_id",
   "additional_skills_notes", "facebook_url",
   "photo_url", "linkedin_url", "candidate_notes",
   "work_status", "work_schedule_text",

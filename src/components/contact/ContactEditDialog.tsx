@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import type { ContactRow, Contact360Dicts } from "@/hooks/useContact360";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2 } from "lucide-react";
 import DictionaryMultiSelect from "@/components/ui/DictionaryMultiSelect";
 import { CityRegionPicker } from "@/components/ui/CityRegionPicker";
+import { AdminPanelSection } from "@/components/admin/AdminPanelSection";
+import { AdminPanelField } from "@/components/admin/AdminPanelField";
+import { AdminPanelActions } from "@/components/admin/AdminPanelActions";
 import {
   selectValue,
   buildContactPatch,
@@ -24,44 +25,64 @@ interface Props {
   onSaved: (patch: Record<string, unknown>) => Promise<void>;
 }
 
-const BRAND_PRIMARY = "#008080";
+const inputClassName = "rounded-xl";
+const selectClassName =
+  "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500";
 
-// Searchable organization picker (966+ accounts → needs search, not a plain <select>).
 function AccountPicker({ value, onChange }: { value: number | null; onChange: (id: number | null) => void }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
-  const { data: accounts = [] } = useQuery<{ account_id: number; account_name: string | null }[]>({
+  const {
+    data: accounts = [],
+    isLoading,
+    isError,
+    error,
+  } = useQuery<{ account_id: number; account_name: string | null }[]>({
     queryKey: ["accounts_names"],
     queryFn: async () => {
-      const { data } = await supabase.from("accounts").select("account_id,account_name").order("account_name");
+      const { data, error: queryError } = await supabase
+        .from("accounts")
+        .select("account_id,account_name")
+        .order("account_name");
+      if (queryError) throw queryError;
       return data ?? [];
     },
     staleTime: 600_000,
   });
-  const selected = accounts.find((a) => a.account_id === value);
+
+  const selected = accounts.find((account) => account.account_id === value);
   const needle = q.trim().toLowerCase();
   const filtered = (needle
-    ? accounts.filter((a) => (a.account_name ?? "").toLowerCase().includes(needle))
+    ? accounts.filter((account) => (account.account_name ?? "").toLowerCase().includes(needle))
     : accounts
   ).slice(0, 50);
-  const inputCls =
-    "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500";
+
   return (
     <div className="relative">
       <div className="flex items-center gap-2">
         <input
-          className={inputCls}
+          className={selectClassName}
           dir="rtl"
-          placeholder="חיפוש ארגון..."
+          placeholder={isLoading ? "טוען ארגונים..." : "חיפוש ארגון..."}
           value={open ? q : selected?.account_name ?? ""}
-          onFocus={() => { setOpen(true); setQ(""); }}
-          onBlur={() => setTimeout(() => setOpen(false), 150)}
-          onChange={(e) => { setQ(e.target.value); setOpen(true); }}
+          disabled={isLoading || isError}
+          onFocus={() => {
+            setOpen(true);
+            setQ("");
+          }}
+          onBlur={() => window.setTimeout(() => setOpen(false), 150)}
+          onChange={(event) => {
+            setQ(event.target.value);
+            setOpen(true);
+          }}
         />
         {value != null && (
           <button
             type="button"
-            onClick={() => { onChange(null); setQ(""); }}
+            onClick={() => {
+              onChange(null);
+              setQ("");
+            }}
             className="shrink-0 rounded-md px-2 py-1 text-slate-400 hover:text-red-600"
             title="ביטול שיוך"
           >
@@ -69,16 +90,25 @@ function AccountPicker({ value, onChange }: { value: number | null; onChange: (i
           </button>
         )}
       </div>
-      {open && filtered.length > 0 && (
+      {isError && (
+        <p className="mt-1 text-xs font-medium text-red-600">
+          {error instanceof Error ? error.message : "טעינת הארגונים נכשלה"}
+        </p>
+      )}
+      {open && !isLoading && !isError && filtered.length > 0 && (
         <div className="absolute z-40 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-          {filtered.map((a) => (
+          {filtered.map((account) => (
             <button
-              key={a.account_id}
+              key={account.account_id}
               type="button"
-              onMouseDown={() => { onChange(a.account_id); setOpen(false); setQ(""); }}
+              onMouseDown={() => {
+                onChange(account.account_id);
+                setOpen(false);
+                setQ("");
+              }}
               className="block w-full px-3 py-2 text-right text-sm text-slate-700 hover:bg-slate-50"
             >
-              {a.account_name ?? `#${a.account_id}`}
+              {account.account_name ?? `#${account.account_id}`}
             </button>
           ))}
         </div>
@@ -98,19 +128,8 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
     setAdminForm(next);
   }, [open, contact, dicts]);
 
-  const setAf = (field: string, val: unknown) =>
-    setAdminForm((prev) => ({ ...prev, [field]: val }));
-
-  const selectCls =
-    "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500";
-
-  const sectionTitle = (title: string, red = false) => (
-    <h3
-      className={`mb-3 border-b pb-1 text-sm font-bold ${red ? "border-red-100 text-red-600" : "border-teal-100 text-teal-700"}`}
-    >
-      {title}
-    </h3>
-  );
+  const setAf = (field: string, value: unknown) =>
+    setAdminForm((previous) => ({ ...previous, [field]: value }));
 
   async function handleSave() {
     if (!contact) return;
@@ -124,7 +143,7 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => !saving && onOpenChange(nextOpen)}>
       <DialogContent
         dir="rtl"
         className="max-h-[85vh] max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 font-['Heebo']"
@@ -136,258 +155,258 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-6 py-2">
-          {/* פרטים אישיים */}
-          <div>
-            {sectionTitle("פרטים אישיים")}
-            <div className="grid grid-cols-2 gap-3">
-              {/* שם מלא ושם תצוגה — שדות ראשיים */}
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">שם מלא</label>
+        <div className="py-2">
+          <AdminPanelSection title="פרטים אישיים">
+            <AdminPanelField
+              label="שם מלא"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Input
                   dir="rtl"
                   value={selectValue(adminForm.full_name)}
-                  onChange={(e) => setAf("full_name", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("full_name", event.target.value)}
+                  className={inputClassName}
                 />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">שם תצוגה</label>
+              )}
+            />
+            <AdminPanelField
+              label="שם תצוגה"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Input
                   dir="rtl"
                   value={selectValue(adminForm.display_name)}
-                  onChange={(e) => setAf("display_name", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("display_name", event.target.value)}
+                  className={inputClassName}
                 />
-              </div>
-
-              {/* שם פרטי + שם משפחה (אופציונלי) */}
-              {(
-                [
-                  ["first_name", "שם פרטי", "rtl"],
-                  ["last_name", "שם משפחה", "rtl"],
-                  ["phone", "נייד", "ltr"],
-                  ["second_phone", "נייד נוסף", "ltr"],
-                  ["email", "אימייל", "ltr"],
-                  ["second_email", "אימייל נוסף", "ltr"],
-                ] as const
-              ).map(([f, l, d]) => (
-                <div key={f} className="space-y-1">
-                  <label className="text-xs text-slate-500">{l}</label>
+              )}
+            />
+            {(
+              [
+                ["first_name", "שם פרטי", "rtl"],
+                ["last_name", "שם משפחה", "rtl"],
+                ["phone", "נייד", "ltr"],
+                ["second_phone", "נייד נוסף", "ltr"],
+                ["email", "אימייל", "ltr"],
+                ["second_email", "אימייל נוסף", "ltr"],
+              ] as const
+            ).map(([field, label, direction]) => (
+              <AdminPanelField
+                key={field}
+                label={label}
+                mode="edit"
+                editValue={(
                   <Input
-                    dir={d}
-                    value={selectValue(adminForm[f])}
-                    onChange={(e) => setAf(f, e.target.value)}
-                    className="rounded-xl"
+                    dir={direction}
+                    value={selectValue(adminForm[field])}
+                    onChange={(event) => setAf(field, event.target.value)}
+                    className={inputClassName}
                   />
-                </div>
-              ))}
-
-              {/* אזור + עיר — רכיב משותף (כל הערים, חיפוש, מילוי אזור אוטומטי) */}
-              <div className="col-span-2">
-                <CityRegionPicker
-                  cityId={adminForm.city_id != null && adminForm.city_id !== "" ? Number(adminForm.city_id) : null}
-                  regionId={adminForm.region_id != null && adminForm.region_id !== "" ? Number(adminForm.region_id) : null}
-                  onRegionChange={(id) => setAf("region_id", id)}
-                  onCityChange={(id) => setAf("city_id", id)}
-                  regions={dicts?.regions}
-                />
-              </div>
-
-              {/* ארגון מקושר */}
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">ארגון מקושר</label>
-                <AccountPicker
-                  value={adminForm.account_link != null && adminForm.account_link !== "" ? Number(adminForm.account_link) : null}
-                  onChange={(id) => setAf("account_link", id)}
-                />
-              </div>
-
-              {/* מגדר */}
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">מגדר</label>
+                )}
+              />
+            ))}
+            <div className="sm:col-span-2">
+              <CityRegionPicker
+                cityId={adminForm.city_id != null && adminForm.city_id !== "" ? Number(adminForm.city_id) : null}
+                regionId={adminForm.region_id != null && adminForm.region_id !== "" ? Number(adminForm.region_id) : null}
+                onRegionChange={(id) => setAf("region_id", id)}
+                onCityChange={(id) => setAf("city_id", id)}
+                regions={dicts?.regions}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="mb-1 block text-[12px] font-semibold text-[#6B6B6B]">ארגון מקושר</label>
+              <AccountPicker
+                value={adminForm.account_link != null && adminForm.account_link !== "" ? Number(adminForm.account_link) : null}
+                onChange={(id) => setAf("account_link", id)}
+              />
+            </div>
+            <AdminPanelField
+              label="מגדר"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.gender)}
-                  onChange={(e) => setAf("gender", e.target.value ? Number(e.target.value) : null)}
+                  onChange={(event) => setAf("gender", event.target.value ? Number(event.target.value) : null)}
                 >
                   <option value="">— בחר —</option>
-                  {dicts?.genders.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.name}
-                    </option>
+                  {dicts?.genders.map((gender) => (
+                    <option key={gender.id} value={gender.id}>{gender.name}</option>
                   ))}
                 </select>
-              </div>
-
-              {/* שנת לידה */}
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">שנת לידה</label>
+              )}
+            />
+            <AdminPanelField
+              label="שנת לידה"
+              mode="edit"
+              editValue={(
                 <Input
                   type="number"
                   dir="ltr"
                   value={selectValue(adminForm.birth_year)}
-                  onChange={(e) =>
-                    setAf("birth_year", e.target.value ? Number(e.target.value) : null)
-                  }
-                  className="rounded-xl"
+                  onChange={(event) => setAf("birth_year", event.target.value ? Number(event.target.value) : null)}
+                  className={inputClassName}
                 />
-              </div>
-            </div>
-          </div>
+              )}
+            />
+          </AdminPanelSection>
 
-          {/* תפקיד מקצועי */}
-          <div>
-            {sectionTitle("תפקיד מקצועי")}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">תפקיד</label>
+          <AdminPanelSection title="תפקיד מקצועי">
+            <AdminPanelField
+              label="תפקיד"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.role)}
-                  onChange={(e) => {
-                    setAf("role", e.target.value ? Number(e.target.value) : null);
-                    setAf("sub_role", []);
+                  onChange={(event) => {
+                    setAdminForm((previous) => ({
+                      ...previous,
+                      role: event.target.value ? Number(event.target.value) : null,
+                      sub_role: [],
+                    }));
                   }}
                 >
                   <option value="">— בחר תפקיד —</option>
-                  {dicts?.roles.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
+                  {dicts?.roles.map((role) => (
+                    <option key={role.id} value={role.id}>{role.name}</option>
                   ))}
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">ניסיון</label>
+              )}
+            />
+            <AdminPanelField
+              label="ניסיון"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.experience)}
-                  onChange={(e) =>
-                    setAf("experience", e.target.value ? Number(e.target.value) : null)
-                  }
+                  onChange={(event) => setAf("experience", event.target.value ? Number(event.target.value) : null)}
                 >
                   <option value="">— בחר —</option>
-                  {dicts?.experience.map((ex) => (
-                    <option key={ex.id} value={ex.id}>
-                      {ex.name}
-                    </option>
+                  {dicts?.experience.map((experience) => (
+                    <option key={experience.id} value={experience.id}>{experience.name}</option>
                   ))}
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">כותרת מקצועית</label>
+              )}
+            />
+            <AdminPanelField
+              label="כותרת מקצועית"
+              mode="edit"
+              editValue={(
                 <Input
                   dir="rtl"
                   value={selectValue(adminForm.professional_title)}
-                  onChange={(e) => setAf("professional_title", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("professional_title", event.target.value)}
+                  className={inputClassName}
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">מספר רישיון</label>
+              )}
+            />
+            <AdminPanelField
+              label="מספר רישיון"
+              mode="edit"
+              editValue={(
                 <Input
                   dir="ltr"
                   value={selectValue(adminForm.license_no)}
-                  onChange={(e) => setAf("license_no", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("license_no", event.target.value)}
+                  className={inputClassName}
                 />
-              </div>
-            </div>
+              )}
+            />
             {!!adminForm.role && (
-              <div className="mt-3">
+              <div className="sm:col-span-2">
                 <DictionaryMultiSelect
                   label="תת-תפקיד"
-                  options={(dicts?.subRoles ?? []).filter(
-                    (r) => r.role_id === Number(adminForm.role),
-                  )}
+                  options={(dicts?.subRoles ?? []).filter((subRole) => subRole.role_id === Number(adminForm.role))}
                   value={adminForm.sub_role}
                   onChange={(value) => setAf("sub_role", value)}
                   placeholder="חיפוש תת-תפקיד..."
                 />
               </div>
             )}
-            <div className="mt-3 grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">מעסיק נוכחי</label>
+            <AdminPanelField
+              label="מעסיק נוכחי"
+              mode="edit"
+              editValue={(
                 <Input
                   dir="rtl"
                   value={selectValue(adminForm.current_employer)}
-                  onChange={(e) => setAf("current_employer", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("current_employer", event.target.value)}
+                  className={inputClassName}
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">הערות ימים ושעות</label>
+              )}
+            />
+            <AdminPanelField
+              label="הערות ימים ושעות"
+              mode="edit"
+              editValue={(
                 <Input
                   dir="rtl"
                   value={selectValue(adminForm.work_schedule_text)}
-                  onChange={(e) => setAf("work_schedule_text", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("work_schedule_text", event.target.value)}
+                  className={inputClassName}
                 />
-              </div>
-              <div className="col-span-2">
-                <DictionaryMultiSelect
-                  label="מערכות"
-                  options={dicts?.systems ?? []}
-                  value={adminForm.systems_used}
-                  onChange={(value) => setAf("systems_used", value)}
-                  placeholder="חיפוש מערכת..."
-                  grid
-                />
-              </div>
-              <div className="col-span-2">
-                <DictionaryMultiSelect
-                  label="פרוצדורות / תחומי ניסיון"
-                  options={dicts?.procedures ?? []}
-                  value={adminForm.procedures_experience}
-                  onChange={(value) => setAf("procedures_experience", value)}
-                  placeholder="חיפוש תחום ניסיון..."
-                />
-              </div>
+              )}
+            />
+            <div className="sm:col-span-2">
+              <DictionaryMultiSelect
+                label="מערכות"
+                options={dicts?.systems ?? []}
+                value={adminForm.systems_used}
+                onChange={(value) => setAf("systems_used", value)}
+                placeholder="חיפוש מערכת..."
+                grid
+              />
             </div>
-          </div>
+            <div className="sm:col-span-2">
+              <DictionaryMultiSelect
+                label="פרוצדורות / תחומי ניסיון"
+                options={dicts?.procedures ?? []}
+                value={adminForm.procedures_experience}
+                onChange={(value) => setAf("procedures_experience", value)}
+                placeholder="חיפוש תחום ניסיון..."
+              />
+            </div>
+          </AdminPanelSection>
 
-          {/* תנאים והעדפות לתעסוקה */}
-          <div>
-            {sectionTitle("תנאים והעדפות לתעסוקה")}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">ניידות</label>
+          <AdminPanelSection title="תנאים והעדפות לתעסוקה">
+            <AdminPanelField
+              label="ניידות"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.mobility_id)}
-                  onChange={(e) =>
-                    setAf("mobility_id", e.target.value ? Number(e.target.value) : null)
-                  }
+                  onChange={(event) => setAf("mobility_id", event.target.value ? Number(event.target.value) : null)}
                 >
                   <option value="">— בחר —</option>
-                  {dicts?.mobility.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
+                  {dicts?.mobility.map((mobility) => (
+                    <option key={mobility.id} value={mobility.id}>{mobility.name}</option>
                   ))}
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">מיסוי</label>
+              )}
+            />
+            <AdminPanelField
+              label="מיסוי"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.tax_type_id)}
-                  onChange={(e) =>
-                    setAf("tax_type_id", e.target.value ? Number(e.target.value) : null)
-                  }
+                  onChange={(event) => setAf("tax_type_id", event.target.value ? Number(event.target.value) : null)}
                 >
                   <option value="">— בחר —</option>
-                  {dicts?.taxTypes.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
+                  {dicts?.taxTypes.map((taxType) => (
+                    <option key={taxType.id} value={taxType.id}>{taxType.name}</option>
                   ))}
                 </select>
-              </div>
-            </div>
-            <div className="mt-3">
+              )}
+            />
+            <div className="sm:col-span-2">
               <DictionaryMultiSelect
                 label="אזורים רלוונטיים לעבודה"
                 options={dicts?.regions ?? []}
@@ -396,7 +415,7 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
                 placeholder="חיפוש אזור..."
               />
             </div>
-            <div className="mt-3">
+            <div className="sm:col-span-2">
               <DictionaryMultiSelect
                 label="ערים רלוונטיות לעבודה"
                 options={dicts?.cities ?? []}
@@ -405,378 +424,395 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
                 placeholder="חיפוש עיר..."
               />
             </div>
-            <label className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-              <span>רלוונטי לכל הארץ</span>
-              <input
-                type="checkbox"
-                checked={Boolean(adminForm.preferred_all_country)}
-                onChange={(e) => setAf("preferred_all_country", e.target.checked)}
-                className="h-4 w-4 rounded border-slate-300 accent-teal-600"
-              />
-            </label>
-          </div>
+            <AdminPanelField
+              label="רלוונטי לכל הארץ"
+              mode="edit"
+              fullWidth
+              editValue={(
+                <label className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <span>{Boolean(adminForm.preferred_all_country) ? "כן" : "לא"}</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(adminForm.preferred_all_country)}
+                    onChange={(event) => setAf("preferred_all_country", event.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 accent-teal-600"
+                  />
+                </label>
+              )}
+            />
+          </AdminPanelSection>
 
-          {/* מדיה חברתית */}
-          <div>
-            {sectionTitle("מדיה חברתית")}
-            <div className="grid grid-cols-1 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">לינק לפייסבוק</label>
+          <AdminPanelSection title="מדיה חברתית">
+            <AdminPanelField
+              label="לינק לפייסבוק"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Input
                   dir="ltr"
                   value={selectValue(adminForm.facebook_url)}
-                  onChange={(e) => setAf("facebook_url", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("facebook_url", event.target.value)}
+                  className={inputClassName}
                   placeholder="https://facebook.com/..."
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">שם פייסבוק</label>
+              )}
+            />
+            <AdminPanelField
+              label="שם פייסבוק"
+              mode="edit"
+              editValue={(
                 <Input
                   dir="rtl"
                   value={selectValue(adminForm.facebook_name)}
-                  onChange={(e) => setAf("facebook_name", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("facebook_name", event.target.value)}
+                  className={inputClassName}
                   placeholder="שם כפי שמופיע בפייסבוק"
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">Facebook ID</label>
+              )}
+            />
+            <AdminPanelField
+              label="Facebook ID"
+              mode="edit"
+              editValue={(
                 <Input
                   dir="ltr"
                   value={selectValue(adminForm.facebook_id)}
-                  onChange={(e) =>
-                    setAf("facebook_id", e.target.value ? Number(e.target.value) : null)
-                  }
-                  className="rounded-xl"
+                  onChange={(event) => setAf("facebook_id", event.target.value ? Number(event.target.value) : null)}
+                  className={inputClassName}
                   placeholder="מספר מזהה אם קיים"
                 />
-              </div>
-            </div>
-          </div>
+              )}
+            />
+          </AdminPanelSection>
 
-          {/* CRM */}
-          <div>
-            {sectionTitle("CRM")}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">פולואפ הבא</label>
+          <AdminPanelSection title="CRM">
+            <AdminPanelField
+              label="פולואפ הבא"
+              mode="edit"
+              editValue={(
                 <Input
                   type="date"
                   dir="ltr"
                   value={String(adminForm.next_follow_up ?? "").slice(0, 10)}
-                  onChange={(e) => setAf("next_follow_up", e.target.value || null)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("next_follow_up", event.target.value || null)}
+                  className={inputClassName}
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">קשר אחרון</label>
+              )}
+            />
+            <AdminPanelField
+              label="קשר אחרון"
+              mode="edit"
+              editValue={(
                 <Input
                   type="date"
                   dir="ltr"
                   value={String(adminForm.last_contact_date ?? "").slice(0, 10)}
-                  onChange={(e) => setAf("last_contact_date", e.target.value || null)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("last_contact_date", event.target.value || null)}
+                  className={inputClassName}
                 />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">הערות פנימיות</label>
+              )}
+            />
+            <AdminPanelField
+              label="הערות פנימיות"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Textarea
                   dir="rtl"
                   rows={3}
                   value={selectValue(adminForm.notes)}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setAf("notes", e.target.value)
-                  }
+                  onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setAf("notes", event.target.value)}
                   className="rounded-xl border-slate-200 bg-slate-50"
                 />
-              </div>
-            </div>
-          </div>
+              )}
+            />
+          </AdminPanelSection>
 
-          {/* פרופיל ציבורי */}
-          <div>
-            {sectionTitle("פרופיל ציבורי")}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <DictionaryMultiSelect
-                  label="זמינות מועמד/ת"
-                  options={dicts?.availability ?? []}
-                  value={adminForm.candidate_availability_ids}
-                  onChange={(value) => setAf("candidate_availability_ids", value)}
-                  placeholder="חיפוש זמינות..."
-                />
-              </div>
-              <div className="col-span-2">
-                <DictionaryMultiSelect
-                  label="היקף משרה רלוונטי"
-                  options={dicts?.scopes ?? []}
-                  value={adminForm.preferred_scope}
-                  onChange={(value) => setAf("preferred_scope", value)}
-                  placeholder="חיפוש היקף משרה..."
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">שכר חודשי</label>
+          <AdminPanelSection title="פרופיל ציבורי">
+            <div className="sm:col-span-2">
+              <DictionaryMultiSelect
+                label="זמינות מועמד/ת"
+                options={dicts?.availability ?? []}
+                value={adminForm.candidate_availability_ids}
+                onChange={(value) => setAf("candidate_availability_ids", value)}
+                placeholder="חיפוש זמינות..."
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <DictionaryMultiSelect
+                label="היקף משרה רלוונטי"
+                options={dicts?.scopes ?? []}
+                value={adminForm.preferred_scope}
+                onChange={(value) => setAf("preferred_scope", value)}
+                placeholder="חיפוש היקף משרה..."
+              />
+            </div>
+            <AdminPanelField
+              label="שכר חודשי"
+              mode="edit"
+              editValue={(
                 <Input
                   type="number"
                   dir="ltr"
                   value={selectValue(adminForm.salary_expectation_monthly)}
-                  onChange={(e) =>
-                    setAf(
-                      "salary_expectation_monthly",
-                      e.target.value ? Number(e.target.value) : null,
-                    )
-                  }
-                  className="rounded-xl"
+                  onChange={(event) => setAf("salary_expectation_monthly", event.target.value ? Number(event.target.value) : null)}
+                  className={inputClassName}
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">שכר שעתי</label>
+              )}
+            />
+            <AdminPanelField
+              label="שכר שעתי"
+              mode="edit"
+              editValue={(
                 <Input
                   type="number"
                   dir="ltr"
                   value={selectValue(adminForm.salary_expectation_hourly)}
-                  onChange={(e) =>
-                    setAf(
-                      "salary_expectation_hourly",
-                      e.target.value ? Number(e.target.value) : null,
-                    )
-                  }
-                  className="rounded-xl"
+                  onChange={(event) => setAf("salary_expectation_hourly", event.target.value ? Number(event.target.value) : null)}
+                  className={inputClassName}
                 />
-              </div>
-              <div className="col-span-2">
-                <DictionaryMultiSelect
-                  label="שפות"
-                  options={dicts?.languages ?? []}
-                  value={adminForm.languages}
-                  onChange={(value) => setAf("languages", value)}
-                  placeholder="חיפוש שפה..."
-                  grid
-                />
-              </div>
-              <div className="col-span-2">
-                <DictionaryMultiSelect
-                  label="סוגי שכר רלוונטיים"
-                  options={dicts?.salaryTypes ?? []}
-                  value={adminForm.candidate_salary_type_ids}
-                  onChange={(value) => setAf("candidate_salary_type_ids", value)}
-                  placeholder="חיפוש סוג שכר..."
-                />
-              </div>
-              <label className="col-span-2 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <span>יש קורות חיים</span>
-                <input
-                  type="checkbox"
-                  checked={Boolean(adminForm.has_cv)}
-                  onChange={(e) => setAf("has_cv", e.target.checked)}
-                  className="h-4 w-4 rounded border-slate-300 accent-teal-600"
-                />
-              </label>
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">לינק לקורות חיים</label>
+              )}
+            />
+            <div className="sm:col-span-2">
+              <DictionaryMultiSelect
+                label="שפות"
+                options={dicts?.languages ?? []}
+                value={adminForm.languages}
+                onChange={(value) => setAf("languages", value)}
+                placeholder="חיפוש שפה..."
+                grid
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <DictionaryMultiSelect
+                label="סוגי שכר רלוונטיים"
+                options={dicts?.salaryTypes ?? []}
+                value={adminForm.candidate_salary_type_ids}
+                onChange={(value) => setAf("candidate_salary_type_ids", value)}
+                placeholder="חיפוש סוג שכר..."
+              />
+            </div>
+            <AdminPanelField
+              label="יש קורות חיים"
+              mode="edit"
+              fullWidth
+              editValue={(
+                <label className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <span>{Boolean(adminForm.has_cv) ? "כן" : "לא"}</span>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(adminForm.has_cv)}
+                    onChange={(event) => setAf("has_cv", event.target.checked)}
+                    className="h-4 w-4 rounded border-slate-300 accent-teal-600"
+                  />
+                </label>
+              )}
+            />
+            <AdminPanelField
+              label="לינק לקורות חיים"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Input
                   dir="ltr"
                   value={selectValue(adminForm.cv_link)}
-                  onChange={(e) => setAf("cv_link", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("cv_link", event.target.value)}
+                  className={inputClassName}
                   placeholder="https://..."
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">תאריך קבלת קו״ח</label>
+              )}
+            />
+            <AdminPanelField
+              label="תאריך קבלת קו״ח"
+              mode="edit"
+              editValue={(
                 <Input
                   type="date"
                   dir="ltr"
                   value={String(adminForm.cv_received_date ?? "").slice(0, 10)}
-                  onChange={(e) => setAf("cv_received_date", e.target.value || null)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("cv_received_date", event.target.value || null)}
+                  className={inputClassName}
                 />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">לינק תיק עבודות</label>
+              )}
+            />
+            <AdminPanelField
+              label="לינק תיק עבודות"
+              mode="edit"
+              editValue={(
                 <Input
                   dir="ltr"
                   value={selectValue(adminForm.portfolio_url)}
-                  onChange={(e) => setAf("portfolio_url", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("portfolio_url", event.target.value)}
+                  className={inputClassName}
                   placeholder="https://..."
                 />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">לינק המלצות</label>
+              )}
+            />
+            <AdminPanelField
+              label="לינק המלצות"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Input
                   dir="ltr"
                   value={selectValue(adminForm.recommendations_url)}
-                  onChange={(e) => setAf("recommendations_url", e.target.value)}
-                  className="rounded-xl"
+                  onChange={(event) => setAf("recommendations_url", event.target.value)}
+                  className={inputClassName}
                   placeholder="https://..."
                 />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">פרופיל מקצועי</label>
+              )}
+            />
+            <AdminPanelField
+              label="פרופיל מקצועי"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Textarea
                   dir="rtl"
                   rows={4}
                   value={selectValue(adminForm.personal_summary)}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setAf("personal_summary", e.target.value)
-                  }
+                  onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setAf("personal_summary", event.target.value)}
                   className="rounded-xl border-slate-200 bg-slate-50"
                 />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">השכלה</label>
+              )}
+            />
+            <AdminPanelField
+              label="השכלה"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Textarea
                   dir="rtl"
                   rows={3}
                   value={selectValue(adminForm.academic_education)}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setAf("academic_education", e.target.value)
-                  }
+                  onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setAf("academic_education", event.target.value)}
                   className="rounded-xl border-slate-200 bg-slate-50"
                 />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">קורסים והסמכות</label>
+              )}
+            />
+            <AdminPanelField
+              label="קורסים והסמכות"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Textarea
                   dir="rtl"
                   rows={3}
                   value={selectValue(adminForm.professional_courses)}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setAf("professional_courses", e.target.value)
-                  }
+                  onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setAf("professional_courses", event.target.value)}
                   className="rounded-xl border-slate-200 bg-slate-50"
                 />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-xs text-slate-500">כישורים נוספים</label>
+              )}
+            />
+            <AdminPanelField
+              label="כישורים נוספים"
+              mode="edit"
+              fullWidth
+              editValue={(
                 <Textarea
                   dir="rtl"
                   rows={2}
                   value={selectValue(adminForm.additional_skills_notes)}
-                  onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-                    setAf("additional_skills_notes", e.target.value)
-                  }
+                  onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setAf("additional_skills_notes", event.target.value)}
                   className="rounded-xl border-slate-200 bg-slate-50"
                 />
-              </div>
-            </div>
-          </div>
+              )}
+            />
+          </AdminPanelSection>
 
-          {/* סטטוסים — אדמין בלבד */}
-          <div>
-            {sectionTitle("🔒 סטטוסים — אדמין בלבד", true)}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">סטטוס בדיקה</label>
+          <AdminPanelSection title="🔒 סטטוסים — אדמין בלבד">
+            <AdminPanelField
+              label="סטטוס בדיקה"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.check_status)}
-                  onChange={(e) =>
-                    setAf("check_status", e.target.value ? Number(e.target.value) : null)
-                  }
+                  onChange={(event) => setAf("check_status", event.target.value ? Number(event.target.value) : null)}
                 >
                   <option value="">— בחר —</option>
-                  {dicts?.checkStatuses.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                  {dicts?.checkStatuses.map((status) => (
+                    <option key={status.id} value={status.id}>{status.name}</option>
                   ))}
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">סטטוס קשר במדיה חברתית</label>
+              )}
+            />
+            <AdminPanelField
+              label="סטטוס קשר במדיה חברתית"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.social_status)}
-                  onChange={(e) =>
-                    setAf("social_status", e.target.value ? Number(e.target.value) : null)
-                  }
+                  onChange={(event) => setAf("social_status", event.target.value ? Number(event.target.value) : null)}
                 >
                   <option value="">— בחר —</option>
-                  {dicts?.socialStatuses.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                  {dicts?.socialStatuses.map((status) => (
+                    <option key={status.id} value={status.id}>{status.name}</option>
                   ))}
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">מקור</label>
+              )}
+            />
+            <AdminPanelField
+              label="מקור"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.source)}
-                  onChange={(e) =>
-                    setAf("source", e.target.value ? Number(e.target.value) : null)
-                  }
+                  onChange={(event) => setAf("source", event.target.value ? Number(event.target.value) : null)}
                 >
                   <option value="">— בחר —</option>
-                  {dicts?.sources.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                  {dicts?.sources.map((source) => (
+                    <option key={source.id} value={source.id}>{source.name}</option>
                   ))}
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">סוג פרופיל</label>
+              )}
+            />
+            <AdminPanelField
+              label="סוג פרופיל"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.profile_type)}
-                  onChange={(e) =>
-                    setAf("profile_type", e.target.value ? Number(e.target.value) : null)
-                  }
+                  onChange={(event) => setAf("profile_type", event.target.value ? Number(event.target.value) : null)}
                 >
                   <option value="">— בחר —</option>
-                  {dicts?.profileTypes.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
+                  {dicts?.profileTypes.map((profileType) => (
+                    <option key={profileType.id} value={profileType.id}>{profileType.name}</option>
                   ))}
                 </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs text-slate-500">סטטוס תעסוקה</label>
+              )}
+            />
+            <AdminPanelField
+              label="סטטוס תעסוקה"
+              mode="edit"
+              editValue={(
                 <select
-                  className={selectCls}
+                  className={selectClassName}
                   value={selectValue(adminForm.work_status)}
-                  onChange={(e) =>
-                    setAf("work_status", e.target.value ? Number(e.target.value) : null)
-                  }
+                  onChange={(event) => setAf("work_status", event.target.value ? Number(event.target.value) : null)}
                 >
                   <option value="">— בחר —</option>
-                  {dicts?.workStatuses.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                  {dicts?.workStatuses.map((status) => (
+                    <option key={status.id} value={status.id}>{status.name}</option>
                   ))}
                 </select>
-              </div>
-            </div>
-          </div>
+              )}
+            />
+          </AdminPanelSection>
         </div>
 
-        <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)} className="rounded-xl">
-            ביטול
-          </Button>
-          <Button
-            disabled={saving}
-            className="rounded-xl text-white"
-            style={{ backgroundColor: BRAND_PRIMARY }}
-            onClick={handleSave}
-          >
-            {saving ? (
-              <>
-                <Loader2 className="me-2 h-4 w-4 animate-spin" />
-                שומר...
-              </>
-            ) : (
-              "שמור שינויים"
-            )}
-          </Button>
+        <div className="mt-2 border-t border-slate-100 pt-4">
+          <AdminPanelActions
+            mode="edit"
+            onClose={() => onOpenChange(false)}
+            onCancelEdit={() => onOpenChange(false)}
+            onSave={handleSave}
+            saving={saving}
+            saveLabel="שמור שינויים"
+          />
         </div>
       </DialogContent>
     </Dialog>

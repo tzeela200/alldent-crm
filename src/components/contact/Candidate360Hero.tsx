@@ -1,6 +1,9 @@
 import React from "react";
 import type { ContactRow, Contact360Dicts } from "@/hooks/useContact360";
 import { Badge } from "@/components/ui/badge";
+import { RoleBadge } from "@/components/admin/RoleBadge";
+import { getRoleColorHex } from "@/lib/roleColors";
+import { applicationHasCv, openApplicationCv } from "@/lib/cv";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -17,28 +20,6 @@ import {
 } from "lucide-react";
 
 const BRAND_PRIMARY = "#008080";
-
-const ROLE_COLORS = {
-  specialists: "#086df4",
-  dentists: "#0cc0df",
-  hygienist: "#d10383",
-  assistant: "#774196",
-  secretary: "#ff751f",
-  management: "#076911",
-  technician: "#d4a800",
-} as const;
-
-function getRoleAccentColor(roleName?: string | null) {
-  const normalized = String(roleName ?? "").toLowerCase();
-  if (normalized.includes("רופא")) return ROLE_COLORS.dentists;
-  if (normalized.includes("שיננ") || normalized.includes("hygien")) return ROLE_COLORS.hygienist;
-  if (normalized.includes("סייע") || normalized.includes("assist")) return ROLE_COLORS.assistant;
-  if (normalized.includes("מזכיר") || normalized.includes("secret")) return ROLE_COLORS.secretary;
-  if (normalized.includes("ניהול") || normalized.includes("מנהל") || normalized.includes("management")) return ROLE_COLORS.management;
-  if (normalized.includes("טכנ") || normalized.includes("technician")) return ROLE_COLORS.technician;
-  if (normalized.includes("מומח") || normalized.includes("special")) return ROLE_COLORS.specialists;
-  return BRAND_PRIMARY;
-}
 
 function dictName(items: { id: number; name: string }[], value: number | string | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -66,15 +47,6 @@ function buildWhatsAppLink(phone: string) {
   return `https://wa.me/${intl}`;
 }
 
-function isValidHttpUrl(s?: string | null): boolean {
-  try {
-    const u = new URL(s ?? "");
-    return u.protocol === "http:" || u.protocol === "https:";
-  } catch {
-    return false;
-  }
-}
-
 function availabilityBadgeClass(id: number | null): string {
   const n = Number(id);
   if (n === 1 || n === 2 || n === 7) return "border-emerald-200 bg-emerald-50 text-emerald-700";
@@ -84,11 +56,18 @@ function availabilityBadgeClass(id: number | null): string {
 }
 
 function checkBadgeClass(status: number | null | undefined): string {
-  const n = Number(status);
-  if (n === 3) return "border-emerald-200 bg-emerald-50 text-emerald-700";
-  if (n === 2) return "border-red-200 bg-red-50 text-red-700";
-  if (n === 4) return "border-blue-200 bg-blue-50 text-blue-700";
-  return "border-amber-200 bg-amber-50 text-amber-700";
+  switch (Number(status)) {
+    case 1:
+      return "border-amber-200 bg-amber-50 text-amber-700";
+    case 2:
+      return "border-red-200 bg-red-50 text-red-700";
+    case 3:
+      return "border-emerald-200 bg-emerald-50 text-emerald-700";
+    case 4:
+      return "border-blue-200 bg-blue-50 text-blue-700";
+    default:
+      return "border-slate-200 bg-slate-100 text-slate-700";
+  }
 }
 
 function formatDate(value?: string | null) {
@@ -156,7 +135,7 @@ export function Candidate360Hero({
   onToggleStatusDropdown,
 }: Props) {
   const roleName = dictName(dicts?.roles ?? [], contact.role);
-  const roleAccentColor = getRoleAccentColor(roleName);
+  const roleAccentColor = getRoleColorHex(contact.role);
 
   const subRoleParts = toNumberArray(contact.sub_role).map((id) =>
     dictName(dicts?.subRoles ?? [], id),
@@ -171,7 +150,7 @@ export function Candidate360Hero({
     .filter((t) => t && t !== "—" && !/^\d+$/.test(t))
     .join(" · ");
 
-  const canOpenCv = Boolean(contact.has_cv && isValidHttpUrl(contact.cv_link));
+  const hasCv = applicationHasCv(contact);
   const firstAvailabilityId = toNumberArray(contact.candidate_availability_ids)[0] ?? null;
 
   return (
@@ -206,16 +185,7 @@ export function Candidate360Hero({
                 {/* Badges */}
                 <div className="flex flex-wrap items-center gap-2 border-t border-[#E2E8F0] pt-4">
                   {roleName !== "—" && (
-                    <Badge
-                      className="h-[30px] rounded-full border px-3 text-xs font-semibold shadow-none"
-                      style={{
-                        borderColor: `${roleAccentColor}33`,
-                        backgroundColor: `${roleAccentColor}12`,
-                        color: roleAccentColor,
-                      }}
-                    >
-                      {roleName}
-                    </Badge>
+                    <RoleBadge roleId={contact.role} label={roleName} />
                   )}
                   {toNumberArray(contact.candidate_availability_ids).length > 0 && (
                     <Badge
@@ -230,10 +200,15 @@ export function Candidate360Hero({
                     {dictName(dicts?.checkStatuses ?? [], contact.check_status)}
                   </Badge>
                   <Badge
-                    className={`h-[30px] rounded-full border px-3 text-xs font-semibold shadow-none ${canOpenCv ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}
+                    className={`h-[30px] rounded-full border px-3 text-xs font-semibold shadow-none ${hasCv ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-red-200 bg-red-50 text-red-700"}`}
                   >
-                    {canOpenCv ? "קו״ח זמין" : "ללא קו״ח"}
+                    {hasCv ? "קו״ח זמין" : "ללא קו״ח"}
                   </Badge>
+                  {contact.cv_received_date && (
+                    <Badge variant="outline" className="h-[30px] rounded-full border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600">
+                      קו״ח התקבלו: {formatDate(contact.cv_received_date)}
+                    </Badge>
+                  )}
                   {contact.experience != null && (
                     <Badge
                       variant="outline"
@@ -338,20 +313,20 @@ export function Candidate360Hero({
                 </a>
               )}
 
-              {canOpenCv && (
-                <a href={contact.cv_link ?? undefined} target="_blank" rel="noreferrer">
-                  <Button
-                    variant="outline"
-                    className="h-10 rounded-xl border-slate-200 bg-white px-4 text-slate-800 hover:bg-[#F3F4F6]"
-                  >
-                    <FileText className="me-2 h-4 w-4" />
-                    קו״ח
-                  </Button>
-                </a>
+              {hasCv && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-10 rounded-xl border-slate-200 bg-white px-4 text-slate-800 hover:bg-[#F3F4F6]"
+                  onClick={() => void openApplicationCv(contact)}
+                >
+                  <FileText className="me-2 h-4 w-4" />
+                  קו״ח
+                </Button>
               )}
 
               <a
-                href={`/profile/${contact.profile_token ?? resolvedId}`}
+                href={contact.profile_token ? `/profile/${encodeURIComponent(contact.profile_token)}` : `/candidate/${resolvedId}`}
                 target="_blank"
                 rel="noreferrer"
               >
