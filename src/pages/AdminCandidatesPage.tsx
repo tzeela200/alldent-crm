@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
   Briefcase,
@@ -10,7 +10,6 @@ import {
   Download,
   Edit2,
   Eye,
-  MoreHorizontal,
   Phone,
   Plus,
   RefreshCw,
@@ -28,23 +27,21 @@ import {
   SearchBar,
   SelectFilter,
   ActionButton,
-  Pagination,
-  EmptyState,
 } from '@/components/layout/Shell'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
-import { SortableTh } from '@/components/ui/SortableTh'
 import { RegionBadge } from '@/components/admin/RegionBadge'
 import { RoleBadge } from '@/components/admin/RoleBadge'
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-} from '@/components/ui/dropdown-menu'
+import SidePanel from '@/components/ui/SidePanel'
+import { AdminTable, type AdminColumn } from '@/components/admin/AdminTable'
+import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
+import { AdminActionsMenu, type AdminActionMenuItem } from '@/components/admin/AdminActionsMenu'
+import { AdminPanelSection } from '@/components/admin/AdminPanelSection'
+import { AdminPanelField } from '@/components/admin/AdminPanelField'
+import { StatusBadge } from '@/components/admin/StatusBadge'
 import { formatPhone as libFormatPhone } from '@/lib/normalizePhone'
 import {
   DICT_CHECK_STATUSES,
@@ -225,6 +222,7 @@ function toneClass(tone: 'default' | 'success' | 'warning' | 'danger' | 'muted' 
 
 export default function AdminCandidatesPage() {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
 
   const [activeTab, setActiveTab] = useState<ActiveTab>('active')
   const [filters, setFilters] = useState<ExtendedCandidateFilters>({})
@@ -256,7 +254,7 @@ export default function AdminCandidatesPage() {
   }
 
   // ── Tab A: active candidates from rel_contact_profiles ──────────────────
-  const { data: candidateIds = [] } = useQuery<number[]>({
+  const { data: candidateIds = [], isLoading: candidateIdsLoading, isError: candidateIdsError } = useQuery<number[]>({
     queryKey: ['candidate-ids'],
     queryFn: async () => {
       const { data, error } = await supabase.from('rel_contact_profiles').select('contact_id').eq('profile_type_id', 1)
@@ -266,7 +264,7 @@ export default function AdminCandidatesPage() {
     staleTime: 60_000,
   })
 
-  const { data: rawContacts = [] } = useQuery<Contact[]>({
+  const { data: rawContacts = [], isLoading: rawContactsLoading, isError: rawContactsError } = useQuery<Contact[]>({
     queryKey: ['contacts', 'candidates', candidateIds],
     queryFn: async () => {
       if (candidateIds.length === 0) return []
@@ -279,7 +277,7 @@ export default function AdminCandidatesPage() {
   })
 
   // ── Tab B: job seekers by work_status ────────────────────────────────────
-  const { data: seekerContacts = [] } = useQuery<Contact[]>({
+  const { data: seekerContacts = [], isLoading: seekerLoading, isError: seekerError } = useQuery<Contact[]>({
     queryKey: ['contacts', 'seekers'],
     queryFn: async () => {
       const { data, error } = await supabase.from('contact').select('*').in('work_status', [1, 2, 6]).order('contact_id')
@@ -359,7 +357,7 @@ export default function AdminCandidatesPage() {
   })
 
   // ── Tags ──────────────────────────────────────────────────────────────────
-  const { data: allTagRows = [] } = useQuery<TagRow[]>({
+  const { data: allTagRows = [], isError: allTagRowsError } = useQuery<TagRow[]>({
     queryKey: ['contact_tags_all'],
     queryFn: async () => {
       const { data, error } = await supabase.from('contact_tags').select('id,contact_id,tag,tag_id')
@@ -413,7 +411,7 @@ export default function AdminCandidatesPage() {
   )
 
   // ── Applications bulk fetch ────────────────────────────────────────────────
-  const { data: allApplications = [] } = useQuery<{ application_id: number; candidate_link: number | null; application_status: number | null }[]>({
+  const { data: allApplications = [], isError: allApplicationsError } = useQuery<{ application_id: number; candidate_link: number | null; application_status: number | null }[]>({
     queryKey: ['candidate_applications_bulk', currentContactIds],
     queryFn: async () => {
       if (currentContactIds.length === 0) return []
@@ -619,7 +617,6 @@ export default function AdminCandidatesPage() {
     })
   }, [filteredCandidates, sortBy, sortDir])
 
-  const totalPages = Math.max(1, Math.ceil(sortedCandidates.length / PAGE_SIZE))
   const pageData = sortedCandidates.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const selectedCandidate = useMemo(
@@ -842,8 +839,6 @@ export default function AdminCandidatesPage() {
     }
   }
 
-  const selectedCount = selectedRows.length
-
   // ── Legacy tag warning (dev) ───────────────────────────────────────────────
   useEffect(() => {
     if (!allTagRows.length) return
@@ -853,6 +848,197 @@ export default function AdminCandidatesPage() {
       console.warn(`[tags-migration] ${legacyRows.length} contact_tags rows have text tag but no tag_id:`, uniqueTexts)
     }
   }, [allTagRows])
+
+  // ── Selection / loading / error adapters for AdminTable ────────────────────
+  const selectedPageIds = pageData.map((c) => String(c.contact_id))
+  const selectedIdStrings = selectedRows.map(String)
+  const allPageRowsSelected = selectedPageIds.length > 0 && selectedPageIds.every((id) => selectedIdStrings.includes(id))
+  const somePageRowsSelected = selectedPageIds.some((id) => selectedIdStrings.includes(id))
+  const hasActiveFilters = Object.values(filters).some((v) => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== null && v !== ''))
+
+  const isTableLoading = activeTab === 'active' ? candidateIdsLoading || rawContactsLoading : seekerLoading
+  const tableError =
+    (activeTab === 'active' ? candidateIdsError || rawContactsError : seekerError) || allApplicationsError || allTagRowsError
+      ? 'אירעה שגיאה בטעינת המועמדים. נסה לרענן.'
+      : undefined
+
+  // ── Column definitions (fixed ALL_COLUMNS order, filtered by visibleColumns) ─
+  const candidateColumns: AdminColumn<CandidateView>[] = []
+  if (visibleColumns.includes('name')) {
+    candidateColumns.push({
+      key: 'name', label: 'שם', sortable: true, minWidth: '210px',
+      render: (candidate) => (
+        <div className="min-w-[200px] space-y-1 py-2">
+          <div className="text-[14px] font-bold text-[#0F172A]">
+            {candidate.full_name ?? candidate.display_name ?? '—'}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {candidate.derived.highPotential && <SignalChip tone="accent">פוטנציאל גבוה</SignalChip>}
+            {candidate.derived.partialLocation && <SignalChip tone="muted">מיקום חלקי</SignalChip>}
+          </div>
+        </div>
+      ),
+    })
+  }
+  if (visibleColumns.includes('phone')) {
+    candidateColumns.push({
+      key: 'phone', label: 'נייד', sortable: true, nowrap: true, minWidth: '140px',
+      render: (candidate) => {
+        const pn = (candidate as any).phone_norm
+        return <div className="font-semibold text-slate-700">{pn ? formatPhone(pn) : '—'}</div>
+      },
+    })
+  }
+  if (visibleColumns.includes('email')) {
+    candidateColumns.push({
+      key: 'email', label: 'אימייל', sortable: true, minWidth: '200px',
+      render: (candidate) => <span dir="ltr" className="text-slate-600">{candidate.email || '—'}</span>,
+    })
+  }
+  if (visibleColumns.includes('role')) {
+    candidateColumns.push({
+      key: 'role', label: 'תפקיד מועמד', sortable: true, minWidth: '150px',
+      render: (candidate) => <RoleBadge label={roleName(candidate.role)} roleId={Number(candidate.role)} />,
+    })
+  }
+  if (visibleColumns.includes('sub_role')) {
+    candidateColumns.push({
+      key: 'sub_role', label: 'תת־תפקיד', minWidth: '140px',
+      render: (candidate) => subRoleName(candidate.sub_role),
+    })
+  }
+  if (visibleColumns.includes('experience')) {
+    candidateColumns.push({
+      key: 'experience', label: 'ניסיון', sortable: true, minWidth: '110px',
+      render: (candidate) => experienceName(candidate.experience),
+    })
+  }
+  if (visibleColumns.includes('availability')) {
+    candidateColumns.push({
+      key: 'availability', label: 'זמינות', minWidth: '180px',
+      render: (candidate) => (candidate.candidate_availability_ids ?? []).length ? (
+        <div className="flex flex-wrap gap-1 py-2">
+          {(candidate.candidate_availability_ids ?? []).map((id) => (
+            <CandidateAttributeBadge key={id} tone={availabilityTone(id)}>{availabilityName(id)}</CandidateAttributeBadge>
+          ))}
+        </div>
+      ) : <span className="text-slate-400">—</span>,
+    })
+  }
+  if (visibleColumns.includes('work_status')) {
+    candidateColumns.push({
+      key: 'work_status', label: 'סטטוס תעסוקה', sortable: true, minWidth: '140px',
+      render: (candidate) => <LightChip>{workStatusName((candidate as any).work_status)}</LightChip>,
+    })
+  }
+  if (visibleColumns.includes('scope')) {
+    candidateColumns.push({
+      key: 'scope', label: 'היקף מועדף', minWidth: '120px',
+      render: (candidate) => candidate.preferred_scope ?? '—',
+    })
+  }
+  if (visibleColumns.includes('languages')) {
+    candidateColumns.push({
+      key: 'languages', label: 'שפות', minWidth: '160px',
+      render: (candidate) => <div className="max-w-[180px] whitespace-normal">{languagesName(candidate.languages)}</div>,
+    })
+  }
+  if (visibleColumns.includes('city')) {
+    candidateColumns.push({
+      key: 'city', label: 'עיר מועמד', sortable: true, minWidth: '130px',
+      render: (candidate) => <LightChip>{cityName(candidate.city_id)}</LightChip>,
+    })
+  }
+  if (visibleColumns.includes('region')) {
+    candidateColumns.push({
+      key: 'region', label: 'אזור מועמד', sortable: true, minWidth: '140px',
+      render: (candidate) => <RegionBadge regionId={candidate.region_id} label={regionName(candidate.region_id)} />,
+    })
+  }
+  if (visibleColumns.includes('cv')) {
+    candidateColumns.push({
+      key: 'cv', label: 'קו"ח', sortable: true, minWidth: '100px',
+      render: (candidate) => (
+        <CandidateAttributeBadge tone={candidate.derived.hasCv ? 'success' : 'muted'}>
+          {candidate.derived.hasCv ? 'יש קו"ח' : 'ללא קו"ח'}
+        </CandidateAttributeBadge>
+      ),
+    })
+  }
+  if (visibleColumns.includes('tags')) {
+    candidateColumns.push({
+      key: 'tags', label: 'תגיות', minWidth: '200px',
+      render: (candidate) => (
+        <div className="flex max-w-[220px] flex-wrap gap-1.5 py-2">
+          {candidate.mergedTagNames.length ? (
+            candidate.mergedTagNames.map((tagName, idx) => (
+              <TagChip key={`${candidate.contact_id}-${idx}`}>{tagName}</TagChip>
+            ))
+          ) : (
+            <span className="text-slate-400">ללא תגיות</span>
+          )}
+        </div>
+      ),
+    })
+  }
+  if (visibleColumns.includes('salary')) {
+    candidateColumns.push({
+      key: 'salary', label: 'ציפיות שכר', sortable: true, nowrap: true, minWidth: '140px',
+      render: (candidate) => formatSalary((candidate as any).salary_expectation_hourly, (candidate as any).salary_expectation_monthly),
+    })
+  }
+  if (visibleColumns.includes('active_apps')) {
+    candidateColumns.push({
+      key: 'active_apps', label: 'הגשות פעילות', sortable: true, minWidth: '120px',
+      render: (candidate) => (
+        <span className={`rounded-md px-2.5 py-1 text-[12px] font-bold ${
+          candidate.derived.activeAppsCount > 0 ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-500'
+        }`}>
+          {candidate.derived.activeAppsCount}
+        </span>
+      ),
+    })
+  }
+  if (visibleColumns.includes('prev_apps')) {
+    candidateColumns.push({
+      key: 'prev_apps', label: 'הגשות קודמות', sortable: true, minWidth: '120px',
+      render: (candidate) => (
+        <span className="rounded-md bg-slate-900 px-2.5 py-1 text-[12px] font-bold text-white">
+          {candidate.derived.totalAppsCount}
+        </span>
+      ),
+    })
+  }
+  candidateColumns.push({
+    key: 'actions', label: 'פעולות', width: '72px', headerClassName: 'text-center', cellClassName: 'text-center',
+    render: (candidate) => {
+      const pn = (candidate as any).phone_norm
+      const phone = (candidate as any).phone
+      const items: AdminActionMenuItem[] = [
+        {
+          key: 'open-360', label: 'פתיחת 360', icon: <Eye className="h-4 w-4" />,
+          onClick: () => navigate(`/admin/candidates/${candidate.contact_id}`),
+        },
+        {
+          key: 'whatsapp', label: 'וואטסאפ', icon: <Phone className="h-4 w-4" />, disabled: !candidate.derived.hasPhone,
+          onClick: () => { const n = normalizeDigits(pn ?? phone); if (n) window.open(`https://wa.me/${n}`, '_blank') },
+        },
+        {
+          key: 'create-application', label: 'יצירת הגשה', icon: <Briefcase className="h-4 w-4" />,
+          onClick: () => openCreateApplication(candidate.contact_id),
+        },
+        {
+          key: 'smart-match', label: 'סמארט מאץ׳', icon: <WandSparkles className="h-4 w-4" />,
+          onClick: () => showToast('פתיחת Smart Match', 'info'),
+        },
+      ]
+      return (
+        <div onClick={(e) => e.stopPropagation()}>
+          <AdminActionsMenu items={items} ariaLabel={`פעולות עבור ${candidate.full_name ?? candidate.display_name ?? 'מועמד'}`} />
+        </div>
+      )
+    },
+  })
 
   return (
     <Shell
@@ -1066,431 +1252,227 @@ export default function AdminCandidatesPage() {
             </div>
           </Toolbar>
 
-          {/* ── Bulk action toolbar ───────────────────────────────────────── */}
-          {selectedCount > 0 && (
-            <Toolbar>
-              <div className="rounded-2xl border border-[#D97706]/20 bg-[#FFFBEB] p-4 shadow-sm">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="rounded-[8px] bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">
-                      נבחרו {selectedCount} מועמדים
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2">
-                      <select
-                        value={bulkTagAction}
-                        onChange={(e) => setBulkTagAction(e.target.value as BulkTagAction)}
-                        className="bg-transparent text-[13px] outline-none"
-                      >
-                        <option value="">פעולת תגית</option>
-                        <option value="add">הוספת תגית</option>
-                        <option value="remove">הסרת תגית</option>
-                      </select>
-                      <select
-                        value={bulkTagValue}
-                        onChange={(e) => setBulkTagValue(e.target.value)}
-                        className="bg-transparent text-[13px] outline-none"
-                      >
-                        <option value="">בחר תגית</option>
-                        {candidateTagOptions.map((tag) => (
-                          <option key={tag.id} value={String(tag.id)}>{tag.name}</option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        onClick={applyBulkTagAction}
-                        className="rounded-lg bg-[#008080] px-3 py-1 text-[12px] font-bold text-white"
-                      >
-                        החל
-                      </button>
-                    </div>
-                    <SmallActionButton onClick={exportCsv}>ייצוא</SmallActionButton>
-                  </div>
-                </div>
-              </div>
-            </Toolbar>
-          )}
-
           {/* ── Table ────────────────────────────────────────────────────── */}
           <Toolbar>
-            {pageData.length === 0 ? (
-              <div className="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-                <EmptyState
-                  icon={UserCheck}
-                  title={currentPoolContacts.length === 0 ? 'אין מועמדים עדיין' : 'לא נמצאו מועמדים'}
-                  description={currentPoolContacts.length === 0 ? 'אין נתונים בתצוגה הנוכחית' : 'שנה את הפילטרים'}
+            <AdminTable<CandidateView>
+              columns={candidateColumns}
+              data={pageData}
+              keyField="contact_id"
+              onRowClick={(candidate) => openQuickSheet(candidate.contact_id)}
+              selectedIds={selectedIdStrings}
+              onSelectId={(id) => toggleRow(Number(id))}
+              allSelected={allPageRowsSelected}
+              someSelected={somePageRowsSelected}
+              onSelectAll={togglePageRows}
+              sortKey={sortBy ?? undefined}
+              sortDir={sortDir}
+              onSort={onSort}
+              isLoading={isTableLoading}
+              hasActiveFilter={hasActiveFilters}
+              error={tableError}
+              emptyMessage="אין מועמדים עדיין"
+              noResultsMessage="לא נמצאו מועמדים"
+              minWidth="1700px"
+              bulkActions={
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1.5">
+                    <select
+                      value={bulkTagAction}
+                      onChange={(e) => setBulkTagAction(e.target.value as BulkTagAction)}
+                      className="bg-transparent text-[13px] outline-none"
+                    >
+                      <option value="">פעולת תגית</option>
+                      <option value="add">הוספת תגית</option>
+                      <option value="remove">הסרת תגית</option>
+                    </select>
+                    <select
+                      value={bulkTagValue}
+                      onChange={(e) => setBulkTagValue(e.target.value)}
+                      className="bg-transparent text-[13px] outline-none"
+                    >
+                      <option value="">בחר תגית</option>
+                      {candidateTagOptions.map((tag) => (
+                        <option key={tag.id} value={String(tag.id)}>{tag.name}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={applyBulkTagAction}
+                      className="rounded-lg bg-[#008080] px-3 py-1 text-[12px] font-bold text-white"
+                    >
+                      החל
+                    </button>
+                  </div>
+                  <SmallActionButton onClick={exportCsv}>ייצוא</SmallActionButton>
+                </div>
+              }
+              pagination={
+                <AdminTablePagination
+                  page={page + 1}
+                  pageSize={PAGE_SIZE}
+                  total={filteredCandidates.length}
+                  onPageChange={(nextPage) => setPage(nextPage - 1)}
                 />
-              </div>
-            ) : (
-              <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div className="overflow-x-auto">
-                  <table className="min-w-[1700px] w-full border-collapse">
-                    <thead className="bg-[#F9FAFB]">
-                      <tr className="border-b border-[#D9D9D9] text-right text-[12px] font-semibold text-[#6B6B6B]">
-                        <th className="px-3 py-3">
-                          <input
-                            type="checkbox"
-                            checked={pageData.length > 0 && pageData.every((row) => selectedRows.includes(row.contact_id))}
-                            onChange={togglePageRows}
-                            className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
-                          />
-                        </th>
-                        {visibleColumns.includes('name') && <SortableTh label="שם" sortKey="name" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('phone') && <SortableTh label="נייד" sortKey="phone" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('email') && <SortableTh label="אימייל" sortKey="email" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('role') && <SortableTh label="תפקיד מועמד" sortKey="role" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('sub_role') && <th className="px-3 py-3">תת־תפקיד</th>}
-                        {visibleColumns.includes('experience') && <SortableTh label="ניסיון" sortKey="experience" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('availability') && <th className="px-3 py-3">זמינות</th>}
-                        {visibleColumns.includes('work_status') && <SortableTh label="סטטוס תעסוקה" sortKey="work_status" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('scope') && <th className="px-3 py-3">היקף מועדף</th>}
-                        {visibleColumns.includes('languages') && <th className="px-3 py-3">שפות</th>}
-                        {visibleColumns.includes('city') && <SortableTh label="עיר מועמד" sortKey="city" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('region') && <SortableTh label="אזור מועמד" sortKey="region" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('cv') && <SortableTh label={'קו"ח'} sortKey="cv" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('tags') && <th className="px-3 py-3">תגיות</th>}
-                        {visibleColumns.includes('salary') && <SortableTh label="ציפיות שכר" sortKey="salary" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('active_apps') && <SortableTh label="הגשות פעילות" sortKey="active_apps" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        {visibleColumns.includes('prev_apps') && <SortableTh label="הגשות קודמות" sortKey="prev_apps" sortBy={sortBy} sortDir={sortDir} onSort={onSort} />}
-                        <th className="px-3 py-3 text-center">פעולות</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[#F3F4F6] bg-white">
-                      {pageData.map((candidate) => {
-                        const selected = selectedRows.includes(candidate.contact_id)
-                        const pn = (candidate as any).phone_norm
-                        const phone = (candidate as any).phone
-                        return (
-                          <tr
-                            key={candidate.contact_id}
-                            className={`cursor-pointer text-[13px] font-medium text-[#2D2D2D] transition ${
-                              selected ? 'bg-[#F0FDFC]' : 'hover:bg-[#FAFAF7]'
-                            }`}
-                            onClick={() => openQuickSheet(candidate.contact_id)}
-                          >
-                            <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                              <input
-                                type="checkbox"
-                                checked={selected}
-                                onChange={() => toggleRow(candidate.contact_id)}
-                                className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
-                              />
-                            </td>
-                            {visibleColumns.includes('name') && (
-                              <td className="px-3 py-3">
-                                <div className="min-w-[200px] space-y-1">
-                                  <div className="text-[14px] font-bold text-[#0F172A]">
-                                    {candidate.full_name ?? candidate.display_name ?? '—'}
-                                  </div>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {candidate.derived.highPotential && <SignalChip tone="accent">פוטנציאל גבוה</SignalChip>}
-                                    {candidate.derived.partialLocation && <SignalChip tone="muted">מיקום חלקי</SignalChip>}
-                                  </div>
-                                </div>
-                              </td>
-                            )}
-                            {visibleColumns.includes('phone') && (
-                              <td className="px-3 py-3">
-                                <div className="font-semibold text-slate-700">{pn ? formatPhone(pn) : '—'}</div>
-                              </td>
-                            )}
-                            {visibleColumns.includes('email') && (
-                              <td className="px-3 py-3">
-                                <span dir="ltr" className="text-slate-600">{candidate.email || '—'}</span>
-                              </td>
-                            )}
-                            {visibleColumns.includes('role') && (
-                              <td className="px-3 py-3">
-                                <RoleBadge label={roleName(candidate.role)} roleId={Number(candidate.role)} />
-                              </td>
-                            )}
-                            {visibleColumns.includes('sub_role') && (
-                              <td className="px-3 py-3">{subRoleName(candidate.sub_role)}</td>
-                            )}
-                            {visibleColumns.includes('experience') && (
-                              <td className="px-3 py-3">{experienceName(candidate.experience)}</td>
-                            )}
-                            {visibleColumns.includes('availability') && (
-                              <td className="px-3 py-3">
-                                {(candidate.candidate_availability_ids ?? []).length ? (
-                                  <div className="flex flex-wrap gap-1">
-                                    {(candidate.candidate_availability_ids ?? []).map((id) => (
-                                      <StatusBadge key={id} tone={availabilityTone(id)}>
-                                        {availabilityName(id)}
-                                      </StatusBadge>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-400">—</span>
-                                )}
-                              </td>
-                            )}
-                            {visibleColumns.includes('work_status') && (
-                              <td className="px-3 py-3">
-                                <LightChip>{workStatusName((candidate as any).work_status)}</LightChip>
-                              </td>
-                            )}
-                            {visibleColumns.includes('scope') && (
-                              <td className="px-3 py-3">{candidate.preferred_scope ?? '—'}</td>
-                            )}
-                            {visibleColumns.includes('languages') && (
-                              <td className="px-3 py-3">
-                                <div className="max-w-[180px] whitespace-normal">{languagesName(candidate.languages)}</div>
-                              </td>
-                            )}
-                            {visibleColumns.includes('city') && (
-                              <td className="px-3 py-3"><LightChip>{cityName(candidate.city_id)}</LightChip></td>
-                            )}
-                            {visibleColumns.includes('region') && (
-                              <td className="px-3 py-3"><RegionBadge regionId={candidate.region_id} label={regionName(candidate.region_id)} /></td>
-                            )}
-                            {visibleColumns.includes('cv') && (
-                              <td className="px-3 py-3">
-                                <StatusBadge tone={candidate.derived.hasCv ? 'success' : 'muted'}>
-                                  {candidate.derived.hasCv ? 'יש קו"ח' : 'ללא קו"ח'}
-                                </StatusBadge>
-                              </td>
-                            )}
-                            {visibleColumns.includes('tags') && (
-                              <td className="px-3 py-3">
-                                <div className="flex max-w-[220px] flex-wrap gap-1.5">
-                                  {candidate.mergedTagNames.length ? (
-                                    candidate.mergedTagNames.map((tagName, idx) => (
-                                      <TagChip key={`${candidate.contact_id}-${idx}`}>{tagName}</TagChip>
-                                    ))
-                                  ) : (
-                                    <span className="text-slate-400">ללא תגיות</span>
-                                  )}
-                                </div>
-                              </td>
-                            )}
-                            {visibleColumns.includes('salary') && (
-                              <td className="px-3 py-3">
-                                {formatSalary((candidate as any).salary_expectation_hourly, (candidate as any).salary_expectation_monthly)}
-                              </td>
-                            )}
-                            {visibleColumns.includes('active_apps') && (
-                              <td className="px-3 py-3">
-                                <span className={`rounded-md px-2.5 py-1 text-[12px] font-bold ${
-                                  candidate.derived.activeAppsCount > 0 ? 'bg-teal-50 text-teal-700' : 'bg-slate-100 text-slate-500'
-                                }`}>
-                                  {candidate.derived.activeAppsCount}
-                                </span>
-                              </td>
-                            )}
-                            {visibleColumns.includes('prev_apps') && (
-                              <td className="px-3 py-3">
-                                <span className="rounded-md bg-slate-900 px-2.5 py-1 text-[12px] font-bold text-white">
-                                  {candidate.derived.totalAppsCount}
-                                </span>
-                              </td>
-                            )}
-                            <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex justify-center">
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild>
-                                    <button
-                                      type="button"
-                                      title="פעולות"
-                                      className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] border border-[#D9D9D9] bg-white text-[#6B6B6B] transition hover:text-[#008080] hover:shadow-sm"
-                                    >
-                                      <MoreHorizontal className="h-5 w-5" />
-                                    </button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent>
-                                    <DropdownMenuItem asChild>
-                                      <Link to={`/admin/candidates/${candidate.contact_id}`}>
-                                        <Eye className="h-4 w-4" /> פתיחת 360
-                                      </Link>
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      disabled={!candidate.derived.hasPhone}
-                                      onSelect={() => {
-                                        const n = normalizeDigits(pn ?? phone)
-                                        if (!n) return
-                                        window.open(`https://wa.me/${n}`, '_blank')
-                                      }}
-                                    >
-                                      <Phone className="h-4 w-4" /> וואטסאפ
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => openCreateApplication(candidate.contact_id)}>
-                                      <Briefcase className="h-4 w-4" /> יצירת הגשה
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={() => showToast('פתיחת Smart Match', 'info')}>
-                                      <WandSparkles className="h-4 w-4" /> סמארט מאץ׳
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              </div>
-                            </td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="border-t border-slate-200 bg-white px-3 py-3">
-                  <Pagination page={page} totalPages={totalPages} onPageChange={setPage} totalItems={filteredCandidates.length} />
-                </div>
-              </div>
-            )}
+              }
+            />
           </Toolbar>
         </div>
 
         {/* ── Quick Sheet ───────────────────────────────────────────────── */}
         {sheet.open && selectedCandidate && (
-          <div className="fixed inset-0 z-50 flex justify-start">
-            <div className="absolute inset-0 bg-slate-900/30" onClick={closeQuickSheet} />
-            <aside className="relative z-10 h-full w-full max-w-[600px] overflow-y-auto border-l border-slate-200 bg-white shadow-xl">
-              <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 backdrop-blur-sm">
-                <div className="flex items-start justify-between gap-3 px-5 py-5">
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[22px] font-bold text-[#008080] shadow-sm">
-                      {(selectedCandidate.full_name ?? selectedCandidate.display_name ?? '?').charAt(0)}
+          <SidePanel
+            open
+            onClose={closeQuickSheet}
+            width="max-w-[600px]"
+            header={
+              <div className="flex items-start justify-between gap-3 px-5 py-5">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[22px] font-bold text-[#008080] shadow-sm">
+                    {(selectedCandidate.full_name ?? selectedCandidate.display_name ?? '?').charAt(0)}
+                  </div>
+                  <div className="space-y-2">
+                    <div>
+                      <h2 className="text-[22px] font-bold text-[#0F172A]">
+                        {selectedCandidate.full_name ?? selectedCandidate.display_name ?? '—'}
+                      </h2>
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        <RoleBadge label={roleName(selectedCandidate.role)} roleId={Number(selectedCandidate.role)} />
+                        <LightChip>{availabilityNames(selectedCandidate.candidate_availability_ids)}</LightChip>
+                        <LightChip>{workStatusName((selectedCandidate as any).work_status)}</LightChip>
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <div>
-                        <h2 className="text-[22px] font-bold text-[#0F172A]">
-                          {selectedCandidate.full_name ?? selectedCandidate.display_name ?? '—'}
-                        </h2>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                          <RoleBadge label={roleName(selectedCandidate.role)} roleId={Number(selectedCandidate.role)} />
-                          <LightChip>{availabilityNames(selectedCandidate.candidate_availability_ids)}</LightChip>
-                          <LightChip>{workStatusName((selectedCandidate as any).work_status)}</LightChip>
-                        </div>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <PrimaryLinkAction
-                          to={`/admin/candidates/${selectedCandidate.contact_id}`}
-                          icon={<Eye className="h-4 w-4" />}
-                          label="פתח 360"
-                        />
-                        <QuickActionButton
-                          icon={<Phone className="h-4 w-4" />}
-                          label="וואטסאפ"
-                          onClick={() => {
-                            const n = normalizeDigits((selectedCandidate as any).phone_norm ?? (selectedCandidate as any).phone)
-                            if (!n) { showToast('אין טלפון תקין', 'error'); return }
-                            window.open(`https://wa.me/${n}`, '_blank')
-                          }}
-                        />
-                        <QuickActionButton
-                          icon={<Briefcase className="h-4 w-4" />}
-                          label="יצירת הגשה"
-                          onClick={() => openCreateApplication(selectedCandidate.contact_id)}
-                        />
-                      </div>
+                    <div className="flex flex-wrap gap-2">
+                      <PrimaryLinkAction
+                        to={`/admin/candidates/${selectedCandidate.contact_id}`}
+                        icon={<Eye className="h-4 w-4" />}
+                        label="פתח 360"
+                      />
+                      <QuickActionButton
+                        icon={<Phone className="h-4 w-4" />}
+                        label="וואטסאפ"
+                        onClick={() => {
+                          const n = normalizeDigits((selectedCandidate as any).phone_norm ?? (selectedCandidate as any).phone)
+                          if (!n) { showToast('אין טלפון תקין', 'error'); return }
+                          window.open(`https://wa.me/${n}`, '_blank')
+                        }}
+                      />
+                      <QuickActionButton
+                        icon={<Briefcase className="h-4 w-4" />}
+                        label="יצירת הגשה"
+                        onClick={() => openCreateApplication(selectedCandidate.contact_id)}
+                      />
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={closeQuickSheet}
-                    className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
-                    aria-label="סגור"
-                  >
-                    <X className="h-5 w-5" />
-                  </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={closeQuickSheet}
+                  className="rounded-xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-50"
+                  aria-label="סגור"
+                >
+                  <X className="h-5 w-5" />
+                </button>
               </div>
+            }
+          >
+            <AdminPanelSection title="מידע מהיר">
+              <AdminPanelField label="תפקיד מועמד" mode="view" viewValue={roleName(selectedCandidate.role)} />
+              <AdminPanelField label="זמינות" mode="view" viewValue={availabilityNames(selectedCandidate.candidate_availability_ids)} />
+              <AdminPanelField label="סטטוס תעסוקה" mode="view" viewValue={workStatusName((selectedCandidate as any).work_status)} />
+              <AdminPanelField label="ניסיון" mode="view" viewValue={experienceName(selectedCandidate.experience)} />
+              <AdminPanelField label="שכר" mode="view" viewValue={formatSalary((selectedCandidate as any).salary_expectation_hourly, (selectedCandidate as any).salary_expectation_monthly)} />
+              <AdminPanelField label="עיר מועמד" mode="view" viewValue={cityName(selectedCandidate.city_id)} />
+              <AdminPanelField label="אזור מועמד" mode="view" viewValue={regionName(selectedCandidate.region_id)} />
+              <AdminPanelField label='קו"ח' mode="view" viewValue={selectedCandidate.derived.hasCv ? 'יש קו"ח' : 'ללא קו"ח'} />
+            </AdminPanelSection>
 
-              <div className="space-y-4 p-5">
-                <SectionCard title="מידע מהיר">
-                  <QuickGrid
-                    items={[
-                      { label: 'תפקיד מועמד', value: roleName(selectedCandidate.role) },
-                      { label: 'זמינות', value: availabilityNames(selectedCandidate.candidate_availability_ids) },
-                      { label: 'סטטוס תעסוקה', value: workStatusName((selectedCandidate as any).work_status) },
-                      { label: 'ניסיון', value: experienceName(selectedCandidate.experience) },
-                      { label: 'שכר', value: formatSalary((selectedCandidate as any).salary_expectation_hourly, (selectedCandidate as any).salary_expectation_monthly) },
-                      { label: 'עיר מועמד', value: cityName(selectedCandidate.city_id) },
-                      { label: 'אזור מועמד', value: regionName(selectedCandidate.region_id) },
-                      { label: 'קו"ח', value: selectedCandidate.derived.hasCv ? 'יש קו"ח' : 'ללא קו"ח' },
-                    ]}
-                  />
-                </SectionCard>
-
-                <SectionCard title="תגיות">
-                  <div className="flex flex-wrap gap-2">
-                    {selectedCandidate.mergedTagRows.length ? (
-                      selectedCandidate.mergedTagRows.map((tagRow) => {
-                        const displayName = resolveTagName(tagRow)
-                        return (
-                          <button
-                            key={tagRow.id}
-                            type="button"
-                            onClick={() => removeTagFromCandidate(selectedCandidate.contact_id, tagRow)}
-                            className="inline-flex items-center gap-1 rounded-[6px] border border-[#99F6E4] bg-[#F0FDFC] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"
-                            title="לחץ להסרה"
-                          >
-                            <Tag className="h-3 w-3" />
-                            {displayName}
-                            <X className="h-3 w-3 opacity-60" />
-                          </button>
-                        )
-                      })
-                    ) : (
-                      <span className="text-[13px] text-slate-500">ללא תגיות</span>
-                    )}
-                  </div>
-
-                  {/* Add tag inline */}
-                  {addTagDialog.contactId === selectedCandidate.contact_id ? (
-                    <div className="mt-3 flex items-center gap-2">
-                      <select
-                        value={addTagDialog.tagId}
-                        onChange={(e) => setAddTagDialog((prev) => ({ ...prev, tagId: e.target.value }))}
-                        className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]"
-                      >
-                        <option value="">בחר תגית</option>
-                        {candidateTagOptions.map((t) => (
-                          <option key={t.id} value={String(t.id)}>{t.name}</option>
-                        ))}
-                      </select>
-                      <button
-                        type="button"
-                        disabled={!addTagDialog.tagId}
-                        onClick={() => addTagDialog.tagId && addTagToCandidate(selectedCandidate.contact_id, Number(addTagDialog.tagId))}
-                        className="rounded-xl bg-[#008080] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
-                      >
-                        הוסף
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setAddTagDialog({ contactId: null, tagId: '' })}
-                        className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] text-slate-500"
-                      >
-                        ביטול
-                      </button>
-                    </div>
+            <AdminPanelSection title="תגיות">
+              <div className="sm:col-span-2">
+                <div className="flex flex-wrap gap-2">
+                  {selectedCandidate.mergedTagRows.length ? (
+                    selectedCandidate.mergedTagRows.map((tagRow) => {
+                      const displayName = resolveTagName(tagRow)
+                      return (
+                        <button
+                          key={tagRow.id}
+                          type="button"
+                          onClick={() => removeTagFromCandidate(selectedCandidate.contact_id, tagRow)}
+                          className="inline-flex items-center gap-1 rounded-[6px] border border-[#99F6E4] bg-[#F0FDFC] px-2.5 py-1 text-[12px] font-semibold text-[#008080]"
+                          title="לחץ להסרה"
+                        >
+                          <Tag className="h-3 w-3" />
+                          {displayName}
+                          <X className="h-3 w-3 opacity-60" />
+                        </button>
+                      )
+                    })
                   ) : (
+                    <span className="text-[13px] text-slate-500">ללא תגיות</span>
+                  )}
+                </div>
+
+                {/* Add tag inline */}
+                {addTagDialog.contactId === selectedCandidate.contact_id ? (
+                  <div className="mt-3 flex items-center gap-2">
+                    <select
+                      value={addTagDialog.tagId}
+                      onChange={(e) => setAddTagDialog((prev) => ({ ...prev, tagId: e.target.value }))}
+                      className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-[13px] outline-none focus:border-[#008080]"
+                    >
+                      <option value="">בחר תגית</option>
+                      {candidateTagOptions.map((t) => (
+                        <option key={t.id} value={String(t.id)}>{t.name}</option>
+                      ))}
+                    </select>
                     <button
                       type="button"
-                      onClick={() => setAddTagDialog({ contactId: selectedCandidate.contact_id, tagId: '' })}
-                      className="mt-3 flex items-center gap-1 text-[13px] font-semibold text-[#008080]"
+                      disabled={!addTagDialog.tagId}
+                      onClick={() => addTagDialog.tagId && addTagToCandidate(selectedCandidate.contact_id, Number(addTagDialog.tagId))}
+                      className="rounded-xl bg-[#008080] px-3 py-2 text-[13px] font-bold text-white disabled:opacity-50"
                     >
-                      <Plus className="h-3.5 w-3.5" />
-                      הוסף תגית
+                      הוסף
                     </button>
-                  )}
-                </SectionCard>
-
-                <SectionCard title="היסטוריית הגשות">
-                  <CandidateApplicationsSection
-                    contactId={selectedCandidate.contact_id}
-                    phoneNorm={(selectedCandidate as any).phone_norm ?? null}
-                  />
-                </SectionCard>
-
-                <SectionCard title="CRM">
-                  <QuickLine label="קשר אחרון" value={formatDate(selectedCandidate.last_contact_date)} />
-                  <QuickLine label="פולואפ הבא" value={formatDate(selectedCandidate.next_follow_up)} />
-                  <QuickLine label="סטטוס בדיקה" value={dictLabel(DICT_CHECK_STATUSES, selectedCandidate.check_status)} />
-                  <QuickLine label="סטטוס חברתי" value={socialStatusName(selectedCandidate.social_status)} />
-                </SectionCard>
+                    <button
+                      type="button"
+                      onClick={() => setAddTagDialog({ contactId: null, tagId: '' })}
+                      className="rounded-xl border border-slate-200 px-3 py-2 text-[13px] text-slate-500"
+                    >
+                      ביטול
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setAddTagDialog({ contactId: selectedCandidate.contact_id, tagId: '' })}
+                    className="mt-3 flex items-center gap-1 text-[13px] font-semibold text-[#008080]"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    הוסף תגית
+                  </button>
+                )}
               </div>
-            </aside>
-          </div>
+            </AdminPanelSection>
+
+            <AdminPanelSection title="היסטוריית הגשות">
+              <div className="sm:col-span-2">
+                <CandidateApplicationsSection
+                  contactId={selectedCandidate.contact_id}
+                  phoneNorm={(selectedCandidate as any).phone_norm ?? null}
+                />
+              </div>
+            </AdminPanelSection>
+
+            <AdminPanelSection title="CRM">
+              <AdminPanelField label="קשר אחרון" mode="view" viewValue={formatDate(selectedCandidate.last_contact_date)} />
+              <AdminPanelField label="פולואפ הבא" mode="view" viewValue={formatDate(selectedCandidate.next_follow_up)} />
+              <AdminPanelField
+                label="סטטוס בדיקה"
+                mode="view"
+                viewValue={<StatusBadge statusType="check" statusId={selectedCandidate.check_status} />}
+              />
+              <AdminPanelField label="סטטוס חברתי" mode="view" viewValue={socialStatusName(selectedCandidate.social_status)} />
+            </AdminPanelSection>
+          </SidePanel>
         )}
 
         {/* ── Create Application Dialog ─────────────────────────────────── */}
@@ -1652,7 +1634,7 @@ function KpiCard({ label, value, subtext, tone, onClick }: { label: string; valu
   )
 }
 
-function StatusBadge({ tone, children }: { tone: 'default' | 'success' | 'warning' | 'danger' | 'muted'; children: React.ReactNode }) {
+function CandidateAttributeBadge({ tone, children }: { tone: 'default' | 'success' | 'warning' | 'danger' | 'muted'; children: React.ReactNode }) {
   return <span className={`rounded-md px-2.5 py-1 text-[12px] font-semibold ${toneClass(tone)}`}>{children}</span>
 }
 
@@ -1671,37 +1653,6 @@ function TagChip({ children }: { children: React.ReactNode }) {
 
 function LightChip({ children }: { children: React.ReactNode }) {
   return <span className="rounded-md bg-slate-100 px-2.5 py-1 text-[12px] font-semibold text-slate-700">{children}</span>
-}
-
-function SectionCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 text-[16px] font-bold text-[#0F172A]">{title}</div>
-      {children}
-    </section>
-  )
-}
-
-function QuickGrid({ items }: { items: Array<{ label: string; value: string }> }) {
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {items.map((item) => (
-        <div key={item.label} className="rounded-2xl border border-slate-200 bg-[#F8FAFC] p-3">
-          <div className="text-[13px] font-semibold text-slate-500">{item.label}</div>
-          <div className="mt-1 text-[14px] font-bold text-[#0F172A]">{item.value || '—'}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function QuickLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-1 text-[13px]">
-      <span className="font-semibold text-slate-500">{label}</span>
-      <span className="font-bold text-[#0F172A]">{value || '—'}</span>
-    </div>
-  )
 }
 
 function QuickActionButton({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick: () => void }) {
