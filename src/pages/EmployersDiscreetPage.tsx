@@ -559,9 +559,9 @@ export default function EmployersDiscreetPage() {
               </span>
 
               <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1.06] tracking-[-0.04em] md:text-6xl lg:text-[64px]">
-                גיוס אישי ודיסקרטי
+                גיוס אישי
                 <span className="mt-2 block text-[#E8CC72]">
-                  שירות אישי, דיסקרטיות ומיקוד
+                  שירות סינון מועמדים, דיסקרטיות ומיקוד
                 </span>
               </h1>
 
