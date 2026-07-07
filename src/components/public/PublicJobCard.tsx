@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import type { PublicJob } from '@/services/publicJobsService'
 import { getJobImage } from '@/lib/publicJobUtils'
 import { roleColorFromName } from '@/lib/publicRolePages'
+import { getRoleColor } from '@/lib/roleColors'
 
 const C = {
   primary:     '#0A9393',
@@ -28,7 +29,9 @@ export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const navigate = useNavigate()
   const image = getJobImage(job)
-  const roleColor = roleColorFromName(job.job_role_name)
+  // צבע לפי role_id (SSOT) — לא לפי שם, כי "סייעת רופא שיניים" מכיל "רופא"
+  // והיה נצבע בטעות כרופא. נפילה לשם רק כשאין role_id.
+  const roleColor = job.job_role != null ? getRoleColor(job.job_role).solid : roleColorFromName(job.job_role_name)
 
   const excerpt = job.public_excerpt || (job.job_description ? job.job_description.slice(0, 260) + (job.job_description.length > 260 ? '...' : '') : null)
 

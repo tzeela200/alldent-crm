@@ -382,27 +382,14 @@ function EcosystemShowcase() {
 
 // ─── Role-based job picker ────────────────────────────────────────────────────
 
-const ROLE_KEYWORDS = ['רופא', 'מומח', 'שינ', 'סייע', 'מזכיר', 'ניהול', 'טכנא']
-
-function pickOnePerRole(jobs: PublicJob[] | undefined): PublicJob[] {
-  const seen = new Set<string>()
-  const out: PublicJob[] = []
-  for (const job of jobs ?? []) {
-    const key = ROLE_KEYWORDS.find((k) => (job.job_title ?? '').includes(k)) ?? '__other__'
-    if (!seen.has(key)) {
-      seen.add(key)
-      out.push(job)
-    }
-    if (out.length === 6) break
-  }
-  return out
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function PublicHomePage() {
   const { data: jobs, isLoading } = usePublicJobs({ sort: 'newest' })
-  const featuredJobs = pickOnePerRole(jobs)
+  // המשרות החמות = הכי עדכניות לפי זמן פרסום, החדשה ביותר ראשונה.
+  const featuredJobs = [...(jobs ?? [])]
+    .sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
+    .slice(0, 6)
 
   return (
     <div className="bg-white">
