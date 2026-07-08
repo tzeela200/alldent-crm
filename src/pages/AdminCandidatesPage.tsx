@@ -518,15 +518,14 @@ export default function AdminCandidatesPage() {
     return names.length ? names.join(', ') : '—'
   }
   const experienceName = (id: number | null | undefined) => DICT_EXPERIENCE.find((r) => r.id === id)?.name ?? '—'
-  // DB column is bigint[]; the shared Contact type still says string for legacy reasons — read defensively.
+  // DB column is bigint[]; normalize defensively in case a legacy row contains an unexpected value.
   const languagesName = (value: unknown): string => {
     if (!Array.isArray(value) || value.length === 0) return '—'
     return value.map((id) => languageOptions.find((l) => l.id === Number(id))?.name ?? String(id)).join(', ')
   }
   const socialStatusName = (id: number | null | undefined) => DICT_SOCIAL_STATUSES.find((r) => r.id === id)?.name ?? '—'
   const workStatusName = (id: number | null | undefined) => dictLabel(workStatusOptions, id)
-  // DB columns sub_role / preferred_scope are int8[]; the shared Contact type still says
-  // scalar/string for legacy reasons — read defensively (mirror languagesName).
+  // DB columns sub_role / preferred_scope are int8[]; normalize defensively for legacy rows.
   const toIdArray = (value: unknown): number[] =>
     Array.isArray(value) ? value.map(Number) : value != null && value !== '' ? [Number(value)] : []
   const subRoleNames = (value: unknown): string => {

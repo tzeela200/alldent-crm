@@ -26,13 +26,13 @@ export interface Contact {
   second_phone: string | null
   second_email: string | null
   role: number | null // → dict_roles
-  sub_role: number | null // → dict_sub_roles
+  sub_role: number[] | null // → dict_sub_roles (multi-value)
   candidate_availability_ids: number[] | null // → dict_availability (multi-value; canonical column)
   /** @deprecated column removed from DB (June 2026). Use candidate_availability_ids. Kept only so legacy read-sites compile; always undefined at runtime. */
   availability?: number | null
   experience: number | null // → dict_experience
-  preferred_scope: string | null
-  languages: string | null
+  preferred_scope: number[] | null // → dict_scopes (multi-value)
+  languages: number[] | null // → dict_languages (multi-value)
   region_id: number | null // → dict_regions
   city_id: number | null // → dict_cities
   cv_link: string | null
@@ -121,10 +121,10 @@ export interface Job {
   job_status: number | null // → dict_job_statuses
   job_title: string | null
   job_role: number | null // → dict_roles
-  job_sub_role: number | null // FK → dict_sub_roles (bigint ב-DB)
-  scope: number | null // FK → dict_scopes (bigint ב-DB)
+  job_sub_role: number[] | null // → dict_sub_roles (multi-value)
+  scope: number[] | null // → dict_scopes (multi-value)
   required_experience: number | null // → dict_experience
-  required_languages: string | null
+  required_languages: number[] | null // → dict_languages (multi-value)
   region_id: number | null // → dict_regions
   city_id: number | null // → dict_cities
   address: string | null
@@ -271,7 +271,7 @@ export const PROFILE_TYPES = {
 export interface ContactFilters {
   search?: string
   role?: number
-  sub_role?: number
+  sub_role?: number[]
   region_id?: number
   city_id?: number
   availability?: number
@@ -290,7 +290,7 @@ export interface JobFilters {
   region_id?: number
   city_id?: number
   account_link?: number
-  scope?: string
+  scope?: number[]
 }
 
 export interface ApplicationFilters {

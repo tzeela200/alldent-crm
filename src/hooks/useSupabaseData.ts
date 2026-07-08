@@ -96,7 +96,7 @@ export function useContacts(filters: ContactFilters = {}) {
         .order('contact_id', { ascending: true })
 
       if (filters.role) query = query.eq('role', filters.role)
-      if (filters.sub_role) query = query.eq('sub_role', filters.sub_role)
+      if (filters.sub_role?.length) query = query.overlaps('sub_role', filters.sub_role)
       if (filters.region_id) query = query.eq('region_id', filters.region_id)
       if (filters.city_id) query = query.eq('city_id', filters.city_id)
       if (filters.availability) query = query.contains('candidate_availability_ids', [filters.availability])
