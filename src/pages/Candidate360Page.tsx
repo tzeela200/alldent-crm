@@ -103,7 +103,6 @@ type JobRow = {
   region_id: number | null;
   city_id: number | null;
   address: string | null;
-  salary_range: string | null;
   job_description: string | null;
   job_requirements: string | null;
   job_url: string | null;
@@ -220,7 +219,7 @@ const ACCOUNT_SELECT =
   "account_id, account_name, bus_id, account_status, account_type, phone, second_phone, email, second_email, billing_email, website_url, facebook_url, region_id, city_id, address, contact_link, notes, active_job_count_auto, total_jobs_count, rel_role, all_applicants_names, last_contact_date, next_follow_up, whatsapp_last_sent, created_timestamp, updated_timestamp, clinic_type, chairs_count, specialties, team_size, hiring_roles, extended_data, systems_used";
 
 const JOB_SELECT =
-  "job_code, account_link, job_status, job_title, job_role, job_sub_role, scope, required_experience, required_languages, region_id, city_id, address, salary_range, job_description, job_requirements, job_url, rel_employer_contact, total_applicants, date_facebook, date_website, date_whatsapp, last_publish_date, notes, created_time, updated_timestamp";
+  "job_code, account_link, job_status, job_title, job_role, job_sub_role, scope, required_experience, required_languages, region_id, city_id, address, job_description, job_requirements, job_url, rel_employer_contact, total_applicants, date_facebook, date_website, date_whatsapp, last_publish_date, notes, created_time, updated_timestamp";
 
 const CONTACT_SELECT =
   "contact_id, phone, phone_norm, display_name, first_name, last_name, full_name, email, second_phone, second_email, role, sub_role, candidate_availability_ids, experience, preferred_scope, languages, region_id, city_id, cv_link, has_cv, account_link, profile_type, source, check_status, social_status, facebook_url, facebook_name, facebook_id, last_contact_date, next_follow_up, prev_applications_count, notes, created_timestamp, updated_timestamp, professional_title, current_employer";
@@ -280,7 +279,6 @@ const PREVIEW_JOBS: JobRow[] = [
     region_id: 1,
     city_id: 231,
     address: null,
-    salary_range: '45-55 ש"ח לשעה',
     job_description: "דרושה סייעת אחראית ומסורה לעבודה במשמרות במרפאה מתקדמת.",
     job_requirements: "ניסיון מוכח של שנה לפחות, יחסי אנוש מעולים, נכונות למשמרות ערב.",
     job_url: null,
