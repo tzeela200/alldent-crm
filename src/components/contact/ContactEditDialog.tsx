@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabase";
+import { AccountPicker } from "@/components/ui/AccountPicker";
 import type { ContactRow, Contact360Dicts } from "@/hooks/useContact360";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -28,94 +27,6 @@ interface Props {
 const inputClassName = "rounded-xl";
 const selectClassName =
   "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500";
-
-function AccountPicker({ value, onChange }: { value: number | null; onChange: (id: number | null) => void }) {
-  const [q, setQ] = useState("");
-  const [open, setOpen] = useState(false);
-  const {
-    data: accounts = [],
-    isLoading,
-    isError,
-    error,
-  } = useQuery<{ account_id: number; account_name: string | null }[]>({
-    queryKey: ["accounts_names"],
-    queryFn: async () => {
-      const { data, error: queryError } = await supabase
-        .from("accounts")
-        .select("account_id,account_name")
-        .order("account_name");
-      if (queryError) throw queryError;
-      return data ?? [];
-    },
-    staleTime: 600_000,
-  });
-
-  const selected = accounts.find((account) => account.account_id === value);
-  const needle = q.trim().toLowerCase();
-  const filtered = (needle
-    ? accounts.filter((account) => (account.account_name ?? "").toLowerCase().includes(needle))
-    : accounts
-  ).slice(0, 50);
-
-  return (
-    <div className="relative">
-      <div className="flex items-center gap-2">
-        <input
-          className={selectClassName}
-          dir="rtl"
-          placeholder={isLoading ? "טוען ארגונים..." : "חיפוש ארגון..."}
-          value={open ? q : selected?.account_name ?? ""}
-          disabled={isLoading || isError}
-          onFocus={() => {
-            setOpen(true);
-            setQ("");
-          }}
-          onBlur={() => window.setTimeout(() => setOpen(false), 150)}
-          onChange={(event) => {
-            setQ(event.target.value);
-            setOpen(true);
-          }}
-        />
-        {value != null && (
-          <button
-            type="button"
-            onClick={() => {
-              onChange(null);
-              setQ("");
-            }}
-            className="shrink-0 rounded-md px-2 py-1 text-slate-400 hover:text-red-600"
-            title="ביטול שיוך"
-          >
-            ×
-          </button>
-        )}
-      </div>
-      {isError && (
-        <p className="mt-1 text-xs font-medium text-red-600">
-          {error instanceof Error ? error.message : "טעינת הארגונים נכשלה"}
-        </p>
-      )}
-      {open && !isLoading && !isError && filtered.length > 0 && (
-        <div className="absolute z-40 mt-1 max-h-56 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg">
-          {filtered.map((account) => (
-            <button
-              key={account.account_id}
-              type="button"
-              onMouseDown={() => {
-                onChange(account.account_id);
-                setOpen(false);
-                setQ("");
-              }}
-              className="block w-full px-3 py-2 text-right text-sm text-slate-700 hover:bg-slate-50"
-            >
-              {account.account_name ?? `#${account.account_id}`}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved }: Props) {
   const [adminForm, setAdminForm] = useState<FormState>({});
@@ -219,8 +130,8 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
             <div className="sm:col-span-2">
               <label className="mb-1 block text-[12px] font-semibold text-[#6B6B6B]">ארגון מקושר</label>
               <AccountPicker
-                value={adminForm.account_link != null && adminForm.account_link !== "" ? Number(adminForm.account_link) : null}
-                onChange={(id) => setAf("account_link", id)}
+                value={adminForm.account_link != null && adminForm.account_link !== "" ? String(adminForm.account_link) : null}
+                onChange={(id) => setAf("account_link", id ? Number(id) : null)}
               />
             </div>
             <AdminPanelField
