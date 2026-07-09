@@ -211,6 +211,31 @@ export default function JobDetailsPage() {
       const mustHide = nextJobStatus !== JOB_STATUS_ACTIVE
       const nextPublicStatus = mustHide ? PUBLIC_STATUS_HIDDEN : toNullableNumber(draft.public_status)
       const newJobCode = cleanText(draft.job_code) || localJob.job_code
+
+      // אימות שכר לפי אילוצי ה-DB: שעתי 40–1000, חודשי 1000 ומעלה. ריק = מותר.
+      const hourly = toNullableNumber(draft.salary_expectation_hourly)
+      if (draft.salary_expectation_hourly.trim() && hourly === null) {
+        showToast('שכר שעתי חייב להיות מספר', 'error')
+        setSaving(false)
+        return
+      }
+      if (hourly !== null && (hourly < 40 || hourly > 1000)) {
+        showToast('שכר שעתי חייב להיות מספר בין 40 ל-1000 ₪', 'error')
+        setSaving(false)
+        return
+      }
+      const monthly = toNullableNumber(draft.salary_expectation_monthly)
+      if (draft.salary_expectation_monthly.trim() && monthly === null) {
+        showToast('שכר חודשי חייב להיות מספר', 'error')
+        setSaving(false)
+        return
+      }
+      if (monthly !== null && monthly < 1000) {
+        showToast('שכר חודשי חייב להיות מספר של 1000 ₪ ומעלה', 'error')
+        setSaving(false)
+        return
+      }
+
       const patch = {
         job_code: newJobCode,
         job_title: cleanText(draft.job_title),
@@ -231,8 +256,8 @@ export default function JobDetailsPage() {
         salary_type_ids: draft.salary_type_ids.length ? draft.salary_type_ids : [],
         tax_type_id: toNullableNumber(draft.tax_type_id),
         mobility_id: toNullableNumber(draft.mobility_id),
-        salary_expectation_hourly: toNullableNumber(draft.salary_expectation_hourly),
-        salary_expectation_monthly: toNullableNumber(draft.salary_expectation_monthly),
+        salary_expectation_hourly: hourly,
+        salary_expectation_monthly: monthly,
         show_salary_public: draft.show_salary_public,
         work_schedule_text: cleanText(draft.work_schedule_text),
         job_description: cleanText(draft.job_description),

@@ -233,7 +233,7 @@ export default function SmartMatchPage() {
       region: regionName(selectedJob.region_id),
       city: cityName(selectedJob.city_id),
       experience: experienceName(selectedJob.required_experience),
-      salaryRange: formatJobSalary(selectedJob.salary_min, selectedJob.salary_max, selectedJob.salary_range),
+      salaryRange: formatCandidateSalary(selectedJob.salary_expectation_hourly, selectedJob.salary_expectation_monthly),
       languages: selectedJob.required_languages ?? '—',
       scope: selectedJob.scope ?? '—',
     }
@@ -2090,22 +2090,34 @@ function buildBreakdown(
 
 
 function calculateSalaryScore(candidate: any, job: any) {
-  const hourly = typeof candidate.salary_expectation_hourly === 'number' ? candidate.salary_expectation_hourly : null
-  const monthly =
+  const candHourly = typeof candidate.salary_expectation_hourly === 'number' ? candidate.salary_expectation_hourly : null
+  const candMonthly =
     typeof candidate.salary_expectation_monthly === 'number' ? candidate.salary_expectation_monthly : null
-  const min = typeof job.salary_min === 'number' ? job.salary_min : null
-  const max = typeof job.salary_max === 'number' ? job.salary_max : null
+  const jobHourly = typeof job.salary_expectation_hourly === 'number' ? job.salary_expectation_hourly : null
+  const jobMonthly = typeof job.salary_expectation_monthly === 'number' ? job.salary_expectation_monthly : null
 
 
-  if (hourly !== null && min !== null && max !== null) {
-    if (hourly >= min && hourly <= max) return SALARY_WEIGHT
-    if (hourly < min && min - hourly <= Math.max(10, min * 0.1)) return 10
-    if (hourly > max && hourly - max <= Math.max(10, max * 0.1)) return 8
+  // שכר שעתי: הצעת המשרה מול ציפיית המועמד. המשרה מציעה לפחות כמה שהמועמד מבקש → התאמה מלאה.
+  if (candHourly !== null && jobHourly !== null) {
+    if (jobHourly >= candHourly) return SALARY_WEIGHT
+    const gap = candHourly - jobHourly
+    if (gap <= Math.max(5, candHourly * 0.1)) return 10
+    if (gap <= Math.max(10, candHourly * 0.2)) return 6
     return 3
   }
 
 
-  if (monthly !== null) return 8
+  // שכר חודשי
+  if (candMonthly !== null && jobMonthly !== null) {
+    if (jobMonthly >= candMonthly) return SALARY_WEIGHT
+    const gap = candMonthly - jobMonthly
+    if (gap <= candMonthly * 0.1) return 10
+    if (gap <= candMonthly * 0.2) return 6
+    return 3
+  }
+
+
+  if (candMonthly !== null || jobMonthly !== null) return 8
   return 6
 }
 
@@ -2277,13 +2289,6 @@ function buildRecommendation({
 
 function clampScore(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)))
-}
-
-
-function formatJobSalary(min: number | null | undefined, max: number | null | undefined, salaryRange: string | null | undefined) {
-  if (salaryRange) return salaryRange
-  if (typeof min === 'number' && typeof max === 'number') return `${min}-${max} ₪/שעה`
-  return 'לא צוין'
 }
 
 
