@@ -1,2186 +1,983 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useAccountMutations } from "@/hooks/useAccountMutations";
+import type { ApplicationRow, DictItem } from "@/hooks/useContact360";
 import { useContactMutations } from "@/hooks/useContactMutations";
+import { openApplicationCv, applicationHasCv } from "@/lib/cv";
+import { getRoleColorHex } from "@/lib/roleColors";
+import ContactHistoryPanel from "@/components/admin/ContactHistoryPanel";
+import ContactMessagesPanel from "@/components/admin/ContactMessagesPanel";
+import React, { useMemo, useState, useEffect } from "react";
+import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
 import {
   AlertCircle,
-  ArrowRight,
-  BadgeCheck,
-  Briefcase,
-  Building2,
-  CalendarClock,
-  CheckCircle2,
-  ClipboardCopy,
-  Clock3,
-  Edit2,
-  ExternalLink,
-  Facebook,
-  FileText,
-  Globe,
-  Mail,
-  MapPin,
-  MessageCircle,
-  Phone,
+  Loader2,
   Plus,
-  Printer,
   Save,
-  ShieldAlert,
-  Sparkles,
-  Users,
+  Search,
+  Tag,
   X,
 } from "lucide-react";
 
-import { supabase } from "@/lib/supabase";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import { toast } from "sonner";
-import { ContactPicker } from "@/components/ui/ContactPicker";
-import { CityRegionPicker } from "@/components/ui/CityRegionPicker";
-import { OrgContactPicker } from "@/components/ui/OrgContactPicker";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+import { supabase } from "@/lib/supabase";
+import { isContactNotFoundError, useContact360, useContact360Dicts } from "@/hooks/useContact360";
+import type { JobRow, LinkedJobRow } from "@/hooks/useContact360";
+import { RoleSubRolePicker } from "@/components/ui/RoleSubRolePicker";
+import { useQueryClient } from "@tanstack/react-query";
+import { AdminTable, type AdminColumn } from "@/components/admin/AdminTable";
 
-type DictRow = {
-  id: number;
-  name: string | null;
-};
+import BlockIdentity from "@/components/contact/BlockIdentity";
+import BlockProfessional from "@/components/contact/BlockProfessional";
+import BlockConditions from "@/components/contact/BlockConditions";
+import BlockSocial from "@/components/contact/BlockSocial";
+import { Candidate360Hero } from "@/components/contact/Candidate360Hero";
+import { BlockCRM } from "@/components/contact/BlockCRM";
+import { AdminStatusBar } from "@/components/contact/AdminStatusBar";
+import { ContactEditDialog } from "@/components/contact/ContactEditDialog";
+import { BlockEmployer } from "@/components/contact/BlockEmployer";
 
-type AccountRow = {
-  account_id: number;
-  account_name: string;
-  bus_id: string | null;
-  account_status: number | null;
-  account_type: number | null;
-  phone: string | null;
-  second_phone: string | null;
-  email: string | null;
-  second_email: string | null;
-  billing_email: string | null;
-  website_url: string | null;
-  facebook_url: string | null;
-  region_id: number | null;
-  city_id: number | null;
-  address: string | null;
-  contact_link: string | null;
-  notes: string | null;
-  active_job_count_auto: number | null;
-  total_jobs_count: number | null;
-  rel_role: string | null;
-  all_applicants_names: string | null;
-  last_contact_date: string | null;
-  next_follow_up: string | null;
-  whatsapp_last_sent: string | null;
-  created_timestamp: string | null;
-  updated_timestamp: string | null;
-  clinic_type: string | null;
-  chairs_count: number | null;
-  specialties: string[] | null;
-  team_size: number | null;
-  hiring_roles: string[] | null;
-  extended_data: Record<string, unknown> | null;
-  systems_used: number[] | null;
-};
+const BRAND = { primary: "#008080", pageBg: "#F3F4F6", cardBorder: "#E2E8F0" };
 
-type JobRow = {
-  job_code: string;
-  account_link: number | null;
-  job_status: number | null;
-  job_title: string;
-  job_role: number | null;
-  job_sub_role: number[] | null;
-  scope: number[] | null;
-  required_experience: number | null;
-  required_languages: number[] | null;
-  region_id: number | null;
-  city_id: number | null;
-  address: string | null;
-  job_description: string | null;
-  job_requirements: string | null;
-  job_url: string | null;
-  rel_employer_contact: number | null;
-  total_applicants: number | null;
-  date_facebook: string | null;
-  date_website: string | null;
-  date_whatsapp: string | null;
-  last_publish_date: string | null;
-  notes: string | null;
-  created_time: string | null;
-  updated_timestamp: string | null;
-};
+type ToastState = { type: "success" | "error"; text: string } | null;
 
-type ContactRow = {
-  contact_id: number;
-  phone: string | null;
-  phone_norm: string;
-  display_name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  full_name: string | null;
-  email: string | null;
-  second_phone: string | null;
-  second_email: string | null;
-  role: number | null;
-  sub_role: number[] | null;
-  candidate_availability_ids: number[] | null;
-  experience: number | null;
-  preferred_scope: number[] | null;
-  languages: number[] | null;
-  region_id: number | null;
-  city_id: number | null;
-  cv_link: string | null;
-  has_cv: boolean | null;
-  account_link: number | null;
-  profile_type: number | null;
-  source: number | null;
-  check_status: number | null;
-  social_status: number | null;
-  facebook_url: string | null;
-  facebook_name: string | null;
-  facebook_id: number | null;
-  last_contact_date: string | null;
-  next_follow_up: string | null;
-  prev_applications_count: number | null;
-  notes: string | null;
-  created_timestamp: string | null;
-  updated_timestamp: string | null;
-  professional_title: string | null;
-  current_employer: string | null;
-};
+// ─── utils ───────────────────────────────────────────────────────────────────
 
-type ApplicationRow = {
-  application_id: number;
-  record_name: string | null;
-  submission_date: string | null;
-  display_date: string | null;
-  form_title: string | null;
-  job_code: string | null;
-  job_link: string | null;
-  account_name: string | null;
-  job_role: string | null;
-  job_city: string | null;
-  job_region: string | null;
-  candidate_phone: string | null;
-  candidate_name: string | null;
-  candidate_email: string | null;
-  cv_link: string | null;
-  candidate_link: number | null;
-  candidate_notes: string | null;
-  status_in_master: string | null;
-  check_status: number | null;
-  job_status_view: string | null;
-  application_status: number | null;
-  master_availability: string | null;
-  master_role: string | null;
-  master_city: string | null;
-  master_region: string | null;
-  internal_notes: string | null;
-  created_timestamp: string | null;
-  updated_timestamp: string | null;
-  phone_norm: string | null;
-};
-
-type DictBundle = {
-  accountStatuses: Map<number, string>;
-  accountTypes: Map<number, string>;
-  jobStatuses: Map<number, string>;
-  applicationStatuses: Map<number, string>;
-  checkStatuses: Map<number, string>;
-  roles: Map<number, string>;
-  subRoles: Map<number, string>;
-  scopes: Map<number, string>;
-  languages: Map<number, string>;
-  regions: Map<number, string>;
-  cities: Map<number, string>;
-  systems: Map<number, string>;
-};
-
-type RecommendedAction = {
-  key: string;
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  href?: string;
-  label: string;
-  severity: "info" | "warning" | "error" | "success";
-};
-
-// ─── Select strings ───────────────────────────────────────────────────────────
-
-const ACCOUNT_SELECT =
-  "account_id, account_name, bus_id, account_status, account_type, phone, second_phone, email, second_email, billing_email, website_url, facebook_url, region_id, city_id, address, contact_link, notes, active_job_count_auto, total_jobs_count, rel_role, all_applicants_names, last_contact_date, next_follow_up, whatsapp_last_sent, created_timestamp, updated_timestamp, clinic_type, chairs_count, specialties, team_size, hiring_roles, extended_data, systems_used";
-
-const JOB_SELECT =
-  "job_code, account_link, job_status, job_title, job_role, job_sub_role, scope, required_experience, required_languages, region_id, city_id, address, job_description, job_requirements, job_url, rel_employer_contact, total_applicants, date_facebook, date_website, date_whatsapp, last_publish_date, notes, created_time, updated_timestamp";
-
-const CONTACT_SELECT =
-  "contact_id, phone, phone_norm, display_name, first_name, last_name, full_name, email, second_phone, second_email, role, sub_role, candidate_availability_ids, experience, preferred_scope, languages, region_id, city_id, cv_link, has_cv, account_link, profile_type, source, check_status, social_status, facebook_url, facebook_name, facebook_id, last_contact_date, next_follow_up, prev_applications_count, notes, created_timestamp, updated_timestamp, professional_title, current_employer";
-
-const APPLICATION_SELECT =
-  "application_id, record_name, submission_date, display_date, form_title, job_code, job_link, account_name, job_role, job_city, job_region, candidate_phone, candidate_name, candidate_email, cv_link, candidate_link, candidate_notes, status_in_master, check_status, job_status_view, application_status, master_availability, master_role, master_city, master_region, internal_notes, created_timestamp, updated_timestamp, phone_norm";
-
-// ─── Preview mock data ────────────────────────────────────────────────────────
-
-const PREVIEW_ACCOUNT: AccountRow = {
-  account_id: 1,
-  account_name: "מרפאת שיניים סמייל קליניק - דמה",
-  bus_id: "MOCK_516273849",
-  account_status: 7,
-  account_type: 1,
-  phone: "03-5554433",
-  second_phone: null,
-  email: "hr@smile-clinic-mock.co.il",
-  second_email: null,
-  billing_email: null,
-  website_url: null,
-  facebook_url: null,
-  region_id: 1,
-  city_id: 231,
-  address: "הרצל 50, בת ים",
-  contact_link: null,
-  notes: null,
-  active_job_count_auto: 0,
-  total_jobs_count: 0,
-  rel_role: null,
-  all_applicants_names: null,
-  last_contact_date: null,
-  next_follow_up: null,
-  whatsapp_last_sent: null,
-  created_timestamp: "2026-05-23T19:16:53.879744+00:00",
-  updated_timestamp: "2026-05-23T19:16:53.879744+00:00",
-  clinic_type: null,
-  chairs_count: 4,
-  specialties: [],
-  team_size: 12,
-  hiring_roles: [],
-  extended_data: {},
-  systems_used: [],
-};
-
-const PREVIEW_JOBS: JobRow[] = [
-  {
-    job_code: "MOCK_JOB_001",
-    account_link: 1,
-    job_status: 3,
-    job_title: "סייעת רופא שיניים מנוסה למרכז חדיש",
-    job_role: 9,
-    job_sub_role: [1],
-    scope: [1],
-    required_experience: 2,
-    required_languages: null,
-    region_id: 1,
-    city_id: 231,
-    address: null,
-    job_description: "דרושה סייעת אחראית ומסורה לעבודה במשמרות במרפאה מתקדמת.",
-    job_requirements: "ניסיון מוכח של שנה לפחות, יחסי אנוש מעולים, נכונות למשמרות ערב.",
-    job_url: null,
-    rel_employer_contact: null,
-    total_applicants: 0,
-    date_facebook: null,
-    date_website: null,
-    date_whatsapp: null,
-    last_publish_date: null,
-    notes: null,
-    created_time: "2026-05-23T19:16:53.879744+00:00",
-    updated_timestamp: "2026-05-23T19:16:53.879744+00:00",
-  },
-];
-
-const PREVIEW_CONTACTS: ContactRow[] = [
-  {
-    contact_id: 1,
-    phone: "050-1234567",
-    phone_norm: "972500000001",
-    display_name: null,
-    first_name: "דנה",
-    last_name: "כהן",
-    full_name: "דנה כהן",
-    email: "dana.cohen.mock@gmail.com",
-    second_phone: null,
-    second_email: null,
-    role: 9,
-    sub_role: null,
-    candidate_availability_ids: [1],
-    experience: 2,
-    preferred_scope: null,
-    languages: null,
-    region_id: 1,
-    city_id: 231,
-    cv_link: null,
-    has_cv: false,
-    account_link: 1,
-    profile_type: 1,
-    source: null,
-    check_status: 3,
-    social_status: null,
-    facebook_url: null,
-    facebook_name: null,
-    facebook_id: null,
-    last_contact_date: null,
-    next_follow_up: null,
-    prev_applications_count: 0,
-    notes: null,
-    created_timestamp: "2026-05-23T19:16:53.879744+00:00",
-    updated_timestamp: "2026-05-23T19:16:53.879744+00:00",
-    professional_title: null,
-    current_employer: null,
-  },
-];
-
-const PREVIEW_APPLICATIONS: ApplicationRow[] = [
-  {
-    application_id: 1,
-    record_name: "MOCK_APP_001",
-    submission_date: "2026-05-23T19:16:53.879744+00:00",
-    display_date: null,
-    form_title: null,
-    job_code: "MOCK_JOB_001",
-    job_link: null,
-    account_name: "מרפאת שיניים סמייל קליניק - דמה",
-    job_role: "סייעת",
-    job_city: "בת-ים",
-    job_region: "גוש-דן",
-    candidate_phone: "050-1234567",
-    candidate_name: "דנה כהן",
-    candidate_email: "dana.cohen.mock@gmail.com",
-    cv_link: null,
-    candidate_link: 1,
-    candidate_notes: null,
-    status_in_master: null,
-    check_status: 3,
-    job_status_view: null,
-    application_status: 1,
-    master_availability: null,
-    master_role: null,
-    master_city: null,
-    master_region: null,
-    internal_notes: null,
-    created_timestamp: "2026-05-23T19:16:53.879744+00:00",
-    updated_timestamp: "2026-05-23T19:16:53.879744+00:00",
-    phone_norm: "972500000001",
-  },
-];
-
-const PREVIEW_DICTS: DictBundle = {
-  accountStatuses: new Map([[7, "פעיל"]]),
-  accountTypes: new Map([[1, "מרפאת שיניים"]]),
-  jobStatuses: new Map([[3, "פעילה"]]),
-  applicationStatuses: new Map([[1, "חדשה"]]),
-  checkStatuses: new Map([[3, "לבדיקה"]]),
-  roles: new Map([[9, "סייעת"]]),
-  subRoles: new Map([[1, "סייעת מן המניין"]]),
-  scopes: new Map([[1, "משרה מלאה"]]),
-  languages: new Map(),
-  regions: new Map([[1, "גוש-דן"]]),
-  cities: new Map([[231, "בת ים"]]),
-  systems: new Map(),
-};
-
-const ACCOUNT_FIELD_KEYS: Array<keyof AccountRow> = [
-  "account_id",
-  "account_name",
-  "bus_id",
-  "account_status",
-  "account_type",
-  "phone",
-  "second_phone",
-  "email",
-  "second_email",
-  "billing_email",
-  "website_url",
-  "facebook_url",
-  "region_id",
-  "city_id",
-  "address",
-  "contact_link",
-  "notes",
-  "active_job_count_auto",
-  "total_jobs_count",
-  "rel_role",
-  "all_applicants_names",
-  "last_contact_date",
-  "next_follow_up",
-  "whatsapp_last_sent",
-  "created_timestamp",
-  "updated_timestamp",
-  "clinic_type",
-  "chairs_count",
-  "specialties",
-  "team_size",
-  "hiring_roles",
-  "extended_data",
-  "systems_used",
-];
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function asNumber(value: string | undefined): number | null {
-  if (!value) return null;
-  const n = Number(value);
-  return Number.isFinite(n) ? n : null;
-}
-
-function normalizeUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  const trimmed = url.trim();
-  if (!trimmed) return null;
-  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
-}
-
-function normalizePhoneForWhatsApp(phone: string | null | undefined): string | null {
-  const digits = String(phone ?? "").replace(/\D/g, "");
-  if (!digits) return null;
-  if (digits.startsWith("972")) return digits;
-  if (digits.startsWith("0")) return `972${digits.slice(1)}`;
-  return digits;
-}
-
-function whatsappUrl(phone: string | null | undefined): string | null {
-  const normalized = normalizePhoneForWhatsApp(phone);
-  return normalized ? `https://wa.me/${normalized}` : null;
-}
-
-function formatDate(value: string | null | undefined): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium" }).format(date);
-}
-
-function formatDateTime(value: string | null | undefined): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("he-IL", { dateStyle: "medium", timeStyle: "short" }).format(date);
-}
-
-function dictName(map: Map<number, string>, id: number | null | undefined, fallback = "—"): string {
-  if (id === null || id === undefined) return fallback;
-  return map.get(id) ?? fallback;
-}
-
-function dictNames(map: Map<number, string>, ids: number[] | null | undefined, fallback = "—"): string {
-  if (!Array.isArray(ids) || ids.length === 0) return fallback;
-  const names = ids.map((id) => map.get(Number(id))).filter((name): name is string => Boolean(name));
-  return names.length ? names.join(", ") : fallback;
-}
-
-function isPast(value: string | null | undefined): boolean {
-  if (!value) return false;
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return false;
-  return date.getTime() < Date.now();
-}
-
-function isActiveJob(job: JobRow, dicts: DictBundle): boolean {
-  const statusName = dictName(dicts.jobStatuses, job.job_status, "");
-  if (/פעיל|פתוח|בגיוס/i.test(statusName)) return true;
-  return job.job_status === 3 || job.job_status === 7;
-}
-
-function uniqueCount<T>(items: T[], getKey: (item: T) => string | number | null | undefined): number {
-  const keys = new Set<string>();
-  items.forEach((item) => {
-    const key = getKey(item);
-    if (key !== null && key !== undefined && String(key).trim()) {
-      keys.add(String(key));
-    }
-  });
-  return keys.size;
-}
-
-function mapFromRows(rows: DictRow[] | undefined): Map<number, string> {
-  const map = new Map<number, string>();
-  (rows ?? []).forEach((row) => {
-    if (row.id !== null && row.id !== undefined) {
-      map.set(Number(row.id), row.name ?? "—");
-    }
-  });
-  return map;
-}
-
-function statusTone(label: string, id?: number | null): "success" | "warning" | "danger" | "neutral" | "info" {
-  const value = label.toLowerCase();
-  if (/פעיל|חדש|פתוח|מאושר|תקין|נמסר|נקרא/.test(value) || id === 7 || id === 3) return "success";
-  if (/ממתין|לבדיקה|בהמתנה|טיוטה|חלקי/.test(value)) return "warning";
-  if (/סגור|לא פעיל|נכשל|שגיאה|בוטל|נדחה/.test(value)) return "danger";
-  if (/בטיפול|בתהליך|פולואפ|מעקב/.test(value)) return "info";
-  return "neutral";
-}
-
-export function computeAccountCompletion(account: AccountRow): number {
-  const weightedFields: Array<[keyof AccountRow, number]> = [
-    ["account_name", 12],
-    ["bus_id", 9],
-    ["account_status", 7],
-    ["account_type", 7],
-    ["phone", 8],
-    ["email", 8],
-    ["region_id", 6],
-    ["city_id", 6],
-    ["address", 6],
-    ["billing_email", 5],
-    ["website_url", 5],
-    ["clinic_type", 5],
-    ["chairs_count", 4],
-    ["team_size", 4],
-    ["notes", 4],
-    ["next_follow_up", 4],
-  ];
-
-  return Math.min(
-    100,
-    weightedFields.reduce((sum, [key, weight]) => {
-      const value = account[key];
-      if (Array.isArray(value)) return value.length > 0 ? sum + weight : sum;
-      return value !== null && value !== undefined && String(value).trim() !== "" ? sum + weight : sum;
-    }, 0),
-  );
-}
-
-function compactArray(values: Array<string | null | undefined>): string[] {
-  return values.map((value) => String(value ?? "").trim()).filter(Boolean);
-}
-
-function fieldValue(value: unknown): React.ReactNode {
+function dictName(
+  items: DictItem[],
+  value: number | string | null | undefined,
+): string {
   if (value === null || value === undefined || value === "") return "—";
-  if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
-  if (typeof value === "object") {
-    const json = JSON.stringify(value, null, 2);
-    return json === "{}" || json === "[]" ? (
-      "—"
-    ) : (
-      <pre className="max-h-72 overflow-auto rounded-xl bg-slate-50 p-3 text-left text-xs text-slate-700 ring-1 ring-slate-200" dir="ltr">
-        {json}
-      </pre>
-    );
-  }
-  return String(value);
+  const found = items.find((item) => Number(item.id) === Number(value));
+  if (found) return found.name;
+  if (typeof value === "string" && !/^\d+$/.test(value.trim())) return value;
+  return "—";
 }
 
-// ─── UI Primitives ────────────────────────────────────────────────────────────
-
-function SkeletonBlock({ className = "" }: { className?: string }) {
-  return <div className={`animate-pulse rounded-2xl bg-slate-200/70 ${className}`} />;
+function toNumberArray(value: unknown): number[] {
+  if (!Array.isArray(value)) return [];
+  return (value as unknown[]).map(Number).filter(Number.isFinite);
 }
 
-function StatusBadge({ label, id }: { label: string; id?: number | null }) {
-  const tone = statusTone(label, id);
-  const classes = {
-    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    warning: "border-amber-200 bg-amber-50 text-amber-700",
-    danger: "border-rose-200 bg-rose-50 text-rose-700",
-    info: "border-sky-200 bg-sky-50 text-sky-700",
-    neutral: "border-slate-200 bg-slate-50 text-slate-700",
-  }[tone];
-
-  return <Badge className={`rounded-full border px-2.5 py-1 text-xs font-semibold hover:bg-inherit ${classes}`}>{label || "—"}</Badge>;
+function dictNames(items: DictItem[], values: unknown): string {
+  const ids = toNumberArray(values);
+  if (!ids.length) return "—";
+  const names = ids.map((id) => dictName(items, id)).filter((name) => name !== "—");
+  return names.length ? names.join(", ") : "—";
 }
 
-function SectionCard({
+function formatDate(value?: string | null) {
+  if (!value) return "—";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return String(value);
+  return d.toLocaleDateString("he-IL");
+}
+
+function applicationStatusClass(value?: number | string | null) {
+  const statusId = Number(value ?? -1);
+  if ([1, 2, 3, 4, 9].includes(statusId)) return "border-amber-200 bg-amber-50 text-amber-700";
+  if ([6, 7, 8, 11].includes(statusId)) return "border-blue-200 bg-blue-50 text-blue-700";
+  if (statusId === 12) return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  if ([5, 10, 13, 14].includes(statusId)) return "border-red-200 bg-red-50 text-red-700";
+  return "border-slate-200 bg-slate-100 text-slate-700";
+}
+
+function LabelValue({ label, value }: { label: string; value?: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-2">
+      <span className="shrink-0 text-[14px] text-slate-500">{label}</span>
+      <span className="text-end text-[14px] font-semibold text-slate-800">{value || "—"}</span>
+    </div>
+  );
+}
+
+function SectionHeader({
+  icon,
   title,
-  icon,
-  action,
-  children,
+  subtitle,
+  accentColor = BRAND.primary,
 }: {
+  icon: string;
   title: string;
-  icon?: React.ReactNode;
-  action?: React.ReactNode;
-  children: React.ReactNode;
+  subtitle: string;
+  accentColor?: string;
 }) {
   return (
-    <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <CardContent className="p-4 sm:p-5">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 text-slate-900">
-            {icon ? <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#F0FDFC] text-[#008080]">{icon}</span> : null}
-            <h2 className="text-base font-bold sm:text-lg">{title}</h2>
-          </div>
-          {action}
+    <div className="space-y-4">
+      <div className="flex items-center gap-4">
+        <span
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-lg leading-none"
+          style={{ backgroundColor: `${accentColor}14`, color: accentColor }}
+        >
+          {icon}
+        </span>
+        <div>
+          <div className="text-base font-extrabold text-slate-900">{title}</div>
+          <div className="mt-1 text-[14px] leading-[1.6] text-slate-400">{subtitle}</div>
         </div>
-        {children}
-      </CardContent>
-    </Card>
-  );
-}
-
-function LabelValue({ label, value, ltr = false }: { label: string; value: React.ReactNode; ltr?: boolean }) {
-  return (
-    <div className="flex items-start justify-between gap-4 border-b border-slate-100 py-2 last:border-b-0">
-      <span className="shrink-0 text-[13px] text-slate-500">{label}</span>
-      <span dir={ltr ? "ltr" : "rtl"} className="text-end text-sm font-semibold text-slate-800">
-        {value || "—"}
-      </span>
-    </div>
-  );
-}
-
-function KpiCard({ icon, value, label, hint }: { icon: React.ReactNode; value: React.ReactNode; label: string; hint?: string }) {
-  return (
-    <Card className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-2xl font-bold text-[#008080]">{value}</div>
-            <div className="mt-1 text-sm font-semibold text-slate-700">{label}</div>
-            {hint ? <div className="mt-1 text-xs text-slate-500">{hint}</div> : null}
-          </div>
-          <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#F0FDFC] text-[#008080]">{icon}</div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function EmptyState({ title, description, action }: { title: string; description: string; action?: React.ReactNode }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
-      <div className="text-sm font-bold text-slate-800">{title}</div>
-      <div className="mx-auto mt-1 max-w-xl text-sm text-slate-500">{description}</div>
-      {action ? <div className="mt-4 flex justify-center">{action}</div> : null}
-    </div>
-  );
-}
-
-function ErrorBlock({ title, description }: { title: string; description: string }) {
-  return (
-    <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-rose-700">
-      <div className="flex items-center gap-2 text-sm font-bold">
-        <AlertCircle className="h-4 w-4" />
-        {title}
       </div>
-      <div className="mt-1 text-sm">{description}</div>
+      <div className="h-px w-full bg-[#E2E8F0]" />
     </div>
   );
 }
 
-function CommunicationButton({
-  href,
-  icon,
-  children,
-  disabled,
-}: {
-  href: string | null;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  disabled?: boolean;
-}) {
-  if (!href || disabled) {
-    return (
-      <Button variant="outline" size="sm" disabled className="rounded-xl border-slate-200 bg-slate-50 text-slate-400">
-        {icon}
-        {children}
-      </Button>
-    );
+// ─── main component ───────────────────────────────────────────────────────────
+
+export default function Candidate360Page() {
+  const params = useParams<{ contactId?: string; id?: string }>();
+  const rawId = params.contactId ?? params.id ?? "";
+  const isNew = rawId === "new";
+  const resolvedId = isNew ? 0 : Number(rawId);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+  const queryClient = useQueryClient();
+  const { updateContact, insertContact } = useContactMutations();
+  const { data, isLoading, error } = useContact360(resolvedId);
+  const { data: dictsOnly, isLoading: dictsOnlyLoading, error: dictsOnlyError } = useContact360Dicts(isNew);
+
+  // הגעה מ"בקשת גיוס ציבורית" (JobDetailsPage) עם פרטי איש קשר למילוי מוקדם.
+  const prefillContact = (location.state as any)?.prefillContact as
+    | { first_name?: string; last_name?: string; phone?: string; email?: string }
+    | undefined;
+
+  // ── create-new-contact form state ──
+  const [newForm, setNewForm] = useState({
+    first_name: prefillContact?.first_name ?? "", last_name: prefillContact?.last_name ?? "",
+    phone: prefillContact?.phone ?? "", email: prefillContact?.email ?? "",
+    role: "", sub_roles: [] as string[], city_id: "", region_id: "", gender: "", facebook_url: "",
+  });
+  const [newSaving, setNewSaving] = useState(false);
+  const [newError, setNewError] = useState("");
+
+  function setField(field: string, value: string) {
+    setNewForm((f) => ({ ...f, [field]: value }));
   }
 
-  return (
-    <Button asChild variant="outline" size="sm" className="rounded-xl border-slate-200 bg-white text-slate-700 hover:bg-[#F0FDFC] hover:text-[#008080]">
-      <a href={href} target={href.startsWith("http") ? "_blank" : undefined} rel={href.startsWith("http") ? "noreferrer" : undefined}>
-        {icon}
-        {children}
-      </a>
-    </Button>
-  );
-}
+  function isValidEmail(v: string) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  }
 
-// ─── Data hooks ───────────────────────────────────────────────────────────────
+  async function handleCreateContact() {
+    const hasName = newForm.first_name.trim() || newForm.last_name.trim();
+    if (!hasName) { setNewError("יש להזין שם פרטי או שם משפחה"); return; }
+    if (!newForm.phone.trim()) { setNewError("יש להזין מספר נייד"); return; }
+    if (newForm.email.trim() && !isValidEmail(newForm.email.trim())) { setNewError("כתובת האימייל אינה תקינה"); return; }
+    setNewSaving(true);
+    setNewError("");
+    const first = newForm.first_name.trim() || null;
+    const last = newForm.last_name.trim() || null;
+    const full_name = [first, last].filter(Boolean).join(" ");
+    const { data: created, error: err } = await insertContact({
+      first_name: first, last_name: last, full_name, display_name: full_name,
+      phone: newForm.phone.trim() || null, email: newForm.email.trim() || null,
+      role: newForm.role ? Number(newForm.role) : null,
+      sub_role: newForm.sub_roles.length > 0 ? newForm.sub_roles.map(Number) : null,
+      city_id: newForm.city_id ? Number(newForm.city_id) : null,
+      gender: newForm.gender ? Number(newForm.gender) : null,
+      facebook_url: newForm.facebook_url.trim() || null,
+    });
+    setNewSaving(false);
+    if (err || !created) { setNewError("שמירת איש הקשר נכשלה. נסי שוב."); return; }
+    navigate(`/admin/contacts/${created.contact_id}`, { replace: true });
+  }
 
-function useDictRows(table: string) {
-  return useQuery({
-    queryKey: ["dict", table],
-    queryFn: async () => {
-      const { data, error } = await (supabase as any).from(table).select("id, name").order("id", { ascending: true });
-      if (error) throw error;
-      return (data ?? []) as DictRow[];
-    },
-    staleTime: 1000 * 60 * 10,
-  });
-}
+  // ── page state ──
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedJobCode, setSelectedJobCode] = useState("");
+  const [jobSearch, setJobSearch] = useState("");
+  const [createAppNotes, setCreateAppNotes] = useState("");
+  const [createError, setCreateError] = useState("");
+  const [toast, setToast] = useState<ToastState>(null);
+  const [notes, setNotes] = useState<string>("");
+  const [notesSaving, setNotesSaving] = useState(false);
+  const [selectedTagId, setSelectedTagId] = useState("");
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [adminEditOpen, setAdminEditOpen] = useState(false);
 
-function useDictBundle(enabled: boolean, previewMode: boolean): DictBundle {
-  const accountStatuses = useDictRows("dict_account_statuses");
-  const accountTypes = useDictRows("dict_account_types");
-  const jobStatuses = useDictRows("dict_job_statuses");
-  const applicationStatuses = useDictRows("dict_application_statuses");
-  const checkStatuses = useDictRows("dict_check_statuses");
-  const roles = useDictRows("dict_roles");
-  const subRoles = useDictRows("dict_sub_roles");
-  const scopes = useDictRows("dict_scopes");
-  const languages = useDictRows("dict_languages");
-  const regions = useDictRows("dict_regions");
-  const cities = useDictRows("dict_cities");
-  const systems = useDictRows("dict_systems");
-
-  return useMemo(() => {
-    if (!enabled || previewMode) return PREVIEW_DICTS;
-
-    return {
-      accountStatuses: mapFromRows(accountStatuses.data),
-      accountTypes: mapFromRows(accountTypes.data),
-      jobStatuses: mapFromRows(jobStatuses.data),
-      applicationStatuses: mapFromRows(applicationStatuses.data),
-      checkStatuses: mapFromRows(checkStatuses.data),
-      roles: mapFromRows(roles.data),
-      subRoles: mapFromRows(subRoles.data),
-      scopes: mapFromRows(scopes.data),
-      languages: mapFromRows(languages.data),
-      regions: mapFromRows(regions.data),
-      cities: mapFromRows(cities.data),
-      systems: mapFromRows(systems.data),
-    };
-  }, [
-    accountStatuses.data,
-    accountTypes.data,
-    applicationStatuses.data,
-    checkStatuses.data,
-    cities.data,
-    enabled,
-    jobStatuses.data,
-    previewMode,
-    languages.data,
-    regions.data,
-    roles.data,
-    scopes.data,
-    subRoles.data,
-    systems.data,
-  ]);
-}
-
-function useAccountQuery(accountId: number | null, previewMode: boolean) {
-  return useQuery({
-    queryKey: ["employer360", "account", accountId, previewMode],
-    queryFn: async () => {
-      if (previewMode) return PREVIEW_ACCOUNT;
-      if (!accountId) return null;
-
-      const { data, error } = await supabase.from("accounts").select(ACCOUNT_SELECT).eq("account_id", accountId).maybeSingle();
-
-      if (error) throw error;
-      return data as unknown as AccountRow | null;
-    },
-    enabled: previewMode || !!accountId,
-  });
-}
-
-function useAccountJobs(accountId: number | null, previewMode: boolean) {
-  return useQuery({
-    queryKey: ["employer360", "jobs", accountId, previewMode],
-    queryFn: async () => {
-      if (previewMode) return PREVIEW_JOBS;
-      if (!accountId) return [];
-
-      const { data, error } = await supabase
-        .from("job")
-        .select(JOB_SELECT)
-        .eq("account_link", accountId)
-        .order("created_time", { ascending: false });
-
-      if (error) throw error;
-      return (data ?? []) as unknown as JobRow[];
-    },
-    enabled: previewMode || !!accountId,
-  });
-}
-
-function useAccountContacts(accountId: number | null, previewMode: boolean) {
-  return useQuery({
-    queryKey: ["employer360", "contacts", accountId, previewMode],
-    queryFn: async () => {
-      if (previewMode) return PREVIEW_CONTACTS;
-      if (!accountId) return [];
-
-      const { data, error } = await supabase
-        .from("contact")
-        .select(CONTACT_SELECT)
-        .eq("account_link", accountId)
-        .order("updated_timestamp", { ascending: false });
-
-      if (error) throw error;
-      return (data ?? []) as unknown as ContactRow[];
-    },
-    enabled: previewMode || !!accountId,
-  });
-}
-
-function useAccountApplications(jobCodes: string[], previewMode: boolean) {
-  return useQuery({
-    queryKey: ["employer360", "applications", jobCodes, previewMode],
-    queryFn: async () => {
-      if (previewMode) return PREVIEW_APPLICATIONS;
-      if (jobCodes.length === 0) return [];
-
-      const { data, error } = await supabase
-        .from("applications")
-        .select(APPLICATION_SELECT)
-        .in("job_code", jobCodes)
-        .order("submission_date", { ascending: false });
-
-      if (error) throw error;
-      return (data ?? []) as unknown as ApplicationRow[];
-    },
-    enabled: previewMode || jobCodes.length > 0,
-  });
-}
-
-// ─── AccountEditSheet ─────────────────────────────────────────────────────────
-
-type EditSection = "general" | "crm";
-
-
-type EditFields = {
-  account_name: string;
-  bus_id: string;
-  contact_link: string;
-  account_status: string;
-  account_type: string;
-  phone: string;
-  second_phone: string;
-  email: string;
-  second_email: string;
-  billing_email: string;
-  website_url: string;
-  facebook_url: string;
-  region_id: string;
-  city_id: string;
-  address: string;
-  clinic_type: string;
-  chairs_count: string;
-  team_size: string;
-  notes: string;
-  last_contact_date: string;
-  next_follow_up: string;
-};
-
-function AccountEditSheet({
-  open,
-  section,
-  account,
-  dicts,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  section: EditSection;
-  account: AccountRow;
-  dicts: DictBundle;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const { updateAccount } = useAccountMutations();
-  const [saving, setSaving] = useState(false);
-  const [activeSection, setActiveSection] = useState<EditSection>(section);
-
-  const buildFields = (a: AccountRow): EditFields => ({
-    account_name: a.account_name ?? "",
-    bus_id: (a as any).bus_id ?? "",
-    contact_link: String(a.contact_link ?? ""),
-    account_status: String(a.account_status ?? ""),
-    account_type: String(a.account_type ?? ""),
-    phone: a.phone ?? "",
-    second_phone: a.second_phone ?? "",
-    email: a.email ?? "",
-    second_email: a.second_email ?? "",
-    billing_email: a.billing_email ?? "",
-    website_url: a.website_url ?? "",
-    facebook_url: a.facebook_url ?? "",
-    region_id: String(a.region_id ?? ""),
-    city_id: String(a.city_id ?? ""),
-    address: a.address ?? "",
-    clinic_type: a.clinic_type ?? "",
-    chairs_count: a.chairs_count != null ? String(a.chairs_count) : "",
-    team_size: a.team_size != null ? String(a.team_size) : "",
-    notes: a.notes ?? "",
-    last_contact_date: a.last_contact_date ? a.last_contact_date.slice(0, 10) : "",
-    next_follow_up: a.next_follow_up ? a.next_follow_up.slice(0, 10) : "",
-  });
-
-  const [fields, setFields] = useState<EditFields>(() => buildFields(account));
+  const showToast = (type: "success" | "error", text: string) => {
+    setToast({ type, text });
+    window.setTimeout(() => setToast(null), 3000);
+  };
 
   useEffect(() => {
-    if (open) {
-      setActiveSection(section);
-      setFields(buildFields(account));
+    if (data?.contact?.notes !== undefined) {
+      setNotes(data.contact.notes ?? "");
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, section]);
+  }, [data?.contact?.notes]);
 
-  const set = (key: keyof EditFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFields((prev) => ({ ...prev, [key]: e.target.value }));
-  };
+  const contact = data?.contact ?? null;
+  const applications = data?.applications ?? [];
+  const tags = data?.tags ?? [];
+  const account = data?.account ?? null;
+  const jobs = data?.jobs ?? [];
+  const linkedJobs: LinkedJobRow[] = data?.linkedJobs ?? [];
+  const dicts = data?.dicts;
 
-
-
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const updates: Record<string, unknown> = {
-        account_name: fields.account_name.trim() || account.account_name,
-        bus_id: fields.bus_id.trim() || null,
-        contact_link: fields.contact_link || null,
-        account_status: fields.account_status ? Number(fields.account_status) : null,
-        account_type: fields.account_type ? Number(fields.account_type) : null,
-        phone: fields.phone.trim() || null,
-        second_phone: fields.second_phone.trim() || null,
-        email: fields.email.trim() || null,
-        second_email: fields.second_email.trim() || null,
-        billing_email: fields.billing_email.trim() || null,
-        website_url: fields.website_url.trim() || null,
-        facebook_url: fields.facebook_url.trim() || null,
-        region_id: fields.region_id ? Number(fields.region_id) : null,
-        city_id: fields.city_id ? Number(fields.city_id) : null,
-        address: fields.address.trim() || null,
-        clinic_type: fields.clinic_type.trim() || null,
-        chairs_count: fields.chairs_count ? Number(fields.chairs_count) : null,
-        team_size: fields.team_size ? Number(fields.team_size) : null,
-        notes: fields.notes.trim() || null,
-        last_contact_date: fields.last_contact_date || null,
-        next_follow_up: fields.next_follow_up || null,
-      };
-
-      const { error } = await updateAccount(account.account_id, updates);
-
-      if (error) throw error;
-
-      toast.success("הארגון עודכן בהצלחה");
-      onSaved();
-      onClose();
-    } catch (err) {
-      toast.error("שגיאה בשמירה: " + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#008080] focus:outline-none focus:ring-1 focus:ring-[#008080]";
-  const labelClass = "mb-1 block text-xs font-semibold text-slate-500";
-
-  const statusOptions = Array.from(dicts.accountStatuses.entries()).map(([id, name]) => ({ id, name }));
-  const typeOptions = Array.from(dicts.accountTypes.entries()).map(([id, name]) => ({ id, name }));
-
-  return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent
-        dir="rtl"
-        className="max-h-[90vh] max-w-2xl overflow-y-auto font-['Heebo']"
-      >
-        <DialogHeader>
-          <DialogTitle className="text-lg font-black text-slate-900">
-            עריכת ארגון — {account.account_name}
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* Section tabs */}
-        <div className="flex gap-2 border-b border-slate-200 pb-3">
-          <button
-            type="button"
-            onClick={() => setActiveSection("general")}
-            className={`rounded-xl px-4 py-1.5 text-sm font-semibold transition ${activeSection === "general" ? "bg-[#008080] text-white" : "text-slate-600 hover:bg-slate-100"}`}
-          >
-            פרטים כלליים
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection("crm")}
-            className={`rounded-xl px-4 py-1.5 text-sm font-semibold transition ${activeSection === "crm" ? "bg-[#008080] text-white" : "text-slate-600 hover:bg-slate-100"}`}
-          >
-            CRM ומעקב
-          </button>
-        </div>
-
-        {activeSection === "general" && (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className={labelClass}>שם הארגון *</label>
-                <input className={inputClass} value={fields.account_name} onChange={set("account_name")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>ח.פ / עוסק מורשה</label>
-                <input className={inputClass} value={fields.bus_id} onChange={set("bus_id")} placeholder="מספר ח.פ או עוסק מורשה" />
-              </div>
-
-              <div className="sm:col-span-2">
-                <OrgContactPicker
-                  accountId={account.account_id}
-                  employerValue={fields.contact_link}
-                  onEmployerChange={(id) => setFields((prev) => ({ ...prev, contact_link: id ?? "" }))}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>סטטוס</label>
-                <select className={inputClass} value={fields.account_status} onChange={set("account_status")}>
-                  <option value="">— בחר סטטוס —</option>
-                  {statusOptions.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className={labelClass}>סוג ארגון</label>
-                <select className={inputClass} value={fields.account_type} onChange={set("account_type")}>
-                  <option value="">— בחר סוג —</option>
-                  {typeOptions.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className={labelClass}>טלפון ראשי</label>
-                <input className={inputClass} dir="ltr" value={fields.phone} onChange={set("phone")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>טלפון נוסף</label>
-                <input className={inputClass} dir="ltr" value={fields.second_phone} onChange={set("second_phone")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>אימייל ראשי</label>
-                <input className={inputClass} dir="ltr" type="email" value={fields.email} onChange={set("email")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>אימייל נוסף</label>
-                <input className={inputClass} dir="ltr" type="email" value={fields.second_email} onChange={set("second_email")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>אימייל לחיוב</label>
-                <input className={inputClass} dir="ltr" type="email" value={fields.billing_email} onChange={set("billing_email")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>אתר</label>
-                <input className={inputClass} dir="ltr" value={fields.website_url} onChange={set("website_url")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>פייסבוק</label>
-                <input className={inputClass} dir="ltr" value={fields.facebook_url} onChange={set("facebook_url")} />
-              </div>
-
-              <div className="sm:col-span-2">
-                <CityRegionPicker
-                  variant="edit"
-                  regionId={fields.region_id ? Number(fields.region_id) : null}
-                  cityId={fields.city_id ? Number(fields.city_id) : null}
-                  onRegionChange={(regionId) => setFields((prev) => ({ ...prev, region_id: regionId != null ? String(regionId) : "", city_id: "" }))}
-                  onCityChange={(cityId) => setFields((prev) => ({ ...prev, city_id: cityId != null ? String(cityId) : "" }))}
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className={labelClass}>כתובת</label>
-                <input className={inputClass} value={fields.address} onChange={set("address")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>סוג מרפאה / קליניקה</label>
-                <input className={inputClass} value={fields.clinic_type} onChange={set("clinic_type")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>מספר כיסאות</label>
-                <input className={inputClass} type="number" dir="ltr" value={fields.chairs_count} onChange={set("chairs_count")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>גודל צוות</label>
-                <input className={inputClass} type="number" dir="ltr" value={fields.team_size} onChange={set("team_size")} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeSection === "crm" && (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelClass}>תאריך קשר אחרון</label>
-                <input className={inputClass} type="date" dir="ltr" value={fields.last_contact_date} onChange={set("last_contact_date")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>פולואפ הבא</label>
-                <input className={inputClass} type="date" dir="ltr" value={fields.next_follow_up} onChange={set("next_follow_up")} />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className={labelClass}>הערות CRM</label>
-                <textarea
-                  className={`${inputClass} min-h-[120px] resize-y`}
-                  value={fields.notes}
-                  onChange={set("notes")}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-200 pt-4">
-          <Button variant="outline" onClick={onClose} className="rounded-xl" disabled={saving}>
-            <X className="h-4 w-4" />
-            ביטול
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-xl bg-[#008080] text-white hover:bg-[#006B6B]"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? "שומר..." : "שמירה"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-// ─── Hero section ─────────────────────────────────────────────────────────────
-
-function HeroSection({
-  account,
-  dicts,
-  location,
-  activeJobsCount,
-  totalJobsCount,
-  completion,
-  overdueFollowUp,
-  onCopy,
-  onScrollToContacts,
-  onEdit,
-}: {
-  account: AccountRow;
-  dicts: DictBundle;
-  location: string;
-  activeJobsCount: number;
-  totalJobsCount: number;
-  completion: number;
-  overdueFollowUp: boolean;
-  onCopy: (value: string | null | undefined) => void;
-  onScrollToContacts: () => void;
-  onEdit: (section?: EditSection) => void;
-}) {
-  const website = normalizeUrl(account.website_url);
-  const facebook = normalizeUrl(account.facebook_url);
-  const wa = whatsappUrl(account.phone);
-
-  return (
-    <Card className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-      <CardContent className="p-0">
-        <div className="bg-gradient-to-l from-[#008080] to-[#006B6B] p-5 text-white sm:p-6">
-          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-            <div className="flex min-w-0 gap-4">
-              <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white/15 text-2xl font-black ring-1 ring-white/20">
-                {account.account_name?.trim()?.charAt(0) || <Building2 className="h-8 w-8" />}
-              </div>
-              <div className="min-w-0">
-                <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <StatusBadge label={dictName(dicts.accountStatuses, account.account_status, "סטטוס לא הוגדר")} id={account.account_status} />
-                  <Badge className="rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/15">
-                    {dictName(dicts.accountTypes, account.account_type, "סוג ארגון לא הוגדר")}
-                  </Badge>
-                  {overdueFollowUp ? (
-                    <Badge className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700 hover:bg-amber-50">
-                      פולואפ באיחור
-                    </Badge>
-                  ) : null}
-                </div>
-                <h1 className="truncate text-2xl font-black sm:text-3xl">{account.account_name}</h1>
-                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/85">
-                  <span className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    {location}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="h-4 w-4" />
-                    {activeJobsCount} משרות פעילות מתוך {totalJobsCount}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <BadgeCheck className="h-4 w-4" />
-                    פרופיל {completion}% מלא
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap gap-2 lg:justify-end">
-              <Button
-                onClick={() => onEdit("general")}
-                className="rounded-xl bg-white text-[#008080] hover:bg-slate-50"
-              >
-                <Edit2 className="h-4 w-4" />
-                עריכת ארגון
-              </Button>
-              <Button asChild className="rounded-xl border border-white/30 bg-white/15 text-white hover:bg-white/25">
-                <Link to={`/employer-profile/${account.account_id}`}>
-                  <Printer className="h-4 w-4" />
-                  פרופיל להדפסה
-                </Link>
-              </Button>
-              <Button asChild className="rounded-xl bg-[#D97706] text-white hover:bg-[#B95F04]">
-                <Link to={`/admin/jobs/new?account_id=${account.account_id}`}>
-                  <Plus className="h-4 w-4" />
-                  יצירת משרה
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <div className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-5">
-          <CommunicationButton href={wa} icon={<MessageCircle className="h-4 w-4" />}>
-            WhatsApp
-          </CommunicationButton>
-          <CommunicationButton href={account.phone ? `tel:${account.phone}` : null} icon={<Phone className="h-4 w-4" />}>
-            חיוג
-          </CommunicationButton>
-          <CommunicationButton href={account.email ? `mailto:${account.email}` : null} icon={<Mail className="h-4 w-4" />}>
-            אימייל
-          </CommunicationButton>
-          <CommunicationButton href={website} icon={<Globe className="h-4 w-4" />}>
-            אתר
-          </CommunicationButton>
-          <CommunicationButton href={facebook} icon={<Facebook className="h-4 w-4" />}>
-            פייסבוק
-          </CommunicationButton>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 px-4 py-3 text-xs text-slate-500">
-          <button
-            type="button"
-            onClick={() => onCopy(account.bus_id)}
-            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 hover:bg-slate-50 hover:text-[#008080] disabled:pointer-events-none disabled:opacity-40"
-            disabled={!account.bus_id}
-          >
-            <ClipboardCopy className="h-3.5 w-3.5" />
-            ח.פ / עוסק: <span dir="ltr">{account.bus_id || "—"}</span>
-          </button>
-          <button type="button" onClick={onScrollToContacts} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 hover:bg-slate-50 hover:text-[#008080]">
-            <Users className="h-3.5 w-3.5" />
-            מעבר לאנשי קשר
-          </button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function KpiStrip({ account, jobs, applications, dicts }: { account: AccountRow; jobs: JobRow[]; applications: ApplicationRow[]; dicts: DictBundle }) {
-  const activeJobs = useMemo(() => jobs.filter((job) => isActiveJob(job, dicts)), [dicts, jobs]);
-
-  const uniqueCandidates = useMemo(
-    () => uniqueCount(applications, (application) => application.candidate_link ?? application.phone_norm ?? application.candidate_phone ?? application.candidate_email),
+  const activeApplications = useMemo(
+    () => applications.filter((app) => ![9, 10, 11, 12, 13, 14, 15].includes(Number(app.application_status))),
     [applications],
   );
 
-  const openApplications = useMemo(
-    () =>
-      applications.filter((application) => {
-        const label = dictName(dicts.applicationStatuses, application.application_status, application.status_in_master ?? "");
-        return !/סגור|נדחה|בוטל|הושם/i.test(label);
-      }).length,
-    [applications, dicts.applicationStatuses],
+  const availableJobs = useMemo(() => {
+    const q = jobSearch.trim().toLowerCase();
+    return jobs
+      .filter((job) => job.job_status === 3)
+      .filter((job) => {
+        if (!q) return true;
+        return [job.job_code, job.job_title, job.account_name, dictName(dicts?.roles ?? [], job.job_role), dictName(dicts?.cities ?? [], job.city_id), dictName(dicts?.regions ?? [], job.region_id)]
+          .filter(Boolean).join(" ").toLowerCase().includes(q);
+      })
+      .sort((a, b) => {
+        const roleDelta = Number(b.job_role === contact?.role) - Number(a.job_role === contact?.role);
+        if (roleDelta) return roleDelta;
+        return String(a.job_code).localeCompare(String(b.job_code), "he");
+      });
+  }, [jobs, jobSearch, dicts, contact?.role]);
+
+  const selectedJob = useMemo(
+    () => availableJobs.find((job) => job.job_code === selectedJobCode) ?? jobs.find((job) => job.job_code === selectedJobCode) ?? null,
+    [availableJobs, jobs, selectedJobCode],
   );
 
-  const overdueFollowUps = isPast(account.next_follow_up) ? 1 : 0;
+  const recommendedJobs = useMemo<Array<{ job: JobRow; score: number; reasons: string[] }>>(() => {
+    if (!contact || !dicts) return [];
+    const appliedCodes = new Set(applications.map((a) => String(a.job_code ?? "")));
+    const preferredRegions = new Set<number>(contact.preferred_regions ?? []);
+    const preferredCities = new Set<number>(contact.preferred_cities ?? []);
+    return jobs
+      .filter((job) => job.job_status === 3)
+      .filter((job) => !appliedCodes.has(String(job.job_code ?? "")))
+      .map((job) => {
+        let score = 0;
+        const reasons: string[] = [];
+        if (job.job_role === contact.role) { score += 45; reasons.push("תפקיד מדויק"); }
+        const subRoleIds = Array.isArray(contact.sub_role) ? contact.sub_role : (contact.sub_role != null ? [contact.sub_role] : []);
+        const jobSubRoleIds = toNumberArray(job.job_sub_role);
+        if (subRoleIds.some((id) => jobSubRoleIds.includes(Number(id)))) { score += 15; reasons.push("תת־תפקיד רלוונטי"); }
+        if (preferredRegions.has(Number(job.region_id)) || Number(job.region_id) === Number(contact.region_id)) { score += 15; reasons.push("אזור תואם"); }
+        if (preferredCities.has(Number(job.city_id)) || Number(job.city_id) === Number(contact.city_id)) { score += 10; reasons.push("עיר תואמת"); }
+        const preferredScopeIds = toNumberArray(contact.preferred_scope);
+        const jobScopeIds = toNumberArray(job.scope);
+        if (preferredScopeIds.some((id) => jobScopeIds.includes(id))) { score += 10; reasons.push("היקף מתאים"); }
+        const languageIds = toNumberArray(contact.languages);
+        const jobLanguageIds = toNumberArray(job.required_languages);
+        if (languageIds.length && jobLanguageIds.some((id) => languageIds.includes(id))) { score += 5; reasons.push("שפה תואמת"); }
+        const systemIds = toNumberArray(contact.systems_used);
+        const jobSystemIds = toNumberArray(job.systems_used);
+        if (systemIds.length && jobSystemIds.some((id) => systemIds.includes(id))) { score += 5; reasons.push("מערכת תואמת"); }
+        if (typeof contact.experience === "number" && typeof job.required_experience === "number" && contact.experience >= job.required_experience) { score += 5; reasons.push("ניסיון מתאים"); }
+        return { job, score, reasons };
+      })
+      .filter((item) => item.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  }, [contact, applications, jobs, dicts]);
 
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <KpiCard icon={<Briefcase className="h-5 w-5" />} value={activeJobs.length} label="משרות פעילות" hint="מחושב לפי משרות הארגון" />
-      <KpiCard icon={<FileText className="h-5 w-5" />} value={jobs.length} label='סה"כ משרות' hint="פעילות והיסטוריות" />
-      <KpiCard icon={<Users className="h-5 w-5" />} value={uniqueCandidates} label="מועמדים ייחודיים" hint={`${openApplications} הגשות פתוחות`} />
-      <KpiCard icon={<CalendarClock className="h-5 w-5" />} value={overdueFollowUps} label="פולואפים באיחור" hint={account.next_follow_up ? `הבא: ${formatDate(account.next_follow_up)}` : "לא נקבע פולואפ"} />
-    </div>
-  );
-}
+  const aiSummary = useMemo(() => {
+    if (!contact || !dicts) return { summary: "", risks: [], nextAction: "" };
+    const parts = [
+      contact.full_name || contact.display_name,
+      dictName(dicts.roles, contact.role) !== "—" ? `מוגדר/ת כ-${dictName(dicts.roles, contact.role)}` : null,
+      dictName(dicts.experience, contact.experience) !== "—" ? `עם ניסיון ${dictName(dicts.experience, contact.experience)}` : null,
+      dictNames(dicts.availability, contact.candidate_availability_ids) !== "—" ? `וזמינות ${dictNames(dicts.availability, contact.candidate_availability_ids)}` : null,
+      dictName(dicts.cities, contact.city_id) !== "—" ? `באזור ${dictName(dicts.cities, contact.city_id)}` : null,
+    ].filter(Boolean);
+    const risks: string[] = [];
+    if (!applicationHasCv(contact)) risks.push("חסר קו״ח זמין");
+    if (!contact.salary_expectation_hourly && !contact.salary_expectation_monthly) risks.push("חסרים נתוני שכר");
+    if (!contact.role) risks.push("חסר מיפוי תפקיד");
+    const nextAction = contact.next_follow_up
+      ? `לבצע פולואפ בתאריך ${formatDate(contact.next_follow_up)}`
+      : applications.length > 0 ? "לעדכן סטטוס להגשה האחרונה" : "ליצור הגשה ראשונה למשרה מתאימה";
+    return { summary: contact.ai_profile_summary?.trim() || parts.join(" "), risks, nextAction };
+  }, [contact, applications, dicts]);
 
-function LinkContactToAccountPanel({ accountId }: { accountId: number }) {
-  const { updateContact } = useContactMutations()
-  const [pendingId, setPendingId] = React.useState<number | null>(null)
-  const [saving, setSaving] = React.useState(false)
+  const completion = useMemo(() => {
+    if (!contact) return 0;
+    const fields = [
+      contact.full_name, contact.phone, contact.phone_norm, contact.email,
+      contact.role, contact.experience, contact.candidate_availability_ids, contact.region_id,
+      contact.city_id, applicationHasCv(contact), contact.professional_title,
+      contact.current_employer, contact.preferred_scope, contact.check_status,
+    ];
+    return Math.round((fields.filter(Boolean).length / fields.length) * 100);
+  }, [contact]);
 
-  const handleLink = async () => {
-    if (!pendingId) return
-    setSaving(true)
-    const { error } = await updateContact(pendingId, { account_link: accountId })
-    setSaving(false)
-    if (error) {
-      toast.error('שגיאה בשיוך איש הקשר')
-    } else {
-      toast.success('איש הקשר שויך לארגון בהצלחה')
-      setPendingId(null)
-    }
-  }
-
-  return (
-    <SectionCard title="שיוך איש קשר לארגון" icon={<Users className="h-4 w-4" />}>
-      <p className="mb-3 text-[13px] text-[#6B6B6B]">חפש איש קשר קיים ושייך אותו לארגון זה</p>
-      <ContactPicker
-        label="חיפוש איש קשר"
-        value={pendingId}
-        onChange={(id) => setPendingId(id)}
-      />
-      {pendingId && (
-        <Button
-          className="mt-3 w-full rounded-xl bg-[#008080] text-white hover:bg-[#006D6D]"
-          onClick={handleLink}
-          disabled={saving}
-        >
-          {saving ? 'משייך...' : 'שייך לארגון'}
-        </Button>
-      )}
-    </SectionCard>
-  )
-}
-
-function OrganizationDetails({ account, dicts, onCopy }: { account: AccountRow; dicts: DictBundle; onCopy: (value: string | null | undefined) => void }) {
-  return (
-    <SectionCard
-      title="פרטי ארגון"
-      icon={<Building2 className="h-4 w-4" />}
-      action={
-        <Button variant="ghost" size="sm" className="rounded-xl text-[#008080]" onClick={() => onCopy([account.account_name, account.address].filter(Boolean).join(" | "))}>
-          <ClipboardCopy className="h-4 w-4" />
-          העתקה
-        </Button>
-      }
-    >
-      <LabelValue label="שם הארגון" value={account.account_name} />
-      <LabelValue label="ח.פ / עוסק" value={account.bus_id} ltr />
-      <LabelValue label="סוג ארגון" value={dictName(dicts.accountTypes, account.account_type)} />
-      <LabelValue label="סטטוס" value={<StatusBadge label={dictName(dicts.accountStatuses, account.account_status)} id={account.account_status} />} />
-      <LabelValue label="אזור" value={dictName(dicts.regions, account.region_id)} />
-      <LabelValue label="עיר" value={dictName(dicts.cities, account.city_id)} />
-      <LabelValue label="כתובת" value={account.address} />
-      <LabelValue label="סוג מרפאה" value={account.clinic_type} />
-      <LabelValue label="מספר כיסאות" value={account.chairs_count} />
-      <LabelValue label="גודל צוות" value={account.team_size} />
-    </SectionCard>
-  );
-}
-
-function CommunicationDetails({ account }: { account: AccountRow }) {
-  return (
-    <SectionCard title="תקשורת" icon={<Phone className="h-4 w-4" />}>
-      <LabelValue label="טלפון ראשי" value={account.phone} ltr />
-      <LabelValue label="טלפון נוסף" value={account.second_phone} ltr />
-      <LabelValue label="אימייל ראשי" value={account.email} ltr />
-      <LabelValue label="אימייל נוסף" value={account.second_email} ltr />
-      <LabelValue label="אימייל לחיוב" value={account.billing_email} ltr />
-      <LabelValue
-        label="אתר"
-        value={
-          normalizeUrl(account.website_url) ? (
-            <a href={normalizeUrl(account.website_url) ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#008080] hover:underline" dir="ltr">
-              {account.website_url}
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          ) : (
-            "—"
-          )
-        }
-      />
-      <LabelValue
-        label="פייסבוק"
-        value={
-          normalizeUrl(account.facebook_url) ? (
-            <a href={normalizeUrl(account.facebook_url) ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[#008080] hover:underline" dir="ltr">
-              {account.facebook_url}
-              <ExternalLink className="h-3.5 w-3.5" />
-            </a>
-          ) : (
-            "—"
-          )
-        }
-      />
-      <LabelValue label="WhatsApp אחרון" value={formatDateTime(account.whatsapp_last_sent)} />
-    </SectionCard>
-  );
-}
-
-function RecommendedActionsPanel({ actions }: { actions: RecommendedAction[] }) {
-  const severityClasses = {
-    info: "border-sky-200 bg-sky-50 text-sky-700",
-    warning: "border-amber-200 bg-amber-50 text-amber-700",
-    error: "border-rose-200 bg-rose-50 text-rose-700",
-    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  };
-
-  if (actions.length === 0) {
-    return (
-      <SectionCard title="פעולות מומלצות" icon={<Sparkles className="h-4 w-4" />}>
-        <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-emerald-700">
-          <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0" />
-          <div>
-            <div className="text-sm font-bold">הכל תקין</div>
-            <div className="text-sm">אין פעולות דחופות כרגע.</div>
-          </div>
-        </div>
-      </SectionCard>
-    );
-  }
-
-  return (
-    <SectionCard title="פעולות מומלצות" icon={<Sparkles className="h-4 w-4" />}>
-      <div className="space-y-3">
-        {actions.map((action) => {
-          const content = (
-            <div className={`rounded-2xl border p-3 ${severityClasses[action.severity]}`}>
-              <div className="flex items-start gap-3">
-                <span className="mt-0.5 shrink-0">{action.icon}</span>
-                <div className="min-w-0 flex-1">
-                  <div className="text-sm font-bold">{action.title}</div>
-                  <div className="text-xs opacity-90">{action.description}</div>
-                  <div className="mt-2 text-xs font-bold">{action.label}</div>
-                </div>
-              </div>
-            </div>
-          );
-
-          return action.href && action.href.startsWith("/") ? (
-            <Link key={action.key} to={action.href} className="block transition hover:scale-[1.01]">
-              {content}
+  const applicationColumns = useMemo<AdminColumn<ApplicationRow>[]>(() => [
+    {
+      key: "job",
+      label: "קוד / תפקיד",
+      minWidth: "180px",
+      render: (application) => (
+        <div className="flex items-center gap-1 text-sm font-semibold text-slate-900">
+          {application.job_code ? (
+            <Link
+              to={`/admin/jobs/${application.job_code}`}
+              className="font-mono text-xs text-[#008080] hover:underline"
+            >
+              {application.job_code}
             </Link>
-          ) : action.href ? (
-            <a key={action.key} href={action.href} target="_blank" rel="noreferrer" className="block transition hover:scale-[1.01]">
-              {content}
-            </a>
           ) : (
-            <div key={action.key}>{content}</div>
-          );
-        })}
-      </div>
-    </SectionCard>
-  );
-}
-
-function JobsPanel({ jobs, dicts, isLoading, error, accountId }: { jobs: JobRow[]; dicts: DictBundle; isLoading: boolean; error: unknown; accountId: number }) {
-  if (isLoading) {
-    return (
-      <SectionCard title="משרות" icon={<Briefcase className="h-4 w-4" />}>
-        <div className="space-y-3">
-          <SkeletonBlock className="h-12" />
-          <SkeletonBlock className="h-12" />
-          <SkeletonBlock className="h-12" />
-        </div>
-      </SectionCard>
-    );
-  }
-
-  if (error) {
-    return (
-      <SectionCard title="משרות" icon={<Briefcase className="h-4 w-4" />}>
-        <ErrorBlock title="שגיאה בטעינת משרות" description="לא ניתן היה לטעון את המשרות המקושרות לארגון." />
-      </SectionCard>
-    );
-  }
-
-  return (
-    <SectionCard
-      title={`משרות (${jobs.length})`}
-      icon={<Briefcase className="h-4 w-4" />}
-      action={
-        <Button asChild size="sm" className="rounded-xl bg-[#008080] text-white hover:bg-[#006B6B]">
-          <Link to={`/admin/jobs/new?account_id=${accountId}`}>
-            <Plus className="h-4 w-4" />
-            משרה חדשה
-          </Link>
-        </Button>
-      }
-    >
-      {jobs.length === 0 ? (
-        <EmptyState
-          title="אין משרות לארגון זה"
-          description="אפשר לפתוח משרה חדשה מתוך כרטסת הארגון, כשהארגון כבר מקושר להקמת המשרה."
-          action={
-            <Button asChild className="rounded-xl bg-[#008080] hover:bg-[#006B6B]">
-              <Link to={`/admin/jobs/new?account_id=${accountId}`}>יצירת משרה</Link>
-            </Button>
-          }
-        />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-separate border-spacing-0 text-sm">
-            <thead>
-              <tr className="text-slate-500">
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">מספר משרה</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">כותרת</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">תפקיד</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">מיקום</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">היקף</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">מועמדים</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">סטטוס</th>
-              </tr>
-            </thead>
-            <tbody>
-              {jobs.map((job) => (
-                <tr key={job.job_code} className="group hover:bg-slate-50">
-                  <td className="border-b border-slate-100 px-3 py-3 font-mono text-[#008080]" dir="ltr">
-                    <Link to={`/admin/jobs/${job.job_code}`} className="hover:underline">
-                      {job.job_code}
-                    </Link>
-                  </td>
-                  <td className="border-b border-slate-100 px-3 py-3 font-semibold text-slate-900">{job.job_title}</td>
-                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">
-                    <div>{dictName(dicts.roles, job.job_role)}</div>
-                    {job.job_sub_role?.length ? <div className="mt-1 text-xs text-slate-500">{dictNames(dicts.subRoles, job.job_sub_role)}</div> : null}
-                  </td>
-                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">
-                    {compactArray([dictName(dicts.cities, job.city_id, ""), dictName(dicts.regions, job.region_id, "")]).join(" · ") || "—"}
-                  </td>
-                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{dictNames(dicts.scopes, job.scope)}</td>
-                  <td className="border-b border-slate-100 px-3 py-3 font-semibold text-slate-900">{job.total_applicants ?? 0}</td>
-                  <td className="border-b border-slate-100 px-3 py-3">
-                    <StatusBadge label={dictName(dicts.jobStatuses, job.job_status)} id={job.job_status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </SectionCard>
-  );
-}
-
-function ContactsPanel({ contacts, dicts, isLoading, error }: { contacts: ContactRow[]; dicts: DictBundle; isLoading: boolean; error: unknown }) {
-  if (isLoading) {
-    return (
-      <SectionCard title="אנשי קשר" icon={<Users className="h-4 w-4" />}>
-        <div className="space-y-3">
-          <SkeletonBlock className="h-16" />
-          <SkeletonBlock className="h-16" />
-        </div>
-      </SectionCard>
-    );
-  }
-
-  if (error) {
-    return (
-      <SectionCard title="אנשי קשר" icon={<Users className="h-4 w-4" />}>
-        <ErrorBlock title="שגיאה בטעינת אנשי קשר" description="לא ניתן היה לטעון את אנשי הקשר המקושרים לארגון." />
-      </SectionCard>
-    );
-  }
-
-  return (
-    <SectionCard
-      title={`אנשי קשר (${contacts.length})`}
-      icon={<Users className="h-4 w-4" />}
-      action={
-        <Button asChild variant="outline" size="sm" className="rounded-xl">
-          <Link to="/admin/contacts">
-            <Users className="h-4 w-4" />
-            מאגר אנשי קשר
-          </Link>
-        </Button>
-      }
-    >
-      {contacts.length === 0 ? (
-        <EmptyState title="אין אנשי קשר משויכים" description="יש לשייך אנשי קשר דרך כרטסת איש קשר או מאגר אנשי הקשר." />
-      ) : (
-        <div className="space-y-3">
-          {contacts.map((contact) => {
-            const name = contact.full_name || contact.display_name || compactArray([contact.first_name, contact.last_name]).join(" ") || "איש קשר ללא שם";
-            return (
-              <div key={contact.contact_id} className="rounded-2xl border border-slate-200 p-3 transition hover:border-[#008080]/30 hover:bg-[#F0FDFC]/40">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <Link to={`/admin/contacts/${contact.contact_id}`} className="font-bold text-slate-900 hover:text-[#008080] hover:underline">
-                      {name}
-                    </Link>
-                    <div className="mt-1 text-xs text-slate-500">
-                      {compactArray([
-                        dictName(dicts.roles, contact.role, contact.professional_title ?? "תפקיד לא הוגדר"),
-                        contact.sub_role?.length ? dictNames(dicts.subRoles, contact.sub_role, "") : "",
-                      ]).join(" · ")}
-                    </div>
-                  </div>
-                  {isPast(contact.next_follow_up) ? <Badge className="rounded-full border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50">פולואפ</Badge> : null}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
-                  {contact.phone ? (
-                    <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
-                      <Phone className="h-3.5 w-3.5" />
-                      {contact.phone}
-                    </a>
-                  ) : null}
-                  {contact.email ? (
-                    <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
-                      <Mail className="h-3.5 w-3.5" />
-                      {contact.email}
-                    </a>
-                  ) : null}
-                  {whatsappUrl(contact.phone) ? (
-                    <a href={whatsappUrl(contact.phone) ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      WhatsApp
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </SectionCard>
-  );
-}
-
-function ApplicationsPanel({
-  applications,
-  dicts,
-  isLoading,
-  error,
-}: {
-  applications: ApplicationRow[];
-  dicts: DictBundle;
-  isLoading: boolean;
-  error: unknown;
-}) {
-  if (isLoading) {
-    return (
-      <SectionCard title="הגשות דרך משרות" icon={<FileText className="h-4 w-4" />}>
-        <div className="space-y-3">
-          <SkeletonBlock className="h-12" />
-          <SkeletonBlock className="h-12" />
-        </div>
-      </SectionCard>
-    );
-  }
-
-  if (error) {
-    return (
-      <SectionCard title="הגשות דרך משרות" icon={<FileText className="h-4 w-4" />}>
-        <ErrorBlock title="שגיאה בטעינת הגשות" description="לא ניתן היה לטעון את ההגשות המשויכות למשרות הארגון." />
-      </SectionCard>
-    );
-  }
-
-  return (
-    <SectionCard
-      title={`הגשות דרך משרות (${applications.length})`}
-      icon={<FileText className="h-4 w-4" />}
-      action={
-        <Button asChild variant="outline" size="sm" className="rounded-xl">
-          <Link to="/admin/applications">
-            <FileText className="h-4 w-4" />
-            כל ההגשות
-          </Link>
-        </Button>
-      }
-    >
-      {applications.length === 0 ? (
-        <EmptyState title="אין הגשות לארגון זה" description="כאשר מועמדים יגישו למשרות של הארגון, ההגשות יופיעו כאן." />
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-separate border-spacing-0 text-sm">
-            <thead>
-              <tr className="text-slate-500">
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">מועמד</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">משרה</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">תפקיד</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">תאריך הגשה</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">סטטוס הגשה</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">בדיקה</th>
-              </tr>
-            </thead>
-            <tbody>
-              {applications.map((application) => (
-                <tr key={application.application_id} className="hover:bg-slate-50">
-                  <td className="border-b border-slate-100 px-3 py-3 font-semibold text-slate-900">
-                    {application.candidate_link ? (
-                      <Link to={`/admin/contacts/${application.candidate_link}`} className="hover:text-[#008080] hover:underline">
-                        {application.candidate_name || "מועמד ללא שם"}
-                      </Link>
-                    ) : (
-                      application.candidate_name || "—"
-                    )}
-                    <div className="mt-1 text-xs font-normal text-slate-500" dir="ltr">
-                      {application.candidate_phone || application.candidate_email || ""}
-                    </div>
-                  </td>
-                  <td className="border-b border-slate-100 px-3 py-3 font-mono text-[#008080]" dir="ltr">
-                    {application.job_code ? (
-                      <Link to={`/admin/jobs/${application.job_code}`} className="hover:underline">
-                        {application.job_code}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{application.job_role || application.master_role || "—"}</td>
-                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{formatDate(application.submission_date)}</td>
-                  <td className="border-b border-slate-100 px-3 py-3">
-                    <StatusBadge label={dictName(dicts.applicationStatuses, application.application_status, application.status_in_master ?? "—")} id={application.application_status} />
-                  </td>
-                  <td className="border-b border-slate-100 px-3 py-3">
-                    <StatusBadge label={dictName(dicts.checkStatuses, application.check_status)} id={application.check_status} />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </SectionCard>
-  );
-}
-
-function CrmPanel({ account, onEdit }: { account: AccountRow; onEdit: (section: EditSection) => void }) {
-  return (
-    <SectionCard
-      title="CRM ומעקב"
-      icon={<Clock3 className="h-4 w-4" />}
-      action={
-        <Button variant="outline" size="sm" className="rounded-xl" onClick={() => onEdit("crm")}>
-          <Edit2 className="h-4 w-4" />
-          עדכון CRM
-        </Button>
-      }
-    >
-      <div className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-2xl bg-slate-50 p-4">
-          <div className="text-xs text-slate-500">קשר אחרון</div>
-          <div className="mt-1 text-sm font-bold text-slate-900">{formatDateTime(account.last_contact_date)}</div>
-        </div>
-        <div className={`rounded-2xl p-4 ${isPast(account.next_follow_up) ? "bg-amber-50 text-amber-800" : "bg-slate-50 text-slate-900"}`}>
-          <div className="text-xs opacity-70">פולואפ הבא</div>
-          <div className="mt-1 text-sm font-bold">{formatDateTime(account.next_follow_up)}</div>
-        </div>
-        <div className="rounded-2xl bg-slate-50 p-4">
-          <div className="text-xs text-slate-500">WhatsApp אחרון</div>
-          <div className="mt-1 text-sm font-bold text-slate-900">{formatDateTime(account.whatsapp_last_sent)}</div>
-        </div>
-      </div>
-      <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="mb-1 text-sm font-bold text-slate-900">הערות CRM</div>
-        <p className="whitespace-pre-wrap text-sm leading-6 text-slate-600">{account.notes || "אין הערות CRM שמורות לארגון זה."}</p>
-      </div>
-    </SectionCard>
-  );
-}
-
-function ProfessionalDnaPanel({ account, jobs, dicts }: { account: AccountRow; jobs: JobRow[]; dicts: DictBundle }) {
-  const roleFrequency = useMemo(() => {
-    const map = new Map<string, number>();
-    jobs.forEach((job) => {
-      const role = compactArray([
-        dictName(dicts.roles, job.job_role, ""),
-        job.job_sub_role?.length ? dictNames(dicts.subRoles, job.job_sub_role, "") : "",
-      ]).join(" · ") || "לא הוגדר";
-      map.set(role, (map.get(role) ?? 0) + 1);
-    });
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  }, [dicts.roles, dicts.subRoles, jobs]);
-
-  const systems = useMemo(() => (account.systems_used ?? []).map((id) => dictName(dicts.systems, id, String(id))), [account.systems_used, dicts.systems]);
-
-  return (
-    <div className="grid gap-4 xl:grid-cols-2">
-      <SectionCard title="DNA קליני־עסקי" icon={<ShieldAlert className="h-4 w-4" />}>
-        <LabelValue label="סוג מרפאה" value={account.clinic_type} />
-        <LabelValue label="תחומי התמחות" value={(account.specialties ?? []).join(", ") || "—"} />
-        <LabelValue label="מערכות בשימוש" value={systems.join(", ") || "—"} />
-        <LabelValue label="מספר כיסאות" value={account.chairs_count} />
-        <LabelValue label="גודל צוות" value={account.team_size} />
-      </SectionCard>
-
-      <SectionCard title="פרופיל גיוס" icon={<Briefcase className="h-4 w-4" />}>
-        <LabelValue label="תפקידי גיוס מועדפים" value={(account.hiring_roles ?? []).join(", ") || "—"} />
-        <LabelValue label="תפקיד יחסי" value={account.rel_role} />
-        <LabelValue label="מועמדים משויכים היסטורית" value={account.all_applicants_names} />
-        <div className="mt-4 rounded-2xl bg-slate-50 p-4">
-          <div className="mb-3 text-sm font-bold text-slate-900">תדירות תפקידים לפי משרות</div>
-          {roleFrequency.length === 0 ? (
-            <div className="text-sm text-slate-500">אין מספיק משרות לחישוב תדירות.</div>
-          ) : (
-            roleFrequency.map(([role, count]) => (
-              <div key={role} className="mb-2 flex items-center justify-between gap-4 last:mb-0">
-                <span className="text-sm text-slate-700">{role}</span>
-                <Badge className="rounded-full bg-white text-[#008080] ring-1 ring-slate-200 hover:bg-white">{count}</Badge>
-              </div>
-            ))
+            <span className="font-mono text-xs text-slate-400">—</span>
           )}
+          <span>{application.job_role || "—"}</span>
         </div>
-      </SectionCard>
-    </div>
-  );
-}
+      ),
+    },
+    {
+      key: "account_name",
+      label: "מעסיק",
+      minWidth: "150px",
+      render: (application) => application.account_name || "—",
+    },
+    {
+      key: "application_status",
+      label: "סטטוס הגשה",
+      minWidth: "150px",
+      render: (application) => (
+        <Badge className={`h-[30px] rounded-full border px-3 text-xs shadow-none ${applicationStatusClass(application.application_status)}`}>
+          {dictName(dicts?.applicationStatuses ?? [], application.application_status)}
+        </Badge>
+      ),
+    },
+    {
+      key: "submission_date",
+      label: "תאריך הגשה",
+      nowrap: true,
+      render: (application) => <span className="text-slate-500">{formatDate(application.submission_date)}</span>,
+    },
+    {
+      key: "updated_timestamp",
+      label: "עדכון אחרון",
+      nowrap: true,
+      render: (application) => <span className="text-slate-500">{formatDate(application.updated_timestamp)}</span>,
+    },
+    {
+      key: "cv",
+      label: 'קו"ח',
+      nowrap: true,
+      render: (application) => applicationHasCv(application) ? (
+        <button
+          type="button"
+          onClick={() => void openApplicationCv(application)}
+          className="text-blue-600 hover:underline"
+        >
+          צפייה
+        </button>
+      ) : (
+        <span className="text-slate-300">—</span>
+      ),
+    },
+  ], [dicts?.applicationStatuses]);
 
-function BillingAdminPanel({ account }: { account: AccountRow }) {
-  return (
-    <SectionCard title="הנהלת חשבונות ומנהלה" icon={<FileText className="h-4 w-4" />}>
-      <LabelValue label="אימייל לחיוב" value={account.billing_email} ltr />
-      <LabelValue label="מזהה עסקי" value={account.bus_id} ltr />
-      <LabelValue label="כתובת" value={account.address} />
-      <LabelValue label="תאריך יצירה" value={formatDateTime(account.created_timestamp)} />
-      <LabelValue label="עדכון אחרון" value={formatDateTime(account.updated_timestamp)} />
-    </SectionCard>
-  );
-}
+  const availableCandidateTags = useMemo(() => (dicts?.candidateTags ?? []).filter((candidateTag) =>
+    !tags.some((tag) =>
+      Number(tag.tag_id) === candidateTag.id ||
+      (!tag.tag_id && tag.tag.trim() === candidateTag.name.trim()),
+    ),
+  ), [dicts?.candidateTags, tags]);
 
-function AdditionalDataPanel({ account }: { account: AccountRow }) {
-  const entries = useMemo(() => {
-    const record = account as Record<string, unknown>;
-    return ACCOUNT_FIELD_KEYS.map((key) => [key, record[key as string]] as const);
-  }, [account]);
-
-  return (
-    <SectionCard title="כל שדות החשבון" icon={<FileText className="h-4 w-4" />}>
-      <div className="grid gap-3 lg:grid-cols-2">
-        {entries.map(([key, value]) => (
-          <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <div className="mb-1 text-xs font-bold text-slate-500" dir="ltr">
-              {key}
-            </div>
-            <div className="text-sm font-semibold text-slate-800">{fieldValue(value)}</div>
-          </div>
-        ))}
-      </div>
-    </SectionCard>
-  );
-}
-
-function buildRecommendedActions(account: AccountRow, jobs: JobRow[], contacts: ContactRow[], applications: ApplicationRow[], dicts: DictBundle): RecommendedAction[] {
-  const activeJobs = jobs.filter((job) => isActiveJob(job, dicts));
-  const jobCodesWithApplications = new Set(applications.map((application) => application.job_code).filter(Boolean));
-  const jobsWithoutApplicants = activeJobs.filter((job) => !jobCodesWithApplications.has(job.job_code));
-  const actions: RecommendedAction[] = [];
-
-  if (activeJobs.length === 0) {
-    actions.push({
-      key: "no-active-jobs",
-      icon: <Briefcase className="h-4 w-4" />,
-      title: "אין משרות פעילות",
-      description: "כדאי לפתוח משרה חדשה או לבדוק האם סטטוס המשרות עודכן נכון.",
-      href: `/admin/jobs/new?account_id=${account.account_id}`,
-      label: "יצירת משרה",
-      severity: "warning",
-    });
+  // ── actions ──
+  async function saveNotes() {
+    if (!contact) return;
+    setNotesSaving(true);
+    const { error: err } = await updateContact(contact.contact_id, { notes, updated_timestamp: new Date().toISOString() });
+    setNotesSaving(false);
+    if (err) showToast("error", "שגיאה בשמירת הערות");
+    else showToast("success", "הערות נשמרו");
   }
 
-  if (contacts.length === 0) {
-    actions.push({
-      key: "no-contacts",
-      icon: <Users className="h-4 w-4" />,
-      title: "אין אנשי קשר משויכים",
-      description: "מומלץ לשייך איש קשר כדי לשמור רצף CRM תקין מול הארגון.",
-      href: "/admin/contacts",
-      label: "פתיחת מאגר אנשי קשר",
-      severity: "warning",
-    });
-  }
-
-  if (jobsWithoutApplicants.length > 0) {
-    actions.push({
-      key: "jobs-without-applicants",
-      icon: <Sparkles className="h-4 w-4" />,
-      title: `${jobsWithoutApplicants.length} משרות פעילות ללא הגשות`,
-      description: "אפשר לפתוח Smart Match או לבדוק את פרסום המשרות.",
-      href: `/admin/smart-match?account_id=${account.account_id}`,
-      label: "פתיחת Smart Match",
-      severity: "info",
-    });
-  }
-
-  if (isPast(account.next_follow_up)) {
-    actions.push({
-      key: "overdue-follow-up",
-      icon: <Clock3 className="h-4 w-4" />,
-      title: "פולואפ באיחור",
-      description: `הפולואפ הבא נקבע ל-${formatDate(account.next_follow_up)}.`,
-      href: whatsappUrl(account.phone) ?? undefined,
-      label: whatsappUrl(account.phone) ? "שליחת WhatsApp" : "עדכון פולואפ",
-      severity: "error",
-    });
-  }
-
-  return actions;
-}
-
-// ─── Main page ────────────────────────────────────────────────────────────────
-
-export default function Employer360Page() {
-  const params = useParams<{ id?: string; accountId?: string; employerId?: string }>();
-  const [searchParams] = useSearchParams();
-  const queryClient = useQueryClient();
-  const contactsRef = useRef<HTMLDivElement>(null);
-  const copyTimeoutRef = useRef<number | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editSection, setEditSection] = useState<EditSection>("general");
-
-  const previewMode = searchParams.get("preview") === "1" || params.id === "preview" || params.accountId === "preview" || params.employerId === "preview";
-  const accountId = useMemo(() => asNumber(params.accountId ?? params.id ?? params.employerId), [params.accountId, params.employerId, params.id]);
-
-  const dicts = useDictBundle(true, previewMode);
-  const accountQuery = useAccountQuery(accountId, previewMode);
-  const jobsQuery = useAccountJobs(accountId, previewMode);
-  const contactsQuery = useAccountContacts(accountId, previewMode);
-
-  const jobCodes = useMemo(() => (jobsQuery.data ?? []).map((job) => job.job_code).filter(Boolean), [jobsQuery.data]);
-  const applicationsQuery = useAccountApplications(jobCodes, previewMode);
-
-  const handleEdit = useCallback((section: EditSection = "general") => {
-    setEditSection(section);
-    setEditOpen(true);
-  }, []);
-
-  const handleEditSaved = useCallback(() => {}, []);
-
-  useEffect(() => {
-    if (!accountId || previewMode) return;
-
-    const channel = supabase
-      .channel(`employer-360-${accountId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "accounts", filter: `account_id=eq.${accountId}` }, () => {
-        void queryClient.invalidateQueries({ queryKey: ["employer360", "account", accountId] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "job", filter: `account_link=eq.${accountId}` }, () => {
-        void queryClient.invalidateQueries({ queryKey: ["employer360", "jobs", accountId] });
-        void queryClient.invalidateQueries({ queryKey: ["employer360", "applications"] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "contact", filter: `account_link=eq.${accountId}` }, () => {
-        void queryClient.invalidateQueries({ queryKey: ["employer360", "contacts", accountId] });
-      })
-      .on("postgres_changes", { event: "*", schema: "public", table: "applications" }, () => {
-        void queryClient.invalidateQueries({ queryKey: ["employer360", "applications"] });
-      })
-      .subscribe();
-
-    return () => {
-      void supabase.removeChannel(channel);
-    };
-  }, [accountId, previewMode, queryClient]);
-
-  useEffect(() => {
-    return () => {
-      if (copyTimeoutRef.current !== null) {
-        window.clearTimeout(copyTimeoutRef.current);
-      }
-    };
-  }, []);
-
-  const handleCopy = useCallback(async (value: string | null | undefined) => {
-    const text = String(value ?? "").trim();
-    if (!text) return;
-
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
+  async function addTag() {
+    if (!contact || !dicts || !selectedTagId) return;
+    const selectedTag = dicts.candidateTags.find((tag) => tag.id === Number(selectedTagId));
+    if (!selectedTag) {
+      showToast("error", "התגית שנבחרה אינה קיימת במילון");
+      return;
     }
-
-    setCopied(true);
-
-    if (copyTimeoutRef.current !== null) {
-      window.clearTimeout(copyTimeoutRef.current);
+    const duplicate = tags.some((tag) =>
+      Number(tag.tag_id) === selectedTag.id ||
+      (!tag.tag_id && tag.tag.trim() === selectedTag.name.trim()),
+    );
+    if (duplicate) {
+      showToast("error", "התגית כבר קיימת");
+      return;
     }
+    const { error: insertError } = await supabase.from("contact_tags").insert({
+      contact_id: contact.contact_id,
+      tag_id: selectedTag.id,
+      tag: selectedTag.name,
+    });
+    if (insertError) {
+      showToast("error", `שגיאה בהוספת תגית: ${insertError.message}`);
+      return;
+    }
+    setSelectedTagId("");
+    await queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] });
+    showToast("success", "התגית נוספה");
+  }
 
-    copyTimeoutRef.current = window.setTimeout(() => {
-      setCopied(false);
-      copyTimeoutRef.current = null;
-    }, 1500);
-  }, []);
+  async function removeTag(tagId: number) {
+    const { error: err } = await supabase.from("contact_tags").delete().eq("id", tagId);
+    if (err) showToast("error", "שגיאה במחיקת תגית");
+    else queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] });
+  }
 
-  const scrollToContacts = useCallback(() => {
-    contactsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  async function createApplication() {
+    const code = selectedJobCode;
+    setCreateError("");
+    if (!code || !contact) { setCreateError("יש לבחור משרה לפני יצירת הגשה."); return; }
+    const job = jobs.find((j) => j.job_code === code);
+    if (!job) { setCreateError("לא נמצאה משרה פעילה מתאימה לבחירה."); return; }
+    let duplicateQuery = supabase.from("applications").select("application_id", { count: "exact", head: true }).eq("job_code", code);
+    duplicateQuery = contact.phone_norm
+      ? duplicateQuery.or(`candidate_link.eq.${contact.contact_id},phone_norm.eq.${contact.phone_norm}`)
+      : duplicateQuery.eq("candidate_link", contact.contact_id);
+    const { count, error: duplicateError } = await duplicateQuery;
+    if (duplicateError) { setCreateError(`בדיקת כפילות נכשלה: ${duplicateError.message}`); return; }
+    if ((count ?? 0) > 0) { setCreateError("כבר קיימת הגשה עבור משרה זו למועמד/ת הזה/ו."); return; }
+    const now = new Date().toISOString();
+    const note = createAppNotes.trim() || null;
+    const { error: err } = await supabase.from("applications").insert({
+      job_code: code, candidate_link: contact.contact_id, phone_norm: contact.phone_norm,
+      application_status: 1, submission_date: now, created_timestamp: now, updated_timestamp: now,
+      candidate_name: contact.full_name ?? contact.display_name,
+      candidate_email: contact.email ?? null, candidate_phone: contact.phone ?? null,
+      account_name: job.account_name ?? null, account_link: job.account_link ?? null,
+      job_role: dictName(dicts?.roles ?? [], job.job_role),
+      job_city: dictName(dicts?.cities ?? [], job.city_id),
+      job_region: dictName(dicts?.regions ?? [], job.region_id),
+      job_city_id: job.city_id ?? null, candidate_notes: note || null,
+      internal_notes: note ? `נוצר מתוך Contact 360. הערת אדמין: ${note}` : "נוצר מתוך Contact 360",
+      has_cv: Boolean(contact.has_cv), cv_link: contact.cv_link ?? null,
+      source: 6, is_manual: true,
+    });
+    if (err) { showToast("error", `שגיאה ביצירת הגשה: ${err.message}`); return; }
+    setSelectedJobCode(""); setJobSearch(""); setCreateAppNotes(""); setDialogOpen(false);
+    showToast("success", `הגשה למשרה ${code} נוצרה`);
+    queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] });
+  }
 
-  const account = accountQuery.data ?? null;
-  const jobs = jobsQuery.data ?? [];
-  const contacts = contactsQuery.data ?? [];
-  const applications = applicationsQuery.data ?? [];
-
-  const activeJobs = useMemo(() => jobs.filter((job) => isActiveJob(job, dicts)), [dicts, jobs]);
-  const completion = useMemo(() => (account ? computeAccountCompletion(account) : 0), [account]);
-
-  const location = useMemo(() => {
-    if (!account) return "—";
-    return compactArray([dictName(dicts.cities, account.city_id, ""), dictName(dicts.regions, account.region_id, "")]).join(" · ") || "—";
-  }, [account, dicts.cities, dicts.regions]);
-
-  const recommendedActions = useMemo(
-    () => (account ? buildRecommendedActions(account, jobs, contacts, applications, dicts) : []),
-    [account, applications, contacts, dicts, jobs],
-  );
-
-  if (!previewMode && !accountId) {
-    return (
-      <main dir="rtl" className="min-h-screen bg-[#F8FAFC] p-4 font-['Heebo'] text-slate-900 sm:p-6">
-        <div className="mx-auto max-w-3xl py-24">
-          <ErrorBlock title="חסר מזהה ארגון" description="לא התקבל account_id תקין בכתובת המסך." />
-          <Button asChild className="mt-4 rounded-xl bg-[#008080] hover:bg-[#006B6B]">
-            <Link to="/admin/accounts">
-              <ArrowRight className="h-4 w-4" />
-              חזרה למאגר ארגונים
+  // ── create new contact ──
+  if (isNew) {
+    if (dictsOnlyLoading) {
+      return (
+        <div dir="rtl" className="flex min-h-screen items-center justify-center bg-[#F3F4F6] font-['Heebo']">
+          <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+        </div>
+      );
+    }
+    if (dictsOnlyError) {
+      return (
+        <div dir="rtl" className="min-h-screen bg-[#F3F4F6] p-6 font-['Heebo']">
+          <div className="flex flex-col items-center justify-center py-32 text-center">
+            <AlertCircle className="mb-4 h-10 w-10 text-red-500" />
+            <h2 className="text-xl font-bold text-slate-900">טעינת המילונים נכשלה</h2>
+            <p className="mt-2 max-w-xl text-sm text-red-700">
+              {dictsOnlyError instanceof Error ? dictsOnlyError.message : "לא ניתן לטעון את מסך יצירת איש הקשר"}
+            </p>
+            <Link to="/admin/contacts" className="mt-6">
+              <Button variant="outline" className="rounded-xl border-slate-200">חזרה לרשימת אנשי קשר</Button>
             </Link>
-          </Button>
+          </div>
         </div>
-      </main>
-    );
-  }
-
-  if (accountQuery.isLoading) {
+      );
+    }
+    const selectCls = "w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-50";
+    const roles = dictsOnly?.roles ?? [];
+    const allCities = dictsOnly?.cities ?? [];
+    const regions = dictsOnly?.regions ?? [];
+    const genders = dictsOnly?.genders ?? [];
+    const filteredCities = newForm.region_id
+      ? allCities.filter((c) => Number(c.region_id) === Number(newForm.region_id))
+      : allCities;
     return (
-      <main dir="rtl" className="min-h-screen bg-[#F8FAFC] p-4 font-['Heebo'] text-slate-900 sm:p-6">
-        <div className="mx-auto max-w-[1600px] space-y-4">
-          <SkeletonBlock className="h-56" />
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <SkeletonBlock className="h-28" />
-            <SkeletonBlock className="h-28" />
-            <SkeletonBlock className="h-28" />
-            <SkeletonBlock className="h-28" />
-          </div>
-          <div className="grid gap-4 lg:grid-cols-3">
-            <SkeletonBlock className="h-96 lg:col-span-2" />
-            <SkeletonBlock className="h-96" />
-          </div>
-        </div>
-      </main>
-    );
-  }
-
-  if (accountQuery.error) {
-    return (
-      <main dir="rtl" className="min-h-screen bg-[#F8FAFC] p-4 font-['Heebo'] text-slate-900 sm:p-6">
-        <div className="mx-auto max-w-3xl py-24">
-          <ErrorBlock title="שגיאה בטעינת הארגון" description="אירעה שגיאה בעת טעינת כרטסת הארגון מ-Supabase." />
-          <Button asChild className="mt-4 rounded-xl bg-[#008080] hover:bg-[#006B6B]">
-            <Link to="/admin/accounts">
-              <ArrowRight className="h-4 w-4" />
-              חזרה למאגר ארגונים
-            </Link>
-          </Button>
-        </div>
-      </main>
-    );
-  }
-
-  if (!account) {
-    return (
-      <main dir="rtl" className="min-h-screen bg-[#F8FAFC] p-4 font-['Heebo'] text-slate-900 sm:p-6">
-        <div className="mx-auto max-w-3xl py-24 text-center">
-          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-            <Building2 className="h-7 w-7" />
-          </div>
-          <h1 className="mt-4 text-xl font-black text-slate-900">ארגון לא נמצא</h1>
-          <p className="mt-2 text-sm text-slate-500">לא נמצאה רשומת accounts עבור המזהה המבוקש.</p>
-          <Button asChild className="mt-5 rounded-xl bg-[#008080] hover:bg-[#006B6B]">
-            <Link to="/admin/accounts">
-              <ArrowRight className="h-4 w-4" />
-              חזרה למאגר ארגונים
-            </Link>
-          </Button>
-        </div>
-      </main>
-    );
-  }
-
-  return (
-    <main dir="rtl" className="min-h-screen bg-[#F8FAFC] p-4 font-['Heebo'] text-slate-900 sm:p-6">
-      <div className="mx-auto max-w-[1600px] space-y-4">
-        {previewMode ? (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
-            מצב תצוגת דמה פעיל. הנתונים מוצגים לפי ערכי Mock נקיים התואמים לשדות Supabase.
-          </div>
-        ) : null}
-
-        {copied ? <div className="fixed bottom-4 left-4 z-50 rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg">הועתק ללוח</div> : null}
-
-        <HeroSection
-          account={account}
-          dicts={dicts}
-          location={location}
-          activeJobsCount={activeJobs.length}
-          totalJobsCount={jobs.length}
-          completion={completion}
-          overdueFollowUp={isPast(account.next_follow_up)}
-          onCopy={handleCopy}
-          onScrollToContacts={scrollToContacts}
-          onEdit={handleEdit}
-        />
-
-        <KpiStrip account={account} jobs={jobs} applications={applications} dicts={dicts} />
-
-        <Tabs defaultValue="overview" dir="rtl" className="space-y-4">
-          <TabsList className="grid h-auto grid-cols-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200 md:grid-cols-4">
-            <TabsTrigger value="overview" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
-              תפעולי
-            </TabsTrigger>
-            <TabsTrigger value="crm" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
-              CRM
-            </TabsTrigger>
-            <TabsTrigger value="dna" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
-              DNA מקצועי
-            </TabsTrigger>
-            <TabsTrigger value="admin" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
-              מנהלה
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="overview" className="mt-0 space-y-4">
-            <div className="grid gap-4 xl:grid-cols-3">
-              <div className="space-y-4 xl:col-span-2">
-                <JobsPanel jobs={jobs} dicts={dicts} isLoading={jobsQuery.isLoading} error={jobsQuery.error} accountId={account.account_id} />
-                <ApplicationsPanel applications={applications} dicts={dicts} isLoading={applicationsQuery.isLoading} error={applicationsQuery.error} />
+      <div dir="rtl" className="min-h-screen bg-[#F3F4F6] p-6 font-['Heebo']">
+        <div className="mx-auto max-w-lg">
+          <h1 className="mb-6 text-2xl font-bold text-slate-800">איש קשר חדש</h1>
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">שם פרטי</label>
+                  <Input value={newForm.first_name} onChange={(e) => setField("first_name", e.target.value)} placeholder="שם פרטי" />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">שם משפחה</label>
+                  <Input value={newForm.last_name} onChange={(e) => setField("last_name", e.target.value)} placeholder="שם משפחה" />
+                </div>
               </div>
-              <div className="space-y-4">
-                <RecommendedActionsPanel actions={recommendedActions} />
-                <div ref={contactsRef}>
-                  <ContactsPanel contacts={contacts} dicts={dicts} isLoading={contactsQuery.isLoading} error={contactsQuery.error} />
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">נייד</label>
+                <Input value={newForm.phone} onChange={(e) => setField("phone", e.target.value)} placeholder="05X-XXXXXXX" type="tel" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">אימייל</label>
+                <Input value={newForm.email} onChange={(e) => setField("email", e.target.value)} placeholder="name@example.com" type="email" />
+              </div>
+              <RoleSubRolePicker
+                variant="edit"
+                roleId={newForm.role ? Number(newForm.role) : null}
+                subRoleIds={newForm.sub_roles.map(Number)}
+                onRoleChange={(id) => setNewForm((f) => ({ ...f, role: id ? String(id) : '', sub_roles: [] }))}
+                onSubRoleChange={(ids) => setNewForm((f) => ({ ...f, sub_roles: ids.map(String) }))}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">אזור</label>
+                  <select className={selectCls} value={newForm.region_id} onChange={(e) => setNewForm((f) => ({ ...f, region_id: e.target.value, city_id: "" }))}>
+                    <option value="">— בחרי אזור —</option>
+                    {regions.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">עיר</label>
+                  <select className={selectCls} value={newForm.city_id} disabled={!newForm.region_id} onChange={(e) => setField("city_id", e.target.value)}>
+                    <option value="">{newForm.region_id ? "— בחרי עיר —" : "— בחרי אזור תחילה —"}</option>
+                    {filteredCities.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">מגדר</label>
+                <select className={selectCls} value={newForm.gender} onChange={(e) => setField("gender", e.target.value)}>
+                  <option value="">— בחרי מגדר —</option>
+                  {genders.map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">פייסבוק</label>
+                <Input value={newForm.facebook_url} onChange={(e) => setField("facebook_url", e.target.value)} placeholder="https://facebook.com/..." type="url" />
+              </div>
+              {newError && <p className="text-sm text-red-600">{newError}</p>}
+              <Button onClick={handleCreateContact} disabled={newSaving} className="w-full bg-teal-600 text-white hover:bg-teal-700">
+                {newSaving ? <Loader2 className="ml-2 h-4 w-4 animate-spin" /> : <Save className="ml-2 h-4 w-4" />}
+                שמור איש קשר
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div dir="rtl" className="flex min-h-screen items-center justify-center bg-[#F3F4F6] font-['Heebo']">
+        <Loader2 className="h-8 w-8 animate-spin text-teal-600" />
+      </div>
+    );
+  }
+
+  if (error) {
+    const notFound = isContactNotFoundError(error);
+    const loadErrorMessage = (error as { message?: unknown }).message;
+    return (
+      <div dir="rtl" className="min-h-screen bg-[#F3F4F6] p-6 font-['Heebo']">
+        <div className="flex flex-col items-center justify-center py-32 text-center">
+          <div className={`mb-4 flex h-16 w-16 items-center justify-center rounded-2xl ${notFound ? "bg-slate-100" : "bg-red-50"}`}>
+            <AlertCircle className={`h-8 w-8 ${notFound ? "text-slate-400" : "text-red-500"}`} />
+          </div>
+          <h2 className="text-xl font-bold text-slate-900">
+            {notFound ? "איש הקשר לא נמצא" : "שגיאה בטעינת איש הקשר"}
+          </h2>
+          <p className={`mt-2 max-w-xl text-sm ${notFound ? "text-slate-500" : "text-red-700"}`}>
+            {notFound
+              ? `לא נמצא איש קשר עם מזהה ${resolvedId}`
+              : typeof loadErrorMessage === "string" ? loadErrorMessage : "לא ניתן לטעון את נתוני Contact 360"}
+          </p>
+          <Link to="/admin/contacts" className="mt-6">
+            <Button variant="outline" className="rounded-xl border-slate-200">חזרה לרשימת אנשי קשר</Button>
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  if (!contact) {
+    return null;
+  }
+
+  // ─── render ───────────────────────────────────────────────────────────────
+
+  const roleAccentColor = getRoleColorHex(contact.role);
+
+  return (
+    <div dir="rtl" className="min-h-screen space-y-8 bg-[#F3F4F6] p-4 font-['Heebo'] sm:p-6">
+      <div className="flex justify-start">
+        <Link to="/admin/contacts">
+          <Button variant="outline" className="rounded-xl border-slate-200 bg-white">
+            חזרה לרשימת אנשי קשר
+          </Button>
+        </Link>
+      </div>
+
+      {/* ===== HERO + KPI ===== */}
+      <Candidate360Hero
+        contact={contact}
+        dicts={dicts}
+        completion={completion}
+        recommendedJobsCount={recommendedJobs.length}
+        applicationsCount={applications.length}
+        activeApplicationsCount={activeApplications.length}
+        resolvedId={resolvedId}
+        onEdit={() => setAdminEditOpen(true)}
+        onOpenCreateApp={() => setDialogOpen(true)}
+        onUpdateCheckStatus={async (statusId) => {
+          setStatusDropdownOpen(false);
+          const { error: updateError } = await updateContact(resolvedId, { check_status: statusId });
+          if (updateError) {
+            showToast("error", `שגיאה בעדכון הסטטוס: ${updateError.message}`);
+            return;
+          }
+          await queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] });
+          showToast("success", "סטטוס עודכן");
+        }}
+        onCopyLink={async () => {
+          if (!contact.profile_token) {
+            showToast("error", "עדיין לא קיים קישור ציבורי למועמד/ת");
+            return;
+          }
+          const link = `${window.location.origin}/profile/${encodeURIComponent(contact.profile_token)}`;
+          try {
+            await navigator.clipboard.writeText(link);
+            showToast("success", "הלינק הועתק ללוח");
+          } catch {
+            showToast("error", "העתקת הקישור נכשלה");
+          }
+        }}
+        statusDropdownOpen={statusDropdownOpen}
+        onToggleStatusDropdown={() => setStatusDropdownOpen((v) => !v)}
+      />
+
+      {/* ===== TAGS (near top) ===== */}
+      <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+        <CardContent className="p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Tag className="h-4 w-4" style={{ color: BRAND.primary }} />
+            <span className="text-sm font-bold text-slate-900">תגיות</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {tags.length > 0 ? tags.map((tag) => {
+              const dictionaryName = tag.tag_id
+                ? dicts?.candidateTags.find((candidateTag) => candidateTag.id === Number(tag.tag_id))?.name
+                : null;
+              return (
+                <div key={tag.id} className="inline-flex h-[28px] items-center gap-2 rounded-full border border-[#E2E8F0] bg-white px-3 text-xs font-semibold text-slate-900">
+                  {dictionaryName ?? tag.tag}
+                  <button type="button" onClick={() => removeTag(tag.id)} className="text-slate-400 hover:text-red-600">
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              );
+            }) : <span className="text-sm text-slate-400">אין תגיות עדיין</span>}
+          </div>
+          <div className="mt-3 flex gap-2">
+            <select
+              value={selectedTagId}
+              onChange={(event) => setSelectedTagId(event.target.value)}
+              className="h-10 flex-1 rounded-xl border border-slate-200 bg-[#F3F4F6] px-3 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-teal-500"
+            >
+              <option value="">— בחירת תגית מהמילון —</option>
+              {availableCandidateTags.map((candidateTag) => (
+                <option key={candidateTag.id} value={candidateTag.id}>{candidateTag.name}</option>
+              ))}
+            </select>
+            <Button
+              variant="outline"
+              className="h-10 rounded-xl border-slate-200"
+              onClick={addTag}
+              disabled={!selectedTagId}
+            >
+              הוסף
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ===== הודעות מהמועמד + היסטוריית שינויים ===== */}
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <ContactMessagesPanel contactId={resolvedId} />
+        <ContactHistoryPanel contactId={resolvedId} />
+      </div>
+
+      {/* ===== פרטים אישיים + מדיה חברתית ===== */}
+      {dicts && (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <BlockIdentity contact={contact} dicts={dicts} />
+          <BlockSocial contact={contact} dicts={dicts} />
+        </div>
+      )}
+
+      {/* ===== מקצועיות + תנאים ===== */}
+      {dicts && (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <BlockProfessional contact={contact} dicts={dicts} />
+          <BlockConditions contact={contact} dicts={dicts} />
+        </div>
+      )}
+
+      {/* ===== סיכום תפעולי ===== */}
+      <section className="space-y-6">
+        <SectionHeader icon="🧠" title="סיכום תפעולי" subtitle="ניתוח AI, סיכונים ופעולה מומלצת" accentColor={roleAccentColor} />
+        <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+          <CardContent className="p-6">
+            <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]">
+              <div className="space-y-3">
+                {contact.personal_summary && (
+                  <div className="rounded-2xl border border-[#E5E7EB] bg-white p-5">
+                    <div className="mb-2 text-sm font-bold text-slate-800">פרופיל מקצועי</div>
+                    <div className="whitespace-pre-wrap text-sm leading-7 text-slate-900">{contact.personal_summary}</div>
+                  </div>
+                )}
+                <div className="rounded-2xl border border-[#E5E7EB] bg-[#F3F4F6] p-6 text-sm leading-7 text-slate-900">
+                  {aiSummary.summary || "—"}
+                </div>
+              </div>
+              <div className="space-y-3">
+                <div className="rounded-2xl border border-[#E5E7EB] bg-[#F3F4F6] p-4">
+                  <div className="mb-2 text-sm font-bold text-slate-800">סיכונים מרכזיים</div>
+                  {aiSummary.risks.length > 0 ? (
+                    <ul className="space-y-1 text-sm text-slate-800">{aiSummary.risks.map((r) => <li key={r}>• {r}</li>)}</ul>
+                  ) : (
+                    <div className="text-sm text-slate-600">לא זוהו סיכונים מהותיים כרגע.</div>
+                  )}
+                </div>
+                <div className="rounded-2xl border border-[#E2E8F0] p-4" style={{ borderInlineStartColor: BRAND.primary, borderInlineStartWidth: 4, backgroundColor: "rgba(0,128,128,0.04)" }}>
+                  <div className="mb-2 text-sm font-extrabold text-teal-900">פעולה מומלצת הבאה</div>
+                  <div className="text-base font-bold leading-7 text-teal-900">{aiSummary.nextAction}</div>
                 </div>
               </div>
             </div>
-          </TabsContent>
+          </CardContent>
+        </Card>
+      </section>
 
-          <TabsContent value="crm" className="mt-0 space-y-4">
-            <div className="grid gap-4 xl:grid-cols-3">
-              <div className="xl:col-span-2">
-                <CrmPanel account={account} onEdit={handleEdit} />
-              </div>
-              <RecommendedActionsPanel actions={recommendedActions} />
+      {/* ===== הגשות ומשרות ===== */}
+      <section className="space-y-6">
+        <SectionHeader icon="📋" title="הגשות ומשרות" subtitle="הגשות קיימות ומשרות מומלצות למועמד/ת" accentColor={roleAccentColor} />
+
+        {/* Applications table */}
+        <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+          <CardContent className="p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-slate-900">הגשות ({applications.length})</h2>
+              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="h-10 rounded-xl text-white" style={{ backgroundColor: BRAND.primary }}>
+                    <Plus className="me-1.5 h-3.5 w-3.5" />
+                    הגשה חדשה
+                  </Button>
+                </DialogTrigger>
+              </Dialog>
             </div>
-          </TabsContent>
+            <AdminTable<ApplicationRow>
+              columns={applicationColumns}
+              data={applications}
+              keyField="application_id"
+              emptyMessage="אין הגשות לאיש קשר זה"
+              minWidth="900px"
+            />
+          </CardContent>
+        </Card>
 
-          <TabsContent value="dna" className="mt-0">
-            <ProfessionalDnaPanel account={account} jobs={jobs} dicts={dicts} />
-          </TabsContent>
+        {/* Recommended jobs */}
+        {recommendedJobs.length > 0 && (
+          <Card className="rounded-2xl border border-[#E2E8F0] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+            <CardContent className="p-6">
+              <h2 className="mb-4 text-lg font-bold text-slate-900">משרות מומלצות ({recommendedJobs.length})</h2>
+              <div className="grid gap-4 xl:grid-cols-3">
+                {recommendedJobs.map((item) => (
+                  <div key={item.job.job_code} className="rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+                    <div className="mb-3 flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-bold text-slate-900">{item.job.job_title}</div>
+                        {item.job.account_name && <div className="mt-0.5 text-xs text-slate-500">{item.job.account_name}</div>}
+                        <div className="mt-0.5 text-xs text-slate-500">
+                          {[dictName(dicts?.cities ?? [], item.job.city_id), dictName(dicts?.regions ?? [], item.job.region_id)]
+                            .filter((t) => t && t !== "—").join(" · ")}
+                        </div>
+                      </div>
+                      <Badge className={`h-[30px] rounded-full border px-3 text-xs shadow-none ${item.score >= 70 ? "border-emerald-200 bg-emerald-50 text-emerald-700" : item.score >= 45 ? "border-amber-200 bg-amber-50 text-slate-600" : "border-slate-200 bg-slate-100 text-slate-700"}`}>
+                        {item.score}%
+                      </Badge>
+                    </div>
+                    <div className="mb-3 rounded-xl border border-slate-200 bg-[#F3F4F6] p-3">
+                      <div className="mb-1 text-[12px] text-slate-500">למה זה מתאים</div>
+                      <ul className="space-y-0.5 text-xs text-slate-900">{item.reasons.map((r) => <li key={r}>• {r}</li>)}</ul>
+                    </div>
+                    <Button size="sm" className="h-10 w-full rounded-xl text-white" style={{ backgroundColor: BRAND.primary }}
+                      onClick={() => { setSelectedJobCode(item.job.job_code); setDialogOpen(true); }}>
+                      <Plus className="me-1.5 h-3.5 w-3.5" />
+                      יצירת הגשה
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </section>
 
-          <TabsContent value="admin" className="mt-0 grid gap-4 xl:grid-cols-2">
-            <OrganizationDetails account={account} dicts={dicts} onCopy={handleCopy} />
-            <CommunicationDetails account={account} />
-            <LinkContactToAccountPanel accountId={account.account_id} />
-            <BillingAdminPanel account={account} />
-          </TabsContent>
+      {/* ===== ארגון מקושר + משרות מגייס/מעסיק ===== */}
+      {(account || contact.linked_org_name || linkedJobs.length > 0) && (
+        <BlockEmployer
+          contact={contact}
+          linkedJobs={linkedJobs}
+          dicts={dicts}
+          account={account}
+        />
+      )}
 
-        </Tabs>
-      </div>
+      {/* ===== CRM + מטאדאטה ===== */}
+      {dicts && (
+        <BlockCRM
+          contact={contact}
+          dicts={dicts}
+          notes={notes}
+          onNotesChange={setNotes}
+          onSaveNotes={saveNotes}
+          notesSaving={notesSaving}
+        />
+      )}
 
-      {/* Inline edit sheet */}
-      <AccountEditSheet
-        open={editOpen}
-        section={editSection}
-        account={account}
+      {/* ===== אזור אדמין — סטטוסים ===== */}
+      {dicts && (
+        <AdminStatusBar
+          contact={contact}
+          dicts={dicts}
+          onEdit={() => setAdminEditOpen(true)}
+        />
+      )}
+
+      {/* Scroll to top */}
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className="fixed bottom-6 left-6 z-50 flex h-10 w-10 items-center justify-center rounded-full bg-[#008080] text-lg text-white shadow-[0_1px_3px_rgba(0,0,0,.04)] transition hover:bg-teal-700"
+      >↑</button>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed bottom-8 left-1/2 z-[300] -translate-x-1/2">
+          <div className={`flex items-center gap-3 rounded-2xl px-6 py-3 text-sm font-bold shadow-sm ${toast.type === "success" ? "bg-slate-900 text-white" : "bg-red-50 text-red-700"}`}>
+            {toast.text}
+          </div>
+        </div>
+      )}
+
+      {/* ─── Create application dialog ─── */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent dir="rtl" className="max-w-3xl rounded-2xl border border-slate-200">
+          <DialogHeader>
+            <DialogTitle className="text-right">יצירת הגשה חדשה</DialogTitle>
+            <DialogDescription className="text-right">
+              בוחרים משרה, בודקים את הפרטים, מוסיפים הערה במידת הצורך ורק אז מאשרים יצירת הגשה.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <div className="text-sm font-bold text-slate-900">{contact.full_name || contact.display_name}</div>
+              <div className="mt-1 flex flex-wrap gap-3 text-xs text-slate-500">
+                {contact.phone && <span>נייד: {contact.phone}</span>}
+                {contact.email && <span>אימייל: {contact.email}</span>}
+              </div>
+            </div>
+            <div className="grid gap-4 lg:grid-cols-[1fr_1.1fr]">
+              <div className="space-y-3">
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-900">חיפוש משרה</label>
+                  <div className="relative">
+                    <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                    <Input value={jobSearch} onChange={(e) => setJobSearch(e.target.value)} placeholder="קוד משרה, תפקיד, עיר או ארגון" className="h-11 rounded-xl border-slate-200 pr-9" />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1.5 block text-sm font-semibold text-slate-900">בחירת משרה</label>
+                  <select value={selectedJobCode} onChange={(e) => { setSelectedJobCode(e.target.value); setCreateError(""); }} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none">
+                    <option value="">— בחר/י משרה —</option>
+                    {availableJobs.map((job) => (
+                      <option key={job.job_code} value={job.job_code}>
+                        {job.job_code} · {dictName(dicts?.roles ?? [], job.job_role)} · {job.job_title || "ללא כותרת"} · {[dictName(dicts?.cities ?? [], job.city_id), dictName(dicts?.regions ?? [], job.region_id)].filter((t) => t !== "—").join(" / ")}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {recommendedJobs.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="text-[13px] text-slate-500">התאמות מהירות</div>
+                    {recommendedJobs.map((item) => (
+                      <button key={item.job.job_code} type="button" onClick={() => { setSelectedJobCode(item.job.job_code); setCreateError(""); }}
+                        className="flex w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-right text-sm font-bold text-slate-900 hover:bg-slate-50">
+                        <span>{item.job.job_code} · {item.job.job_title}</span>
+                        <span className="rounded-full bg-teal-50 px-2 py-1 text-xs text-teal-700">{item.score}%</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="mb-3 text-sm font-extrabold text-slate-900">פרטי המשרה לפני אישור</div>
+                {selectedJob ? (
+                  <div className="divide-y divide-slate-100">
+                    <LabelValue label="קוד משרה" value={<span className="font-mono">{selectedJob.job_code}</span>} />
+                    <LabelValue label="כותרת" value={selectedJob.job_title || "—"} />
+                    <LabelValue label="ארגון" value={selectedJob.account_name || "—"} />
+                    <LabelValue label="תפקיד" value={dictName(dicts?.roles ?? [], selectedJob.job_role)} />
+                    <LabelValue label="תת־תפקיד" value={dictNames(dicts?.subRoles ?? [], selectedJob.job_sub_role)} />
+                    <LabelValue label="עיר / אזור" value={[dictName(dicts?.cities ?? [], selectedJob.city_id), dictName(dicts?.regions ?? [], selectedJob.region_id)].filter((t) => t !== "—").join(" · ") || "—"} />
+                    <LabelValue label="היקף" value={dictNames(dicts?.scopes ?? [], selectedJob.scope)} />
+                    <LabelValue label="ניסיון נדרש" value={dictName(dicts?.experience ?? [], selectedJob.required_experience)} />
+                    <LabelValue label="שפות נדרשות" value={dictNames(dicts?.languages ?? [], selectedJob.required_languages)} />
+                    <LabelValue label="מערכות" value={dictNames(dicts?.systems ?? [], selectedJob.systems_used)} />
+                    <LabelValue label="סוגי שכר" value={dictNames(dicts?.salaryTypes ?? [], selectedJob.salary_type_ids)} />
+                    <LabelValue label="ימים ושעות" value={selectedJob.work_schedule_text || "—"} />
+                  </div>
+                ) : (
+                  <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-500">בחרי משרה כדי לראות פרטים לפני יצירת ההגשה.</div>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-sm font-semibold text-slate-900">הערות להגשה</label>
+              <Textarea value={createAppNotes} onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setCreateAppNotes(e.target.value)}
+                placeholder="הערה פנימית לפני יצירת ההגשה..." className="min-h-[88px] rounded-2xl border-slate-200 bg-slate-50 text-sm" />
+            </div>
+            {createError && (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{createError}</div>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" className="rounded-xl border-slate-200" onClick={() => { setSelectedJobCode(""); setJobSearch(""); setCreateAppNotes(""); setCreateError(""); }}>ניקוי</Button>
+              <Button disabled={!selectedJobCode} className="h-10 rounded-xl text-white" style={{ backgroundColor: BRAND.primary }} onClick={() => createApplication()}>אישור יצירת הגשה</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Admin Edit Dialog ─── */}
+      <ContactEditDialog
+        open={adminEditOpen}
+        onOpenChange={setAdminEditOpen}
+        contact={contact}
         dicts={dicts}
-        onClose={() => setEditOpen(false)}
-        onSaved={handleEditSaved}
+        onSaved={async (patch) => {
+          const { error: saveError } = await updateContact(resolvedId, patch);
+          if (saveError) showToast("error", "שגיאה בשמירה");
+          else {
+            setAdminEditOpen(false);
+            showToast("success", "הפרטים עודכנו בהצלחה");
+          }
+        }}
       />
-    </main>
+    </div>
   );
 }
