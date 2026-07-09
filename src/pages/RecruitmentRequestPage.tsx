@@ -79,7 +79,6 @@ export default function RecruitmentRequestPage() {
   const [form, setForm] = useState<FormState>({ ...EMPTY_FORM })
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
-  const [resultJobCode, setResultJobCode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const { data: roles = [] } = useQuery({ queryKey: ['dict_roles'], queryFn: () => fetchDict('dict_roles'), staleTime: 600_000 })
@@ -175,7 +174,7 @@ export default function RecruitmentRequestPage() {
 
     setSubmitting(true)
     try {
-      const { data, error: rpcError } = await submitRecruitmentRequest({
+      const { error: rpcError } = await submitRecruitmentRequest({
         requester_company_name: form.company_name.trim(),
         requester_business_id: form.business_id.trim() || null,
         requester_contact_name: form.contact_name.trim(),
@@ -205,7 +204,6 @@ export default function RecruitmentRequestPage() {
       })
 
       if (rpcError) throw rpcError
-      setResultJobCode(data?.job_code ?? null)
       setSuccess(true)
     } catch {
       setError('אירעה שגיאה בשליחת הבקשה. אנא נסו שנית.')
@@ -223,9 +221,6 @@ export default function RecruitmentRequestPage() {
           </div>
           <h2 className="text-[24px] font-bold text-[#2D2D2D] mb-3">בקשת הגיוס התקבלה</h2>
           <p className="text-[#6B6B6B] text-[16px]">צוות AllDent יבדוק את הבקשה ויחזור אליכם בהקדם.</p>
-          {resultJobCode && (
-            <p className="mt-4 text-[13px] text-[#6B6B6B]" dir="ltr">מספר בקשה: {resultJobCode}</p>
-          )}
         </div>
       </div>
     )

@@ -10,6 +10,7 @@ import JobAIWriter from '@/components/admin/JobAIWriter'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { ContactPicker } from '@/components/ui/ContactPicker'
+import { AccountPicker, type AccountPickerResult } from '@/components/ui/AccountPicker'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 type ToastTone = 'success' | 'error' | 'info'
@@ -109,19 +110,6 @@ export default function CreateJobWizardPage() {
     return (data ?? []) as DictItem[]
   }
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts-for-job-create'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('accounts')
-        .select('account_id,account_name,bus_id,phone,email,region_id,city_id,address')
-        .order('account_name')
-      if (error) throw error
-      return data ?? []
-    },
-    staleTime: 300_000,
-  })
-
   const { data: roles = [] } = useQuery({ queryKey: ['dict_roles'], queryFn: () => fetchDict('dict_roles'), staleTime: 600_000 })
   const { data: subRoles = [] } = useQuery({
     queryKey: ['dict_sub_roles'],
@@ -160,10 +148,7 @@ export default function CreateJobWizardPage() {
   const { data: mobility = [] } = useQuery({ queryKey: ['dict_mobility'], queryFn: () => fetchDict('dict_mobility'), staleTime: 600_000 })
   const { data: salaryTypes = [] } = useQuery({ queryKey: ['dict_salary_types'], queryFn: () => fetchDict('dict_salary_types'), staleTime: 600_000 })
 
-  const selectedAccount = useMemo(
-    () => accounts.find((account: any) => String(account.account_id) === String(form.existingAccountId)),
-    [accounts, form.existingAccountId],
-  )
+  const [selectedAccount, setSelectedAccount] = useState<AccountPickerResult | null>(null)
 
   const cityOptions = useMemo(() => {
     const regionId = Number(form.region_id || 0)
@@ -352,7 +337,14 @@ export default function CreateJobWizardPage() {
 
               {form.createMode === 'existing' ? (
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                  <SelectField label="בחירת ארגון" value={form.existingAccountId} onChange={(value) => setField('existingAccountId', value)} options={accounts.map((a: any) => ({ value: String(a.account_id), label: `${a.account_name ?? 'ללא שם'}${a.bus_id ? ` · ${a.bus_id}` : ''}` }))} />
+                  <AccountPicker
+                    label="בחירת ארגון"
+                    value={form.existingAccountId || null}
+                    onChange={(id, account) => {
+                      setField('existingAccountId', id ?? '')
+                      setSelectedAccount(account ?? null)
+                    }}
+                  />
                   <div className="flex items-end">
                     <button type="button" onClick={applyAccountToJob} className="h-11 rounded-xl border border-[#008080] bg-white px-4 text-[13px] font-bold text-[#008080] transition hover:bg-[#E6F3F3]">העתקת מיקום מהארגון</button>
                   </div>
