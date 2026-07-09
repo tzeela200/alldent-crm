@@ -215,15 +215,20 @@ export default function CreateJobWizardPage() {
       let accountLink: number | null = form.createMode === 'existing' ? toNullableNumber(form.existingAccountId) : null
 
       if (form.createMode === 'new') {
+        const accountName = cleanText(form.newAccountName)
+        if (!accountName) {
+          showToast('יש להזין שם ארגון', 'error')
+          setSaving(false)
+          return
+        }
         const accountPayload = {
-          account_name: cleanText(form.newAccountName),
+          account_name: accountName,
           bus_id: cleanText(form.newAccountBusId),
           phone: cleanText(form.newAccountPhone),
           email: cleanText(form.newAccountEmail),
           region_id: toNullableNumber(form.accountRegionId),
           city_id: toNullableNumber(form.accountCityId),
           address: cleanText(form.accountAddress),
-          created_at: new Date().toISOString(),
         }
         const { data: newAccount, error: accountError } = await supabase
           .from('accounts')
@@ -246,6 +251,31 @@ export default function CreateJobWizardPage() {
         setSaving(false)
         return
       }
+
+      // אימות שכר לפי אילוצי ה-DB: שעתי 40–1000, חודשי 1000 ומעלה. ריק = מותר.
+      const hourly = toNullableNumber(form.salary_expectation_hourly)
+      if (form.salary_expectation_hourly.trim() && hourly === null) {
+        showToast('שכר שעתי חייב להיות מספר', 'error')
+        setSaving(false)
+        return
+      }
+      if (hourly !== null && (hourly < 40 || hourly > 1000)) {
+        showToast('שכר שעתי חייב להיות מספר בין 40 ל-1000 ₪', 'error')
+        setSaving(false)
+        return
+      }
+      const monthly = toNullableNumber(form.salary_expectation_monthly)
+      if (form.salary_expectation_monthly.trim() && monthly === null) {
+        showToast('שכר חודשי חייב להיות מספר', 'error')
+        setSaving(false)
+        return
+      }
+      if (monthly !== null && monthly < 1000) {
+        showToast('שכר חודשי חייב להיות מספר של 1000 ₪ ומעלה', 'error')
+        setSaving(false)
+        return
+      }
+
       const payload = {
         job_code: normalized,
         account_link: accountLink,
@@ -258,14 +288,14 @@ export default function CreateJobWizardPage() {
         region_id: toNullableNumber(form.region_id),
         city_id: toNullableNumber(form.city_id),
         address: cleanText(form.address),
-        scope: form.scope.length ? form.scope : null,
-        required_languages: form.required_languages.length ? form.required_languages : null,
-        systems_used: form.systems_used.length ? form.systems_used : null,
-        salary_type_ids: form.salary_type_ids.length ? form.salary_type_ids : null,
+        scope: form.scope,
+        required_languages: form.required_languages,
+        systems_used: form.systems_used,
+        salary_type_ids: form.salary_type_ids,
         tax_type_id: toNullableNumber(form.tax_type_id),
         mobility_id: toNullableNumber(form.mobility_id),
-        salary_expectation_hourly: toNullableNumber(form.salary_expectation_hourly),
-        salary_expectation_monthly: toNullableNumber(form.salary_expectation_monthly),
+        salary_expectation_hourly: hourly,
+        salary_expectation_monthly: monthly,
         show_salary_public: form.show_salary_public,
         work_schedule_text: cleanText(form.work_schedule_text),
         job_description: cleanText(form.job_description),
