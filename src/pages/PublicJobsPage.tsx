@@ -3,7 +3,7 @@ import { motion, useInView, animate, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import PublicJobCard from '@/components/public/PublicJobCard'
 import { TextCascade } from '@/components/ui/TextCascade'
-import { usePublicJobs } from '@/hooks/usePublicJobs'
+import { usePublicJobs, usePublicJobFilters } from '@/hooks/usePublicJobs'
 import type { PublicJobFilters } from '@/services/publicJobsService'
 
 // ─── Brand palette ───────────────────────────────────────────────────────────
@@ -124,9 +124,14 @@ function FilterPill({
 // ─── Page ────────────────────────────────────────────────────────────────────
 export default function PublicJobsPage() {
   const [search, setSearch] = useState('')
+  const [city, setCity] = useState('')
   const navigate = useNavigate()
 
-  const filters: PublicJobFilters = { search: search || undefined }
+  // רשימת הערים לבורר — נגזרת מכל המשרות הציבוריות (ללא הסינון הנוכחי), כדי שהבורר יישאר יציב
+  const { data: allJobs } = usePublicJobs({})
+  const { cities } = usePublicJobFilters(allJobs)
+
+  const filters: PublicJobFilters = { search: search || undefined, city: city || undefined }
   const { data: jobs, isLoading } = usePublicJobs(filters)
   const totalJobs = jobs?.length ?? 0
 
@@ -265,6 +270,39 @@ export default function PublicJobsPage() {
             />
             <span className="absolute top-1/2 -translate-y-1/2" style={{ left: '1rem', color: BRAND_COLORS.primary, fontSize: 16 }}>
               🔍
+            </span>
+          </motion.div>
+
+          {/* City filter */}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5, delay: 0.88 }}
+            className="relative w-full mt-3"
+            style={{ maxWidth: 360 }}
+          >
+            <select
+              value={city}
+              onChange={e => setCity(e.target.value)}
+              dir="rtl"
+              className="w-full py-3.5 rounded-full text-gray-900 text-[14px] outline-none cursor-pointer"
+              style={{
+                paddingRight: '1.25rem',
+                paddingLeft: '3rem',
+                background: BRAND_COLORS.white,
+                border: '1px solid rgba(0,0,0,0.08)',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.12)',
+                fontFamily: 'Heebo, sans-serif',
+                appearance: 'none',
+              }}
+            >
+              <option value="">כל הערים</option>
+              {cities.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+            <span className="absolute top-1/2 -translate-y-1/2 pointer-events-none" style={{ left: '1rem', color: BRAND_COLORS.primary, fontSize: 16 }}>
+              📍
             </span>
           </motion.div>
         </div>
