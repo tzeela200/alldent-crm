@@ -20,6 +20,13 @@
     { "source": "/Sharon",                "destination": "/jobs/Sharon",          "permanent": true }
   ],
   "rewrites": [
+    {
+      "source": "/jobs/:slug([A-Za-z0-9_-]+)",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Applebot|SkypeUriPreview|Embedly|Iframely|Googlebot|bingbot).*" }
+      ],
+      "destination": "/api/og?slug=:slug"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
