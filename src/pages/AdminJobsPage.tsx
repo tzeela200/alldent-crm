@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronUp,
   Bell,
+  TrendingUp,
 } from 'lucide-react'
 import {
   Shell,
@@ -767,6 +768,24 @@ export default function AdminJobsPage() {
     )
   }
 
+  // קידום משרה: רענון תאריך הפרסום כדי שהמשרה תקפוץ שוב לראש לוח המשרות
+  // ועמוד התפקיד (שניהם ממוינים לפי published_at). לא נוגע ב-created_time
+  // (תאריך פתיחת המשרה נשאר יציב לעד).
+  const promoteJob = (job: any) => {
+    if (Number(job.public_status) !== PUBLIC_STATUS_IDS.published) {
+      showToast('אפשר לקדם רק משרה שכבר מפורסמת', 'error')
+      return
+    }
+    updateJobPatch(
+      String(job.job_code),
+      {
+        published_at: new Date().toISOString(),
+        last_publish_date: todayIsoDate(),
+      },
+      'המשרה קודמה — תופיע ראשונה בלוח המשרות',
+    )
+  }
+
   const duplicateJob = async (job: any) => {
     const jobCode = String(job.job_code)
     const nextCode = generateDuplicateCode(jobCode, localJobs.map((item) => String(item.job_code)))
@@ -853,6 +872,7 @@ export default function AdminJobsPage() {
       { key: 'edit', icon: <Edit2 className="h-4 w-4" />, label: 'עריכה מלאה', onClick: () => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`) },
       { key: 'duplicate', icon: <Copy className="h-4 w-4" />, label: 'שכפול', onClick: () => duplicateJob(job), disabled: pending },
       { key: 'publish', icon: <Send className="h-4 w-4" />, label: 'פרסום', onClick: () => publishJob(job), disabled: pending },
+      { key: 'promote', icon: <TrendingUp className="h-4 w-4" />, label: 'קידום משרה (רענון תאריך פרסום)', onClick: () => promoteJob(job), disabled: pending },
       { key: 'smart-match', icon: <Sparkles className="h-4 w-4" />, label: 'Smart Match — לא מחובר', onClick: () => {}, disabled: true },
       { key: 'whatsapp', icon: <MessageCircle className="h-4 w-4" />, label: 'וואטסאפ', onClick: () => openWhatsApp(job) },
       { key: 'archive', icon: <Archive className="h-4 w-4" />, label: 'ארכוב', onClick: () => updateJobPatch(jobCode, { job_status: JOB_STATUS_IDS.archived, public_status: PUBLIC_STATUS_IDS.hidden, unpublished_at: new Date().toISOString() }, 'המשרה הועברה לארכיון'), disabled: pending, danger: true, separatorBefore: true },

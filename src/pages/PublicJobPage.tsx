@@ -141,20 +141,20 @@ function JobHero({
           alt={job.job_title ?? ''}
           onLoad={onImageLoad}
           className="absolute inset-0 -z-20 h-full w-full object-cover transition-opacity duration-500"
-          style={{ opacity: imgLoaded ? 0.34 : 0 }}
+          style={{ opacity: imgLoaded ? 0.55 : 0 }}
         />
       ) : (
         <div className="absolute inset-0 -z-20 bg-[#2D2D2D]" />
       )}
 
-      <div className="absolute inset-0 -z-10 bg-gradient-to-l from-[#008080]/85 via-[#2D2D2D]/86 to-[#0F0F10]/80" />
+      <div className="absolute inset-0 -z-10 bg-gradient-to-l from-[#008080]/60 via-[#2D2D2D]/62 to-[#0F0F10]/55" />
 
       <div className="mx-auto max-w-6xl px-4 py-4 md:px-8 md:py-5">
         <div className="mb-4 flex items-center justify-between gap-3 md:mb-5">
           <Link to="/jobs" className="text-sm font-bold text-white/80 transition-colors hover:text-white">
             ← חזרה ללוח המשרות
           </Link>
-          <span className="rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs font-bold text-white/85">
+          <span className="rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-base font-extrabold text-white md:text-lg">
             קוד משרה: {job.job_code}
           </span>
         </div>

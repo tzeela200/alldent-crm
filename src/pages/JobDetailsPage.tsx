@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useJobMutations } from '@/hooks/useJobMutations'
 import JobAIWriter from '@/components/admin/JobAIWriter'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Briefcase, Building2, CheckCircle2, ChevronLeft, Copy, FileText, Image as ImageIcon, MapPin, Save, Send, Sparkles, Trash2, Users } from 'lucide-react'
+import { Briefcase, Building2, CheckCircle2, ChevronLeft, Copy, FileText, Image as ImageIcon, MapPin, Save, Send, Sparkles, Trash2, TrendingUp, Users } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { Shell, ActionButton, EmptyState } from '@/components/layout/Shell'
 import { supabase } from '@/lib/supabase'
@@ -306,6 +306,25 @@ export default function JobDetailsPage() {
     void activateAccountIfFromRecruitmentRequest(localJob.job_code, localJob.account_link)
   }
 
+  // קידום משרה: רענון תאריך הפרסום כדי שהמשרה תקפוץ שוב לראש לוח המשרות
+  // ועמוד התפקיד (שניהם ממוינים לפי published_at). לא נוגע ב-created_time.
+  const promoteJob = async () => {
+    if (!localJob) return
+    if (Number(localJob.public_status) !== PUBLIC_STATUS_PUBLISHED) {
+      showToast('אפשר לקדם רק משרה שכבר מפורסמת', 'error')
+      return
+    }
+    const patch = {
+      published_at: new Date().toISOString(),
+      last_publish_date: todayIsoDate(),
+      updated_timestamp: new Date().toISOString(),
+    }
+    const { error } = await updateJob(localJob.job_code, patch)
+    if (error) { showToast(error.message, 'error'); return }
+    setLocalJob((prev: any) => ({ ...prev, ...patch }))
+    showToast('המשרה קודמה — תופיע ראשונה בלוח המשרות', 'success')
+  }
+
   // משרות שהגיעו מהטופס הציבורי (יש להן שורת job_recruitment_intake) —
   // ברגע שבאמת מתפרסמות, הארגון המקושר הופך ל"מגייס פעיל". לא חל על
   // משרות שנוצרו ידנית באדמין לארגון קיים.
@@ -369,7 +388,7 @@ export default function JobDetailsPage() {
             <section className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap items-center gap-2"><Pill text={statusName} tone={isActive ? 'success' : 'muted'} /><Pill text={publicStatusName} tone={isPublished ? 'success' : 'muted'} /></div>
-                <div className="flex flex-wrap gap-2"><ActionButton variant="success" icon={Send} onClick={publishJob}>פרסום</ActionButton><ActionButton variant="danger" icon={Trash2} onClick={archiveJob}>ארכיון</ActionButton></div>
+                <div className="flex flex-wrap gap-2"><ActionButton variant="success" icon={Send} onClick={publishJob}>פרסום</ActionButton>{isPublished && <ActionButton variant="ghost" icon={TrendingUp} onClick={promoteJob}>קידום משרה</ActionButton>}<ActionButton variant="danger" icon={Trash2} onClick={archiveJob}>ארכיון</ActionButton></div>
               </div>
               <SectionTitle icon={<Briefcase className="h-5 w-5" />} title="עריכת משרה מלאה" />
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
