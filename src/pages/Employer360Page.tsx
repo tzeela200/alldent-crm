@@ -107,6 +107,7 @@ type JobRow = {
   job_requirements: string | null;
   job_url: string | null;
   rel_employer_contact: number | null;
+  rel_recruiter_contact: number | null;
   total_applicants: number | null;
   date_facebook: string | null;
   date_website: string | null;
@@ -216,7 +217,7 @@ const ACCOUNT_SELECT =
   "account_id, account_name, bus_id, account_status, account_type, phone, second_phone, email, second_email, billing_email, website_url, facebook_url, region_id, city_id, address, contact_link, notes, active_job_count_auto, total_jobs_count, rel_role, all_applicants_names, last_contact_date, next_follow_up, whatsapp_last_sent, created_timestamp, updated_timestamp, clinic_type, chairs_count, specialties, team_size, hiring_roles, extended_data, systems_used";
 
 const JOB_SELECT =
-  "job_code, account_link, job_status, job_title, job_role, job_sub_role, scope, required_experience, required_languages, region_id, city_id, address, job_description, job_requirements, job_url, rel_employer_contact, total_applicants, date_facebook, date_website, date_whatsapp, last_publish_date, notes, created_time, updated_timestamp";
+  "job_code, account_link, job_status, job_title, job_role, job_sub_role, scope, required_experience, required_languages, region_id, city_id, address, job_description, job_requirements, job_url, rel_employer_contact, rel_recruiter_contact, total_applicants, date_facebook, date_website, date_whatsapp, last_publish_date, notes, created_time, updated_timestamp";
 
 const CONTACT_SELECT =
   "contact_id, phone, phone_norm, display_name, first_name, last_name, full_name, email, second_phone, second_email, role, sub_role, candidate_availability_ids, experience, preferred_scope, languages, region_id, city_id, cv_link, has_cv, account_link, profile_type, source, check_status, social_status, facebook_url, facebook_name, facebook_id, last_contact_date, next_follow_up, prev_applications_count, notes, created_timestamp, updated_timestamp, professional_title, current_employer";
@@ -280,6 +281,7 @@ const PREVIEW_JOBS: JobRow[] = [
     job_requirements: "ניסיון מוכח של שנה לפחות, יחסי אנוש מעולים, נכונות למשמרות ערב.",
     job_url: null,
     rel_employer_contact: null,
+    rel_recruiter_contact: null,
     total_applicants: 0,
     date_facebook: null,
     date_website: null,
@@ -1535,7 +1537,7 @@ function JobsPanel({ jobs, dicts, isLoading, error, accountId }: { jobs: JobRow[
   );
 }
 
-function ContactsPanel({ contacts, dicts, isLoading, error }: { contacts: ContactRow[]; dicts: DictBundle; isLoading: boolean; error: unknown }) {
+function ContactsPanel({ contacts, jobs, dicts, isLoading, error }: { contacts: ContactRow[]; jobs: JobRow[]; dicts: DictBundle; isLoading: boolean; error: unknown }) {
   if (isLoading) {
     return (
       <SectionCard title="אנשי קשר" icon={<Users className="h-4 w-4" />}>
@@ -1555,6 +1557,64 @@ function ContactsPanel({ contacts, dicts, isLoading, error }: { contacts: Contac
     );
   }
 
+  // תפקיד פר-ארגון: נגזר ממשרות הארגון (מעסיק/מגייס), + עובד ארגון/איש קשר לשאר
+  const empIds = new Set((jobs ?? []).map((j) => Number(j.rel_employer_contact)).filter((v) => v > 0));
+  const recIds = new Set((jobs ?? []).map((j) => Number(j.rel_recruiter_contact)).filter((v) => v > 0));
+  const employers = contacts.filter((c) => empIds.has(Number(c.contact_id)));
+  const recruiters = contacts.filter((c) => recIds.has(Number(c.contact_id)) && !empIds.has(Number(c.contact_id)));
+  const others = contacts.filter((c) => !empIds.has(Number(c.contact_id)) && !recIds.has(Number(c.contact_id)));
+
+  const renderCard = (contact: ContactRow) => {
+    const name = contact.full_name || contact.display_name || compactArray([contact.first_name, contact.last_name]).join(" ") || "איש קשר ללא שם";
+    const isEmp = empIds.has(Number(contact.contact_id));
+    const isRec = recIds.has(Number(contact.contact_id));
+    return (
+      <div key={contact.contact_id} className="rounded-2xl border border-slate-200 p-3 transition hover:border-[#008080]/30 hover:bg-[#F0FDFC]/40">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <Link to={`/admin/contacts/${contact.contact_id}`} className="font-bold text-slate-900 hover:text-[#008080] hover:underline">
+              {name}
+            </Link>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {isEmp ? <span className="rounded-full bg-[#E6F3F3] px-2 py-0.5 text-[11px] font-bold text-[#008080]">מעסיק</span> : null}
+              {isRec ? <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700">מגייס</span> : null}
+              <span className="text-xs text-slate-500">{dictName(dicts.roles, contact.role, contact.professional_title ?? "תפקיד לא הוגדר")}</span>
+            </div>
+          </div>
+          {isPast(contact.next_follow_up) ? <Badge className="rounded-full border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50">פולואפ</Badge> : null}
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+          {contact.phone ? (
+            <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
+              <Phone className="h-3.5 w-3.5" />
+              {contact.phone}
+            </a>
+          ) : null}
+          {contact.email ? (
+            <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
+              <Mail className="h-3.5 w-3.5" />
+              {contact.email}
+            </a>
+          ) : null}
+          {whatsappUrl(contact.phone) ? (
+            <a href={whatsappUrl(contact.phone) ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
+              <MessageCircle className="h-3.5 w-3.5" />
+              WhatsApp
+            </a>
+          ) : null}
+        </div>
+      </div>
+    );
+  };
+
+  const renderGroup = (title: string, list: ContactRow[]) =>
+    list.length ? (
+      <div className="space-y-2">
+        <h4 className="text-[13px] font-bold text-slate-500">{title} ({list.length})</h4>
+        {list.map(renderCard)}
+      </div>
+    ) : null;
+
   return (
     <SectionCard
       title={`אנשי קשר (${contacts.length})`}
@@ -1569,45 +1629,12 @@ function ContactsPanel({ contacts, dicts, isLoading, error }: { contacts: Contac
       }
     >
       {contacts.length === 0 ? (
-        <EmptyState title="אין אנשי קשר משויכים" description="יש לשייך אנשי קשר דרך כרטסת איש קשר או מאגר אנשי הקשר." />
+        <EmptyState title="אין אנשי קשר משויכים" description="שייכי מעסיק/מגייס דרך המשרה, או איש קשר דרך המאגר." />
       ) : (
-        <div className="space-y-3">
-          {contacts.map((contact) => {
-            const name = contact.full_name || contact.display_name || compactArray([contact.first_name, contact.last_name]).join(" ") || "איש קשר ללא שם";
-            return (
-              <div key={contact.contact_id} className="rounded-2xl border border-slate-200 p-3 transition hover:border-[#008080]/30 hover:bg-[#F0FDFC]/40">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <Link to={`/admin/contacts/${contact.contact_id}`} className="font-bold text-slate-900 hover:text-[#008080] hover:underline">
-                      {name}
-                    </Link>
-                    <div className="mt-1 text-xs text-slate-500">{dictName(dicts.roles, contact.role, contact.professional_title ?? "תפקיד לא הוגדר")}</div>
-                  </div>
-                  {isPast(contact.next_follow_up) ? <Badge className="rounded-full border border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-50">פולואפ</Badge> : null}
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
-                  {contact.phone ? (
-                    <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
-                      <Phone className="h-3.5 w-3.5" />
-                      {contact.phone}
-                    </a>
-                  ) : null}
-                  {contact.email ? (
-                    <a href={`mailto:${contact.email}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
-                      <Mail className="h-3.5 w-3.5" />
-                      {contact.email}
-                    </a>
-                  ) : null}
-                  {whatsappUrl(contact.phone) ? (
-                    <a href={whatsappUrl(contact.phone) ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      WhatsApp
-                    </a>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
+        <div className="space-y-4">
+          {renderGroup("מעסיקים", employers)}
+          {renderGroup("מגייסים", recruiters)}
+          {renderGroup("עובדי ארגון / אנשי קשר", others)}
         </div>
       )}
     </SectionCard>
@@ -2111,7 +2138,7 @@ export default function Employer360Page() {
               <div className="space-y-4">
                 <RecommendedActionsPanel actions={recommendedActions} />
                 <div ref={contactsRef}>
-                  <ContactsPanel contacts={contacts} dicts={dicts} isLoading={contactsQuery.isLoading} error={contactsQuery.error} />
+                  <ContactsPanel contacts={contacts} jobs={jobs} dicts={dicts} isLoading={contactsQuery.isLoading} error={contactsQuery.error} />
                 </div>
               </div>
             </div>
