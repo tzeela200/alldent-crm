@@ -36,16 +36,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { ContactPicker } from "@/components/ui/ContactPicker";
 import { CityRegionPicker } from "@/components/ui/CityRegionPicker";
 import { OrgContactPicker } from "@/components/ui/OrgContactPicker";
+import { StatusBadge } from "@/components/admin/StatusBadge";
+import { whatsappLink, formatPhone } from "@/lib/normalizePhone";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -199,6 +195,8 @@ type DictBundle = {
   regions: Map<number, string>;
   cities: Map<number, string>;
   systems: Map<number, string>;
+  scopes: Map<number, string>;
+  subRoles: Map<number, string>;
 };
 
 type RecommendedAction = {
@@ -378,6 +376,8 @@ const PREVIEW_DICTS: DictBundle = {
   regions: new Map([[1, "גוש-דן"]]),
   cities: new Map([[231, "בת ים"]]),
   systems: new Map(),
+  scopes: new Map([[1, "משרה מלאה"]]),
+  subRoles: new Map(),
 };
 
 const ACCOUNT_FIELD_KEYS: Array<keyof AccountRow> = [
@@ -431,17 +431,26 @@ function normalizeUrl(url: string | null | undefined): string | null {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
-function normalizePhoneForWhatsApp(phone: string | null | undefined): string | null {
-  const digits = String(phone ?? "").replace(/\D/g, "");
-  if (!digits) return null;
-  if (digits.startsWith("972")) return digits;
-  if (digits.startsWith("0")) return `972${digits.slice(1)}`;
-  return digits;
+// WhatsApp/טלפון — מקור אמת יחיד: src/lib/normalizePhone.ts (whatsappLink/formatPhone).
+// whatsappLink מטפל נכון גם ב-9 ספרות בלי 0/972.
+
+// המרת ערך שדה-מערך (bigint[]) / מחרוזת / מספר לרשימת מזהים נקייה
+function toIdArray(value: unknown): number[] {
+  if (Array.isArray(value)) return value.map((v) => Number(v)).filter((n) => Number.isFinite(n) && n > 0);
+  if (value === null || value === undefined) return [];
+  if (typeof value === "number") return Number.isFinite(value) && value > 0 ? [value] : [];
+  // מחרוזת: "3", "3,5", "{3,5}"
+  return String(value)
+    .replace(/[{}]/g, "")
+    .split(",")
+    .map((part) => Number(part.trim()))
+    .filter((n) => Number.isFinite(n) && n > 0);
 }
 
-function whatsappUrl(phone: string | null | undefined): string | null {
-  const normalized = normalizePhoneForWhatsApp(phone);
-  return normalized ? `https://wa.me/${normalized}` : null;
+// מיפוי מזהי-מערך לשמות דרך מילון, מחזיר מחרוזת מופרדת בפסיקים
+function idsToNames(value: unknown, dict: Map<number, string>): string {
+  const names = toIdArray(value).map((id) => dict.get(id) ?? String(id));
+  return names.length ? names.join(", ") : "—";
 }
 
 function formatDate(value: string | null | undefined): string {
@@ -470,10 +479,10 @@ function isPast(value: string | null | undefined): boolean {
   return date.getTime() < Date.now();
 }
 
-function isActiveJob(job: JobRow, dicts: DictBundle): boolean {
-  const statusName = dictName(dicts.jobStatuses, job.job_status, "");
-  if (/פעיל|פתוח|בגיוס/i.test(statusName)) return true;
-  return job.job_status === 3 || job.job_status === 7;
+// משרה פעילה = job_status===3 ("פעילה") בלבד (החלטת המשתמשת 2026-07-12).
+// 7="סגורה־אחר" ושאר הסטטוסים אינם פעילים. תואם JOB_STATUS_IDS.active + v_job_public.
+function isActiveJob(job: JobRow): boolean {
+  return Number(job.job_status) === 3;
 }
 
 function uniqueCount<T>(items: T[], getKey: (item: T) => string | number | null | undefined): number {
@@ -497,13 +506,12 @@ function mapFromRows(rows: DictRow[] | undefined): Map<number, string> {
   return map;
 }
 
-function statusTone(label: string, id?: number | null): "success" | "warning" | "danger" | "neutral" | "info" {
-  const value = label.toLowerCase();
-  if (/פעיל|חדש|פתוח|מאושר|תקין|נמסר|נקרא/.test(value) || id === 7 || id === 3) return "success";
-  if (/ממתין|לבדיקה|בהמתנה|טיוטה|חלקי/.test(value)) return "warning";
-  if (/סגור|לא פעיל|נכשל|שגיאה|בוטל|נדחה/.test(value)) return "danger";
-  if (/בטיפול|בתהליך|פולואפ|מעקב/.test(value)) return "info";
-  return "neutral";
+// סטטוסים טרמינליים/סגורים של הגשה (מקור אמת: useApplications / FINAL_APP_STATUSES).
+// "הגשה פתוחה" = application_status שאינו באחד מאלה: 5,10,13,14,15.
+const CLOSED_APP_STATUSES = new Set([5, 10, 13, 14, 15]);
+function isOpenApplication(statusId: number | null | undefined): boolean {
+  if (statusId === null || statusId === undefined) return true;
+  return !CLOSED_APP_STATUSES.has(Number(statusId));
 }
 
 export function computeAccountCompletion(account: AccountRow): number {
@@ -560,19 +568,6 @@ function fieldValue(value: unknown): React.ReactNode {
 
 function SkeletonBlock({ className = "" }: { className?: string }) {
   return <div className={`animate-pulse rounded-2xl bg-slate-200/70 ${className}`} />;
-}
-
-function StatusBadge({ label, id }: { label: string; id?: number | null }) {
-  const tone = statusTone(label, id);
-  const classes = {
-    success: "border-emerald-200 bg-emerald-50 text-emerald-700",
-    warning: "border-amber-200 bg-amber-50 text-amber-700",
-    danger: "border-rose-200 bg-rose-50 text-rose-700",
-    info: "border-sky-200 bg-sky-50 text-sky-700",
-    neutral: "border-slate-200 bg-slate-50 text-slate-700",
-  }[tone];
-
-  return <Badge className={`rounded-full border px-2.5 py-1 text-xs font-semibold hover:bg-inherit ${classes}`}>{label || "—"}</Badge>;
 }
 
 function SectionCard({
@@ -706,6 +701,8 @@ function useDictBundle(enabled: boolean, previewMode: boolean): DictBundle {
   const regions = useDictRows("dict_regions");
   const cities = useDictRows("dict_cities");
   const systems = useDictRows("dict_systems");
+  const scopes = useDictRows("dict_scopes");
+  const subRoles = useDictRows("dict_sub_roles");
 
   return useMemo(() => {
     if (!enabled || previewMode) return PREVIEW_DICTS;
@@ -720,6 +717,8 @@ function useDictBundle(enabled: boolean, previewMode: boolean): DictBundle {
       regions: mapFromRows(regions.data),
       cities: mapFromRows(cities.data),
       systems: mapFromRows(systems.data),
+      scopes: mapFromRows(scopes.data),
+      subRoles: mapFromRows(subRoles.data),
     };
   }, [
     accountStatuses.data,
@@ -733,6 +732,8 @@ function useDictBundle(enabled: boolean, previewMode: boolean): DictBundle {
     regions.data,
     roles.data,
     systems.data,
+    scopes.data,
+    subRoles.data,
   ]);
 }
 
@@ -812,10 +813,7 @@ function useAccountApplications(jobCodes: string[], previewMode: boolean) {
   });
 }
 
-// ─── AccountEditSheet ─────────────────────────────────────────────────────────
-
-type EditSection = "general" | "crm";
-
+// ─── עריכה inline (במסך עצמו — אין דיאלוג נפרד) ───────────────────────────────
 
 type EditFields = {
   account_name: string;
@@ -841,26 +839,9 @@ type EditFields = {
   next_follow_up: string;
 };
 
-function AccountEditSheet({
-  open,
-  section,
-  account,
-  dicts,
-  onClose,
-  onSaved,
-}: {
-  open: boolean;
-  section: EditSection;
-  account: AccountRow;
-  dicts: DictBundle;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const { updateAccount } = useAccountMutations();
-  const [saving, setSaving] = useState(false);
-  const [activeSection, setActiveSection] = useState<EditSection>(section);
-
-  const buildFields = (a: AccountRow): EditFields => ({
+// אתחול שדות עריכה מרשומת הארגון
+function buildEditFields(a: AccountRow): EditFields {
+  return {
     account_name: a.account_name ?? "",
     bus_id: (a as any).bus_id ?? "",
     contact_link: String(a.contact_link ?? ""),
@@ -882,255 +863,105 @@ function AccountEditSheet({
     notes: a.notes ?? "",
     last_contact_date: a.last_contact_date ? a.last_contact_date.slice(0, 10) : "",
     next_follow_up: a.next_follow_up ? a.next_follow_up.slice(0, 10) : "",
-  });
-
-  const [fields, setFields] = useState<EditFields>(() => buildFields(account));
-
-  useEffect(() => {
-    if (open) {
-      setActiveSection(section);
-      setFields(buildFields(account));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, section]);
-
-  const set = (key: keyof EditFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFields((prev) => ({ ...prev, [key]: e.target.value }));
   };
+}
 
-
-
-
-  const handleSave = async () => {
-    setSaving(true);
-    try {
-      const updates: Record<string, unknown> = {
-        account_name: fields.account_name.trim() || account.account_name,
-        bus_id: fields.bus_id.trim() || null,
-        contact_link: fields.contact_link || null,
-        account_status: fields.account_status ? Number(fields.account_status) : null,
-        account_type: fields.account_type ? Number(fields.account_type) : null,
-        phone: fields.phone.trim() || null,
-        second_phone: fields.second_phone.trim() || null,
-        email: fields.email.trim() || null,
-        second_email: fields.second_email.trim() || null,
-        billing_email: fields.billing_email.trim() || null,
-        website_url: fields.website_url.trim() || null,
-        facebook_url: fields.facebook_url.trim() || null,
-        region_id: fields.region_id ? Number(fields.region_id) : null,
-        city_id: fields.city_id ? Number(fields.city_id) : null,
-        address: fields.address.trim() || null,
-        clinic_type: fields.clinic_type.trim() || null,
-        chairs_count: fields.chairs_count ? Number(fields.chairs_count) : null,
-        team_size: fields.team_size ? Number(fields.team_size) : null,
-        notes: fields.notes.trim() || null,
-        last_contact_date: fields.last_contact_date || null,
-        next_follow_up: fields.next_follow_up || null,
-      };
-
-      const { error } = await updateAccount(account.account_id, updates);
-
-      if (error) throw error;
-
-      toast.success("הארגון עודכן בהצלחה");
-      onSaved();
-      onClose();
-    } catch (err) {
-      toast.error("שגיאה בשמירה: " + (err instanceof Error ? err.message : String(err)));
-    } finally {
-      setSaving(false);
-    }
+// המרת שדות עריכה ל-payload לעדכון accounts (coercion string→number/null + trim)
+function editFieldsToUpdates(fields: EditFields, account: AccountRow): Record<string, unknown> {
+  return {
+    account_name: fields.account_name.trim() || account.account_name,
+    bus_id: fields.bus_id.trim() || null,
+    contact_link: fields.contact_link || null,
+    account_status: fields.account_status ? Number(fields.account_status) : null,
+    account_type: fields.account_type ? Number(fields.account_type) : null,
+    phone: fields.phone.trim() || null,
+    second_phone: fields.second_phone.trim() || null,
+    email: fields.email.trim() || null,
+    second_email: fields.second_email.trim() || null,
+    billing_email: fields.billing_email.trim() || null,
+    website_url: fields.website_url.trim() || null,
+    facebook_url: fields.facebook_url.trim() || null,
+    region_id: fields.region_id ? Number(fields.region_id) : null,
+    city_id: fields.city_id ? Number(fields.city_id) : null,
+    address: fields.address.trim() || null,
+    clinic_type: fields.clinic_type.trim() || null,
+    chairs_count: fields.chairs_count ? Number(fields.chairs_count) : null,
+    team_size: fields.team_size ? Number(fields.team_size) : null,
+    notes: fields.notes.trim() || null,
+    last_contact_date: fields.last_contact_date || null,
+    next_follow_up: fields.next_follow_up || null,
   };
+}
 
-  const inputClass = "w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-[#008080] focus:outline-none focus:ring-1 focus:ring-[#008080]";
-  const labelClass = "mb-1 block text-xs font-semibold text-slate-500";
+// הקשר עריכה שמועבר לפאנלים; null = מצב תצוגה
+type EditCtx = {
+  fields: EditFields;
+  setField: (key: keyof EditFields) => (value: string) => void;
+};
 
-  const statusOptions = Array.from(dicts.accountStatuses.entries()).map(([id, name]) => ({ id, name }));
-  const typeOptions = Array.from(dicts.accountTypes.entries()).map(([id, name]) => ({ id, name }));
+const EDIT_INPUT_CLASS =
+  "w-1/2 min-w-[140px] rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-[#008080] focus:outline-none focus:ring-1 focus:ring-[#008080]";
 
+// שדה טקסט/מספר/תאריך לעריכה inline בתוך כרטיס
+function EditRow({
+  label,
+  value,
+  onChange,
+  ltr = false,
+  type = "text",
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  ltr?: boolean;
+  type?: string;
+  placeholder?: string;
+}) {
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent
-        dir="rtl"
-        className="max-h-[90vh] max-w-2xl overflow-y-auto font-['Heebo']"
-      >
-        <DialogHeader>
-          <DialogTitle className="text-lg font-black text-slate-900">
-            עריכת ארגון — {account.account_name}
-          </DialogTitle>
-        </DialogHeader>
-
-        {/* Section tabs */}
-        <div className="flex gap-2 border-b border-slate-200 pb-3">
-          <button
-            type="button"
-            onClick={() => setActiveSection("general")}
-            className={`rounded-xl px-4 py-1.5 text-sm font-semibold transition ${activeSection === "general" ? "bg-[#008080] text-white" : "text-slate-600 hover:bg-slate-100"}`}
-          >
-            פרטים כלליים
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveSection("crm")}
-            className={`rounded-xl px-4 py-1.5 text-sm font-semibold transition ${activeSection === "crm" ? "bg-[#008080] text-white" : "text-slate-600 hover:bg-slate-100"}`}
-          >
-            CRM ומעקב
-          </button>
-        </div>
-
-        {activeSection === "general" && (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="sm:col-span-2">
-                <label className={labelClass}>שם הארגון *</label>
-                <input className={inputClass} value={fields.account_name} onChange={set("account_name")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>ח.פ / עוסק מורשה</label>
-                <input className={inputClass} value={fields.bus_id} onChange={set("bus_id")} placeholder="מספר ח.פ או עוסק מורשה" />
-              </div>
-
-              <div className="sm:col-span-2">
-                <OrgContactPicker
-                  accountId={account.account_id}
-                  employerValue={fields.contact_link}
-                  onEmployerChange={(id) => setFields((prev) => ({ ...prev, contact_link: id ?? "" }))}
-                />
-              </div>
-
-              <div>
-                <label className={labelClass}>סטטוס</label>
-                <select className={inputClass} value={fields.account_status} onChange={set("account_status")}>
-                  <option value="">— בחר סטטוס —</option>
-                  {statusOptions.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className={labelClass}>סוג ארגון</label>
-                <select className={inputClass} value={fields.account_type} onChange={set("account_type")}>
-                  <option value="">— בחר סוג —</option>
-                  {typeOptions.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className={labelClass}>טלפון ראשי</label>
-                <input className={inputClass} dir="ltr" value={fields.phone} onChange={set("phone")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>טלפון נוסף</label>
-                <input className={inputClass} dir="ltr" value={fields.second_phone} onChange={set("second_phone")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>אימייל ראשי</label>
-                <input className={inputClass} dir="ltr" type="email" value={fields.email} onChange={set("email")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>אימייל נוסף</label>
-                <input className={inputClass} dir="ltr" type="email" value={fields.second_email} onChange={set("second_email")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>אימייל לחיוב</label>
-                <input className={inputClass} dir="ltr" type="email" value={fields.billing_email} onChange={set("billing_email")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>אתר</label>
-                <input className={inputClass} dir="ltr" value={fields.website_url} onChange={set("website_url")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>פייסבוק</label>
-                <input className={inputClass} dir="ltr" value={fields.facebook_url} onChange={set("facebook_url")} />
-              </div>
-
-              <div className="sm:col-span-2">
-                <CityRegionPicker
-                  variant="edit"
-                  regionId={fields.region_id ? Number(fields.region_id) : null}
-                  cityId={fields.city_id ? Number(fields.city_id) : null}
-                  onRegionChange={(regionId) => setFields((prev) => ({ ...prev, region_id: regionId != null ? String(regionId) : "", city_id: "" }))}
-                  onCityChange={(cityId) => setFields((prev) => ({ ...prev, city_id: cityId != null ? String(cityId) : "" }))}
-                />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className={labelClass}>כתובת</label>
-                <input className={inputClass} value={fields.address} onChange={set("address")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>סוג מרפאה / קליניקה</label>
-                <input className={inputClass} value={fields.clinic_type} onChange={set("clinic_type")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>מספר כיסאות</label>
-                <input className={inputClass} type="number" dir="ltr" value={fields.chairs_count} onChange={set("chairs_count")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>גודל צוות</label>
-                <input className={inputClass} type="number" dir="ltr" value={fields.team_size} onChange={set("team_size")} />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {activeSection === "crm" && (
-          <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className={labelClass}>תאריך קשר אחרון</label>
-                <input className={inputClass} type="date" dir="ltr" value={fields.last_contact_date} onChange={set("last_contact_date")} />
-              </div>
-
-              <div>
-                <label className={labelClass}>פולואפ הבא</label>
-                <input className={inputClass} type="date" dir="ltr" value={fields.next_follow_up} onChange={set("next_follow_up")} />
-              </div>
-
-              <div className="sm:col-span-2">
-                <label className={labelClass}>הערות CRM</label>
-                <textarea
-                  className={`${inputClass} min-h-[120px] resize-y`}
-                  value={fields.notes}
-                  onChange={set("notes")}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-slate-200 pt-4">
-          <Button variant="outline" onClick={onClose} className="rounded-xl" disabled={saving}>
-            <X className="h-4 w-4" />
-            ביטול
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={saving}
-            className="rounded-xl bg-[#008080] text-white hover:bg-[#006B6B]"
-          >
-            <Save className="h-4 w-4" />
-            {saving ? "שומר..." : "שמירה"}
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+    <div className="flex items-center justify-between gap-4 border-b border-slate-100 py-2 last:border-b-0">
+      <label className="shrink-0 text-[13px] text-slate-500">{label}</label>
+      <input
+        className={EDIT_INPUT_CLASS}
+        dir={ltr ? "ltr" : "rtl"}
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
   );
 }
+
+// שדה בחירה (select) לעריכה inline
+function EditSelectRow({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder = "— בחר —",
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ id: number; name: string }>;
+  placeholder?: string;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-slate-100 py-2 last:border-b-0">
+      <label className="shrink-0 text-[13px] text-slate-500">{label}</label>
+      <select className={EDIT_INPUT_CLASS} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">{placeholder}</option>
+        {options.map((o) => (
+          <option key={o.id} value={o.id}>
+            {o.name}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 
 // ─── Hero section ─────────────────────────────────────────────────────────────
 
@@ -1145,6 +976,7 @@ function HeroSection({
   onCopy,
   onScrollToContacts,
   onEdit,
+  editing,
 }: {
   account: AccountRow;
   dicts: DictBundle;
@@ -1155,11 +987,12 @@ function HeroSection({
   overdueFollowUp: boolean;
   onCopy: (value: string | null | undefined) => void;
   onScrollToContacts: () => void;
-  onEdit: (section?: EditSection) => void;
+  onEdit: () => void;
+  editing: boolean;
 }) {
   const website = normalizeUrl(account.website_url);
   const facebook = normalizeUrl(account.facebook_url);
-  const wa = whatsappUrl(account.phone);
+  const wa = whatsappLink(account.phone) || null;
 
   return (
     <Card className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -1172,7 +1005,7 @@ function HeroSection({
               </div>
               <div className="min-w-0">
                 <div className="mb-2 flex flex-wrap items-center gap-2">
-                  <StatusBadge label={dictName(dicts.accountStatuses, account.account_status, "סטטוס לא הוגדר")} id={account.account_status} />
+                  <StatusBadge statusType="account" statusId={account.account_status} label={dictName(dicts.accountStatuses, account.account_status, "סטטוס ארגון לא הוגדר")} />
                   <Badge className="rounded-full border border-white/20 bg-white/15 px-2.5 py-1 text-xs font-semibold text-white hover:bg-white/15">
                     {dictName(dicts.accountTypes, account.account_type, "סוג ארגון לא הוגדר")}
                   </Badge>
@@ -1201,13 +1034,15 @@ function HeroSection({
             </div>
 
             <div className="flex flex-wrap gap-2 lg:justify-end">
-              <Button
-                onClick={() => onEdit("general")}
-                className="rounded-xl bg-white text-[#008080] hover:bg-slate-50"
-              >
-                <Edit2 className="h-4 w-4" />
-                עריכת ארגון
-              </Button>
+              {!editing && (
+                <Button
+                  onClick={onEdit}
+                  className="rounded-xl bg-white text-[#008080] hover:bg-slate-50"
+                >
+                  <Edit2 className="h-4 w-4" />
+                  עריכה
+                </Button>
+              )}
               <Button asChild className="rounded-xl border border-white/30 bg-white/15 text-white hover:bg-white/25">
                 <Link to={`/employer-profile/${account.account_id}`}>
                   <Printer className="h-4 w-4" />
@@ -1263,7 +1098,7 @@ function HeroSection({
 }
 
 function KpiStrip({ account, jobs, applications, dicts }: { account: AccountRow; jobs: JobRow[]; applications: ApplicationRow[]; dicts: DictBundle }) {
-  const activeJobs = useMemo(() => jobs.filter((job) => isActiveJob(job, dicts)), [dicts, jobs]);
+  const activeJobs = useMemo(() => jobs.filter((job) => isActiveJob(job)), [dicts, jobs]);
 
   const uniqueCandidates = useMemo(
     () => uniqueCount(applications, (application) => application.candidate_link ?? application.phone_norm ?? application.candidate_phone ?? application.candidate_email),
@@ -1271,12 +1106,8 @@ function KpiStrip({ account, jobs, applications, dicts }: { account: AccountRow;
   );
 
   const openApplications = useMemo(
-    () =>
-      applications.filter((application) => {
-        const label = dictName(dicts.applicationStatuses, application.application_status, application.status_in_master ?? "");
-        return !/סגור|נדחה|בוטל|הושם/i.test(label);
-      }).length,
-    [applications, dicts.applicationStatuses],
+    () => applications.filter((application) => isOpenApplication(application.application_status)).length,
+    [applications],
   );
 
   const overdueFollowUps = isPast(account.next_follow_up) ? 1 : 0;
@@ -1330,37 +1161,90 @@ function LinkContactToAccountPanel({ accountId }: { accountId: number }) {
   )
 }
 
-function OrganizationDetails({ account, dicts, onCopy }: { account: AccountRow; dicts: DictBundle; onCopy: (value: string | null | undefined) => void }) {
+function OrganizationDetails({ account, dicts, onCopy, edit }: { account: AccountRow; dicts: DictBundle; onCopy: (value: string | null | undefined) => void; edit?: EditCtx | null }) {
+  const statusOptions = Array.from(dicts.accountStatuses.entries()).map(([id, name]) => ({ id, name }));
+  const typeOptions = Array.from(dicts.accountTypes.entries()).map(([id, name]) => ({ id, name }));
+
   return (
     <SectionCard
       title="פרטי ארגון"
       icon={<Building2 className="h-4 w-4" />}
       action={
-        <Button variant="ghost" size="sm" className="rounded-xl text-[#008080]" onClick={() => onCopy([account.account_name, account.address].filter(Boolean).join(" | "))}>
-          <ClipboardCopy className="h-4 w-4" />
-          העתקה
-        </Button>
+        edit ? null : (
+          <Button variant="ghost" size="sm" className="rounded-xl text-[#008080]" onClick={() => onCopy([account.account_name, account.address].filter(Boolean).join(" | "))}>
+            <ClipboardCopy className="h-4 w-4" />
+            העתקה
+          </Button>
+        )
       }
     >
-      <LabelValue label="שם הארגון" value={account.account_name} />
-      <LabelValue label="ח.פ / עוסק" value={account.bus_id} ltr />
-      <LabelValue label="סוג ארגון" value={dictName(dicts.accountTypes, account.account_type)} />
-      <LabelValue label="סטטוס" value={<StatusBadge label={dictName(dicts.accountStatuses, account.account_status)} id={account.account_status} />} />
-      <LabelValue label="אזור" value={dictName(dicts.regions, account.region_id)} />
-      <LabelValue label="עיר" value={dictName(dicts.cities, account.city_id)} />
-      <LabelValue label="כתובת" value={account.address} />
-      <LabelValue label="סוג מרפאה" value={account.clinic_type} />
-      <LabelValue label="מספר כיסאות" value={account.chairs_count} />
-      <LabelValue label="גודל צוות" value={account.team_size} />
+      {edit ? (
+        <>
+          <EditRow label="שם הארגון" value={edit.fields.account_name} onChange={edit.setField("account_name")} />
+          <EditRow label="ח.פ / עוסק" value={edit.fields.bus_id} onChange={edit.setField("bus_id")} ltr placeholder="מספר ח.פ או עוסק מורשה" />
+          <EditSelectRow label="סוג ארגון" value={edit.fields.account_type} onChange={edit.setField("account_type")} options={typeOptions} placeholder="— בחר סוג ארגון —" />
+          <EditSelectRow label="סטטוס ארגון" value={edit.fields.account_status} onChange={edit.setField("account_status")} options={statusOptions} placeholder="— בחר סטטוס ארגון —" />
+          <div className="border-b border-slate-100 py-2">
+            <OrgContactPicker
+              accountId={account.account_id}
+              employerValue={edit.fields.contact_link}
+              onEmployerChange={(id) => edit.setField("contact_link")(id ?? "")}
+            />
+          </div>
+          <div className="border-b border-slate-100 py-2">
+            <CityRegionPicker
+              variant="edit"
+              regionId={edit.fields.region_id ? Number(edit.fields.region_id) : null}
+              cityId={edit.fields.city_id ? Number(edit.fields.city_id) : null}
+              onRegionChange={(regionId) => {
+                edit.setField("region_id")(regionId != null ? String(regionId) : "");
+                edit.setField("city_id")("");
+              }}
+              onCityChange={(cityId) => edit.setField("city_id")(cityId != null ? String(cityId) : "")}
+            />
+          </div>
+          <EditRow label="כתובת" value={edit.fields.address} onChange={edit.setField("address")} />
+          <EditRow label="סוג מרפאה" value={edit.fields.clinic_type} onChange={edit.setField("clinic_type")} />
+          <EditRow label="מספר כיסאות" value={edit.fields.chairs_count} onChange={edit.setField("chairs_count")} ltr type="number" />
+          <EditRow label="גודל צוות" value={edit.fields.team_size} onChange={edit.setField("team_size")} ltr type="number" />
+        </>
+      ) : (
+        <>
+          <LabelValue label="שם הארגון" value={account.account_name} />
+          <LabelValue label="ח.פ / עוסק" value={account.bus_id} ltr />
+          <LabelValue label="סוג ארגון" value={dictName(dicts.accountTypes, account.account_type)} />
+          <LabelValue label="סטטוס ארגון" value={<StatusBadge statusType="account" statusId={account.account_status} label={dictName(dicts.accountStatuses, account.account_status)} />} />
+          <LabelValue label="אזור" value={dictName(dicts.regions, account.region_id)} />
+          <LabelValue label="עיר" value={dictName(dicts.cities, account.city_id)} />
+          <LabelValue label="כתובת" value={account.address} />
+          <LabelValue label="סוג מרפאה" value={account.clinic_type} />
+          <LabelValue label="מספר כיסאות" value={account.chairs_count} />
+          <LabelValue label="גודל צוות" value={account.team_size} />
+        </>
+      )}
     </SectionCard>
   );
 }
 
-function CommunicationDetails({ account }: { account: AccountRow }) {
+function CommunicationDetails({ account, edit }: { account: AccountRow; edit?: EditCtx | null }) {
+  if (edit) {
+    return (
+      <SectionCard title="תקשורת" icon={<Phone className="h-4 w-4" />}>
+        <EditRow label="טלפון ראשי" value={edit.fields.phone} onChange={edit.setField("phone")} ltr />
+        <EditRow label="טלפון נוסף" value={edit.fields.second_phone} onChange={edit.setField("second_phone")} ltr />
+        <EditRow label="אימייל ראשי" value={edit.fields.email} onChange={edit.setField("email")} ltr type="email" />
+        <EditRow label="אימייל נוסף" value={edit.fields.second_email} onChange={edit.setField("second_email")} ltr type="email" />
+        <EditRow label="אימייל לחיוב" value={edit.fields.billing_email} onChange={edit.setField("billing_email")} ltr type="email" />
+        <EditRow label="אתר" value={edit.fields.website_url} onChange={edit.setField("website_url")} ltr />
+        <EditRow label="פייסבוק" value={edit.fields.facebook_url} onChange={edit.setField("facebook_url")} ltr />
+        <LabelValue label="WhatsApp אחרון" value={formatDateTime(account.whatsapp_last_sent)} />
+      </SectionCard>
+    );
+  }
   return (
     <SectionCard title="תקשורת" icon={<Phone className="h-4 w-4" />}>
-      <LabelValue label="טלפון ראשי" value={account.phone} ltr />
-      <LabelValue label="טלפון נוסף" value={account.second_phone} ltr />
+      <LabelValue label="טלפון ראשי" value={account.phone ? formatPhone(account.phone) : "—"} ltr />
+      <LabelValue label="טלפון נוסף" value={account.second_phone ? formatPhone(account.second_phone) : "—"} ltr />
       <LabelValue label="אימייל ראשי" value={account.email} ltr />
       <LabelValue label="אימייל נוסף" value={account.second_email} ltr />
       <LabelValue label="אימייל לחיוב" value={account.billing_email} ltr />
@@ -1497,16 +1381,19 @@ function JobsPanel({ jobs, dicts, isLoading, error, accountId }: { jobs: JobRow[
         />
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[760px] border-separate border-spacing-0 text-sm">
+          <table className="w-full min-w-[1040px] border-separate border-spacing-0 text-sm">
             <thead>
               <tr className="text-slate-500">
                 <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">מספר משרה</th>
                 <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">כותרת</th>
                 <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">תפקיד</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">מיקום</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">היקף</th>
+                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">תת תפקיד</th>
+                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">עיר</th>
+                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">היקף משרה</th>
+                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">תאריך פתיחה</th>
+                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">תאריך פרסום</th>
                 <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">מועמדים</th>
-                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">סטטוס</th>
+                <th className="border-b border-slate-200 px-3 py-2 text-right font-semibold">סטטוס משרה</th>
               </tr>
             </thead>
             <tbody>
@@ -1518,14 +1405,15 @@ function JobsPanel({ jobs, dicts, isLoading, error, accountId }: { jobs: JobRow[
                     </Link>
                   </td>
                   <td className="border-b border-slate-100 px-3 py-3 font-semibold text-slate-900">{job.job_title}</td>
-                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{dictName(dicts.roles, job.job_role, job.job_sub_role ?? "—")}</td>
-                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">
-                    {compactArray([dictName(dicts.cities, job.city_id, ""), dictName(dicts.regions, job.region_id, "")]).join(" · ") || "—"}
-                  </td>
-                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{job.scope || "—"}</td>
+                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{dictName(dicts.roles, job.job_role)}</td>
+                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{idsToNames(job.job_sub_role, dicts.subRoles)}</td>
+                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{dictName(dicts.cities, job.city_id)}</td>
+                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{idsToNames(job.scope, dicts.scopes)}</td>
+                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700" dir="ltr">{formatDate(job.created_time)}</td>
+                  <td className="border-b border-slate-100 px-3 py-3 text-slate-700" dir="ltr">{formatDate(job.last_publish_date)}</td>
                   <td className="border-b border-slate-100 px-3 py-3 font-semibold text-slate-900">{job.total_applicants ?? 0}</td>
                   <td className="border-b border-slate-100 px-3 py-3">
-                    <StatusBadge label={dictName(dicts.jobStatuses, job.job_status)} id={job.job_status} />
+                    <StatusBadge statusType="job" statusId={Number(job.job_status)} label={dictName(dicts.jobStatuses, job.job_status)} />
                   </td>
                 </tr>
               ))}
@@ -1596,8 +1484,8 @@ function ContactsPanel({ contacts, jobs, dicts, isLoading, error }: { contacts: 
               {contact.email}
             </a>
           ) : null}
-          {whatsappUrl(contact.phone) ? (
-            <a href={whatsappUrl(contact.phone) ?? "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
+          {whatsappLink(contact.phone) ? (
+            <a href={whatsappLink(contact.phone) || "#"} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
               <MessageCircle className="h-3.5 w-3.5" />
               WhatsApp
             </a>
@@ -1726,10 +1614,10 @@ function ApplicationsPanel({
                   <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{application.job_role || application.master_role || "—"}</td>
                   <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{formatDate(application.submission_date)}</td>
                   <td className="border-b border-slate-100 px-3 py-3">
-                    <StatusBadge label={dictName(dicts.applicationStatuses, application.application_status, application.status_in_master ?? "—")} id={application.application_status} />
+                    <StatusBadge statusType="application" statusId={application.application_status} label={dictName(dicts.applicationStatuses, application.application_status, application.status_in_master ?? "—")} />
                   </td>
                   <td className="border-b border-slate-100 px-3 py-3">
-                    <StatusBadge label={dictName(dicts.checkStatuses, application.check_status)} id={application.check_status} />
+                    <StatusBadge statusType="check" statusId={application.check_status} label={dictName(dicts.checkStatuses, application.check_status)} />
                   </td>
                 </tr>
               ))}
@@ -1741,17 +1629,27 @@ function ApplicationsPanel({
   );
 }
 
-function CrmPanel({ account, onEdit }: { account: AccountRow; onEdit: (section: EditSection) => void }) {
+function CrmPanel({ account, edit }: { account: AccountRow; edit?: EditCtx | null }) {
+  if (edit) {
+    return (
+      <SectionCard title="CRM ומעקב" icon={<Clock3 className="h-4 w-4" />}>
+        <EditRow label="תאריך קשר אחרון" value={edit.fields.last_contact_date} onChange={edit.setField("last_contact_date")} ltr type="date" />
+        <EditRow label="פולואפ הבא" value={edit.fields.next_follow_up} onChange={edit.setField("next_follow_up")} ltr type="date" />
+        <div className="mt-4">
+          <label className="mb-1 block text-[13px] text-slate-500">הערות CRM</label>
+          <textarea
+            className="min-h-[120px] w-full resize-y rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 focus:border-[#008080] focus:outline-none focus:ring-1 focus:ring-[#008080]"
+            value={edit.fields.notes}
+            onChange={(e) => edit.setField("notes")(e.target.value)}
+          />
+        </div>
+      </SectionCard>
+    );
+  }
   return (
     <SectionCard
       title="CRM ומעקב"
       icon={<Clock3 className="h-4 w-4" />}
-      action={
-        <Button variant="outline" size="sm" className="rounded-xl" onClick={() => onEdit("crm")}>
-          <Edit2 className="h-4 w-4" />
-          עדכון CRM
-        </Button>
-      }
     >
       <div className="grid gap-4 md:grid-cols-3">
         <div className="rounded-2xl bg-slate-50 p-4">
@@ -1854,7 +1752,7 @@ function AdditionalDataPanel({ account }: { account: AccountRow }) {
 }
 
 function buildRecommendedActions(account: AccountRow, jobs: JobRow[], contacts: ContactRow[], applications: ApplicationRow[], dicts: DictBundle): RecommendedAction[] {
-  const activeJobs = jobs.filter((job) => isActiveJob(job, dicts));
+  const activeJobs = jobs.filter((job) => isActiveJob(job));
   const jobCodesWithApplications = new Set(applications.map((application) => application.job_code).filter(Boolean));
   const jobsWithoutApplicants = activeJobs.filter((job) => !jobCodesWithApplications.has(job.job_code));
   const actions: RecommendedAction[] = [];
@@ -1901,8 +1799,8 @@ function buildRecommendedActions(account: AccountRow, jobs: JobRow[], contacts: 
       icon: <Clock3 className="h-4 w-4" />,
       title: "פולואפ באיחור",
       description: `הפולואפ הבא נקבע ל-${formatDate(account.next_follow_up)}.`,
-      href: whatsappUrl(account.phone) ?? undefined,
-      label: whatsappUrl(account.phone) ? "שליחת WhatsApp" : "עדכון פולואפ",
+      href: whatsappLink(account.phone) || undefined,
+      label: whatsappLink(account.phone) ? "שליחת WhatsApp" : "עדכון פולואפ",
       severity: "error",
     });
   }
@@ -1919,8 +1817,11 @@ export default function Employer360Page() {
   const contactsRef = useRef<HTMLDivElement>(null);
   const copyTimeoutRef = useRef<number | null>(null);
   const [copied, setCopied] = useState(false);
-  const [editOpen, setEditOpen] = useState(false);
-  const [editSection, setEditSection] = useState<EditSection>("general");
+  const [editMode, setEditMode] = useState(false);
+  const [fields, setFields] = useState<EditFields | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [tab, setTab] = useState<string>("overview");
+  const { updateAccount } = useAccountMutations();
 
   const previewMode = searchParams.get("preview") === "1" || params.id === "preview" || params.accountId === "preview" || params.employerId === "preview";
   const accountId = useMemo(() => asNumber(params.accountId ?? params.id ?? params.employerId), [params.accountId, params.employerId, params.id]);
@@ -1933,12 +1834,12 @@ export default function Employer360Page() {
   const jobCodes = useMemo(() => (jobsQuery.data ?? []).map((job) => job.job_code).filter(Boolean), [jobsQuery.data]);
   const applicationsQuery = useAccountApplications(jobCodes, previewMode);
 
-  const handleEdit = useCallback((section: EditSection = "general") => {
-    setEditSection(section);
-    setEditOpen(true);
-  }, []);
-
-  const handleEditSaved = useCallback(() => {}, []);
+  const setField = useCallback(
+    (key: keyof EditFields) => (value: string) => {
+      setFields((prev) => (prev ? { ...prev, [key]: value } : prev));
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!accountId || previewMode) return;
@@ -2002,7 +1903,7 @@ export default function Employer360Page() {
   const contacts = contactsQuery.data ?? [];
   const applications = applicationsQuery.data ?? [];
 
-  const activeJobs = useMemo(() => jobs.filter((job) => isActiveJob(job, dicts)), [dicts, jobs]);
+  const activeJobs = useMemo(() => jobs.filter((job) => isActiveJob(job)), [dicts, jobs]);
   const completion = useMemo(() => (account ? computeAccountCompletion(account) : 0), [account]);
 
   const location = useMemo(() => {
@@ -2014,6 +1915,36 @@ export default function Employer360Page() {
     () => (account ? buildRecommendedActions(account, jobs, contacts, applications, dicts) : []),
     [account, applications, contacts, dicts, jobs],
   );
+
+  const startEdit = useCallback(() => {
+    if (account) setFields(buildEditFields(account));
+    setEditMode(true);
+    setTab("details");
+  }, [account]);
+
+  const cancelEdit = useCallback(() => {
+    if (account) setFields(buildEditFields(account));
+    setEditMode(false);
+  }, [account]);
+
+  const saveEdit = useCallback(async () => {
+    if (!account || !fields) return;
+    setSaving(true);
+    try {
+      const { error } = await updateAccount(account.account_id, editFieldsToUpdates(fields, account));
+      if (error) throw error;
+      // רענון כרטסת ה-360 (invalidation של כל שאילתות employer360 בתחילית) — כך העריכה משתקפת מיד
+      await queryClient.invalidateQueries({ queryKey: ["employer360"] });
+      toast.success("הארגון עודכן בהצלחה");
+      setEditMode(false);
+    } catch (err) {
+      toast.error("שגיאה בשמירה: " + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setSaving(false);
+    }
+  }, [account, fields, updateAccount, queryClient]);
+
+  const editCtx: EditCtx | null = editMode && fields ? { fields, setField } : null;
 
   if (!previewMode && !accountId) {
     return (
@@ -2108,24 +2039,38 @@ export default function Employer360Page() {
           overdueFollowUp={isPast(account.next_follow_up)}
           onCopy={handleCopy}
           onScrollToContacts={scrollToContacts}
-          onEdit={handleEdit}
+          onEdit={startEdit}
+          editing={editMode}
         />
+
+        {editMode ? (
+          <div className="sticky top-2 z-40 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#008080]/30 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+            <span className="text-sm font-semibold text-slate-700">מצב עריכה — כל הפרטים בכרטסת ניתנים לעריכה בלשוניות "פרטים ומנהלה" ו-"CRM ו-DNA"</span>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={cancelEdit} disabled={saving} className="rounded-xl">
+                <X className="h-4 w-4" />
+                ביטול
+              </Button>
+              <Button onClick={saveEdit} disabled={saving} className="rounded-xl bg-[#008080] text-white hover:bg-[#006B6B]">
+                <Save className="h-4 w-4" />
+                {saving ? "שומר..." : "שמירה"}
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         <KpiStrip account={account} jobs={jobs} applications={applications} dicts={dicts} />
 
-        <Tabs defaultValue="overview" dir="rtl" className="space-y-4">
-          <TabsList className="grid h-auto grid-cols-2 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200 md:grid-cols-4">
+        <Tabs value={tab} onValueChange={setTab} dir="rtl" className="space-y-4">
+          <TabsList className="grid h-auto grid-cols-3 rounded-2xl bg-white p-1 shadow-sm ring-1 ring-slate-200">
             <TabsTrigger value="overview" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
-              תפעולי
+              סקירה
+            </TabsTrigger>
+            <TabsTrigger value="details" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
+              פרטים ומנהלה
             </TabsTrigger>
             <TabsTrigger value="crm" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
-              CRM
-            </TabsTrigger>
-            <TabsTrigger value="dna" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
-              DNA מקצועי
-            </TabsTrigger>
-            <TabsTrigger value="admin" className="rounded-xl data-[state=active]:bg-[#008080] data-[state=active]:text-white">
-              מנהלה
+              CRM ו-DNA
             </TabsTrigger>
           </TabsList>
 
@@ -2144,38 +2089,21 @@ export default function Employer360Page() {
             </div>
           </TabsContent>
 
-          <TabsContent value="crm" className="mt-0 space-y-4">
-            <div className="grid gap-4 xl:grid-cols-3">
-              <div className="xl:col-span-2">
-                <CrmPanel account={account} onEdit={handleEdit} />
-              </div>
-              <RecommendedActionsPanel actions={recommendedActions} />
-            </div>
-          </TabsContent>
-
-          <TabsContent value="dna" className="mt-0">
-            <ProfessionalDnaPanel account={account} jobs={jobs} dicts={dicts} />
-          </TabsContent>
-
-          <TabsContent value="admin" className="mt-0 grid gap-4 xl:grid-cols-2">
-            <OrganizationDetails account={account} dicts={dicts} onCopy={handleCopy} />
-            <CommunicationDetails account={account} />
+          <TabsContent value="details" className="mt-0 grid gap-4 xl:grid-cols-2">
+            <OrganizationDetails account={account} dicts={dicts} onCopy={handleCopy} edit={editCtx} />
+            <CommunicationDetails account={account} edit={editCtx} />
             <LinkContactToAccountPanel accountId={account.account_id} />
             <BillingAdminPanel account={account} />
           </TabsContent>
 
+          <TabsContent value="crm" className="mt-0 space-y-4">
+            <div className="grid gap-4 xl:grid-cols-2">
+              <CrmPanel account={account} edit={editCtx} />
+              <ProfessionalDnaPanel account={account} jobs={jobs} dicts={dicts} />
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
-
-      {/* Inline edit sheet */}
-      <AccountEditSheet
-        open={editOpen}
-        section={editSection}
-        account={account}
-        dicts={dicts}
-        onClose={() => setEditOpen(false)}
-        onSaved={handleEditSaved}
-      />
     </main>
   );
 }

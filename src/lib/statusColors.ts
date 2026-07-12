@@ -17,17 +17,39 @@ export const applicationStatusColors: Record<number, { bg: string; text: string;
   15: { bg: 'bg-sky-100', text: 'text-sky-800', label: 'הושמה' },
 }
 
-// סטטוסי משרה (job_status)
+// סטטוסי משרה (job_status) — SSOT יחיד לכל המסכים.
+// תוויות מיושרות למילון החי dict_job_statuses (7 = "סגורה־אחר", לא "פורסמה").
+// פלטה בהירה/עדינה שאושרה (2026-07-12): פעילה=ירוק בהיר, מאוישת+סגורה־הצלחה=סגול בהיר,
+// חדש=צהוב, טיוטה=אפור, מושהה+סגורה־אחר+בוטלה+ארכיון=אדום. שינוי צבע כאן = משתנה בכל המערכת.
 export const jobStatusColors: Record<number, { bg: string; text: string; label: string }> = {
-  1: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'טיוטה' },
-  2: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'ממתינה לאישור' },
-  3: { bg: 'bg-green-100', text: 'text-green-800', label: 'פעילה' },
-  4: { bg: 'bg-cyan-100', text: 'text-cyan-800', label: 'הקפאה' },
-  5: { bg: 'bg-red-100', text: 'text-red-800', label: 'סגורה' },
-  6: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'אוישה' },
-  7: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'פורסמה' },
-  8: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'בוטלה' },
-  9: { bg: 'bg-slate-100', text: 'text-slate-800', label: 'ארכיון' },
+  1: { bg: 'bg-yellow-50', text: 'text-yellow-700', label: 'חדש' },
+  2: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'טיוטה' },
+  3: { bg: 'bg-green-50', text: 'text-green-700', label: 'פעילה' },
+  4: { bg: 'bg-red-50', text: 'text-red-700', label: 'מושהה' },
+  5: { bg: 'bg-purple-50', text: 'text-purple-700', label: 'מאוישת' },
+  6: { bg: 'bg-purple-50', text: 'text-purple-700', label: 'סגורה־הצלחה' },
+  7: { bg: 'bg-red-50', text: 'text-red-700', label: 'סגורה־אחר' },
+  8: { bg: 'bg-red-50', text: 'text-red-700', label: 'בוטלה' },
+  9: { bg: 'bg-red-50', text: 'text-red-700', label: 'ארכיון' },
+}
+
+// מחלקות ל-<select> עריכת סטטוס משרה (border+focus) — נגזרות מאותה פלטה בהירה,
+// כדי שה-select הנערך (AdminJobsPage) יהיה זהה בצבע ל-badge. SSOT יחיד.
+const jobStatusSelectClasses: Record<number, string> = {
+  1: 'border-yellow-200 bg-yellow-50 text-yellow-700 focus:ring-2 focus:ring-yellow-100',
+  2: 'border-gray-200 bg-gray-100 text-gray-600 focus:ring-2 focus:ring-gray-100',
+  3: 'border-green-200 bg-green-50 text-green-700 focus:ring-2 focus:ring-green-100',
+  4: 'border-red-200 bg-red-50 text-red-700 focus:ring-2 focus:ring-red-100',
+  5: 'border-purple-200 bg-purple-50 text-purple-700 focus:ring-2 focus:ring-purple-100',
+  6: 'border-purple-200 bg-purple-50 text-purple-700 focus:ring-2 focus:ring-purple-100',
+  7: 'border-red-200 bg-red-50 text-red-700 focus:ring-2 focus:ring-red-100',
+  8: 'border-red-200 bg-red-50 text-red-700 focus:ring-2 focus:ring-red-100',
+  9: 'border-red-200 bg-red-50 text-red-700 focus:ring-2 focus:ring-red-100',
+}
+
+export function getJobStatusSelectClass(statusId: number | null | undefined): string {
+  const id = statusId != null ? Number(statusId) : NaN
+  return jobStatusSelectClasses[id] ?? 'border-gray-200 bg-white text-gray-600 focus:ring-2 focus:ring-gray-100'
 }
 
 // סטטוסי ארגון (account_status) — צבעים בלבד; ה-Label מגיע מהמילון החי
