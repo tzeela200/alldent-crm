@@ -13,6 +13,7 @@ import { RegionBadge } from '@/components/admin/RegionBadge'
 import { formatPhone, phoneSearchTerm, phoneDigits } from '@/lib/normalizePhone'
 import { useAccountMutations } from '@/hooks/useAccountMutations'
 import { AccountPanel } from '@/components/admin/AccountPanel'
+import { MergeRecordsModal } from '@/components/MergeRecordsModal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 interface AccountRow {
@@ -96,7 +97,7 @@ function loadAll<T>(table: string, columns: string, orderCol: string) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function AdminAccountsPage() {
   const navigate = useNavigate()
-  const { updateAccount, insertAccount } = useAccountMutations()
+  const { updateAccount, insertAccount, bulkUpdateAccounts, mergeAccountsRpc } = useAccountMutations()
 
   // ─ Data (shared query keys → invalidated by useAccountMutations/useContactMutations) ─
   const { data: accounts = [], isLoading, error } = useQuery<AccountRow[]>({
@@ -312,6 +313,52 @@ export default function AdminAccountsPage() {
   const openView = (a: EnrichedAccount) => setSheet({ open: true, accountId: a.account_id, mode: 'view' })
   const closePanel = () => setSheet({ open: false, accountId: null, mode: 'view' })
 
+  // ─ בחירת שורות + פעולות גורפות + מיזוג (שוחזר) ─
+  const [toast, setToast] = useState<{ text: string; tone: 'success' | 'error' } | null>(null)
+  const showToast = (text: string, tone: 'success' | 'error' = 'success') => { setToast({ text, tone }); window.setTimeout(() => setToast(null), 2800) }
+
+  const [selectedRows, setSelectedRows] = useState<number[]>([])
+  const [bulkField, setBulkField] = useState('')
+  const [bulkValue, setBulkValue] = useState('')
+  const [mergeOpen, setMergeOpen] = useState(false)
+  const [mergePending, setMergePending] = useState(false)
+
+  const nameFrom = (list: DictItem[], id: number | null | undefined) => list.find((x) => Number(x.id) === Number(id))?.name ?? '—'
+  const pageIds = pageData.map((r) => Number(r.account_id))
+  const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedRows.includes(id))
+  const someSelected = pageIds.some((id) => selectedRows.includes(id))
+  const toggleRow = (id: number) => setSelectedRows((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+  const toggleSelectAll = () => setSelectedRows((prev) => allSelected ? prev.filter((id) => !pageIds.includes(id)) : Array.from(new Set([...prev, ...pageIds])))
+
+  const bulkValueOptions: DictItem[] = bulkField === 'account_status' ? accountStatuses
+    : bulkField === 'account_type' ? accountTypes
+    : bulkField === 'region_id' ? regions
+    : bulkField === 'city_id' ? cities
+    : []
+
+  const applyBulkUpdate = async () => {
+    if (!selectedRows.length) { showToast('לא נבחרו רשומות', 'error'); return }
+    if (!bulkField || !bulkValue) { showToast('בחרי שדה וערך', 'error'); return }
+    const patch = { [bulkField]: Number(bulkValue) }
+    try {
+      const { error: err } = await bulkUpdateAccounts(selectedRows, patch)
+      if (err) throw err
+      setBulkField(''); setBulkValue(''); setSelectedRows([])
+      showToast(`עודכנו ${selectedRows.length} רשומות`)
+    } catch { showToast('שגיאה בעדכון הגורף', 'error') }
+  }
+
+  const handleMergeAccounts = async (masterId: number, overrides: Record<string, unknown>) => {
+    const dupIds = selectedRows.filter((id) => id !== masterId)
+    setMergePending(true)
+    try {
+      const { error: err } = await mergeAccountsRpc({ master_id: masterId, dup_ids: dupIds, overrides })
+      if (err) throw err
+      showToast('הארגונים מוזגו בהצלחה')
+      setMergeOpen(false); setSelectedRows([])
+    } catch { showToast('שגיאה במיזוג הארגונים', 'error') } finally { setMergePending(false) }
+  }
+
   // ─ Columns ─
   const columns: AdminColumn<EnrichedAccount>[] = [
     { key: 'account_name', label: 'שם ארגון', sortable: true, render: (r) => (
@@ -422,6 +469,31 @@ export default function AdminAccountsPage() {
         sortDir={sortDir}
         onSort={toggleSort}
         minWidth="1000px"
+        selectedIds={selectedRows.map(String)}
+        onSelectId={(id) => toggleRow(Number(id))}
+        allSelected={allSelected}
+        someSelected={someSelected}
+        onSelectAll={toggleSelectAll}
+        bulkActions={
+          <div className="flex flex-wrap items-center gap-2">
+            <select value={bulkField} onChange={(e) => { setBulkField(e.target.value); setBulkValue('') }} className="rounded-lg border border-[#D9D9D9] bg-white px-2 py-1 text-[13px]">
+              <option value="">שדה לעדכון גורף</option>
+              <option value="account_status">סטטוס ארגון</option>
+              <option value="account_type">סוג ארגון</option>
+              <option value="region_id">אזור</option>
+              <option value="city_id">עיר</option>
+            </select>
+            <select value={bulkValue} onChange={(e) => setBulkValue(e.target.value)} disabled={!bulkField} className="rounded-lg border border-[#D9D9D9] bg-white px-2 py-1 text-[13px] disabled:opacity-50">
+              <option value="">ערך חדש</option>
+              {bulkValueOptions.map((o) => <option key={o.id} value={String(o.id)}>{o.name}</option>)}
+            </select>
+            <button onClick={applyBulkUpdate} className="rounded-lg bg-[#008080] px-3 py-1 text-[13px] font-bold text-white hover:bg-[#006D6D]">בצע שינוי גורף</button>
+            {selectedRows.length >= 2 && (
+              <button onClick={() => setMergeOpen(true)} className="rounded-lg border border-[#D97706] px-3 py-1 text-[13px] font-bold text-[#D97706] hover:bg-[#FFFBEB]">🔀 מיזוג רשומות</button>
+            )}
+            <button onClick={() => setSelectedRows([])} className="rounded-lg border border-[#D9D9D9] px-3 py-1 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">נקה בחירה</button>
+          </div>
+        }
         pagination={<AdminTablePagination page={page} pageSize={PAGE_SIZE} total={total} onPageChange={setPage} />}
       />
 
@@ -436,6 +508,42 @@ export default function AdminAccountsPage() {
           dicts={{ accountTypes, accountStatuses, profileTypesMap, rolesMap }}
           save={async (patch, id) => (id ? updateAccount(id, patch) : insertAccount(patch))}
         />
+      )}
+
+      {/* מיזוג ארגונים */}
+      {mergeOpen && selectedRows.length >= 2 && (() => {
+        const selectedAccounts = selectedRows
+          .map((id) => pageData.find((a) => Number(a.account_id) === id))
+          .filter(Boolean) as EnrichedAccount[]
+        if (selectedAccounts.length < 2) return null
+        return (
+          <MergeRecordsModal
+            records={selectedAccounts as unknown as Record<string, unknown>[]}
+            idField="account_id"
+            nameField="account_name"
+            displayFields={[
+              { key: 'account_name' as never, label: 'שם ארגון' },
+              { key: 'phone' as never, label: 'טלפון' },
+              { key: 'email' as never, label: 'מייל' },
+              { key: 'address' as never, label: 'כתובת' },
+              { key: 'account_status' as never, label: 'סטטוס', format: (v) => nameFrom(accountStatuses, v as number) },
+              { key: 'account_type' as never, label: 'סוג', format: (v) => nameFrom(accountTypes, v as number) },
+              { key: 'region_id' as never, label: 'אזור', format: (v) => nameFrom(regions, v as number) },
+              { key: 'city_id' as never, label: 'עיר', format: (v) => nameFrom(cities, v as number) },
+              { key: 'notes' as never, label: 'הערות' },
+            ]}
+            onConfirm={handleMergeAccounts}
+            onClose={() => setMergeOpen(false)}
+            pending={mergePending}
+            title="מיזוג ארגונים"
+          />
+        )
+      })()}
+
+      {toast && (
+        <div className={`fixed bottom-4 left-4 z-[60] rounded-2xl border px-4 py-3 text-[13px] font-semibold shadow-md ${toast.tone === 'success' ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534]' : 'border-[#FECACA] bg-[#FEF2F2] text-[#991B1B]'}`}>
+          {toast.text}
+        </div>
       )}
     </div>
   )
