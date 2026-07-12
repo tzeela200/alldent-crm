@@ -37,7 +37,13 @@ export default function PublicLayout() {
         <Outlet />
       </main>
 
-      <SiteFooter />
+      {isJobDetailsPage ? (
+        <div className="hidden md:block">
+          <SiteFooter />
+        </div>
+      ) : (
+        <SiteFooter />
+      )}
 
       <SocialShare elevatedOnMobile={isJobDetailsPage} />
     </div>
