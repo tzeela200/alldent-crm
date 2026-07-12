@@ -129,8 +129,8 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
 
     setSaving(true)
     try {
-      // TODO: master_availability/master_role/master_city/master_region נשמרים כ-ID בתוך string.
-      // לא לשנות DB כאן; אם מציגים אותם, להציג label לפי מילון ולא ID.
+      // הערה: master_role/master_city/master_region נשמרים כ-ID בתוך string.
+      // master_availability הוסר — העמודה לא קיימת ב-applications (מקור האמת: candidate_availability_ids).
       const id = await createApplication.mutateAsync({
         submission_date: submissionDate
           ? new Date(submissionDate).toISOString()
@@ -153,10 +153,6 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
         candidate_notes: candidateNotes || null,
         check_status: checkStatus !== '' ? Number(checkStatus) : null,
         application_status: appStatus,
-        master_availability:
-          selectedContact.candidate_availability_ids?.[0] != null
-            ? String(selectedContact.candidate_availability_ids[0])
-            : '',
         master_role: String(selectedContact.role ?? ''),
         master_city: String(selectedContact.city_id ?? ''),
         master_region: String(selectedContact.region_id ?? ''),

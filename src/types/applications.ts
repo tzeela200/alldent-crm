@@ -17,7 +17,6 @@ export interface ApplicationRow {
   candidate_notes: string | null
   check_status: number | null
   application_status: number | null
-  master_availability: string | null
   master_role: string | null
   master_city: string | null
   master_region: string | null

@@ -155,9 +155,7 @@ type ContactRow = {
 
 type ApplicationRow = {
   application_id: number;
-  record_name: string | null;
   submission_date: string | null;
-  display_date: string | null;
   form_title: string | null;
   job_code: string | null;
   job_link: string | null;
@@ -171,11 +169,8 @@ type ApplicationRow = {
   cv_link: string | null;
   candidate_link: number | null;
   candidate_notes: string | null;
-  status_in_master: string | null;
   check_status: number | null;
-  job_status_view: string | null;
   application_status: number | null;
-  master_availability: string | null;
   master_role: string | null;
   master_city: string | null;
   master_region: string | null;
@@ -211,17 +206,8 @@ type RecommendedAction = {
 
 // ─── Select strings ───────────────────────────────────────────────────────────
 
-const ACCOUNT_SELECT =
-  "account_id, account_name, bus_id, account_status, account_type, phone, second_phone, email, second_email, billing_email, website_url, facebook_url, region_id, city_id, address, contact_link, notes, active_job_count_auto, total_jobs_count, rel_role, all_applicants_names, last_contact_date, next_follow_up, whatsapp_last_sent, created_timestamp, updated_timestamp, clinic_type, chairs_count, specialties, team_size, hiring_roles, extended_data, systems_used";
-
-const JOB_SELECT =
-  "job_code, account_link, job_status, job_title, job_role, job_sub_role, scope, required_experience, required_languages, region_id, city_id, address, job_description, job_requirements, job_url, rel_employer_contact, rel_recruiter_contact, total_applicants, date_facebook, date_website, date_whatsapp, last_publish_date, notes, created_time, updated_timestamp";
-
-const CONTACT_SELECT =
-  "contact_id, phone, phone_norm, display_name, first_name, last_name, full_name, email, second_phone, second_email, role, sub_role, candidate_availability_ids, experience, preferred_scope, languages, region_id, city_id, cv_link, has_cv, account_link, profile_type, source, check_status, social_status, facebook_url, facebook_name, facebook_id, last_contact_date, next_follow_up, prev_applications_count, notes, created_timestamp, updated_timestamp, professional_title, current_employer";
-
-const APPLICATION_SELECT =
-  "application_id, record_name, submission_date, display_date, form_title, job_code, job_link, account_name, job_role, job_city, job_region, candidate_phone, candidate_name, candidate_email, cv_link, candidate_link, candidate_notes, status_in_master, check_status, job_status_view, application_status, master_availability, master_role, master_city, master_region, internal_notes, created_timestamp, updated_timestamp, phone_norm";
+// שליפות המסך משתמשות ב-select('*') (כמו useApplications/useJobs) — חסינות לדריפט סכמה.
+// אין לפרט רשימות עמודות: כל דריפט (עמודה שנמחקה/שונה) גרם 400 חוזר (salary_range/availability/applications).
 
 // ─── Preview mock data ────────────────────────────────────────────────────────
 
@@ -335,9 +321,7 @@ const PREVIEW_CONTACTS: ContactRow[] = [
 const PREVIEW_APPLICATIONS: ApplicationRow[] = [
   {
     application_id: 1,
-    record_name: "MOCK_APP_001",
     submission_date: "2026-05-23T19:16:53.879744+00:00",
-    display_date: null,
     form_title: null,
     job_code: "MOCK_JOB_001",
     job_link: null,
@@ -351,11 +335,8 @@ const PREVIEW_APPLICATIONS: ApplicationRow[] = [
     cv_link: null,
     candidate_link: 1,
     candidate_notes: null,
-    status_in_master: null,
     check_status: 3,
-    job_status_view: null,
     application_status: 1,
-    master_availability: null,
     master_role: null,
     master_city: null,
     master_region: null,
@@ -379,42 +360,6 @@ const PREVIEW_DICTS: DictBundle = {
   scopes: new Map([[1, "משרה מלאה"]]),
   subRoles: new Map(),
 };
-
-const ACCOUNT_FIELD_KEYS: Array<keyof AccountRow> = [
-  "account_id",
-  "account_name",
-  "bus_id",
-  "account_status",
-  "account_type",
-  "phone",
-  "second_phone",
-  "email",
-  "second_email",
-  "billing_email",
-  "website_url",
-  "facebook_url",
-  "region_id",
-  "city_id",
-  "address",
-  "contact_link",
-  "notes",
-  "active_job_count_auto",
-  "total_jobs_count",
-  "rel_role",
-  "all_applicants_names",
-  "last_contact_date",
-  "next_follow_up",
-  "whatsapp_last_sent",
-  "created_timestamp",
-  "updated_timestamp",
-  "clinic_type",
-  "chairs_count",
-  "specialties",
-  "team_size",
-  "hiring_roles",
-  "extended_data",
-  "systems_used",
-];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -546,22 +491,6 @@ export function computeAccountCompletion(account: AccountRow): number {
 
 function compactArray(values: Array<string | null | undefined>): string[] {
   return values.map((value) => String(value ?? "").trim()).filter(Boolean);
-}
-
-function fieldValue(value: unknown): React.ReactNode {
-  if (value === null || value === undefined || value === "") return "—";
-  if (Array.isArray(value)) return value.length ? value.join(", ") : "—";
-  if (typeof value === "object") {
-    const json = JSON.stringify(value, null, 2);
-    return json === "{}" || json === "[]" ? (
-      "—"
-    ) : (
-      <pre className="max-h-72 overflow-auto rounded-xl bg-slate-50 p-3 text-left text-xs text-slate-700 ring-1 ring-slate-200" dir="ltr">
-        {json}
-      </pre>
-    );
-  }
-  return String(value);
 }
 
 // ─── UI Primitives ────────────────────────────────────────────────────────────
@@ -744,7 +673,7 @@ function useAccountQuery(accountId: number | null, previewMode: boolean) {
       if (previewMode) return PREVIEW_ACCOUNT;
       if (!accountId) return null;
 
-      const { data, error } = await supabase.from("accounts").select(ACCOUNT_SELECT).eq("account_id", accountId).maybeSingle();
+      const { data, error } = await supabase.from("accounts").select("*").eq("account_id", accountId).maybeSingle();
 
       if (error) throw error;
       return data as unknown as AccountRow | null;
@@ -762,7 +691,7 @@ function useAccountJobs(accountId: number | null, previewMode: boolean) {
 
       const { data, error } = await supabase
         .from("job")
-        .select(JOB_SELECT)
+        .select("*")
         .eq("account_link", accountId)
         .order("created_time", { ascending: false });
 
@@ -782,7 +711,7 @@ function useAccountContacts(accountId: number | null, previewMode: boolean) {
 
       const { data, error } = await supabase
         .from("contact")
-        .select(CONTACT_SELECT)
+        .select("*")
         .eq("account_link", accountId)
         .order("updated_timestamp", { ascending: false });
 
@@ -802,7 +731,7 @@ function useAccountApplications(jobCodes: string[], previewMode: boolean) {
 
       const { data, error } = await supabase
         .from("applications")
-        .select(APPLICATION_SELECT)
+        .select("*")
         .in("job_code", jobCodes)
         .order("submission_date", { ascending: false });
 
@@ -837,7 +766,17 @@ type EditFields = {
   notes: string;
   last_contact_date: string;
   next_follow_up: string;
+  specialties: string; // text[] — נשמר כמחרוזת מופרדת-פסיקים בעריכה
+  hiring_roles: string; // text[] — מחרוזת מופרדת-פסיקים
+  rel_role: string;
+  systems_used: number[]; // int8[] — multi-select מ-dict_systems
 };
+
+// פיצול קלט מופרד-פסיקים ל-text[] (null אם ריק)
+function splitCsv(value: string): string[] | null {
+  const arr = value.split(",").map((s) => s.trim()).filter(Boolean);
+  return arr.length ? arr : null;
+}
 
 // אתחול שדות עריכה מרשומת הארגון
 function buildEditFields(a: AccountRow): EditFields {
@@ -863,6 +802,10 @@ function buildEditFields(a: AccountRow): EditFields {
     notes: a.notes ?? "",
     last_contact_date: a.last_contact_date ? a.last_contact_date.slice(0, 10) : "",
     next_follow_up: a.next_follow_up ? a.next_follow_up.slice(0, 10) : "",
+    specialties: (a.specialties ?? []).join(", "),
+    hiring_roles: (a.hiring_roles ?? []).join(", "),
+    rel_role: a.rel_role ?? "",
+    systems_used: a.systems_used ?? [],
   };
 }
 
@@ -890,6 +833,10 @@ function editFieldsToUpdates(fields: EditFields, account: AccountRow): Record<st
     notes: fields.notes.trim() || null,
     last_contact_date: fields.last_contact_date || null,
     next_follow_up: fields.next_follow_up || null,
+    specialties: splitCsv(fields.specialties),
+    hiring_roles: splitCsv(fields.hiring_roles),
+    rel_role: fields.rel_role.trim() || null,
+    systems_used: fields.systems_used.length ? fields.systems_used : null,
   };
 }
 
@@ -897,6 +844,7 @@ function editFieldsToUpdates(fields: EditFields, account: AccountRow): Record<st
 type EditCtx = {
   fields: EditFields;
   setField: (key: keyof EditFields) => (value: string) => void;
+  setSystems: (ids: number[]) => void;
 };
 
 const EDIT_INPUT_CLASS =
@@ -929,6 +877,45 @@ function EditRow({
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
       />
+    </div>
+  );
+}
+
+// בחירה מרובה (צ'יפים) לעריכה inline — לשדות מערך מבוססי-מילון (systems_used)
+function EditChipsMultiSelect({
+  label,
+  selected,
+  options,
+  onChange,
+}: {
+  label: string;
+  selected: number[];
+  options: Array<{ id: number; name: string }>;
+  onChange: (ids: number[]) => void;
+}) {
+  const toggle = (id: number) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  return (
+    <div className="border-b border-slate-100 py-2 last:border-b-0">
+      <div className="mb-2 text-[13px] text-slate-500">{label}</div>
+      <div className="flex flex-wrap gap-1.5">
+        {options.length === 0 ? (
+          <span className="text-sm text-slate-400">—</span>
+        ) : (
+          options.map((o) => {
+            const on = selected.includes(o.id);
+            return (
+              <button
+                key={o.id}
+                type="button"
+                onClick={() => toggle(o.id)}
+                className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition ${on ? "border-[#008080] bg-[#E6F3F3] text-[#006D6D]" : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50"}`}
+              >
+                {o.name}
+              </button>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
@@ -1475,7 +1462,7 @@ function ContactsPanel({ contacts, jobs, dicts, isLoading, error }: { contacts: 
           {contact.phone ? (
             <a href={`tel:${contact.phone}`} className="inline-flex items-center gap-1 rounded-lg bg-slate-50 px-2 py-1 hover:text-[#008080]">
               <Phone className="h-3.5 w-3.5" />
-              {contact.phone}
+              {formatPhone(contact.phone)}
             </a>
           ) : null}
           {contact.email ? (
@@ -1614,7 +1601,7 @@ function ApplicationsPanel({
                   <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{application.job_role || application.master_role || "—"}</td>
                   <td className="border-b border-slate-100 px-3 py-3 text-slate-700">{formatDate(application.submission_date)}</td>
                   <td className="border-b border-slate-100 px-3 py-3">
-                    <StatusBadge statusType="application" statusId={application.application_status} label={dictName(dicts.applicationStatuses, application.application_status, application.status_in_master ?? "—")} />
+                    <StatusBadge statusType="application" statusId={application.application_status} label={dictName(dicts.applicationStatuses, application.application_status)} />
                   </td>
                   <td className="border-b border-slate-100 px-3 py-3">
                     <StatusBadge statusType="check" statusId={application.check_status} label={dictName(dicts.checkStatuses, application.check_status)} />
@@ -1673,7 +1660,7 @@ function CrmPanel({ account, edit }: { account: AccountRow; edit?: EditCtx | nul
   );
 }
 
-function ProfessionalDnaPanel({ account, jobs, dicts }: { account: AccountRow; jobs: JobRow[]; dicts: DictBundle }) {
+function ProfessionalDnaPanel({ account, jobs, dicts, edit }: { account: AccountRow; jobs: JobRow[]; dicts: DictBundle; edit?: EditCtx | null }) {
   const roleFrequency = useMemo(() => {
     const map = new Map<string, number>();
     jobs.forEach((job) => {
@@ -1684,20 +1671,39 @@ function ProfessionalDnaPanel({ account, jobs, dicts }: { account: AccountRow; j
   }, [dicts.roles, jobs]);
 
   const systems = useMemo(() => (account.systems_used ?? []).map((id) => dictName(dicts.systems, id, String(id))), [account.systems_used, dicts.systems]);
+  const systemOptions = useMemo(() => Array.from(dicts.systems.entries()).map(([id, name]) => ({ id, name })), [dicts.systems]);
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
       <SectionCard title="DNA קליני־עסקי" icon={<ShieldAlert className="h-4 w-4" />}>
         <LabelValue label="סוג מרפאה" value={account.clinic_type} />
-        <LabelValue label="תחומי התמחות" value={(account.specialties ?? []).join(", ") || "—"} />
-        <LabelValue label="מערכות בשימוש" value={systems.join(", ") || "—"} />
+        {edit ? (
+          <>
+            <EditRow label="תחומי התמחות" value={edit.fields.specialties} onChange={edit.setField("specialties")} placeholder="מופרד בפסיקים" />
+            <EditChipsMultiSelect label="מערכות בשימוש" selected={edit.fields.systems_used} options={systemOptions} onChange={edit.setSystems} />
+          </>
+        ) : (
+          <>
+            <LabelValue label="תחומי התמחות" value={(account.specialties ?? []).join(", ") || "—"} />
+            <LabelValue label="מערכות בשימוש" value={systems.join(", ") || "—"} />
+          </>
+        )}
         <LabelValue label="מספר כיסאות" value={account.chairs_count} />
         <LabelValue label="גודל צוות" value={account.team_size} />
       </SectionCard>
 
       <SectionCard title="פרופיל גיוס" icon={<Briefcase className="h-4 w-4" />}>
-        <LabelValue label="תפקידי גיוס מועדפים" value={(account.hiring_roles ?? []).join(", ") || "—"} />
-        <LabelValue label="תפקיד יחסי" value={account.rel_role} />
+        {edit ? (
+          <>
+            <EditRow label="תפקידי גיוס מועדפים" value={edit.fields.hiring_roles} onChange={edit.setField("hiring_roles")} placeholder="מופרד בפסיקים" />
+            <EditRow label="תפקיד יחסי" value={edit.fields.rel_role} onChange={edit.setField("rel_role")} />
+          </>
+        ) : (
+          <>
+            <LabelValue label="תפקידי גיוס מועדפים" value={(account.hiring_roles ?? []).join(", ") || "—"} />
+            <LabelValue label="תפקיד יחסי" value={account.rel_role} />
+          </>
+        )}
         <LabelValue label="מועמדים משויכים היסטורית" value={account.all_applicants_names} />
         <div className="mt-4 rounded-2xl bg-slate-50 p-4">
           <div className="mb-3 text-sm font-bold text-slate-900">תדירות תפקידים לפי משרות</div>
@@ -1725,28 +1731,6 @@ function BillingAdminPanel({ account }: { account: AccountRow }) {
       <LabelValue label="כתובת" value={account.address} />
       <LabelValue label="תאריך יצירה" value={formatDateTime(account.created_timestamp)} />
       <LabelValue label="עדכון אחרון" value={formatDateTime(account.updated_timestamp)} />
-    </SectionCard>
-  );
-}
-
-function AdditionalDataPanel({ account }: { account: AccountRow }) {
-  const entries = useMemo(() => {
-    const record = account as Record<string, unknown>;
-    return ACCOUNT_FIELD_KEYS.map((key) => [key, record[key as string]] as const);
-  }, [account]);
-
-  return (
-    <SectionCard title="כל שדות החשבון" icon={<FileText className="h-4 w-4" />}>
-      <div className="grid gap-3 lg:grid-cols-2">
-        {entries.map(([key, value]) => (
-          <div key={key} className="rounded-2xl border border-slate-200 bg-slate-50 p-3">
-            <div className="mb-1 text-xs font-bold text-slate-500" dir="ltr">
-              {key}
-            </div>
-            <div className="text-sm font-semibold text-slate-800">{fieldValue(value)}</div>
-          </div>
-        ))}
-      </div>
     </SectionCard>
   );
 }
@@ -1944,7 +1928,14 @@ export default function Employer360Page() {
     }
   }, [account, fields, updateAccount, queryClient]);
 
-  const editCtx: EditCtx | null = editMode && fields ? { fields, setField } : null;
+  const editCtx: EditCtx | null =
+    editMode && fields
+      ? {
+          fields,
+          setField,
+          setSystems: (ids: number[]) => setFields((prev) => (prev ? { ...prev, systems_used: ids } : prev)),
+        }
+      : null;
 
   if (!previewMode && !accountId) {
     return (
@@ -2099,7 +2090,7 @@ export default function Employer360Page() {
           <TabsContent value="crm" className="mt-0 space-y-4">
             <div className="grid gap-4 xl:grid-cols-2">
               <CrmPanel account={account} edit={editCtx} />
-              <ProfessionalDnaPanel account={account} jobs={jobs} dicts={dicts} />
+              <ProfessionalDnaPanel account={account} jobs={jobs} dicts={dicts} edit={editCtx} />
             </div>
           </TabsContent>
         </Tabs>

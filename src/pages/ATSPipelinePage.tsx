@@ -79,7 +79,7 @@ type PipelineCardRow = {
   check_status?: number | null
   updated_timestamp?: string | null
   created_timestamp?: string | null
-  status_in_master?: string | null
+  is_new_candidate?: boolean | null
   pending_employer_feedback?: boolean
 }
 
@@ -935,7 +935,7 @@ function DetailSheet({
             <DetailsGrid
               items={[
                 { label: 'ארגון', value: row.account_name },
-                { label: 'status in master', value: row.status_in_master ?? '—' },
+                { label: 'סטטוס במאגר', value: row.candidate_link != null ? 'קיים במאגר' : 'חדש – ממתין לבדיקה' },
                 { label: 'עודכן', value: timeAgo(row.updated_timestamp) },
                 { label: 'נוצר', value: formatDate(row.created_timestamp) },
               ]}

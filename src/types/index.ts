@@ -165,8 +165,6 @@ export interface ApplicationRow {
 
 /** Join/display projection for UI — produced in joinMockData, not stored on raw mocks. */
 export interface ApplicationEnriched extends ApplicationRow {
-  record_name: string | null
-  display_date: string | null
   form_title: string | null
   job_link: string | null
   account_name: string | null
@@ -178,9 +176,6 @@ export interface ApplicationEnriched extends ApplicationRow {
   candidate_email: string | null
   cv_link: string | null
   candidate_notes: string | null
-  status_in_master: string | null
-  job_status_view: string | null
-  master_availability: string | null
   master_role: string | null
   master_city: string | null
   master_region: string | null
