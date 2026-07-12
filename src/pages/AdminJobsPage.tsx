@@ -41,6 +41,7 @@ import { RoleBadge, getRoleColorHex } from '@/components/admin/RoleBadge'
 import { RegionBadge } from '@/components/admin/RegionBadge'
 import { AdminActionsMenu, type AdminActionMenuItem } from '@/components/admin/AdminActionsMenu'
 import { StatusBadge } from '@/components/admin/StatusBadge'
+import { getJobStatusSelectClass } from '@/lib/statusColors'
 import { getRegionColor } from '@/lib/regionColors'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
@@ -1047,7 +1048,7 @@ export default function AdminJobsPage() {
                                     const value = Number(event.target.value)
                                     if (value) updateJobPatch(String(job.job_code), { job_status: value }, `סטטוס משרה עודכן ל־${statusName(value)}`)
                                   }}
-                                  className={`h-8 cursor-pointer rounded-xl border px-2 text-[12px] font-bold outline-none transition focus:border-[#008080] ${jobStatusSelectClass(Number(job.job_status))}`}
+                                  className={`h-8 cursor-pointer rounded-xl border px-2 text-[12px] font-bold outline-none transition focus:border-[#008080] ${getJobStatusSelectClass(job.job_status)}`}
                                 >
                                   {jobStatuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
                                 </select>
@@ -1174,7 +1175,7 @@ function UnifiedJobPanel({
       <div className="space-y-1.5 min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <span className="rounded-[6px] bg-[#E6F3F3] px-2.5 py-1 font-mono text-[12px] font-bold text-[#008080]">{job.job_code}</span>
-          <StatusPill label={statusName(job.job_status)} tone={jobStatusTone(Number(job.job_status))} />
+          <StatusBadge statusType="job" statusId={Number(job.job_status)} label={statusName(job.job_status)} />
           <StatusBadge statusType="public" statusId={Number(job.public_status)} label={publicStatusName(job.public_status)} />
         </div>
         <h2 className="text-[20px] font-bold text-[#2D2D2D] leading-snug">{job.job_title ?? 'פרטי משרה'}</h2>
@@ -1359,17 +1360,7 @@ function SortableTh({ label, sortKey, sortBy, sortDir, onSort }: { label: string
 }
 
 // RoleBadge imported from shared component above
-
-function StatusPill({ label, tone }: { label: string; tone: 'default' | 'success' | 'warning' | 'danger' | 'muted' }) {
-  const cls = {
-    default: 'bg-[#E6F3F3] text-[#006D6D]',
-    success: 'bg-[#DCFCE7] text-[#166534]',
-    warning: 'bg-[#FEF3C7] text-[#B45309]',
-    danger: 'bg-[#FEE2E2] text-[#991B1B]',
-    muted: 'bg-[#F3F4F6] text-[#6B6B6B]',
-  }[tone]
-  return <span className={`inline-flex rounded-[6px] px-2.5 py-1 text-[12px] font-bold ${cls}`}>{label}</span>
-}
+// StatusPill הוסר — סטטוס משרה מוצג דרך StatusBadge המשותף (SSOT: jobStatusColors).
 
 function BadgeList({ ids, labelById, empty }: { ids: number[]; labelById: (id: number) => string; empty: string }) {
   if (!ids.length) return <span className="text-slate-400">{empty}</span>
@@ -1512,37 +1503,8 @@ function namesFromIds(ids: number[], labelById: (id: number) => string) {
   return names.length ? names.join(', ') : '—'
 }
 
-type StatusTone = 'default' | 'success' | 'warning' | 'danger' | 'muted'
-
-// מיפוי tone מפורש לפי id מהמילון החי (dict_job_statuses) — לא נגזר משם הסטטוס,
-// ולא מ-statusColors.ts הגלובלי (שמיושן עבור job). סטטוס 7 "סגורה־אחר" ניטרלי.
-const JOB_STATUS_TONE: Record<number, StatusTone> = {
-  [JOB_STATUS_IDS.new]: 'default',        // 1 חדש
-  [JOB_STATUS_IDS.draft]: 'warning',      // 2 טיוטה
-  [JOB_STATUS_IDS.active]: 'success',     // 3 פעילה
-  [JOB_STATUS_IDS.hold]: 'warning',       // 4 מושהה
-  [JOB_STATUS_IDS.filled]: 'success',     // 5 מאוישת
-  [JOB_STATUS_IDS.closedSuccess]: 'muted',// 6 סגורה־הצלחה
-  [JOB_STATUS_IDS.closedOther]: 'muted',  // 7 סגורה־אחר
-  [JOB_STATUS_IDS.cancelled]: 'danger',   // 8 בוטלה
-  [JOB_STATUS_IDS.archived]: 'muted',     // 9 ארכיון
-}
-
-const STATUS_TONE_SELECT_CLASS: Record<StatusTone, string> = {
-  default: 'border-[#D9D9D9] bg-white text-[#6B6B6B] focus:ring-2 focus:ring-[#E6F3F3]',
-  success: 'border-[#BBF7D0] bg-[#F0FDF4] text-[#166534] focus:ring-2 focus:ring-[#DCFCE7]',
-  warning: 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309] focus:ring-2 focus:ring-[#FEF3C7]',
-  danger: 'border-[#FECACA] bg-[#FEE2E2] text-[#991B1B] focus:ring-2 focus:ring-[#FEE2E2]',
-  muted: 'border-[#D9D9D9] bg-[#F3F4F6] text-[#6B6B6B] focus:ring-2 focus:ring-[#E6F3F3]',
-}
-
-function jobStatusTone(status: number): StatusTone {
-  return JOB_STATUS_TONE[status] ?? 'muted'
-}
-
-function jobStatusSelectClass(status: number) {
-  return STATUS_TONE_SELECT_CLASS[jobStatusTone(status)]
-}
+// מפות tone המקומיות של סטטוס משרה הוסרו — הצבע נגזר כעת מ-SSOT יחיד
+// (jobStatusColors + getJobStatusSelectClass ב-src/lib/statusColors.ts).
 
 function todayIsoDate() {
   return new Date().toISOString().slice(0, 10)
