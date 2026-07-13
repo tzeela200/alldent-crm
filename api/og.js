@@ -15,6 +15,46 @@ const supabase = createClient(
 const DEFAULT_IMAGE = 'https://www.alldent.co.il/share-default.jpg'
 const SITE_NAME = 'AllDent'
 
+// עמודי קטגוריית תפקיד ציבוריים (/jobs/{slug}) — תמונת שיתוף ייעודית לכל תפקיד.
+// slugs תואמים ל-ALL_ROLE_SLUGS ב-src/lib/publicRolePages.ts
+const ROLE_OG = {
+  dentists: {
+    title: 'משרות לרופאי שיניים | AllDent',
+    description: 'לוח משרות ייעודי לרופאי ורופאות שיניים במרפאות פרטיות, רשתות ומרכזים דנטליים.',
+    image: 'https://www.alldent.co.il/images/jobs-og/dentists.jpg',
+  },
+  specialists: {
+    title: 'משרות לרופאים מומחים | AllDent',
+    description: 'משרות לרופאים מומחים בתחומי אנדודונטיה, פריודונטיה, אורתודונטיה, שיקום ועוד.',
+    image: 'https://www.alldent.co.il/images/jobs-og/specialists.jpg',
+  },
+  hygienists: {
+    title: 'משרות לשינניות | AllDent',
+    description: 'לוח משרות לשינניות במרפאות שיניים ברחבי הארץ, במשרה מלאה או חלקית.',
+    image: 'https://www.alldent.co.il/images/jobs-og/hygienists.jpg',
+  },
+  assistants: {
+    title: 'משרות לסייעות שיניים | AllDent',
+    description: 'משרות לסייעות שיניים במרפאות פרטיות, רשתות, מומחים ומרכזים דנטליים.',
+    image: 'https://www.alldent.co.il/images/jobs-og/assistants.jpg',
+  },
+  secretaries: {
+    title: 'משרות למזכירות רפואיות | AllDent',
+    description: 'משרות למזכירות דנטליות, אדמיניסטרציה וקבלה במרפאות שיניים.',
+    image: 'https://www.alldent.co.il/images/jobs-og/secretaries.jpg',
+  },
+  'management-sales': {
+    title: 'משרות לניהול ומכירות | AllDent',
+    description: 'משרות ניהול, תפעול, שירות ומכירות במרפאות שיניים ורשתות דנטליות.',
+    image: 'https://www.alldent.co.il/images/jobs-og/management-sales.jpg',
+  },
+  technicians: {
+    title: 'משרות לטכנאי שיניים | AllDent',
+    description: 'משרות לטכנאי וטכנאיות שיניים במעבדות, מרפאות וחברות דנטליות.',
+    image: 'https://www.alldent.co.il/images/jobs-og/technicians.jpg',
+  },
+}
+
 // בריחת תווים כדי שכותרת/תיאור לא ישברו את תגיות ה-meta ולא יאפשרו הזרקה
 function esc(value) {
   return String(value ?? '')
@@ -27,14 +67,21 @@ function esc(value) {
 export default async function handler(req, res) {
   const slug = typeof req.query.slug === 'string' ? req.query.slug : ''
   const jobCode = slug ? slug.trim().toUpperCase() : ''
+  const rolePage = slug ? ROLE_OG[slug.trim()] : undefined
 
   let title = 'AllDent | השמה וגיוס למרפאות שיניים'
   let description =
     'חברת ההשמה המובילה בישראל לרפואת שיניים. משרות לרופאים, סייעות, שינניות, מזכירות ומנהלים.'
   let imageUrl = DEFAULT_IMAGE
 
+  if (rolePage) {
+    title = rolePage.title
+    description = rolePage.description
+    imageUrl = rolePage.image
+  }
+
   try {
-    if (jobCode && jobCode !== 'NONE') {
+    if (!rolePage && jobCode && jobCode !== 'NONE') {
       const { data: job, error } = await supabase
         .from('v_job_public')
         .select('job_title, public_excerpt, public_image_url')
@@ -52,8 +99,9 @@ export default async function handler(req, res) {
     // בכשל — נשארים עם ברירות המחדל של המותג
   }
 
-  const canonical = `https://www.alldent.co.il/${jobCode && jobCode !== 'NONE' ? 'jobs/' + jobCode : ''}`
-  const spaTarget = jobCode && jobCode !== 'NONE' ? '/jobs/' + jobCode : '/'
+  const pathSlug = rolePage ? slug.trim() : jobCode
+  const canonical = `https://www.alldent.co.il/${pathSlug && pathSlug !== 'NONE' ? 'jobs/' + pathSlug : ''}`
+  const spaTarget = pathSlug && pathSlug !== 'NONE' ? '/jobs/' + pathSlug : '/'
 
   const html = `<!DOCTYPE html>
 <html lang="he" dir="rtl">
