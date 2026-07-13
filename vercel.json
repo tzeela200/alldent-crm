@@ -27,6 +27,20 @@
       ],
       "destination": "/api/og?slug=:slug"
     },
+    {
+      "source": "/employers/branding",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Applebot|SkypeUriPreview|Embedly|Iframely|Googlebot|bingbot).*" }
+      ],
+      "destination": "/api/og?page=employers-branding"
+    },
+    {
+      "source": "/employers/discreet",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Applebot|SkypeUriPreview|Embedly|Iframely|Googlebot|bingbot).*" }
+      ],
+      "destination": "/api/og?page=employers-discreet"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

@@ -55,6 +55,22 @@ const ROLE_OG = {
   },
 }
 
+// דפי מסלול נוספים (לא תפקידים) — כל אחד עם נתיב קבוע משלו
+const PAGE_OG = {
+  'employers-branding': {
+    path: '/employers/branding',
+    title: 'מיתוג מעסיקים | AllDent',
+    description: 'מסלול גיוס שמציג את המרפאה, הצוות וסביבת העבודה שלכם — אסטרטגיית גיוס עם ערך.',
+    image: 'https://www.alldent.co.il/images/jobs-og/employers-branding.png',
+  },
+  'employers-discreet': {
+    path: '/employers/discreet',
+    title: 'גיוס אישי ודיסקרטי | AllDent',
+    description: 'שירות סינון מועמדים, דיסקרטיות ומיקוד — בלי לחשוף את שם המרפאה בשלב הראשוני.',
+    image: 'https://www.alldent.co.il/images/jobs-og/employers-discreet.png',
+  },
+}
+
 // בריחת תווים כדי שכותרת/תיאור לא ישברו את תגיות ה-meta ולא יאפשרו הזרקה
 function esc(value) {
   return String(value ?? '')
@@ -66,22 +82,28 @@ function esc(value) {
 
 export default async function handler(req, res) {
   const slug = typeof req.query.slug === 'string' ? req.query.slug : ''
+  const pageKey = typeof req.query.page === 'string' ? req.query.page.trim() : ''
   const jobCode = slug ? slug.trim().toUpperCase() : ''
   const rolePage = slug ? ROLE_OG[slug.trim()] : undefined
+  const pageEntry = pageKey ? PAGE_OG[pageKey] : undefined
 
   let title = 'AllDent | השמה וגיוס למרפאות שיניים'
   let description =
     'חברת ההשמה המובילה בישראל לרפואת שיניים. משרות לרופאים, סייעות, שינניות, מזכירות ומנהלים.'
   let imageUrl = DEFAULT_IMAGE
 
-  if (rolePage) {
+  if (pageEntry) {
+    title = pageEntry.title
+    description = pageEntry.description
+    imageUrl = pageEntry.image
+  } else if (rolePage) {
     title = rolePage.title
     description = rolePage.description
     imageUrl = rolePage.image
   }
 
   try {
-    if (!rolePage && jobCode && jobCode !== 'NONE') {
+    if (!pageEntry && !rolePage && jobCode && jobCode !== 'NONE') {
       const { data: job, error } = await supabase
         .from('v_job_public')
         .select('job_title, public_excerpt, public_image_url')
@@ -99,9 +121,15 @@ export default async function handler(req, res) {
     // בכשל — נשארים עם ברירות המחדל של המותג
   }
 
-  const pathSlug = rolePage ? slug.trim() : jobCode
-  const canonical = `https://www.alldent.co.il/${pathSlug && pathSlug !== 'NONE' ? 'jobs/' + pathSlug : ''}`
-  const spaTarget = pathSlug && pathSlug !== 'NONE' ? '/jobs/' + pathSlug : '/'
+  const relativePath = pageEntry
+    ? pageEntry.path
+    : rolePage
+      ? '/jobs/' + slug.trim()
+      : jobCode && jobCode !== 'NONE'
+        ? '/jobs/' + jobCode
+        : '/'
+  const canonical = `https://www.alldent.co.il${relativePath}`
+  const spaTarget = relativePath
 
   const html = `<!DOCTYPE html>
 <html lang="he" dir="rtl">
