@@ -57,6 +57,12 @@ const ROLE_OG = {
 
 // דפי מסלול נוספים (לא תפקידים) — כל אחד עם נתיב קבוע משלו
 const PAGE_OG = {
+  employers: {
+    path: '/employers',
+    title: 'AllDent Employers | גיוס עובדים בעולם הדנטל',
+    description: 'מערכת HR ופלטפורמת גיוס ותעסוקה שנבנתה במיוחד לענף הדנטלי — התאמה רב-ממדית ושני מסלולי גיוס לבחירה.',
+    image: 'https://www.alldent.co.il/images/jobs-og/employers.jpg',
+  },
   'employers-branding': {
     path: '/employers/branding',
     title: 'מיתוג מעסיקים | AllDent',
