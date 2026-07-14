@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   Briefcase,
@@ -150,6 +151,7 @@ export default function ATSPipelinePage() {
   const { data: jobs = [] } = useJobs({})
   const dicts = useDicts()
   const { updateApplication } = useApplicationMutations()
+  const queryClient = useQueryClient()
 
 
   const applicationStatuses = dicts.applicationStatuses ?? []
@@ -418,10 +420,19 @@ export default function ATSPipelinePage() {
       icon={ClipboardList}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <ActionButton variant="ghost" icon={RefreshCw} onClick={() => showToast('הלוח רוענן', 'success')}>
+          <ActionButton
+            variant="ghost"
+            icon={RefreshCw}
+            onClick={() => {
+              // רענון אמיתי מ-Supabase לפני הודעת ההצלחה
+              queryClient.invalidateQueries({ queryKey: ['applications'] })
+              queryClient.invalidateQueries({ queryKey: ['jobs'] })
+              showToast('הלוח רוענן', 'success')
+            }}
+          >
             רענון
           </ActionButton>
-          <Link to="/applications">
+          <Link to="/admin/applications">
             <ActionButton variant="ghost" icon={Inbox}>פתיחת כל ההגשות</ActionButton>
           </Link>
         </div>
@@ -807,7 +818,7 @@ function AtsCard({
         />
         <QuickRouteLink
           title="Candidate 360"
-          to={row.candidate_link ? `/candidates/${row.candidate_link}` : ''}
+          to={row.candidate_link ? `/admin/candidates/${row.candidate_link}` : ''}
           disabled={!row.candidate_link}
           icon={<UserRound className="h-4 w-4" />}
         />
@@ -1047,12 +1058,12 @@ function DetailSheet({
               <QuickSheetButton label="Open CV" href={row.cv_link ?? '#'} onClick={() => openApplicationCv(row)} disabled={!applicationHasCv(row)} />
               <QuickSheetRouteButton
                 label="Open Candidate 360"
-                to={row.candidate_link ? `/candidates/${row.candidate_link}` : ''}
+                to={row.candidate_link ? `/admin/candidates/${row.candidate_link}` : ''}
                 disabled={!row.candidate_link}
               />
               <QuickSheetRouteButton
                 label="Open Job Details"
-                to={row.job_code ? `/jobs/${row.job_code}` : ''}
+                to={row.job_code ? `/admin/jobs/${row.job_code}` : ''}
                 disabled={!row.job_code}
               />
             </div>

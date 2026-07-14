@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   ArrowRight,
@@ -234,7 +235,7 @@ export default function DashboardPage() {
         entityType: 'account' as const,
         name: account.account_name ?? 'ללא שם',
         nextFollowUp: account.next_follow_up,
-        link: `/accounts/${account.account_id ?? ''}`,
+        link: `/admin/accounts/${account.account_id ?? ''}`,
       }))
 
 
@@ -244,7 +245,7 @@ export default function DashboardPage() {
         entityType: 'contact' as const,
         name: candidate.full_name ?? candidate.display_name ?? 'ללא שם',
         nextFollowUp: candidate.next_follow_up,
-        link: `/candidates/${candidate.contact_id ?? ''}`,
+        link: `/admin/candidates/${candidate.contact_id ?? ''}`,
       }))
 
 
@@ -254,7 +255,7 @@ export default function DashboardPage() {
         entityType: 'inbox' as const,
         name: row.display_name ?? 'ללא שם',
         nextFollowUp: row.next_follow_up,
-        link: `/inbox?lead=${row.lead_id ?? ''}`,
+        link: `/admin/inbox?lead=${row.lead_id ?? ''}`,
       }))
 
 
@@ -343,7 +344,7 @@ export default function DashboardPage() {
         title: 'הכי דחוף עכשיו',
         text: `${urgentApplications.length} הגשות תקועות ממתינות לפעולה, חלקן לא עודכנו מעל ${STALE_DAYS} ימים.`,
         ctaLabel: 'פתח הגשות',
-        ctaLink: '/applications?stale=true',
+        ctaLink: '/admin/applications?stale=true',
         tone: 'danger',
       })
     }
@@ -355,7 +356,7 @@ export default function DashboardPage() {
         title: 'משרות תקועות',
         text: `${zeroApplicantJobs.length} משרות פעילות לא קיבלו מועמדים, וזה סימן לצוואר בקבוק בגיוס.`,
         ctaLabel: 'פתח Smart Match',
-        ctaLink: '/smart-match',
+        ctaLink: '/admin/smart-match',
         tone: 'warning',
       })
     }
@@ -367,7 +368,7 @@ export default function DashboardPage() {
         title: 'לידים דורשי הכרעה',
         text: `${inboxUrgent.length} רשומות באינבוקס דורשות סיווג או בדיקת כפילות לפני יצירה.`,
         ctaLabel: 'פתח Inbox',
-        ctaLink: '/inbox?state=open',
+        ctaLink: '/admin/inbox?state=open',
         tone: 'info',
       })
     }
@@ -379,7 +380,7 @@ export default function DashboardPage() {
         title: 'הזדמנות שידוך מיידית',
         text: `נוספו ${newCandidates.length} מועמדים חדשים בטווח הזמן הנבחר. כדאי לבדוק התאמות למשרות ללא מועמדים.`,
         ctaLabel: 'פתח שידוך חכם',
-        ctaLink: '/smart-match',
+        ctaLink: '/admin/smart-match',
         tone: 'success',
       })
     }
@@ -391,7 +392,7 @@ export default function DashboardPage() {
         title: 'פולו-אפ שעבר זמנו',
         text: `${overdueFollowUps.length} פריטי follow-up עברו את תאריך היעד ודורשים סגירה או יצירת קשר.`,
         ctaLabel: 'פתח מעקבים',
-        ctaLink: '/accounts?follow_up=overdue',
+        ctaLink: '/admin/accounts?follow_up=overdue',
         tone: 'warning',
       })
     }
@@ -401,7 +402,15 @@ export default function DashboardPage() {
   }, [urgentApplications, zeroApplicantJobs, inboxUrgent, newCandidates, overdueFollowUps])
 
 
+  const queryClient = useQueryClient()
+
   const onRefresh = () => {
+    // רענון אמיתי: מסמן את שאילתות React Query שהמסך צורך כ-stale → משיכה מחדש מ-Supabase
+    queryClient.invalidateQueries({ queryKey: ['jobs'] })
+    queryClient.invalidateQueries({ queryKey: ['applications'] })
+    queryClient.invalidateQueries({ queryKey: ['contacts'] })
+    queryClient.invalidateQueries({ queryKey: ['accounts'] })
+    queryClient.invalidateQueries({ queryKey: ['dashboard-kpi'] })
     setLastUpdated(new Date().toISOString())
   }
 
@@ -504,34 +513,34 @@ export default function DashboardPage() {
         <DashboardCandidateMessages />
 
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-5 xl:grid-cols-10">
-          <Link to="/jobs?status=active" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/jobs?status=active" className="block rounded-2xl transition hover:shadow-md">
             <KPICard label="משרות פעילות" value={activeJobs.length} icon={Briefcase} />
           </Link>
-          <Link to="/applications?date=current" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/applications?date=current" className="block rounded-2xl transition hover:shadow-md">
             <KPICard label="הגשות חדשות" value={newApplications.length} icon={ClipboardList} />
           </Link>
-          <Link to="/applications?pending=true" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/applications?pending=true" className="block rounded-2xl transition hover:shadow-md">
             <KPICard label="ממתינות לטיפול" value={pendingApplications.length} icon={MailWarning} />
           </Link>
-          <Link to="/contacts?availability=active" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/contacts?availability=active" className="block rounded-2xl transition hover:shadow-md">
             <KPICard label="מועמדים פעילים" value={activeCandidates.length} icon={UserCheck} />
           </Link>
-          <Link to="/accounts?active=true" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/accounts?active=true" className="block rounded-2xl transition hover:shadow-md">
             <KPICard label="מעסיקים פעילים" value={activeEmployers.length} icon={Building2} />
           </Link>
-          <Link to="/inbox?state=open" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/inbox?state=open" className="block rounded-2xl transition hover:shadow-md">
             <KPICard label="לידים פתוחים" value={openInboxRows.length} icon={Inbox} />
           </Link>
-          <Link to="/jobs?applicants=0&status=open" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/jobs?applicants=0&status=open" className="block rounded-2xl transition hover:shadow-md">
             <KPICard label="ללא מועמדים" value={zeroApplicantJobs.length} icon={AlertTriangle} />
           </Link>
-          <Link to="/accounts?follow_up=overdue" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/accounts?follow_up=overdue" className="block rounded-2xl transition hover:shadow-md">
             <KPICard label="Follow-up באיחור" value={overdueFollowUps.length} icon={CalendarClock} />
           </Link>
-          <Link to="/applications?status=12&period=month" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/applications?status=12&period=month" className="block rounded-2xl transition hover:shadow-md">
             <KPICard label="השמות החודש" value={hiresThisMonth} icon={CheckCircle2} />
           </Link>
-          <Link to="/inbox?duplicates=true" className="block rounded-2xl transition hover:shadow-md">
+          <Link to="/admin/inbox?duplicates=true" className="block rounded-2xl transition hover:shadow-md">
             <KPICard
               label="כפילויות באינבוקס"
               value={openInboxRows.filter((row: any) => row.is_duplicate || Number(row.dup_count ?? 0) > 0).length}
@@ -543,22 +552,22 @@ export default function DashboardPage() {
 
         <Toolbar>
           <div className="flex flex-wrap gap-2">
-            <Link to="/jobs/new">
+            <Link to="/admin/jobs/new">
               <ActionButton variant="primary" icon={PlusCircle}>יצירת משרה</ActionButton>
             </Link>
-            <Link to="/contacts">
+            <Link to="/admin/contacts">
               <ActionButton variant="ghost" icon={Users}>יצירת מועמד / איש קשר</ActionButton>
             </Link>
-            <Link to="/inbox">
+            <Link to="/admin/inbox">
               <ActionButton variant="ghost" icon={Inbox}>פתיחת Inbox</ActionButton>
             </Link>
-            <Link to="/pipeline">
+            <Link to="/admin/pipeline">
               <ActionButton variant="ghost" icon={ClipboardList}>פתיחת ATS</ActionButton>
             </Link>
-            <Link to="/smart-match">
+            <Link to="/admin/smart-match">
               <ActionButton variant="ghost" icon={Sparkles}>פתיחת Smart Match</ActionButton>
             </Link>
-            <Link to="/applications">
+            <Link to="/admin/applications">
               <ActionButton variant="ghost" icon={ClipboardList}>פתיחת Admin Applications</ActionButton>
             </Link>
           </div>
@@ -571,7 +580,7 @@ export default function DashboardPage() {
             subtitle="דחוף"
             icon={ClipboardList}
             actionLabel="לכל ההגשות"
-            actionLink="/applications?pending=true"
+            actionLink="/admin/applications?pending=true"
           >
             {loading ? (
               <BlockLoading />
@@ -590,8 +599,8 @@ export default function DashboardPage() {
                       metaRight={row.updated_timestamp ? `עודכן ${timeAgo(row.updated_timestamp)}` : 'ללא עדכון'}
                       tone="danger"
                       ctas={[
-                        { label: 'Open Application', link: `/applications?application_id=${row.application_id}` },
-                        { label: 'Open ATS', link: `/pipeline` },
+                        { label: 'Open Application', link: `/admin/applications?application_id=${row.application_id}` },
+                        { label: 'Open ATS', link: `/admin/pipeline` },
                         {
                           label: 'WhatsApp',
                           link: buildWhatsAppLink(row.candidate_phone ?? row.phone_norm ?? ''),
@@ -612,7 +621,7 @@ export default function DashboardPage() {
             subtitle="דחוף"
             icon={Inbox}
             actionLabel="לכל ה-Inbox"
-            actionLink="/inbox?state=open"
+            actionLink="/admin/inbox?state=open"
           >
             {loading ? (
               <BlockLoading />
@@ -629,8 +638,8 @@ export default function DashboardPage() {
                     metaRight={row.created_timestamp ? timeAgo(row.created_timestamp) : '—'}
                     tone={row.is_duplicate ? 'warning' : 'default'}
                     ctas={[
-                      { label: 'Open Inbox row', link: `/inbox?lead=${row.lead_id}` },
-                      { label: 'Open Inbox filtered', link: `/inbox?state=open` },
+                      { label: 'Open Inbox row', link: `/admin/inbox?lead=${row.lead_id}` },
+                      { label: 'Open Inbox filtered', link: `/admin/inbox?state=open` },
                     ]}
                   />
                 ))}
@@ -646,7 +655,7 @@ export default function DashboardPage() {
             subtitle="חשוב"
             icon={Briefcase}
             actionLabel="לכל המשרות הרלוונטיות"
-            actionLink="/jobs?applicants=0&status=open"
+            actionLink="/admin/jobs?applicants=0&status=open"
           >
             {loading ? (
               <BlockLoading />
@@ -666,8 +675,8 @@ export default function DashboardPage() {
                       metaRight={`${liveDays} ימים באוויר`}
                       tone="warning"
                       ctas={[
-                        { label: 'Open Job Details', link: `/jobs/${job.job_code}` },
-                        { label: 'Open Smart Match', link: `/smart-match?job=${job.job_code}` },
+                        { label: 'Open Job Details', link: `/admin/jobs/${job.job_code}` },
+                        { label: 'Open Smart Match', link: `/admin/smart-match?job=${job.job_code}` },
                       ]}
                     />
                   )
@@ -682,7 +691,7 @@ export default function DashboardPage() {
             subtitle="חשוב"
             icon={CalendarClock}
             actionLabel="לכל המעקבים"
-            actionLink="/accounts?follow_up=overdue"
+            actionLink="/admin/accounts?follow_up=overdue"
           >
             {loading ? (
               <BlockLoading />
@@ -729,7 +738,7 @@ export default function DashboardPage() {
             subtitle="אינפורמטיבי"
             icon={Users}
             actionLabel="לכל המועמדים"
-            actionLink="/contacts"
+            actionLink="/admin/contacts"
           >
             {loading ? (
               <BlockLoading />
@@ -746,8 +755,8 @@ export default function DashboardPage() {
                     metaRight={candidate.created_timestamp ? timeAgo(candidate.created_timestamp) : '—'}
                     tone="default"
                     ctas={[
-                      { label: 'Open Candidate 360', link: `/candidates/${candidate.contact_id}` },
-                      { label: 'Open Smart Match', link: '/smart-match' },
+                      { label: 'Open Candidate 360', link: `/admin/candidates/${candidate.contact_id}` },
+                      { label: 'Open Smart Match', link: '/admin/smart-match' },
                     ]}
                     extraBadge={
                       candidate.has_cv ? (
@@ -768,7 +777,7 @@ export default function DashboardPage() {
             subtitle="אינפורמטיבי"
             icon={Building2}
             actionLabel="לכל המעסיקים"
-            actionLink="/accounts?active=true"
+            actionLink="/admin/accounts?active=true"
           >
             {loading ? (
               <BlockLoading />
@@ -791,8 +800,8 @@ export default function DashboardPage() {
                     }
                     tone="default"
                     ctas={[
-                      { label: 'Open Employer 360', link: `/accounts/${account.account_id}` },
-                      { label: 'Create Job', link: `/jobs/new?account=${account.account_id}` },
+                      { label: 'Open Employer 360', link: `/admin/accounts/${account.account_id}` },
+                      { label: 'Create Job', link: `/admin/jobs/new?account=${account.account_id}` },
                     ]}
                   />
                 ))}

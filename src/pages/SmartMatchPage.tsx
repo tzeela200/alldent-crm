@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -166,6 +167,7 @@ export default function SmartMatchPage() {
   const { data: applications = [] } = useApplications({})
   const dicts = useDicts()
   const { createApplication } = useApplicationMutations()
+  const queryClient = useQueryClient()
 
 
   useEffect(() => {
@@ -613,7 +615,17 @@ export default function SmartMatchPage() {
           </div>
 
 
-          <ActionButton variant="ghost" icon={RefreshCw} onClick={() => showToast('הרשימה רועננה', 'success')}>
+          <ActionButton
+            variant="ghost"
+            icon={RefreshCw}
+            onClick={() => {
+              // רענון אמיתי מ-Supabase לפני הודעת ההצלחה
+              queryClient.invalidateQueries({ queryKey: ['jobs'] })
+              queryClient.invalidateQueries({ queryKey: ['contacts'] })
+              queryClient.invalidateQueries({ queryKey: ['applications'] })
+              showToast('הרשימה רועננה', 'success')
+            }}
+          >
             רענון
           </ActionButton>
 
@@ -624,7 +636,7 @@ export default function SmartMatchPage() {
 
 
           {selectedJob ? (
-            <Link to={`/jobs/${selectedJob.job_code}`}>
+            <Link to={`/admin/jobs/${selectedJob.job_code}`}>
               <ActionButton variant="ghost" icon={ExternalLink}>פתח פרטי משרה</ActionButton>
             </Link>
           ) : null}
