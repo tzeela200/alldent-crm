@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Briefcase, MapPin, MessageCircle, Users } from 'lucide-react'
+import { Award, Briefcase, GraduationCap, MapPin, MessageCircle, Users, Wrench } from 'lucide-react'
 import { usePublicJobs } from '@/hooks/usePublicJobs'
 import type { PublicJob } from '@/services/publicJobsService'
 import PublicJobCard from '@/components/public/PublicJobCard'
@@ -52,71 +52,206 @@ function TypewriterWords() {
 
 // ─── Hero ─────────────────────────────────────────────────────────────────────
 
+const HERO_HIGHLIGHTS = [
+  { icon: Award, label: 'משרות וגיוס איכותי', tone: '#8ff5f5' },
+  { icon: Users, label: 'קהילה מקצועית', tone: '#e4c394' },
+  { icon: Wrench, label: 'כלים מתקדמים', tone: '#8ff5f5' },
+  { icon: GraduationCap, label: 'תוכן וידע מקצועי', tone: '#e4c394' },
+]
+
 function PremiumHero() {
   return (
-    <section className="relative isolate flex min-h-[88svh] overflow-hidden bg-[#1a1a1a] text-white" dir="rtl">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(0,128,128,0.24),transparent_31%),radial-gradient(circle_at_20%_82%,rgba(217,119,6,0.18),transparent_29%),linear-gradient(135deg,#1a1a1a_0%,#2D2D2D_46%,#151515_100%)]" />
-      <div className="pointer-events-none absolute inset-0 opacity-[0.15] [background-image:radial-gradient(rgba(255,255,255,0.08)_0.7px,transparent_0.7px)] [background-size:16px_16px]" />
-      <div className="pointer-events-none absolute -left-32 top-8 h-[30rem] w-[30rem] rounded-full bg-[#008080]/20 blur-3xl" />
-      <div className="pointer-events-none absolute -right-28 bottom-0 h-[28rem] w-[28rem] rounded-full bg-[#D97706]/14 blur-3xl" />
+    <section
+      className="home-hero relative isolate overflow-hidden bg-[#171411] text-white"
+      dir="rtl"
+      aria-labelledby="home-hero-title"
+    >
+      {/* רקע גרפיט חם */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_50%,rgba(0,128,128,0.20),transparent_34%),radial-gradient(circle_at_78%_100%,rgba(181,116,58,0.20),transparent_38%),linear-gradient(112deg,#111312_0%,#171613_42%,#211a15_72%,#171411_100%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(rgba(255,255,255,0.14)_0.7px,transparent_0.7px)] [background-size:22px_22px]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
-      <div className="relative z-10 mx-auto grid w-full max-w-7xl place-items-center px-5 py-20 text-center md:px-8 md:py-28">
-        <div className="mx-auto grid max-w-5xl justify-items-center gap-8 md:gap-10">
-          <img
-            src="/images/logo-teal.png"
-            alt="AllDent"
-            className="h-[48px] w-auto object-contain md:h-[56px]"
-          />
+      {/* קשתות חום–טורקיז מאחורי התמונה */}
+      <div className="pointer-events-none absolute bottom-[-210px] left-[-80px] hidden h-[640px] w-[760px] rounded-[50%] border border-[#d9a35f]/55 lg:block" />
+      <div className="pointer-events-none absolute bottom-[-235px] left-[-25px] hidden h-[660px] w-[790px] rounded-[50%] border border-[#00a7a0]/42 lg:block" />
+      <div className="pointer-events-none absolute bottom-[-255px] left-[30px] hidden h-[680px] w-[820px] rounded-[50%] border border-white/8 lg:block" />
 
-          <h1 className="max-w-[12ch] text-[clamp(2.8rem,6vw,5.2rem)] font-black leading-[1.08] tracking-[-0.04em] text-white">
+      {/* תמונת הצוות – משולבת ברקע ללא מסגרת */}
+      <div className="hero-photo pointer-events-none absolute inset-y-0 left-0 hidden w-[58%] lg:block">
+        <img
+          src="/images/home/alldent-hero-team.webp"
+          alt="ארבעה אנשי מקצוע מעולם הדנטל"
+          loading="eager"
+          decoding="async"
+          className="hero-photo-img h-full w-full object-cover object-[48%_50%]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#171411]/85" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#171411] to-transparent" />
+      </div>
+
+      <div className="relative z-10 mx-auto flex min-h-[610px] w-full max-w-[1640px] flex-col items-center px-5 pb-0 pt-10 md:px-8 lg:min-h-[640px] lg:flex-row lg:py-12 lg:pl-10 lg:pr-4 xl:pl-14 xl:pr-6">
+        {/* תוכן – ללא שינוי במלל, בקישורים או באפקט ההקלדה */}
+        <div className="hero-copy z-20 w-full text-center lg:ml-auto lg:w-[48%] lg:text-right xl:w-[46%]">
+          <p className="hero-anim hero-d1 mb-5 inline-flex items-center gap-2.5 text-[12px] font-extrabold tracking-[0.22em] text-[#e4c394]">
+            <span className="h-px w-7 bg-[#e4c394]/70" />
+            פלטפורמת הדנטל המובילה בישראל
+          </p>
+
+          <h1
+            id="home-hero-title"
+            className="hero-anim hero-d2 mx-auto max-w-[13ch] text-[clamp(2.55rem,6.1vw,5rem)] font-black leading-[1.04] [text-wrap:balance] text-white lg:mx-0"
+          >
             הבית המקצועי של אנשי הדנטל בישראל
           </h1>
 
           <div
-            className="flex min-h-[1.45em] items-center justify-center text-[clamp(1.35rem,2.5vw,2.15rem)] font-extrabold text-[#8ff5f5]"
+            className="hero-anim hero-d3 mt-6 flex min-h-[1.5em] items-center justify-center gap-3 text-[clamp(1.3rem,2.4vw,2.05rem)] font-extrabold text-[#42cbc6] lg:justify-start"
             aria-live="polite"
           >
-            <span className="border-l-2 border-white/65 pl-2">
-              <TypewriterWords />
-            </span>
+            <span className="h-[1.1em] w-[3px] shrink-0 rounded-full bg-[#e4c394]" />
+            <TypewriterWords />
           </div>
 
-          <p className="mx-auto max-w-3xl text-[17px] leading-[1.75] text-white/80 md:text-[22px]">
-            קריירה, גיוס, קהילה, למידה והתפתחות מקצועית — בפלטפורמה אחת.
+          <p className="hero-anim hero-d4 mx-auto mt-6 max-w-xl text-[17px] leading-[1.8] text-white/76 md:text-[19px] lg:mx-0">
+            קריירה, גיוס, קהילה, למידה והתפתחות מקצועית — הכול בפלטפורמה אחת לאנשי הדנטל בישראל.
           </p>
 
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-3">
+          <div className="hero-anim hero-d5 mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
             <Link
               to="/jobs"
-              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-3 text-[14px] font-bold text-white backdrop-blur transition hover:bg-white/15"
+              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full bg-[#008080] px-7 py-3.5 text-[15px] font-bold text-white shadow-[0_20px_46px_-20px_rgba(0,128,128,0.95)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#006D6D] hover:shadow-[0_24px_52px_-20px_rgba(0,128,128,0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ff5f5] focus-visible:ring-offset-2 focus-visible:ring-offset-[#171411]"
             >
-              <Briefcase className="h-4 w-4" />
+              <Briefcase className="h-[18px] w-[18px] transition-transform duration-300 group-hover:-translate-y-0.5" />
               חיפוש משרות
             </Link>
+
             <Link
               to="/employers"
-              className="inline-flex items-center gap-2 rounded-full bg-[#008080] px-5 py-3 text-[14px] font-bold text-white transition hover:bg-[#006D6D]"
+              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full bg-gradient-to-l from-[#d9b37b] to-[#e7c79a] px-7 py-3.5 text-[15px] font-bold text-[#241c10] shadow-[0_20px_46px_-22px_rgba(217,179,123,0.9)] transition duration-300 hover:-translate-y-0.5 hover:from-[#e2be86] hover:to-[#f0d3a8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e4c394] focus-visible:ring-offset-2 focus-visible:ring-offset-[#171411]"
             >
-              <Users className="h-4 w-4" />
+              <Users className="h-[18px] w-[18px] transition-transform duration-300 group-hover:scale-105" />
               גיוס עובדים
             </Link>
+
             <a
               href="https://wa.me/972533951003"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-full bg-[#25D366] px-5 py-3 text-[14px] font-bold text-white shadow-[0_10px_28px_-14px_rgba(37,211,102,0.65)] transition hover:bg-[#20bd5a]"
+              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-6 py-3.5 text-[15px] font-bold text-white backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-[#25D366]/45 hover:bg-white/[0.11] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2 focus-visible:ring-offset-[#171411]"
             >
-              <MessageCircle className="h-4 w-4" />
+              <MessageCircle className="h-[18px] w-[18px] text-[#4ade80] transition-transform duration-300 group-hover:scale-105" />
               WhatsApp
             </a>
           </div>
+
+          <ul className="hero-anim hero-d6 mx-auto mt-9 grid max-w-xl grid-cols-2 border-t border-white/10 pt-6 sm:grid-cols-4 lg:mx-0">
+            {HERO_HIGHLIGHTS.map(({ icon: Icon, label, tone }, index) => (
+              <li
+                key={label}
+                className={`flex min-h-[76px] flex-col items-center justify-center gap-2 px-3 text-center ${
+                  index < HERO_HIGHLIGHTS.length - 1 ? 'sm:border-l sm:border-white/10' : ''
+                }`}
+              >
+                <Icon className="h-6 w-6 shrink-0" style={{ color: tone }} />
+                <span className="text-[13px] font-semibold leading-tight text-white/85">{label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* גרסת מובייל של התמונה */}
+        <div className="hero-mobile-photo relative mt-8 h-[320px] w-full overflow-hidden lg:hidden">
+          <img
+            src="/images/home/alldent-hero-team.webp"
+            alt="ארבעה אנשי מקצוע מעולם הדנטל"
+            loading="eager"
+            decoding="async"
+            className="h-full w-full object-cover object-[48%_50%]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#171411]/20 via-transparent to-[#171411]" />
         </div>
       </div>
 
-      <div className="pointer-events-none absolute bottom-6 left-1/2 grid -translate-x-1/2 justify-items-center gap-2 text-[12px] text-white/55">
-        <span>גללו להמשך</span>
-        <span className="h-12 w-px animate-pulse bg-gradient-to-b from-white/70 to-transparent" />
-      </div>
+      {/* מעבר עדין לאזור הבא */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-16 bg-gradient-to-b from-transparent to-white" />
+
+      <style>{`
+        .home-hero ::selection {
+          background: rgba(0, 128, 128, 0.55);
+          color: #fff;
+        }
+
+        .home-hero .hero-photo-img {
+          -webkit-mask-image:
+            linear-gradient(to right, #000 0%, #000 67%, rgba(0,0,0,0.72) 81%, transparent 100%),
+            linear-gradient(to bottom, transparent 0%, #000 8%, #000 90%, transparent 100%);
+          mask-image:
+            linear-gradient(to right, #000 0%, #000 67%, rgba(0,0,0,0.72) 81%, transparent 100%),
+            linear-gradient(to bottom, transparent 0%, #000 8%, #000 90%, transparent 100%);
+          -webkit-mask-composite: source-in;
+          mask-composite: intersect;
+          filter: saturate(0.96) contrast(1.04);
+          animation: heroKen 18s ease-in-out infinite alternate;
+          transform-origin: 38% 58%;
+        }
+
+        .home-hero .hero-photo {
+          animation: heroPhotoIn 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .home-hero .hero-anim {
+          animation: heroUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .home-hero .hero-d1 { animation-delay: 0.05s; }
+        .home-hero .hero-d2 { animation-delay: 0.16s; }
+        .home-hero .hero-d3 { animation-delay: 0.30s; }
+        .home-hero .hero-d4 { animation-delay: 0.42s; }
+        .home-hero .hero-d5 { animation-delay: 0.54s; }
+        .home-hero .hero-d6 { animation-delay: 0.66s; }
+
+        @keyframes heroUp {
+          from { opacity: 0; transform: translateY(22px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes heroPhotoIn {
+          from { opacity: 0; transform: scale(1.025); }
+          to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes heroKen {
+          from { transform: scale(1); }
+          to { transform: scale(1.035); }
+        }
+
+        @media (max-width: 1023px) {
+          .home-hero .hero-mobile-photo img {
+            -webkit-mask-image: linear-gradient(
+              to bottom,
+              transparent 0%,
+              #000 10%,
+              #000 80%,
+              transparent 100%
+            );
+            mask-image: linear-gradient(
+              to bottom,
+              transparent 0%,
+              #000 10%,
+              #000 80%,
+              transparent 100%
+            );
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .home-hero .hero-photo,
+          .home-hero .hero-anim,
+          .home-hero .hero-photo-img {
+            animation: none !important;
+          }
+        }
+      `}</style>
     </section>
   )
 }
