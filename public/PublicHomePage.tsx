@@ -1,673 +1,606 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
-import {
-  Search, ArrowUpLeft, MessageCircle, Sparkles, Users, Briefcase, CheckCircle2,
-  Smartphone, GraduationCap, Newspaper, Bell, Heart, Award, Shield, Zap,
-  Stethoscope, BookOpen, Play
-} from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Award, Briefcase, GraduationCap, MapPin, MessageCircle, Users, Wrench } from 'lucide-react'
 import { usePublicJobs } from '@/hooks/usePublicJobs'
+import type { PublicJob } from '@/services/publicJobsService'
 import PublicJobCard from '@/components/public/PublicJobCard'
 import PublicJobSkeleton from '@/components/public/PublicJobSkeleton'
 import RevealOnScroll from '@/components/public/RevealOnScroll'
-import AnimatedCounter from '@/components/public/AnimatedCounter'
+import { CareerCategoriesCarousel } from '@/components/home/CareerCategoriesCarousel'
 
-const STATS = [
-  { value: 1558, label: 'משרות שפורסמו' },
-  { value: 18000, label: 'אנשי מקצוע', format: (n: number) => `${(n / 1000).toFixed(0)}K+` },
-  { value: 4348, label: 'סייעות במאגר' },
-  { value: 2327, label: 'שינניות במאגר' },
+// ─── Typewriter ──────────────────────────────────────────────────────────────
+
+const ROTATING_WORDS = [
+  'קריירה דנטלית',
+  'גיוס עובדים',
+  'קהילה מקצועית',
+  'למידה והתפתחות',
+  'לוח משרות דנטלי',
 ]
 
-const FEATURES = [
-  { icon: Briefcase, title: 'לוח משרות', body: 'משרות דנטליות אנונימיות מעודכנות בזמן אמת. פילטרים ממוקדים לתפקיד, אזור והיקף.' },
-  { icon: Shield, title: 'דיסקרטיות מלאה', body: 'שם המרפאה לא נחשף. פרטי המעסיק מוסתרים. המועמדים מוגנים לחלוטין.' },
-  { icon: GraduationCap, title: 'אקדמיה דנטלית', body: 'קורסים, הכשרות וסדנאות מקצועיות לכל תפקיד דנטלי — בקרוב.' },
-  { icon: Newspaper, title: 'חדשות וכתבות', body: 'חידושים, מגמות, ראיונות והדרכות — הבית הדיגיטלי של הענף הדנטלי.' },
-  { icon: Smartphone, title: 'אפליקציה ייעודית', body: 'מערכת ניהול מועמדים, התראות על משרות ופרופיל מקצועי — בפיתוח.' },
-  { icon: Heart, title: 'קהילה מקצועית', body: 'מאגר של אלפי רופאים, סייעות, שינניות וטכנאים — כולם דנטלים, כולם אקטיביים.' },
+function TypewriterWords() {
+  const [wordIndex, setWordIndex] = useState(0)
+  const [charIndex, setCharIndex] = useState(0)
+  const [deleting, setDeleting] = useState(false)
+
+  useEffect(() => {
+    const current = ROTATING_WORDS[wordIndex]
+    const delay = !deleting && charIndex === current.length ? 1350 : deleting ? 48 : 90
+
+    const timer = window.setTimeout(() => {
+      if (!deleting && charIndex < current.length) {
+        setCharIndex((value) => value + 1)
+        return
+      }
+      if (!deleting && charIndex === current.length) {
+        setDeleting(true)
+        return
+      }
+      if (deleting && charIndex > 0) {
+        setCharIndex((value) => value - 1)
+        return
+      }
+      setDeleting(false)
+      setWordIndex((value) => (value + 1) % ROTATING_WORDS.length)
+    }, delay)
+
+    return () => window.clearTimeout(timer)
+  }, [charIndex, deleting, wordIndex])
+
+  return <span>{ROTATING_WORDS[wordIndex].slice(0, charIndex)}</span>
+}
+
+// ─── Hero ─────────────────────────────────────────────────────────────────────
+
+const HERO_HIGHLIGHTS = [
+  { icon: Award, label: 'משרות וגיוס איכותי', tone: '#8ff5f5' },
+  { icon: Users, label: 'קהילה מקצועית', tone: '#e4c394' },
+  { icon: Wrench, label: 'כלים מתקדמים', tone: '#8ff5f5' },
+  { icon: GraduationCap, label: 'תוכן וידע מקצועי', tone: '#e4c394' },
 ]
 
-const ROLE_TILES = [
-  { name: 'רופאי שיניים', count: '10,189', img: '/images/fallback/dentist.svg' },
-  { name: 'סייעות', count: '4,348', img: '/images/fallback/dental-assistant.svg' },
-  { name: 'שינניות', count: '2,327', img: '/images/fallback/hygienist.svg' },
-  { name: 'טכנאי שיניים', count: '617', img: '/images/fallback/dental-tech.svg' },
-  { name: 'מזכירות', count: '719', img: '/images/fallback/receptionist.svg' },
-  { name: 'מנהלי מרפאות', count: '781', img: '/images/fallback/clinic-manager.svg' },
-]
+function PremiumHero() {
+  return (
+    <section
+      className="home-hero relative isolate overflow-hidden bg-[#0b0d0c] text-white"
+      dir="rtl"
+      aria-labelledby="home-hero-title"
+    >
+      {/* רקע גרפיט חם */}
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_46%,rgba(0,128,128,0.14),transparent_30%),radial-gradient(circle_at_94%_84%,rgba(181,116,58,0.22),transparent_30%),radial-gradient(circle_at_94%_8%,rgba(201,150,82,0.08),transparent_22%),linear-gradient(112deg,#080a09_0%,#0b0d0c_44%,#10100f_72%,#0c0c0b_100%)]" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(rgba(255,255,255,0.14)_0.7px,transparent_0.7px)] [background-size:22px_22px]" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
-const ARTICLE_TEASERS = [
+      {/* קשתות חום–טורקיז מאחורי התמונה */}
+      <div className="pointer-events-none absolute bottom-[-210px] left-[-80px] hidden h-[640px] w-[760px] rounded-[50%] border border-[#d9a35f]/55 lg:block" />
+      <div className="pointer-events-none absolute bottom-[-235px] left-[-25px] hidden h-[660px] w-[790px] rounded-[50%] border border-[#00a7a0]/42 lg:block" />
+      <div className="pointer-events-none absolute bottom-[-255px] left-[30px] hidden h-[680px] w-[820px] rounded-[50%] border border-white/8 lg:block" />
+
+      {/* תמונת הצוות – משולבת ברקע ללא מסגרת */}
+      <div className="hero-photo pointer-events-none absolute inset-y-0 left-0 hidden w-[58%] lg:block">
+        <img
+          src="/images/home/alldent-hero-team.webp"
+          alt="ארבעה אנשי מקצוע מעולם הדנטל"
+          loading="eager"
+          decoding="async"
+          className="hero-photo-img h-full w-full object-cover object-[48%_50%]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#0b0d0c]/90" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0b0d0c] to-transparent" />
+      </div>
+
+      <div className="relative z-10 mx-auto flex min-h-[610px] w-full max-w-[1640px] flex-col items-center px-5 pb-0 pt-10 md:px-8 lg:min-h-[640px] lg:flex-row lg:py-12 lg:pl-10 lg:pr-4 xl:pl-14 xl:pr-6">
+        {/* תוכן – ללא שינוי במלל, בקישורים או באפקט ההקלדה */}
+        <div className="hero-copy z-20 w-full text-center lg:ml-auto lg:w-[48%] lg:text-right xl:w-[46%]">
+          <p className="hero-anim hero-d1 mb-5 inline-flex items-center gap-2.5 text-[12px] font-extrabold tracking-[0.22em] text-[#e4c394]">
+            <span className="h-px w-7 bg-[#e4c394]/70" />
+            פלטפורמת הדנטל המובילה בישראל
+          </p>
+
+          <h1
+            id="home-hero-title"
+            className="hero-anim hero-d2 mx-auto max-w-[13ch] text-[clamp(2.55rem,6.1vw,5rem)] font-black leading-[1.04] [text-wrap:balance] text-white lg:mx-0"
+          >
+            הבית המקצועי של אנשי הדנטל בישראל
+          </h1>
+
+          <div
+            className="hero-anim hero-d3 mt-6 flex min-h-[1.5em] items-center justify-center gap-3 text-[clamp(1.3rem,2.4vw,2.05rem)] font-extrabold text-[#42cbc6] lg:justify-start"
+            aria-live="polite"
+          >
+            <span className="h-[1.1em] w-[3px] shrink-0 rounded-full bg-[#e4c394]" />
+            <TypewriterWords />
+          </div>
+
+          <p className="hero-anim hero-d4 mx-auto mt-6 max-w-xl text-[17px] leading-[1.8] text-white/76 md:text-[19px] lg:mx-0">
+            קריירה, גיוס, קהילה, למידה והתפתחות מקצועית — הכול בפלטפורמה אחת לאנשי הדנטל בישראל.
+          </p>
+
+          <div className="hero-anim hero-d5 mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
+            <Link
+              to="/jobs"
+              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full bg-[#008080] px-7 py-3.5 text-[15px] font-bold text-white shadow-[0_20px_46px_-20px_rgba(0,128,128,0.95)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#006D6D] hover:shadow-[0_24px_52px_-20px_rgba(0,128,128,0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ff5f5] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0d0c]"
+            >
+              <Briefcase className="h-[18px] w-[18px] transition-transform duration-300 group-hover:-translate-y-0.5" />
+              חיפוש משרות
+            </Link>
+
+            <Link
+              to="/employers"
+              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full bg-gradient-to-l from-[#d9b37b] to-[#e7c79a] px-7 py-3.5 text-[15px] font-bold text-[#241c10] shadow-[0_20px_46px_-22px_rgba(217,179,123,0.9)] transition duration-300 hover:-translate-y-0.5 hover:from-[#e2be86] hover:to-[#f0d3a8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e4c394] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0d0c]"
+            >
+              <Users className="h-[18px] w-[18px] transition-transform duration-300 group-hover:scale-105" />
+              גיוס עובדים
+            </Link>
+
+            <a
+              href="https://wa.me/972533951003"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-6 py-3.5 text-[15px] font-bold text-white backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-[#25D366]/45 hover:bg-white/[0.11] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0d0c]"
+            >
+              <MessageCircle className="h-[18px] w-[18px] text-[#4ade80] transition-transform duration-300 group-hover:scale-105" />
+              WhatsApp
+            </a>
+          </div>
+
+          <ul className="hero-anim hero-d6 mx-auto mt-9 grid max-w-xl grid-cols-2 border-t border-white/10 pt-6 sm:grid-cols-4 lg:mx-0">
+            {HERO_HIGHLIGHTS.map(({ icon: Icon, label, tone }, index) => (
+              <li
+                key={label}
+                className={`flex min-h-[76px] flex-col items-center justify-center gap-2 px-3 text-center ${
+                  index < HERO_HIGHLIGHTS.length - 1 ? 'sm:border-l sm:border-white/10' : ''
+                }`}
+              >
+                <Icon className="h-6 w-6 shrink-0" style={{ color: tone }} />
+                <span className="text-[13px] font-semibold leading-tight text-white/85">{label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        {/* גרסת מובייל של התמונה */}
+        <div className="hero-mobile-photo relative mt-8 h-[320px] w-full overflow-hidden lg:hidden">
+          <img
+            src="/images/home/alldent-hero-team.webp"
+            alt="ארבעה אנשי מקצוע מעולם הדנטל"
+            loading="eager"
+            decoding="async"
+            className="h-full w-full object-cover object-[48%_50%]"
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0b0d0c]/20 via-transparent to-[#0b0d0c]" />
+        </div>
+      </div>
+
+      {/* מעבר קמור ועדין לאזור הבא */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-[-1px] z-30 h-[54px] overflow-hidden md:h-[72px]"
+        aria-hidden="true"
+      >
+        <svg
+          viewBox="0 0 1440 100"
+          preserveAspectRatio="none"
+          className="h-full w-full"
+        >
+          <path
+            d="M0,82 C360,62 1080,62 1440,82 L1440,100 L0,100 Z"
+            fill="#ffffff"
+          />
+          <path
+            d="M0,82 C360,62 1080,62 1440,82"
+            fill="none"
+            stroke="#c99652"
+            strokeOpacity="0.62"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      </div>
+
+      <style>{`
+        .home-hero ::selection {
+          background: rgba(0, 128, 128, 0.55);
+          color: #fff;
+        }
+
+        .home-hero .hero-photo-img {
+          -webkit-mask-image:
+            linear-gradient(to right, #000 0%, #000 67%, rgba(0,0,0,0.72) 81%, transparent 100%),
+            linear-gradient(to bottom, transparent 0%, #000 8%, #000 90%, transparent 100%);
+          mask-image:
+            linear-gradient(to right, #000 0%, #000 67%, rgba(0,0,0,0.72) 81%, transparent 100%),
+            linear-gradient(to bottom, transparent 0%, #000 8%, #000 90%, transparent 100%);
+          -webkit-mask-composite: source-in;
+          mask-composite: intersect;
+          filter: saturate(0.96) contrast(1.04);
+          animation: heroKen 18s ease-in-out infinite alternate;
+          transform-origin: 38% 58%;
+        }
+
+        .home-hero .hero-photo {
+          animation: heroPhotoIn 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .home-hero .hero-anim {
+          animation: heroUp 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .home-hero .hero-d1 { animation-delay: 0.05s; }
+        .home-hero .hero-d2 { animation-delay: 0.16s; }
+        .home-hero .hero-d3 { animation-delay: 0.30s; }
+        .home-hero .hero-d4 { animation-delay: 0.42s; }
+        .home-hero .hero-d5 { animation-delay: 0.54s; }
+        .home-hero .hero-d6 { animation-delay: 0.66s; }
+
+        @keyframes heroUp {
+          from { opacity: 0; transform: translateY(22px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes heroPhotoIn {
+          from { opacity: 0; transform: scale(1.025); }
+          to { opacity: 1; transform: scale(1); }
+        }
+
+        @keyframes heroKen {
+          from { transform: scale(1); }
+          to { transform: scale(1.035); }
+        }
+
+        @media (max-width: 1023px) {
+          .home-hero .hero-mobile-photo img {
+            -webkit-mask-image: linear-gradient(
+              to bottom,
+              transparent 0%,
+              #000 10%,
+              #000 80%,
+              transparent 100%
+            );
+            mask-image: linear-gradient(
+              to bottom,
+              transparent 0%,
+              #000 10%,
+              #000 80%,
+              transparent 100%
+            );
+          }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+          .home-hero .hero-photo,
+          .home-hero .hero-anim,
+          .home-hero .hero-photo-img {
+            animation: none !important;
+          }
+        }
+      `}</style>
+    </section>
+  )
+}
+
+// ─── Properties data (homepage teaser — 4 mock items) ─────────────────────────
+
+const PROPERTIES = [
   {
-    tag: 'חידושים',
-    title: 'AI ברפואת שיניים: איך טכנולוגיה משנה את המקצוע ב-2026',
-    date: 'בקרוב',
-    img: '/images/fallback/dentist.svg',
-    color: '#008080',
+    id: 'p1',
+    index: '01',
+    title: 'מרפאה פעילה בבאר שבע',
+    location: 'באר שבע',
+    type: 'קליניקה פעילה',
+    description: 'מרפאה פעילה עם מספר חדרי טיפול, ציוד קיים ואפשרות להמשך פעילות מיידי.',
+    highlights: ['5 חדרי טיפול', 'ציוד מלא', 'מטופלים פעילים'],
+    image: '/images/properties/property-1.jpg',
   },
   {
-    tag: 'מדריך',
-    title: 'איך לבחור מרפאה? המדריך המלא לרופא/ה צעיר/ה',
-    date: 'בקרוב',
-    img: '/images/fallback/clinic-manager.svg',
-    color: '#D9A928',
-  },
-  {
-    tag: 'אקדמיה',
-    title: 'קורס סייעות מתקדמות: השתלות וכירורגיה',
-    date: 'בקרוב',
-    img: '/images/fallback/dental-assistant.svg',
-    color: '#006D6D',
+    id: 'p2',
+    index: '02',
+    title: 'מעבדה דנטלית במרכז',
+    location: 'אזור המרכז',
+    type: 'מעבדה דנטלית',
+    description: 'נכס מקצועי המיועד לפעילות מעבדה דנטלית עם תשתית קיימת.',
+    highlights: ['אזור מרכזי', 'תשתית קיימת', 'מתאים להמשך פעילות'],
+    image: '/images/properties/property-2.jpg',
   },
 ]
 
-export default function PublicHomePage() {
-  const navigate = useNavigate()
-  const [q, setQ] = useState('')
-  const [email, setEmail] = useState('')
-  const [signedUp, setSignedUp] = useState(false)
-  const { data: jobs, isLoading } = usePublicJobs({ sort: 'newest' })
+// ─── Properties Showcase — Stack Scroll Reveal ───────────────────────────────
 
-  const onSearch = (e: React.FormEvent) => {
-    e.preventDefault()
-    navigate(q.trim() ? `/jobs?q=${encodeURIComponent(q.trim())}` : '/jobs')
-  }
-
-  const onSubscribe = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (email.trim()) setSignedUp(true)
-  }
-
-  const featuredJobs = jobs?.slice(0, 4) ?? []
+function PropertiesShowcase() {
+  const [imgError, setImgError] = useState<Record<string, boolean>>({})
 
   return (
-    <div>
-      {/* ═════════════════ 1. HERO ═════════════════ */}
-      <section className="relative bg-paper overflow-hidden">
-        {/* Decorative shapes */}
-        <div className="pointer-events-none absolute -top-32 -left-32 w-[500px] h-[500px] rounded-full bg-teal-mist opacity-50 blur-3xl" />
-        <div className="pointer-events-none absolute top-1/3 -right-32 w-[400px] h-[400px] rounded-full bg-gold/10 blur-3xl" />
+    <section className="props-section relative isolate overflow-hidden bg-[#1e1e1e] py-20 text-white md:py-28" dir="rtl">
+      <div className="pointer-events-none absolute -right-32 top-0 h-[28rem] w-[28rem] rounded-full bg-[#008080]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-32 bottom-0 h-[24rem] w-[24rem] rounded-full bg-[#D97706]/8 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(rgba(255,255,255,0.08)_0.7px,transparent_0.7px)] [background-size:16px_16px]" />
 
-        <div className="relative max-w-7xl mx-auto px-5 md:px-8 pt-12 md:pt-20 pb-16 md:pb-24">
-          <div className="grid lg:grid-cols-12 gap-10 lg:gap-16 items-center">
-            {/* Left: text + search */}
-            <div className="lg:col-span-7 text-right">
-              <RevealOnScroll>
-                <div className="inline-flex items-center gap-2 bg-teal-mist text-teal-deep text-[12px] font-bold px-4 py-2 rounded-full mb-6">
-                  <Sparkles className="h-3.5 w-3.5 text-gold" />
-                  <span>הבית של הענף הדנטלי בישראל</span>
-                </div>
-              </RevealOnScroll>
+      <div className="relative z-10 mx-auto max-w-7xl px-5 md:px-8">
+        {/* Header */}
+        <RevealOnScroll>
+          <div className="mb-16 text-center">
+            <p className="mb-4 inline-flex rounded-full border border-white/10 bg-white/[0.07] px-5 py-2 text-[12px] font-extrabold tracking-[0.28em] text-[#D97706] backdrop-blur" dir="ltr">
+              HOME DENT
+            </p>
+            <h2 className="text-[40px] font-black tracking-[-0.04em] text-white md:text-[56px]">
+              נכסים דנטליים
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl text-base leading-9 text-white/65 md:text-lg">
+              מרפאות, מעבדות והזדמנויות עסקיות בעולם הדנטל — מכירה, השכרה, שותפויות והעברת פעילות.
+            </p>
+          </div>
+        </RevealOnScroll>
 
-              <RevealOnScroll delay={100}>
-                <h1 className="font-display text-ink text-[44px] sm:text-[56px] lg:text-[72px] leading-[1.05] mb-6">
-                  פלטפורמת הגיוס,<br />
-                  ההשמה <span className="text-teal">והאקדמיה</span><br />
-                  לעולם הדנטלי.
-                </h1>
-              </RevealOnScroll>
+        {/* Card stack */}
+        <div className="flex flex-col gap-6 md:gap-8">
+          {PROPERTIES.map((item, i) => (
+            <RevealOnScroll key={item.id} delay={i * 120}>
+              <div className="overflow-hidden rounded-[28px] border border-white/[0.07] bg-[#232323] shadow-2xl md:grid md:grid-cols-[1.1fr_1fr]">
 
-              <RevealOnScroll delay={200}>
-                <p className="text-ink/60 text-[16px] md:text-[18px] leading-relaxed max-w-xl mb-7">
-                  משרות אנונימיות, אקדמיה מקצועית, חדשות מהענף, ובקרוב — אפליקציה ייעודית לכל איש מקצוע דנטלי.
-                </p>
-              </RevealOnScroll>
-
-              {/* Checkmark list */}
-              <RevealOnScroll delay={280}>
-                <div className="grid grid-cols-2 gap-3 mb-7 max-w-md">
-                  {['1,500+ משרות פעילות', '18,000+ מקצוענים', 'דיסקרטיות מלאה', 'אפליקציה בקרוב'].map((item) => (
-                    <div key={item} className="flex items-center gap-2 text-[13px] text-ink/75">
-                      <CheckCircle2 className="h-4 w-4 text-teal flex-shrink-0" />
-                      <span>{item}</span>
-                    </div>
-                  ))}
-                </div>
-              </RevealOnScroll>
-
-              {/* Search */}
-              <RevealOnScroll delay={360}>
-                <form onSubmit={onSearch} className="flex flex-col sm:flex-row gap-2 max-w-xl mb-6">
-                  <div className="flex-1 flex items-center bg-white rounded-2xl border border-[#E5E7EB] overflow-hidden shadow-sm focus-within:border-teal transition-colors">
-                    <Search className="h-4 w-4 text-ink/40 mr-4 flex-shrink-0" />
-                    <input
-                      type="text"
-                      value={q}
-                      onChange={(e) => setQ(e.target.value)}
-                      placeholder="חפשו תפקיד, עיר או קוד משרה..."
-                      className="flex-1 py-3.5 text-sm bg-transparent outline-none placeholder:text-ink/35"
+                {/* Image */}
+                <div className="relative h-[300px] min-h-[260px] md:h-full">
+                  {!imgError[item.id] ? (
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      onError={() => setImgError((e) => ({ ...e, [item.id]: true }))}
+                      className="h-full w-full object-cover"
                     />
-                  </div>
-                  <button
-                    type="submit"
-                    className="px-7 py-3.5 bg-teal text-white text-sm font-bold rounded-2xl hover:bg-teal-deep transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Search className="h-4 w-4" />
-                    חיפוש משרות
-                  </button>
-                </form>
-              </RevealOnScroll>
-
-              {/* CTAs */}
-              <RevealOnScroll delay={440}>
-                <div className="flex flex-wrap gap-3">
-                  <Link
-                    to="/jobs"
-                    className="flex items-center gap-2 px-5 py-3 bg-ink text-white text-sm font-bold rounded-xl hover:bg-ink-2 transition-colors"
-                  >
-                    <Briefcase className="h-4 w-4" />
-                    לכל המשרות
-                  </Link>
-                  <Link
-                    to="/for-clinics"
-                    className="flex items-center gap-2 px-5 py-3 bg-white text-ink text-sm font-bold rounded-xl border border-[#E5E7EB] hover:border-teal hover:text-teal transition-colors"
-                  >
-                    <Users className="h-4 w-4" />
-                    מעסיקים — פרסום משרה
-                  </Link>
-                  <a
-                    href="https://wa.me/972533959003"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-5 py-3 text-ink text-sm font-bold hover:text-[#25D366] transition-colors"
-                  >
-                    <MessageCircle className="h-4 w-4 text-[#25D366]" />
-                    WhatsApp
-                  </a>
+                  ) : (
+                    <div className="h-full w-full bg-gradient-to-br from-[#1a3a3a] to-[#2D2D2D]" />
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-l from-[#232323]/60 via-transparent to-transparent md:block" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#232323]/80 via-transparent to-transparent md:hidden" />
                 </div>
-              </RevealOnScroll>
-            </div>
 
-            {/* Right: asymmetric photo collage (JobStock style) */}
-            <div className="lg:col-span-5 relative">
-              <RevealOnScroll delay={400}>
-                <div className="relative h-[480px] md:h-[560px]">
-                  {/* Background blob */}
-                  <div className="absolute top-1/4 right-1/4 w-72 h-72 bg-teal/15 rounded-[60%_40%_50%_50%/40%_50%_50%_60%] -z-0" />
-                  <div className="absolute bottom-10 left-10 w-56 h-56 bg-gold/15 rounded-[40%_60%_60%_40%/60%_40%_60%_40%] -z-0" />
-
-                  {/* Photo 1 — top right (large circle) */}
-                  <div className="absolute top-0 right-0 w-44 h-44 md:w-56 md:h-56 rounded-full overflow-hidden border-4 border-white shadow-xl ring-1 ring-[#E5E7EB]">
-                    <img src="/images/fallback/dentist.svg" alt="" className="w-full h-full object-cover" />
+                {/* Content */}
+                <div className="flex flex-col justify-center px-8 py-8 md:py-10">
+                  <span className="inline-flex w-fit rounded-full bg-[#008080]/15 px-3 py-1 text-[11px] font-extrabold tracking-widest text-[#8ff5f5]">
+                    {item.type}
+                  </span>
+                  <div className="mt-2 flex items-center gap-1.5 text-[14px] text-white/70">
+                    <MapPin className="h-3.5 w-3.5 shrink-0" />
+                    <span>{item.location}</span>
                   </div>
-
-                  {/* Photo 2 — top left (rounded rect) */}
-                  <div className="absolute top-12 right-1/2 -mr-8 md:right-auto md:left-2 md:top-16 w-40 h-52 md:w-48 md:h-60 rounded-[40px] overflow-hidden shadow-xl ring-1 ring-[#E5E7EB] rotate-[-4deg]">
-                    <img src="/images/fallback/dental-assistant.svg" alt="" className="w-full h-full object-cover" />
-                  </div>
-
-                  {/* Photo 3 — bottom right (rounded) */}
-                  <div className="absolute bottom-0 right-12 w-44 h-56 md:w-52 md:h-64 rounded-[40px] overflow-hidden shadow-xl ring-1 ring-[#E5E7EB] rotate-[3deg]">
-                    <img src="/images/fallback/hygienist.svg" alt="" className="w-full h-full object-cover" />
-                  </div>
-
-                  {/* Photo 4 — bottom left (circle) */}
-                  <div className="absolute bottom-16 -left-2 md:left-12 w-36 h-36 md:w-44 md:h-44 rounded-full overflow-hidden border-4 border-white shadow-xl ring-1 ring-[#E5E7EB]">
-                    <img src="/images/fallback/clinic-manager.svg" alt="" className="w-full h-full object-cover" />
-                  </div>
-
-                  {/* Floating badge — stats */}
-                  <div className="absolute top-1/2 left-2 md:left-0 -translate-y-1/2 bg-white rounded-2xl shadow-xl p-4 border border-[#E5E7EB] z-10">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-teal flex items-center justify-center">
-                        <Briefcase className="h-5 w-5 text-white" />
-                      </div>
-                      <div>
-                        <p className="font-display text-2xl text-ink leading-none">
-                          <AnimatedCounter target={1558} format={(n) => n.toLocaleString()} />
-                        </p>
-                        <p className="text-[11px] text-ink/55 mt-0.5">משרות פעילות</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Dotted accent */}
-                  <div
-                    className="absolute -bottom-4 right-0 w-24 h-24 opacity-40"
-                    style={{
-                      backgroundImage: 'radial-gradient(circle, #D9A928 1.5px, transparent 1.5px)',
-                      backgroundSize: '12px 12px',
-                    }}
-                  />
-                </div>
-              </RevealOnScroll>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═════════════════ 2. SPLIT SECTION — half light/half dark ═════════════════ */}
-      <section className="grid md:grid-cols-2 min-h-[400px]">
-        {/* Left — Candidates (dark) */}
-        <div className="relative bg-ink text-white p-10 md:p-16 lg:p-20 flex flex-col justify-center overflow-hidden">
-          <div
-            className="absolute inset-0 opacity-[0.04]"
-            style={{
-              backgroundImage: 'radial-gradient(circle, #FAFAF7 1px, transparent 1px)',
-              backgroundSize: '24px 24px',
-            }}
-          />
-          <RevealOnScroll>
-            <div className="relative max-w-md mr-auto">
-              <p className="text-gold text-[11px] font-bold tracking-[0.25em] uppercase mb-4">For candidates</p>
-              <h2 className="font-display text-[32px] md:text-[42px] leading-[1.1] mb-5">
-                מחפשים עבודה<br />
-                <span className="text-teal">בענף הדנטלי?</span>
-              </h2>
-              <p className="text-white/65 text-[15px] leading-relaxed mb-7">
-                גלו משרות אנונימיות מעודכנות, הגישו מועמדות בדיסקרטיות, וקבלו התאמות ממוקדות לפי תפקיד, אזור וניסיון.
-              </p>
-              <Link
-                to="/jobs"
-                className="inline-flex items-center gap-2 px-6 py-3.5 bg-teal text-white text-sm font-bold rounded-xl hover:bg-teal-deep transition-colors"
-              >
-                לחיפוש משרות
-                <ArrowUpLeft className="h-4 w-4" />
-              </Link>
-            </div>
-          </RevealOnScroll>
-        </div>
-
-        {/* Right — Employers (teal) */}
-        <div className="relative bg-teal text-white p-10 md:p-16 lg:p-20 flex flex-col justify-center overflow-hidden">
-          <div className="absolute -top-20 -left-20 w-64 h-64 bg-white/5 rounded-full" />
-          <div className="absolute -bottom-32 -right-20 w-80 h-80 bg-white/5 rounded-full" />
-
-          <RevealOnScroll delay={100}>
-            <div className="relative max-w-md mr-auto">
-              <p className="text-gold text-[11px] font-bold tracking-[0.25em] uppercase mb-4">For employers</p>
-              <h2 className="font-display text-[32px] md:text-[42px] leading-[1.1] mb-5">
-                מרפאה? מעבדה?<br />
-                <span className="text-gold">מחפשים עובדים?</span>
-              </h2>
-              <p className="text-white/80 text-[15px] leading-relaxed mb-7">
-                פרסמו משרה אנונימית בלוח הדנטלי הגדול בישראל. AllDent מסננת, מתאימה ומציגה רק מועמדים רלוונטיים.
-              </p>
-              <Link
-                to="/for-clinics"
-                className="inline-flex items-center gap-2 px-6 py-3.5 bg-ink text-white text-sm font-bold rounded-xl hover:bg-ink-2 transition-colors"
-              >
-                לפרסום משרה
-                <ArrowUpLeft className="h-4 w-4" />
-              </Link>
-            </div>
-          </RevealOnScroll>
-        </div>
-      </section>
-
-      {/* ═════════════════ 3. STATS ═════════════════ */}
-      <section className="bg-paper py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-5 md:px-8">
-          <RevealOnScroll>
-            <div className="text-center mb-12">
-              <p className="text-teal text-[11px] font-bold tracking-[0.3em] uppercase mb-3">The Numbers</p>
-              <h2 className="font-display text-ink text-[32px] md:text-[44px] leading-tight">
-                קהילת המקצוענים<br className="hidden md:block" />
-                <span className="text-teal">הגדולה בענף.</span>
-              </h2>
-            </div>
-          </RevealOnScroll>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {STATS.map((stat, i) => (
-              <RevealOnScroll key={stat.label} delay={i * 80}>
-                <div className="bg-white rounded-3xl border border-[#E5E7EB] p-6 md:p-8 text-center hover:border-teal hover:shadow-lg transition-all">
-                  <p className="font-display text-teal text-[42px] md:text-[56px] leading-none mb-2">
-                    <AnimatedCounter target={stat.value} format={stat.format} />
+                  <h3 className="mt-1 text-[22px] font-black tracking-tight text-white md:text-[28px]">
+                    {item.title}
+                  </h3>
+                  <p className="mt-3 text-[15px] leading-7 text-white/60">
+                    {item.description}
                   </p>
-                  <p className="text-ink/65 text-[13.5px] font-medium">{stat.label}</p>
+                  <div className="mt-4 flex flex-wrap gap-2">
+                    {item.highlights.map((h) => (
+                      <span key={h} className="rounded-full bg-white/[0.08] px-3 py-1 text-[12px] text-white/65">
+                        {h}
+                      </span>
+                    ))}
+                  </div>
+                  <Link
+                    to="/dental-assets"
+                    className="mt-6 inline-flex w-fit items-center gap-2 rounded-full bg-[#008080] px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-[#006D6D]"
+                  >
+                    לצפייה בנכס ←
+                  </Link>
+                  <span className="mt-auto pt-6 font-mono text-[11px] text-white/20">{item.index}</span>
                 </div>
-              </RevealOnScroll>
-            ))}
+              </div>
+            </RevealOnScroll>
+          ))}
+        </div>
+
+        {/* Bottom CTA */}
+        <RevealOnScroll>
+          <div className="mt-14 text-center">
+            <Link
+              to="/dental-assets"
+              className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-6 py-3 text-[14px] font-bold text-white transition hover:bg-white/15"
+            >
+              לכל הנכסים הדנטליים
+            </Link>
+          </div>
+        </RevealOnScroll>
+      </div>
+
+      <style>{`
+        .props-section .reveal {
+          transform: translateY(52px) scale(0.97);
+        }
+        .props-section .reveal.in-view {
+          transform: translateY(0) scale(1);
+        }
+      `}</style>
+    </section>
+  )
+}
+
+// ─── Ecosystem mock data ──────────────────────────────────────────────────────
+
+const ECOSYSTEM = [
+  { id: 'labs',       index: '01', label: 'מעבדות דנטליות',   name: 'Dental Lab Pro',    tagline: 'שירותי מעבדה בפריסה ארצית למרפאות, מומחים ומעבדות.' },
+  { id: 'supply',     index: '02', label: 'ציוד וחומרים',      name: 'Dental Supply',     tagline: 'פתרונות לציוד וחומרים דנטליים לכל סוגי המרפאות.' },
+  { id: 'media',      index: '03', label: 'שיווק ומדיה',       name: 'Clinic Media',      tagline: 'צילום, וידאו ותוכן מקצועי למרפאות ועסקים דנטליים.' },
+  { id: 'software',   index: '04', label: 'תוכנות וטכנולוגיה', name: 'Medical Software',  tagline: 'פלטפורמות דיגיטליות לניהול מרפאה ושיפור חווית המטופל.' },
+  { id: 'consulting', index: '05', label: 'ייעוץ וליווי',      name: 'Dental Consulting', tagline: 'ייעוץ אסטרטגי ותפעולי למרפאות ולעסקים בענף הדנטלי.' },
+  { id: 'finance',    index: '06', label: 'מימון וביטוח',      name: 'Finance Dental',    tagline: 'פתרונות עסקיים, מימון וביטוח מקצועי לרפואת שיניים.' },
+]
+
+// ─── Ecosystem Showcase ───────────────────────────────────────────────────────
+
+function EcosystemShowcase() {
+  const [activeId, setActiveId] = useState(ECOSYSTEM[0].id)
+  const [fadeKey, setFadeKey] = useState(0)
+
+  const active = ECOSYSTEM.find((e) => e.id === activeId)!
+
+  function handleActivate(id: string) {
+    if (id === activeId) return
+    setActiveId(id)
+    setFadeKey((k) => k + 1)
+  }
+
+  return (
+    <section className="relative isolate overflow-hidden border-t border-white/[0.06] bg-[#1b1b1b] py-24 text-white" dir="rtl">
+      <div className="pointer-events-none absolute -right-40 top-10 h-[32rem] w-[32rem] rounded-full bg-[#008080]/10 blur-3xl" />
+      <div className="pointer-events-none absolute -left-40 bottom-10 h-[28rem] w-[28rem] rounded-full bg-[#D97706]/7 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.10] [background-image:radial-gradient(rgba(255,255,255,0.08)_0.7px,transparent_0.7px)] [background-size:16px_16px]" />
+
+      <div className="relative z-10 mx-auto max-w-7xl px-5 md:px-8">
+        <RevealOnScroll>
+          <div className="mb-16 text-center">
+            <p className="mb-4 inline-flex rounded-full border border-white/10 bg-white/[0.07] px-5 py-2 text-[12px] font-extrabold tracking-[0.28em] text-[#008080] backdrop-blur" dir="ltr">
+              ALLDENT ECOSYSTEM
+            </p>
+            <h2 className="text-[34px] font-black tracking-[-0.035em] text-white md:text-[44px]">
+              שירותים ופתרונות לעולם הדנטל
+            </h2>
+            <p className="mx-auto mt-3 max-w-2xl text-[16px] leading-relaxed text-white/55">
+              מרפאות, מעבדות, חברות, ספקי ציוד ונותני שירות הפועלים בענף הדנטלי.
+            </p>
+          </div>
+        </RevealOnScroll>
+
+        <div className="grid items-stretch gap-6 md:grid-cols-[1.8fr_1fr]">
+          {/* Spotlight panel */}
+          <div className="overflow-hidden rounded-2xl bg-[#242424]">
+            <div className="relative overflow-hidden" style={{ height: '340px' }}>
+              <div
+                key={`eco-img-${fadeKey}`}
+                className="h-full w-full bg-gradient-to-br from-[#1a3a3a] to-[#2D2D2D]"
+                style={{ animation: 'ecosystemFadeIn 0.45s ease forwards' }}
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#242424]/95 via-[#242424]/20 to-transparent" />
+            </div>
+
+            <div
+              key={`eco-content-${fadeKey}`}
+              className="px-7 py-6"
+              style={{ animation: 'ecosystemFadeIn 0.45s ease forwards' }}
+              dir="rtl"
+            >
+              <span className="inline-flex rounded-full bg-[#008080]/20 px-3 py-1 text-[11px] font-extrabold tracking-widest text-[#008080]">
+                {active.label}
+              </span>
+              <h3 className="mt-3 text-[26px] font-black tracking-tight text-white">
+                {active.name}
+              </h3>
+              <p className="mt-2 text-[15px] leading-relaxed text-white/60">
+                {active.tagline}
+              </p>
+              <button className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#008080] px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-[#006D6D]">
+                לפרטים נוספים ←
+              </button>
+            </div>
           </div>
 
-          {/* Role tiles */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mt-10">
-            {ROLE_TILES.map((role, i) => (
-              <RevealOnScroll key={role.name} delay={i * 60}>
-                <div className="group flex items-center gap-3 bg-white rounded-2xl border border-[#E5E7EB] p-3 hover:border-teal transition-colors cursor-pointer">
-                  <div className="w-12 h-12 rounded-xl overflow-hidden bg-teal-mist flex-shrink-0">
-                    <img src={role.img} alt="" className="w-full h-full object-cover" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-[12.5px] font-bold text-ink truncate group-hover:text-teal transition-colors">{role.name}</p>
-                    <p className="text-[10.5px] font-mono text-ink/45">{role.count}</p>
-                  </div>
+          {/* Category list */}
+          <div className="flex flex-col justify-center gap-1">
+            {ECOSYSTEM.map((item) => {
+              const isActive = item.id === activeId
+              return (
+                <div
+                  key={item.id}
+                  onMouseEnter={() => handleActivate(item.id)}
+                  onClick={() => handleActivate(item.id)}
+                  className={`flex cursor-pointer items-center gap-4 rounded-xl border-r-2 px-5 py-4 transition-all duration-200 ${
+                    isActive
+                      ? 'border-[#008080] bg-white/[0.06]'
+                      : 'border-transparent hover:bg-white/[0.03]'
+                  }`}
+                >
+                  <span className="w-7 shrink-0 font-mono text-[12px] text-[#008080]/60">
+                    {item.index}
+                  </span>
+                  <span className={`text-[15px] font-bold transition-colors duration-200 ${isActive ? 'text-white' : 'text-white/45'}`}>
+                    {item.label}
+                  </span>
                 </div>
-              </RevealOnScroll>
-            ))}
+              )
+            })}
           </div>
         </div>
-      </section>
 
-      {/* ═════════════════ 4. FEATURED JOBS ═════════════════ */}
-      <section className="bg-mist py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-5 md:px-8">
+        <RevealOnScroll>
+          <div className="mt-14 text-center">
+            <button className="inline-flex items-center gap-2 rounded-full bg-[#008080] px-6 py-3 text-[14px] font-bold text-white transition hover:bg-[#006D6D]">
+              לכל השירותים והפתרונות
+            </button>
+          </div>
+        </RevealOnScroll>
+      </div>
+
+      <style>{`
+        @keyframes ecosystemFadeIn {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </section>
+  )
+}
+
+// ─── Role-based job picker ────────────────────────────────────────────────────
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function PublicHomePage() {
+  const { data: jobs, isLoading } = usePublicJobs({ sort: 'newest' })
+  // המשרות החמות = הכי עדכניות לפי זמן פרסום, החדשה ביותר ראשונה.
+  const featuredJobs = [...(jobs ?? [])]
+    .sort((a, b) => (b.published_at ?? '').localeCompare(a.published_at ?? ''))
+    .slice(0, 6)
+
+  return (
+    <div className="bg-white">
+      <PremiumHero />
+
+      <CareerCategoriesCarousel />
+
+      {/* Jobs section */}
+      <section className="bg-[#F3F4F6] py-20 md:py-28" dir="rtl">
+        <div className="mx-auto max-w-7xl px-5 md:px-8">
           <RevealOnScroll>
-            <div className="grid md:grid-cols-2 gap-4 mb-10 items-end">
+            <div className="mb-14 grid gap-4 md:grid-cols-2 md:items-end">
               <div>
-                <p className="text-teal text-[11px] font-bold tracking-[0.3em] uppercase mb-3">Latest opportunities</p>
-                <h2 className="font-display text-ink text-[32px] md:text-[44px] leading-tight">
-                  משרות <span className="text-teal">חמות</span> שמחכות לכם.
+                <p className="mb-3 text-[12px] font-extrabold tracking-[0.24em] text-[#008080] uppercase" dir="ltr">
+                  Latest Opportunities
+                </p>
+                <h2 className="text-[#2D2D2D] text-[34px] md:text-[44px] leading-[1.12] font-black tracking-[-0.035em]">
+                  משרות חדשות בעולם הדנטל
                 </h2>
               </div>
               <div className="flex md:justify-end">
                 <Link
                   to="/jobs"
-                  className="group inline-flex items-center gap-2 text-ink text-[14px] font-bold border-b-2 border-ink pb-1 hover:gap-4 hover:text-teal hover:border-teal transition-all"
+                  className="inline-flex items-center gap-2 rounded-full bg-[#008080] px-5 py-3 text-[14px] font-bold text-white transition hover:bg-[#006D6D]"
                 >
                   לכל המשרות
-                  <ArrowUpLeft className="h-4 w-4" />
                 </Link>
               </div>
             </div>
           </RevealOnScroll>
 
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              {Array.from({ length: 4 }).map((_, i) => <PublicJobSkeleton key={i} />)}
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => <PublicJobSkeleton key={i} />)}
             </div>
           ) : featuredJobs.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {featuredJobs.map((job, i) => (
-                <RevealOnScroll key={job.job_code} delay={i * 80}>
-                  <PublicJobCard job={job} />
+                <RevealOnScroll key={job.job_code} delay={i * 110}>
+                  <PublicJobCard job={job} index={i} />
                 </RevealOnScroll>
               ))}
             </div>
           ) : (
-            <div className="text-center py-16 bg-white rounded-3xl border border-[#E5E7EB]">
-              <Briefcase className="h-12 w-12 mx-auto mb-3 text-ink/30" />
-              <p className="text-sm text-ink/60">משרות חדשות בקרוב</p>
+            <div className="rounded-[2rem] border border-black/10 bg-white py-16 text-center">
+              <Briefcase className="mx-auto mb-3 h-12 w-12 text-[#2D2D2D]/30" />
+              <p className="text-sm text-[#2D2D2D]/60">משרות חדשות בקרוב</p>
             </div>
           )}
         </div>
       </section>
 
-      {/* ═════════════════ 5. APP COMING SOON (dark teaser) ═════════════════ */}
-      <section className="relative bg-ink text-white py-20 md:py-28 overflow-hidden">
-        <div
-          className="absolute inset-0 opacity-[0.05]"
-          style={{
-            backgroundImage: 'radial-gradient(circle, #FAFAF7 1px, transparent 1px)',
-            backgroundSize: '32px 32px',
-          }}
-        />
-        <div className="pointer-events-none absolute top-1/2 -translate-y-1/2 -right-32 w-[500px] h-[500px] bg-teal/20 rounded-full blur-3xl" />
-
-        <div className="relative max-w-7xl mx-auto px-5 md:px-8">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left: text */}
-            <div>
-              <RevealOnScroll>
-                <div className="inline-flex items-center gap-2 bg-gold/15 text-gold text-[11px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full mb-5">
-                  <Sparkles className="h-3 w-3" />
-                  Coming Soon
-                </div>
-              </RevealOnScroll>
-
-              <RevealOnScroll delay={100}>
-                <h2 className="font-display text-white text-[36px] md:text-[52px] leading-[1.05] mb-5">
-                  אפליקציית<br />
-                  <span className="text-teal">AllDent</span><br />
-                  בדרך אליכם.
-                </h2>
-              </RevealOnScroll>
-
-              <RevealOnScroll delay={200}>
-                <p className="text-white/65 text-[15px] md:text-[17px] leading-relaxed mb-7 max-w-lg">
-                  פרופיל מקצועי, התראות על משרות חדשות, הגשת מועמדות בלחיצה, ניהול קורות חיים, ותקשורת ישירה עם AllDent — מהנייד.
-                </p>
-              </RevealOnScroll>
-
-              {/* Features list */}
-              <RevealOnScroll delay={280}>
-                <div className="space-y-3 mb-8">
-                  {[
-                    { icon: Bell, text: 'התראות חכמות על משרות שמתאימות לך' },
-                    { icon: Award, text: 'פרופיל מקצועי + תיק עבודות דיגיטלי' },
-                    { icon: Zap, text: 'הגשה מהירה והתאמות אישיות' },
-                  ].map((item) => (
-                    <div key={item.text} className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center flex-shrink-0">
-                        <item.icon className="h-4 w-4 text-gold" />
-                      </div>
-                      <span className="text-[14px] text-white/85">{item.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </RevealOnScroll>
-
-              {/* Email signup */}
-              <RevealOnScroll delay={360}>
-                {signedUp ? (
-                  <div className="bg-teal/15 border border-teal/30 rounded-2xl p-4 flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-teal flex-shrink-0" />
-                    <p className="text-[14px] text-white">תודה! נשלח לך הודעה ברגע שהאפליקציה תעלה לאוויר.</p>
-                  </div>
-                ) : (
-                  <form onSubmit={onSubscribe} className="flex flex-col sm:flex-row gap-2 max-w-md">
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="האימייל שלך"
-                      required
-                      dir="ltr"
-                      className="flex-1 px-5 py-3.5 text-sm bg-white/10 border border-white/15 rounded-xl outline-none focus:border-teal placeholder:text-white/40 text-white"
-                    />
-                    <button
-                      type="submit"
-                      className="px-5 py-3.5 bg-gold text-ink text-sm font-bold rounded-xl hover:bg-gold-warm transition-colors flex items-center justify-center gap-2"
-                    >
-                      קבלו עדכון
-                      <Bell className="h-4 w-4" />
-                    </button>
-                  </form>
-                )}
-                <p className="text-[11px] text-white/35 mt-3">לא נשלח ספאם. עדכון אחד בלבד כשהאפליקציה תעלה.</p>
-              </RevealOnScroll>
-            </div>
-
-            {/* Right: phone mockup */}
-            <div className="relative flex justify-center">
-              <RevealOnScroll delay={300}>
-                <div className="relative">
-                  {/* Glow behind phone */}
-                  <div className="absolute inset-0 bg-teal/30 blur-3xl rounded-full" />
-
-                  {/* Phone frame */}
-                  <div className="relative w-64 md:w-72 aspect-[9/19] bg-ink-3 rounded-[48px] border-[8px] border-ink-2 shadow-2xl overflow-hidden">
-                    {/* Notch */}
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 w-24 h-6 bg-ink rounded-full z-10" />
-                    {/* Screen content */}
-                    <div className="absolute inset-0 bg-gradient-to-b from-teal-deep to-ink p-5 pt-12 flex flex-col">
-                      <img src="/images/logo.png" alt="AllDent" className="h-7 w-auto brightness-0 invert mx-auto mb-6" />
-                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 mb-3">
-                        <p className="text-[10px] font-mono text-gold tracking-widest uppercase mb-1">משרה חדשה</p>
-                        <p className="text-[13px] font-bold text-white leading-tight">סייעת מנוסה - בני ברק</p>
-                      </div>
-                      <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 mb-3">
-                        <p className="text-[10px] font-mono text-gold tracking-widest uppercase mb-1">התאמה</p>
-                        <p className="text-[13px] font-bold text-white leading-tight">98% התאמה - גן יבנה</p>
-                      </div>
-                      <div className="bg-gold rounded-2xl p-3 mt-auto">
-                        <p className="text-[13px] font-bold text-ink text-center">הגישו מועמדות</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Floating badges */}
-                  <div className="absolute -top-4 -left-4 bg-white text-ink rounded-2xl shadow-xl p-3 hidden md:block">
-                    <div className="flex items-center gap-2">
-                      <Bell className="h-4 w-4 text-teal" />
-                      <p className="text-[11px] font-bold">משרה חדשה!</p>
-                    </div>
-                  </div>
-                  <div className="absolute -bottom-4 -right-4 bg-gold text-ink rounded-2xl shadow-xl p-3 hidden md:block">
-                    <div className="flex items-center gap-2">
-                      <Heart className="h-4 w-4" />
-                      <p className="text-[11px] font-bold">בקרוב ב-2026</p>
-                    </div>
-                  </div>
-                </div>
-              </RevealOnScroll>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ═════════════════ 6. ACADEMY & ARTICLES ═════════════════ */}
-      <section className="bg-white py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-5 md:px-8">
-          <RevealOnScroll>
-            <div className="grid md:grid-cols-2 gap-4 mb-10 items-end">
-              <div>
-                <p className="text-teal text-[11px] font-bold tracking-[0.3em] uppercase mb-3">Academy & insights</p>
-                <h2 className="font-display text-ink text-[32px] md:text-[44px] leading-tight">
-                  הבית הדיגיטלי<br />
-                  <span className="text-teal">של הענף הדנטלי.</span>
-                </h2>
-              </div>
-              <p className="text-ink/60 text-[15px] leading-relaxed md:text-end">
-                כתבות, מדריכים, ראיונות, חידושים וקורסים — כל מה שאיש מקצוע דנטלי צריך לדעת.
-              </p>
-            </div>
-          </RevealOnScroll>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {ARTICLE_TEASERS.map((article, i) => (
-              <RevealOnScroll key={article.title} delay={i * 100}>
-                <article className="group bg-white rounded-3xl overflow-hidden border border-[#E5E7EB] hover:border-teal hover:-translate-y-1 transition-all duration-500 ease-out-expo h-full flex flex-col cursor-pointer">
-                  <div className="relative aspect-[4/3] overflow-hidden bg-mist">
-                    <img src={article.img} alt="" className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-                    {/* Coming soon overlay */}
-                    <div className="absolute inset-0 bg-ink/40 flex items-center justify-center">
-                      <div className="text-center">
-                        <BookOpen className="h-8 w-8 text-white mx-auto mb-2 opacity-80" />
-                        <p className="text-white font-bold text-[15px]">בקרוב</p>
-                      </div>
-                    </div>
-                    {/* Date badge */}
-                    <div className="absolute bottom-3 left-3 bg-white text-ink text-[10.5px] font-mono font-bold tracking-[0.1em] px-3 py-1.5 rounded-full uppercase">
-                      {article.date}
-                    </div>
-                  </div>
-                  <div className="p-6 flex flex-col flex-1">
-                    <p className="text-[10.5px] font-bold tracking-[0.18em] uppercase mb-3" style={{ color: article.color }}>
-                      {article.tag}
-                    </p>
-                    <h3 className="font-bold text-ink text-[17px] leading-[1.3] line-clamp-2 group-hover:text-teal transition-colors mb-auto">
-                      {article.title}
-                    </h3>
-                    <div className="flex items-center justify-between mt-5 pt-4 border-t border-[#F1F2F4]">
-                      <span className="text-[11px] text-ink/45">בקרוב באתר</span>
-                      <span className="flex items-center gap-1.5 text-[11.5px] font-bold tracking-[0.15em] text-teal uppercase">
-                        קריאה
-                        <ArrowUpLeft className="h-3.5 w-3.5" />
-                      </span>
-                    </div>
-                  </div>
-                </article>
-              </RevealOnScroll>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═════════════════ 7. FEATURES & PROCESS ═════════════════ */}
-      <section className="bg-mist py-16 md:py-24">
-        <div className="max-w-7xl mx-auto px-5 md:px-8">
-          <RevealOnScroll>
-            <div className="text-center mb-14">
-              <p className="text-teal text-[11px] font-bold tracking-[0.3em] uppercase mb-3">Features & process</p>
-              <h2 className="font-display text-ink text-[32px] md:text-[44px] leading-tight">
-                למה <span className="text-teal">AllDent?</span>
-              </h2>
-              <p className="text-ink/60 text-[15px] mt-3 max-w-2xl mx-auto">
-                ההבדל הוא בפרטים. פלטפורמה שבנויה רק לענף הדנטלי, על ידי אנשים שמכירים אותו מבפנים.
-              </p>
-            </div>
-          </RevealOnScroll>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {FEATURES.map((item, i) => (
-              <RevealOnScroll key={item.title} delay={i * 80}>
-                <div className="group bg-white rounded-3xl border border-[#E5E7EB] p-7 hover:border-teal hover:shadow-lg transition-all h-full">
-                  <div className="w-12 h-12 rounded-2xl bg-teal-mist flex items-center justify-center mb-5 group-hover:bg-teal transition-colors">
-                    <item.icon className="h-5 w-5 text-teal group-hover:text-white transition-colors" />
-                  </div>
-                  <h3 className="font-bold text-ink text-[18px] mb-3 group-hover:text-teal transition-colors">{item.title}</h3>
-                  <p className="text-ink/60 text-[14px] leading-relaxed">{item.body}</p>
-                </div>
-              </RevealOnScroll>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ═════════════════ 8. FINAL CTA (centered teal) ═════════════════ */}
-      <section className="relative bg-teal overflow-hidden">
-        <div className="absolute -top-20 -right-20 w-72 h-72 bg-white/10 rounded-full" />
-        <div className="absolute -bottom-32 -left-20 w-96 h-96 bg-white/5 rounded-full" />
-
-        <div className="relative max-w-3xl mx-auto px-5 md:px-8 py-20 md:py-28 text-center text-white">
-          <RevealOnScroll>
-            <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur text-white text-[11px] font-bold tracking-widest uppercase px-3 py-1.5 rounded-full mb-6">
-              <Stethoscope className="h-3 w-3" />
-              Ready?
-            </div>
-          </RevealOnScroll>
-
-          <RevealOnScroll delay={100}>
-            <h2 className="font-display text-[40px] md:text-[60px] leading-[1.05] mb-5">
-              הצטרפו <span className="text-gold">לבית</span><br />
-              של הענף הדנטלי.
-            </h2>
-          </RevealOnScroll>
-
-          <RevealOnScroll delay={200}>
-            <p className="text-white/80 text-[16px] md:text-[18px] leading-relaxed max-w-xl mx-auto mb-9">
-              משרות, אקדמיה, חדשות, קהילה ובקרוב אפליקציה — הכל במקום אחד, בעברית, דנטלי.
-            </p>
-          </RevealOnScroll>
-
-          <RevealOnScroll delay={300}>
-            <div className="flex flex-wrap justify-center gap-3">
-              <Link
-                to="/jobs"
-                className="flex items-center gap-2 px-7 py-3.5 bg-ink text-white text-sm font-bold rounded-xl hover:bg-ink-2 transition-colors"
-              >
-                <Briefcase className="h-4 w-4" />
-                לחיפוש משרות
-              </Link>
-              <Link
-                to="/for-clinics"
-                className="flex items-center gap-2 px-7 py-3.5 bg-white text-teal text-sm font-bold rounded-xl hover:bg-paper transition-colors"
-              >
-                <Users className="h-4 w-4" />
-                לפרסום משרה
-              </Link>
-              <a
-                href="https://wa.me/972533959003"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-7 py-3.5 bg-[#25D366] text-white text-sm font-bold rounded-xl hover:opacity-90 transition-opacity"
-              >
-                <MessageCircle className="h-4 w-4" />
-                WhatsApp
-              </a>
-            </div>
-          </RevealOnScroll>
-
-          {/* Coming soon stamp */}
-          <RevealOnScroll delay={400}>
-            <div className="mt-12 flex items-center justify-center gap-2 text-[12px] text-white/60">
-              <Play className="h-3 w-3 fill-white/60" />
-              <span>אפליקציה ייעודית בקרוב 2026</span>
-            </div>
-          </RevealOnScroll>
-        </div>
-      </section>
+      <PropertiesShowcase />
+      <EcosystemShowcase />
     </div>
   )
 }

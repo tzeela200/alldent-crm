@@ -16,7 +16,8 @@
       "Bash(git commit -m ' *)",
       "Bash(git commit *)",
       "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__list_projects",
-      "Bash(xargs grep -l \"useRecruitmentRequest\\\\|recruitment.*request\")"
+      "Bash(xargs grep -l \"useRecruitmentRequest\\\\|recruitment.*request\")",
+      "mcp__6239ba8a-25ff-48de-9726-bf076a6e7264__get_advisors"
     ]
   }
 }

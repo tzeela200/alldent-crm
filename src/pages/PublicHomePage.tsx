@@ -62,12 +62,12 @@ const HERO_HIGHLIGHTS = [
 function PremiumHero() {
   return (
     <section
-      className="home-hero relative isolate overflow-hidden bg-[#171411] text-white"
+      className="home-hero relative isolate overflow-hidden bg-[#0b0d0c] text-white"
       dir="rtl"
       aria-labelledby="home-hero-title"
     >
       {/* רקע גרפיט חם */}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_15%_50%,rgba(0,128,128,0.20),transparent_34%),radial-gradient(circle_at_78%_100%,rgba(181,116,58,0.20),transparent_38%),linear-gradient(112deg,#111312_0%,#171613_42%,#211a15_72%,#171411_100%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_46%,rgba(0,128,128,0.14),transparent_30%),radial-gradient(circle_at_94%_84%,rgba(181,116,58,0.22),transparent_30%),radial-gradient(circle_at_94%_8%,rgba(201,150,82,0.08),transparent_22%),linear-gradient(112deg,#080a09_0%,#0b0d0c_44%,#10100f_72%,#0c0c0b_100%)]" />
       <div className="pointer-events-none absolute inset-0 opacity-[0.08] [background-image:radial-gradient(rgba(255,255,255,0.14)_0.7px,transparent_0.7px)] [background-size:22px_22px]" />
       <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent" />
 
@@ -85,8 +85,8 @@ function PremiumHero() {
           decoding="async"
           className="hero-photo-img h-full w-full object-cover object-[48%_50%]"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#171411]/85" />
-        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#171411] to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-transparent to-[#0b0d0c]/90" />
+        <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-[#0b0d0c] to-transparent" />
       </div>
 
       <div className="relative z-10 mx-auto flex min-h-[610px] w-full max-w-[1640px] flex-col items-center px-5 pb-0 pt-10 md:px-8 lg:min-h-[640px] lg:flex-row lg:py-12 lg:pl-10 lg:pr-4 xl:pl-14 xl:pr-6">
@@ -119,7 +119,7 @@ function PremiumHero() {
           <div className="hero-anim hero-d5 mt-8 flex flex-wrap items-center justify-center gap-3 lg:justify-start">
             <Link
               to="/jobs"
-              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full bg-[#008080] px-7 py-3.5 text-[15px] font-bold text-white shadow-[0_20px_46px_-20px_rgba(0,128,128,0.95)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#006D6D] hover:shadow-[0_24px_52px_-20px_rgba(0,128,128,0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ff5f5] focus-visible:ring-offset-2 focus-visible:ring-offset-[#171411]"
+              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full bg-[#008080] px-7 py-3.5 text-[15px] font-bold text-white shadow-[0_20px_46px_-20px_rgba(0,128,128,0.95)] transition duration-300 hover:-translate-y-0.5 hover:bg-[#006D6D] hover:shadow-[0_24px_52px_-20px_rgba(0,128,128,0.9)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ff5f5] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0d0c]"
             >
               <Briefcase className="h-[18px] w-[18px] transition-transform duration-300 group-hover:-translate-y-0.5" />
               חיפוש משרות
@@ -127,7 +127,7 @@ function PremiumHero() {
 
             <Link
               to="/employers"
-              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full bg-gradient-to-l from-[#d9b37b] to-[#e7c79a] px-7 py-3.5 text-[15px] font-bold text-[#241c10] shadow-[0_20px_46px_-22px_rgba(217,179,123,0.9)] transition duration-300 hover:-translate-y-0.5 hover:from-[#e2be86] hover:to-[#f0d3a8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e4c394] focus-visible:ring-offset-2 focus-visible:ring-offset-[#171411]"
+              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full bg-gradient-to-l from-[#d9b37b] to-[#e7c79a] px-7 py-3.5 text-[15px] font-bold text-[#241c10] shadow-[0_20px_46px_-22px_rgba(217,179,123,0.9)] transition duration-300 hover:-translate-y-0.5 hover:from-[#e2be86] hover:to-[#f0d3a8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#e4c394] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0d0c]"
             >
               <Users className="h-[18px] w-[18px] transition-transform duration-300 group-hover:scale-105" />
               גיוס עובדים
@@ -137,7 +137,7 @@ function PremiumHero() {
               href="https://wa.me/972533951003"
               target="_blank"
               rel="noopener noreferrer"
-              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-6 py-3.5 text-[15px] font-bold text-white backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-[#25D366]/45 hover:bg-white/[0.11] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2 focus-visible:ring-offset-[#171411]"
+              className="group inline-flex min-h-[52px] items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-6 py-3.5 text-[15px] font-bold text-white backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-[#25D366]/45 hover:bg-white/[0.11] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0d0c]"
             >
               <MessageCircle className="h-[18px] w-[18px] text-[#4ade80] transition-transform duration-300 group-hover:scale-105" />
               WhatsApp
@@ -168,12 +168,34 @@ function PremiumHero() {
             decoding="async"
             className="h-full w-full object-cover object-[48%_50%]"
           />
-          <div className="absolute inset-0 bg-gradient-to-b from-[#171411]/20 via-transparent to-[#171411]" />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#0b0d0c]/20 via-transparent to-[#0b0d0c]" />
         </div>
       </div>
 
-      {/* מעבר עדין לאזור הבא */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-16 bg-gradient-to-b from-transparent to-white" />
+      {/* מעבר קמור ועדין לאזור הבא */}
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-[-1px] z-30 h-[54px] overflow-hidden md:h-[72px]"
+        aria-hidden="true"
+      >
+        <svg
+          viewBox="0 0 1440 100"
+          preserveAspectRatio="none"
+          className="h-full w-full"
+        >
+          <path
+            d="M0,82 C360,62 1080,62 1440,82 L1440,100 L0,100 Z"
+            fill="#ffffff"
+          />
+          <path
+            d="M0,82 C360,62 1080,62 1440,82"
+            fill="none"
+            stroke="#c99652"
+            strokeOpacity="0.62"
+            strokeWidth="2"
+            vectorEffect="non-scaling-stroke"
+          />
+        </svg>
+      </div>
 
       <style>{`
         .home-hero ::selection {
