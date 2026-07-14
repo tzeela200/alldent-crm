@@ -31,7 +31,9 @@ import {
   ActionButton,
   EmptyState,
 } from '@/components/layout/Shell'
-import { useApplications, useCandidates, useDicts, useJobs } from '@/hooks/useSupabaseData'
+import { useApplications, useCandidates, useJobs } from '@/hooks/useSupabaseData'
+import { useApplicationDicts } from '@/hooks/useApplicationDicts'
+import { DICT_SUB_ROLES, DICT_EXPERIENCE, DICT_PROFILE_TYPES } from '@/lib/dicts'
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { supabase } from '@/lib/supabase'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
@@ -165,7 +167,7 @@ export default function SmartMatchPage() {
   const { data: jobs = [] } = useJobs({})
   const { data: candidates = [] } = useCandidates({})
   const { data: applications = [] } = useApplications({})
-  const dicts = useDicts()
+  const { data: dicts } = useApplicationDicts()
   const { createApplication } = useApplicationMutations()
   const queryClient = useQueryClient()
 
@@ -184,13 +186,13 @@ export default function SmartMatchPage() {
   }, [toast.open])
 
 
-  const roles = dicts.roles ?? []
-  const subRoles = dicts.subRoles ?? []
-  const regions = dicts.regions ?? []
-  const cities = dicts.cities ?? []
-  const availability = dicts.availability ?? []
-  const experience = dicts.experience ?? []
-  const profileTypes = dicts.profileTypes ?? []
+  const roles = dicts?.roles ?? []
+  const subRoles = DICT_SUB_ROLES
+  const regions = dicts?.regions ?? []
+  const cities = dicts?.cities ?? []
+  const availability = dicts?.availabilities ?? []
+  const experience = DICT_EXPERIENCE
+  const profileTypes = DICT_PROFILE_TYPES
 
 
   const roleName = (id: number | null | undefined) => roles.find((r: any) => r.id === id)?.name ?? '—'
@@ -522,7 +524,9 @@ export default function SmartMatchPage() {
         has_cv: Boolean(candidate.has_cv),
         cv_storage_path: null,
         cv_received_date: null,
-        candidate_availability_ids: null,
+        candidate_availability_ids: Array.isArray(candidate.candidate_availability_ids)
+          ? candidate.candidate_availability_ids
+          : null,
         candidate_salary_type_ids: null,
       })
 

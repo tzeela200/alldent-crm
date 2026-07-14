@@ -29,7 +29,8 @@ import {
   ActionButton,
   EmptyState,
 } from '@/components/layout/Shell'
-import { useApplications, useDicts, useJobs } from '@/hooks/useSupabaseData'
+import { useApplications, useJobs } from '@/hooks/useSupabaseData'
+import { useApplicationDicts } from '@/hooks/useApplicationDicts'
 import { openApplicationCv, applicationHasCv } from '@/lib/cv'
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
@@ -149,15 +150,15 @@ export default function ATSPipelinePage() {
 
   const { data: applications = [], loading, error } = useApplications({})
   const { data: jobs = [] } = useJobs({})
-  const dicts = useDicts()
+  const { data: dicts } = useApplicationDicts()
   const { updateApplication } = useApplicationMutations()
   const queryClient = useQueryClient()
 
 
-  const applicationStatuses = dicts.applicationStatuses ?? []
-  const checkStatuses = dicts.checkStatuses ?? []
-  const regions = dicts.regions ?? []
-  const roles = dicts.roles ?? []
+  const applicationStatuses = dicts?.applicationStatuses ?? []
+  const checkStatuses = dicts?.checkStatuses ?? []
+  const regions = dicts?.regions ?? []
+  const roles = dicts?.roles ?? []
 
 
   useEffect(() => {

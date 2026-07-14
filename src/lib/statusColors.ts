@@ -1,20 +1,24 @@
-// סטטוסי הגשה (application_status)
+// סטטוסי הגשה (application_status) — SSOT יחיד לכל המסכים.
+// תוויות מיושרות למילון החי dict_application_statuses (אומת 2026-07-14).
+// פלטה בהירה/עדינה (bg-*-50 / text-*-700) לפי הסטנדרט שאושר. הצבע מקודד משמעות:
+// כחול=חדש · צהוב/כתום=בתהליך/חסר · סגול/אינדיגו/טורקיז=הועבר-למעסיק/ראיון · ירוק=חפיפה/השמה ·
+// אדום/ורוד=הברזה/אין-התאמה · אפור=נעלם/הוסר/ארכיון. שינוי כאן = משתנה בכל המערכת.
 export const applicationStatusColors: Record<number, { bg: string; text: string; label: string }> = {
-  1: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'חדש' },
-  2: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'בבדיקה' },
-  3: { bg: 'bg-teal-100', text: 'text-teal-800', label: 'רלוונטי' },
-  4: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'נשלח למעסיק' },
-  5: { bg: 'bg-indigo-100', text: 'text-indigo-800', label: 'ראיון תואם' },
-  6: { bg: 'bg-orange-100', text: 'text-orange-800', label: 'בתהליך' },
-  7: { bg: 'bg-cyan-100', text: 'text-cyan-800', label: 'ממתין לתגובה' },
-  8: { bg: 'bg-emerald-100', text: 'text-emerald-800', label: 'התקבל' },
-  9: { bg: 'bg-red-100', text: 'text-red-800', label: 'נדחה' },
-  10: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'ביטל' },
-  11: { bg: 'bg-amber-100', text: 'text-amber-800', label: 'לא רלוונטי' },
-  12: { bg: 'bg-rose-100', text: 'text-rose-800', label: 'לא ענה' },
-  13: { bg: 'bg-slate-100', text: 'text-slate-800', label: 'ארכיון' },
-  14: { bg: 'bg-lime-100', text: 'text-lime-800', label: 'מועמד במאגר' },
-  15: { bg: 'bg-sky-100', text: 'text-sky-800', label: 'הושמה' },
+  1: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'הגשה חדשה' },
+  2: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'בסינון ראשוני' },
+  3: { bg: 'bg-orange-50', text: 'text-orange-700', label: 'חסר קורות חיים' },
+  4: { bg: 'bg-yellow-50', text: 'text-yellow-700', label: 'בטיפול / ממתין למועמד' },
+  5: { bg: 'bg-slate-50', text: 'text-slate-600', label: 'לא ענה / נעלם' },
+  6: { bg: 'bg-purple-50', text: 'text-purple-700', label: 'הועבר למעסיק' },
+  7: { bg: 'bg-indigo-50', text: 'text-indigo-700', label: 'נקבע ראיון' },
+  8: { bg: 'bg-teal-50', text: 'text-teal-700', label: 'בוצע ראיון' },
+  9: { bg: 'bg-amber-50', text: 'text-amber-700', label: 'ממתין למשוב מעסיק' },
+  10: { bg: 'bg-red-50', text: 'text-red-700', label: 'הברזה מראיון' },
+  11: { bg: 'bg-lime-50', text: 'text-lime-700', label: 'חפיפה / ניסיון' },
+  12: { bg: 'bg-green-50', text: 'text-green-700', label: 'השמה (התקבל)' },
+  13: { bg: 'bg-gray-50', text: 'text-gray-600', label: 'הסיר מועמדות' },
+  14: { bg: 'bg-rose-50', text: 'text-rose-700', label: 'אין התאמה' },
+  15: { bg: 'bg-stone-50', text: 'text-stone-600', label: 'לא דנטלי - ארכיון' },
 }
 
 // סטטוסי משרה (job_status) — SSOT יחיד לכל המסכים.
@@ -69,12 +73,14 @@ export const accountStatusColors: Record<number, { bg: string; text: string; lab
   11: { bg: 'bg-gray-100', text: 'text-gray-500', label: 'מוזג / כפילות' },
 }
 
-// סטטוסי בדיקה (check_status)
+// סטטוסי בדיקה (check_status) — תוויות מיושרות למילון החי dict_check_statuses
+// (אומת 2026-07-14). פלטה בהירה. הצבע מקודד משמעות: צהוב=ממתין · אדום=ספאם ·
+// ירוק=מאושר · כחול=בבדיקה מול המועמד.
 export const checkStatusColors: Record<number, { bg: string; text: string; label: string }> = {
-  1: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'ממתין לבדיקה' },
-  2: { bg: 'bg-green-100', text: 'text-green-800', label: 'נבדק - תקין' },
-  3: { bg: 'bg-red-100', text: 'text-red-800', label: 'נבדק - בעייתי' },
-  4: { bg: 'bg-gray-100', text: 'text-gray-800', label: 'לא רלוונטי' },
+  1: { bg: 'bg-yellow-50', text: 'text-yellow-700', label: 'ממתין לבדיקה' },
+  2: { bg: 'bg-red-50', text: 'text-red-700', label: 'ספאם' },
+  3: { bg: 'bg-green-50', text: 'text-green-700', label: 'מאושר למאגר' },
+  4: { bg: 'bg-blue-50', text: 'text-blue-700', label: 'בבדיקה מול המועמד' },
 }
 
 // סטטוסי פרסום (public_status)

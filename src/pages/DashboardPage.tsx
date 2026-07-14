@@ -30,11 +30,12 @@ import {
   EmptyState,
   StatusPill,
 } from '@/components/layout/Shell'
-import { useApplications, useInbox, useJobs, useCandidates, useAccounts, useDicts } from '@/hooks/useSupabaseData'
+import { useApplications, useInbox, useJobs, useCandidates, useAccounts } from '@/hooks/useSupabaseData'
+import { useApplicationDicts } from '@/hooks/useApplicationDicts'
 import { useReviewNeededJobsCount } from '@/hooks/useReviewNeededJobsCount'
 import DashboardCandidateMessages from '@/components/admin/DashboardCandidateMessages'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
-import { applicationStatusColors, jobStatusColors, getStatusBadge } from '@/lib/statusColors'
+import { applicationStatusColors, jobStatusColors, accountStatusColors, getStatusBadge } from '@/lib/statusColors'
 
 
 type DatePreset = 'today' | '7d' | '30d' | 'custom'
@@ -71,7 +72,19 @@ export default function DashboardPage() {
   const { data: inboxRows = [], loading: inboxLoading, error: inboxError } = useInbox({})
   const { data: candidates = [], loading: candidatesLoading, error: candidatesError } = useCandidates({})
   const { data: accounts = [], loading: accountsLoading, error: accountsError } = useAccounts({})
-  const dicts = useDicts()
+  const { data: appDicts } = useApplicationDicts()
+  // מנרמל למבנה שהמסך מצפה לו: availability<-availabilities מהמילון החי,
+  // accountStatuses נגזר מ-accountStatusColors (תוויות מיושרות ל-DB). זמינות מוצגת עדיין
+  // מ-candidate.availability שאינו קיים כעמודה — יתוקן בשלב מבנה-הנתונים.
+  const dicts = {
+    sources: appDicts?.sources ?? [],
+    regions: appDicts?.regions ?? [],
+    roles: appDicts?.roles ?? [],
+    cities: appDicts?.cities ?? [],
+    availability: appDicts?.availabilities ?? [],
+    applicationStatuses: appDicts?.applicationStatuses ?? [],
+    accountStatuses: Object.entries(accountStatusColors).map(([id, v]) => ({ id: Number(id), name: v.label })),
+  }
   const { data: pendingRecruitmentRequests = 0 } = useReviewNeededJobsCount()
 
 
