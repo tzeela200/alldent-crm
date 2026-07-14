@@ -70,6 +70,10 @@ type PipelineCardRow = {
   job_code?: string | null
   job_role?: string | null
   job_region?: string | null
+  job_region_id?: number | null
+  job_city_id?: number | null
+  master_region_id?: number | null
+  master_city_id?: number | null
   account_name?: string | null
   application_status?: number | null
   submission_date?: string | null
@@ -160,6 +164,18 @@ export default function ATSPipelinePage() {
   const regions = dicts?.regions ?? []
   const roles = dicts?.roles ?? []
 
+  // מיפוי משרה לפי קוד — מקור התפקיד/תת-תפקיד/אזור לכרטיס (applications מחזיק רק snapshot טקסטואלי)
+  const jobsByCode = useMemo(() => {
+    const map = new Map<string, any>()
+    ;(jobs as any[]).forEach((job) => {
+      if (job.job_code) map.set(String(job.job_code), job)
+    })
+    return map
+  }, [jobs])
+
+  const roleName = (id: number | null | undefined) =>
+    roles.find((r: any) => Number(r.id) === Number(id))?.name ?? '—'
+
 
   useEffect(() => {
     setLocalRows(
@@ -183,11 +199,25 @@ export default function ATSPipelinePage() {
   const jobsOptions = useMemo(() => {
     return (jobs as any[])
       .filter((job) => Boolean(job.job_code))
+      // צימוד ארגון→משרה: אם נבחר ארגון, להציג רק את משרותיו
+      .filter(
+        (job) =>
+          !filters.account_name || String(job.account_name ?? '') === String(filters.account_name),
+      )
+      .slice()
+      // מיון: משרות פעילות (job_status=3) קודם, ואז לפי קוד יורד (חדש→ישן)
+      .sort((a, b) => {
+        const aActive = Number(a.job_status) === 3 ? 1 : 0
+        const bActive = Number(b.job_status) === 3 ? 1 : 0
+        if (aActive !== bActive) return bActive - aActive
+        return String(b.job_code).localeCompare(String(a.job_code), undefined, { numeric: true })
+      })
+      // תווית: קוד • תפקיד (בלי ארגון — פילטר הארגון כבר מצמצם)
       .map((job) => ({
         value: String(job.job_code),
-        label: `${job.job_code} • ${job.job_title ?? 'ללא כותרת'} • ${job.account_name ?? '—'}`,
+        label: `${job.job_code} • ${roleName(job.job_role)}`,
       }))
-  }, [jobs])
+  }, [jobs, filters.account_name, roles])
 
 
   const accountOptions = useMemo(() => {
@@ -197,18 +227,16 @@ export default function ATSPipelinePage() {
   }, [localRows])
 
 
-  const regionOptions = useMemo(() => {
-    return Array.from(
-      new Set(localRows.map((row) => String(row.job_region ?? '').trim()).filter(Boolean)),
-    ).map((name) => ({ value: name, label: name }))
-  }, [localRows])
+  // אזור/תפקיד מהמילון החי (dict_regions / dict_roles) — לא מטקסט קפוא
+  const regionOptions = useMemo(
+    () => (regions as any[]).map((r: any) => ({ value: String(r.id), label: r.name })),
+    [regions],
+  )
 
-
-  const roleOptions = useMemo(() => {
-    return Array.from(
-      new Set(localRows.map((row) => String(row.job_role ?? '').trim()).filter(Boolean)),
-    ).map((name) => ({ value: name, label: name }))
-  }, [localRows])
+  const roleOptions = useMemo(
+    () => (roles as any[]).map((r: any) => ({ value: String(r.id), label: r.name })),
+    [roles],
+  )
 
 
   const filteredRows = useMemo(() => {
@@ -239,8 +267,11 @@ export default function ATSPipelinePage() {
 
       if (filters.job_code && String(row.job_code ?? '') !== String(filters.job_code)) return false
       if (filters.account_name && String(row.account_name ?? '') !== String(filters.account_name)) return false
-      if (filters.region && String(row.job_region ?? '') !== String(filters.region)) return false
-      if (filters.role && String(row.job_role ?? '') !== String(filters.role)) return false
+      if (filters.region && Number(row.job_region_id) !== Number(filters.region)) return false
+      if (filters.role) {
+        const job = jobsByCode.get(String(row.job_code ?? ''))
+        if (Number(job?.job_role) !== Number(filters.role)) return false
+      }
       if (filters.check_status && Number(row.check_status) !== Number(filters.check_status)) return false
       if (filters.active_only && [12, 13, 14, 15].includes(Number(row.application_status ?? 0))) return false
       if (filters.stale_only && !isStale(row.updated_timestamp, STALE_DAYS)) return false
@@ -250,7 +281,7 @@ export default function ATSPipelinePage() {
 
       return true
     })
-  }, [localRows, filters])
+  }, [localRows, filters, jobsByCode])
 
 
   const totalVisibleCards = filteredRows.length
@@ -441,12 +472,14 @@ export default function ATSPipelinePage() {
     >
       <div className="space-y-6 font-['Heebo']">
         <Toolbar>
-          <div className="grid grid-cols-1 gap-3 xl:grid-cols-7">
-            <SearchBar
-              value={filters.search ?? ''}
-              onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
-              placeholder="חיפוש מועמד, טלפון, אימייל, קוד משרה, מעסיק..."
-            />
+          <div className="grid grid-cols-1 gap-3 xl:grid-cols-8">
+            <div className="xl:col-span-2">
+              <SearchBar
+                value={filters.search ?? ''}
+                onChange={(value) => setFilters((prev) => ({ ...prev, search: value }))}
+                placeholder="חיפוש מועמד, טלפון, אימייל, קוד משרה, מעסיק..."
+              />
+            </div>
 
 
             <SelectFilter
@@ -493,7 +526,7 @@ export default function ATSPipelinePage() {
                 value: String(item.id),
                 label: item.name,
               }))}
-              placeholder="check status"
+              placeholder="סטטוס בדיקה"
             />
 
 
@@ -541,7 +574,7 @@ export default function ATSPipelinePage() {
 
             <div className="flex items-end gap-2">
               <ActionButton variant="ghost" onClick={resetFilters}>
-                reset filters
+                איפוס פילטרים
               </ActionButton>
             </div>
           </div>
