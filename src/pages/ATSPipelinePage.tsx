@@ -32,6 +32,7 @@ import {
 import { useApplications, useJobs } from '@/hooks/useSupabaseData'
 import { useApplicationDicts } from '@/hooks/useApplicationDicts'
 import { openApplicationCv, applicationHasCv } from '@/lib/cv'
+import PipelinePanel from '@/components/applications/PipelinePanel'
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { formatDate, timeAgo } from '@/lib/timeAgo'
 import { applicationStatusColors, checkStatusColors, getStatusBadge } from '@/lib/statusColors'
@@ -155,7 +156,7 @@ export default function ATSPipelinePage() {
   const { data: applications = [], loading, error } = useApplications({})
   const { data: jobs = [] } = useJobs({})
   const { data: dicts } = useApplicationDicts()
-  const { updateApplication } = useApplicationMutations()
+  const { updateApplication, createContactFromApplication, markSpam } = useApplicationMutations()
   const queryClient = useQueryClient()
 
 
@@ -163,6 +164,7 @@ export default function ATSPipelinePage() {
   const checkStatuses = dicts?.checkStatuses ?? []
   const regions = dicts?.regions ?? []
   const roles = dicts?.roles ?? []
+  const cities = dicts?.cities ?? []
 
   // מיפוי משרה לפי קוד — מקור התפקיד/תת-תפקיד/אזור לכרטיס (applications מחזיק רק snapshot טקסטואלי)
   const jobsByCode = useMemo(() => {
@@ -445,6 +447,78 @@ export default function ATSPipelinePage() {
   }
 
 
+  const [busyAction, setBusyAction] = useState(false)
+
+  const updateOpenSheet = (applicationId: number, patch: Record<string, unknown>) => {
+    setDetailSheet((prev) =>
+      prev.row && Number(prev.row.application_id) === Number(applicationId)
+        ? { ...prev, row: { ...prev.row, ...patch } }
+        : prev,
+    )
+  }
+
+  // "אשר למאגר" — זרימה קנונית: יוצר/מקשר contact, check_status=3. יצירה בלבד, אין מחיקה.
+  const handleApproveToPool = async (row: PipelineCardRow) => {
+    const app =
+      (applications as any[]).find((a) => Number(a.application_id) === Number(row.application_id)) ??
+      row
+    setBusyAction(true)
+    try {
+      const newContactId = await createContactFromApplication.mutateAsync(app as any)
+      const patch = {
+        candidate_link: newContactId,
+        check_status: 3,
+        updated_timestamp: new Date().toISOString(),
+      }
+      patchRow(Number(row.application_id), patch as any)
+      updateOpenSheet(Number(row.application_id), patch)
+    } catch {
+      // המוטציה כבר הציגה שגיאה
+    } finally {
+      setBusyAction(false)
+    }
+  }
+
+  // "סמן כספאם" — זרימה קנונית: check_status=2 + ארכיון (15). סיווג בלבד, אין מחיקה.
+  const handleMarkSpam = async (row: PipelineCardRow) => {
+    const app =
+      (applications as any[]).find((a) => Number(a.application_id) === Number(row.application_id)) ??
+      row
+    setBusyAction(true)
+    try {
+      await markSpam.mutateAsync(app as any)
+      const patch = {
+        check_status: 2,
+        application_status: 15,
+        updated_timestamp: new Date().toISOString(),
+      }
+      patchRow(Number(row.application_id), patch as any)
+      updateOpenSheet(Number(row.application_id), patch)
+    } catch {
+      // המוטציה כבר הציגה שגיאה
+    } finally {
+      setBusyAction(false)
+    }
+  }
+
+  // שמירת שדות "רכים" מהפאנל (הערות/פולואפ/אחראי) דרך updateApplication.
+  const handleSaveFields = async (row: PipelineCardRow, patch: Record<string, unknown>) => {
+    if (Object.keys(patch).length === 0) return
+    try {
+      await updateApplication.mutateAsync({
+        applicationId: Number(row.application_id),
+        updates: patch as any,
+      })
+      const full = { ...patch, updated_timestamp: new Date().toISOString() }
+      patchRow(Number(row.application_id), full as any)
+      updateOpenSheet(Number(row.application_id), full)
+      showToast('הפרטים נשמרו', 'success')
+    } catch (err) {
+      showToast(`שגיאה בשמירה: ${err instanceof Error ? err.message : 'שגיאה'}`, 'error')
+    }
+  }
+
+
   return (
     <Shell
       title="ATS Pipeline"
@@ -716,17 +790,22 @@ export default function ATSPipelinePage() {
 
 
         {detailSheet.open && detailSheet.row && (
-          <DetailSheet
+          <PipelinePanel
             row={detailSheet.row}
+            job={jobsByCode.get(String(detailSheet.row.job_code ?? '')) ?? null}
+            regions={regions}
+            cities={cities}
+            roles={roles}
             applicationStatuses={applicationStatuses}
-            checkStatuses={checkStatuses}
             onClose={() => setDetailSheet({ open: false, row: null })}
+            nextStatusOptions={ADJACENT_STATUS_POLICY[Number(detailSheet.row.application_status ?? 0)] ?? []}
             onStatusChange={(nextStatus) => handleStatusChange(detailSheet.row as PipelineCardRow, nextStatus)}
-            onCheckStatusChange={(nextCheckStatus) =>
-              handleCheckStatusChange(detailSheet.row as PipelineCardRow, nextCheckStatus)
-            }
             updatingStatus={updatingStatusId === Number(detailSheet.row.application_id)}
-            updatingCheckStatus={updatingCheckStatusId === Number(detailSheet.row.application_id)}
+            onApproveToPool={() => handleApproveToPool(detailSheet.row as PipelineCardRow)}
+            onMarkSpam={() => handleMarkSpam(detailSheet.row as PipelineCardRow)}
+            busyAction={busyAction}
+            onSaveFields={(patch) => handleSaveFields(detailSheet.row as PipelineCardRow, patch)}
+            savingFields={updateApplication.isPending}
           />
         )}
 
@@ -906,262 +985,6 @@ function AtsCard({
 }
 
 
-function DetailSheet({
-  row,
-  applicationStatuses,
-  checkStatuses,
-  onClose,
-  onStatusChange,
-  onCheckStatusChange,
-  updatingStatus,
-  updatingCheckStatus,
-}: {
-  row: PipelineCardRow
-  applicationStatuses: any[]
-  checkStatuses: any[]
-  onClose: () => void
-  onStatusChange: (nextStatus: number) => void
-  onCheckStatusChange: (nextStatus: number) => void
-  updatingStatus: boolean
-  updatingCheckStatus: boolean
-}) {
-  const appBadge = getStatusBadge(applicationStatusColors, Number(row.application_status ?? 0))
-  const checkBadge = getStatusBadge(checkStatusColors, Number(row.check_status ?? 0))
-  const nextStatusOptions = ADJACENT_STATUS_POLICY[Number(row.application_status ?? 0)] ?? []
-
-
-  return (
-    <div className="fixed inset-0 z-[80] flex justify-start">
-      <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <aside className="relative z-10 h-full w-full max-w-[560px] overflow-y-auto border-l border-slate-200 bg-white shadow-xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur-sm">
-          <div>
-            <h3 className="text-[22px] font-bold text-slate-900">Detail Sheet</h3>
-            <p className="mt-1 text-[13px] text-slate-500">עבודה על הכרטיס בלי לצאת מהלוח</p>
-          </div>
-
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 shadow-sm hover:bg-slate-50"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-
-
-        <div className="space-y-4 p-5">
-          <SectionCard title="candidate summary">
-            <DetailsGrid
-              items={[
-                { label: 'שם מועמד', value: row.candidate_name },
-                { label: 'נייד', value: row.candidate_phone },
-                { label: 'אימייל', value: row.candidate_email },
-                { label: 'Candidate 360', value: row.candidate_link ? 'זמין' : 'לא קיים' },
-              ]}
-            />
-          </SectionCard>
-
-
-          <SectionCard title="job summary">
-            <DetailsGrid
-              items={[
-                { label: 'קוד משרה', value: row.job_code },
-                { label: 'תפקיד', value: row.job_role },
-                { label: 'אזור', value: row.job_region },
-                { label: 'תאריך הגשה', value: formatDate(row.submission_date) },
-              ]}
-            />
-          </SectionCard>
-
-
-          <SectionCard title="employer summary">
-            <DetailsGrid
-              items={[
-                { label: 'ארגון', value: row.account_name },
-                { label: 'סטטוס במאגר', value: row.candidate_link != null ? 'קיים במאגר' : 'חדש – ממתין לבדיקה' },
-                { label: 'עודכן', value: timeAgo(row.updated_timestamp) },
-                { label: 'נוצר', value: formatDate(row.created_timestamp) },
-              ]}
-            />
-          </SectionCard>
-
-
-          <SectionCard title="application status">
-            <div className="space-y-3">
-              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${appBadge.bg} ${appBadge.text}`}>
-                {appBadge.label}
-              </span>
-
-
-              <select
-                dir="rtl"
-                value=""
-                onChange={(e) => {
-                  const value = Number(e.target.value)
-                  if (value) onStatusChange(value)
-                }}
-                disabled={updatingStatus || nextStatusOptions.length === 0}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#008080] disabled:cursor-not-allowed disabled:bg-slate-100"
-              >
-                <option value="">עדכון סטטוס</option>
-                {nextStatusOptions.map((statusId) => (
-                  <option key={statusId} value={statusId}>
-                    {applicationStatuses.find((item) => Number(item.id) === Number(statusId))?.name ??
-                      applicationStatusColors[statusId]?.label ??
-                      `סטטוס ${statusId}`}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </SectionCard>
-
-
-          <SectionCard title="check status">
-            <div className="space-y-3">
-              <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${checkBadge.bg} ${checkBadge.text}`}>
-                {checkBadge.label}
-              </span>
-
-
-              <select
-                dir="rtl"
-                value={String(row.check_status ?? '')}
-                onChange={(e) => onCheckStatusChange(Number(e.target.value))}
-                disabled={updatingCheckStatus}
-                className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-[#008080] disabled:cursor-not-allowed disabled:bg-slate-100"
-              >
-                {checkStatuses.map((status: any) => (
-                  <option key={status.id} value={status.id}>
-                    {status.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </SectionCard>
-
-
-          <SectionCard title="CV">
-            {applicationHasCv(row) ? (
-              <button
-                type="button"
-                onClick={() => openApplicationCv(row)}
-                className="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
-              >
-                Open CV
-              </button>
-            ) : (
-              <div className="rounded-xl bg-amber-50 p-3 text-sm font-medium text-amber-800">
-                חסר קו"ח לפני ראיון / שליחה למעסיק
-              </div>
-            )}
-          </SectionCard>
-
-
-          <SectionCard title="candidate notes">
-            <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-              {row.candidate_notes ?? 'אין הערות מועמד'}
-            </div>
-          </SectionCard>
-
-
-          <SectionCard title="internal notes">
-            <div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700">
-              {row.internal_notes ?? 'אין הערות פנימיות'}
-            </div>
-          </SectionCard>
-
-
-          <SectionCard title="timeline">
-            <div className="space-y-2 text-sm text-slate-600">
-              <div>נוצר: {formatDate(row.created_timestamp)}</div>
-              <div>הוגש: {formatDate(row.submission_date)}</div>
-              <div>עודכן לאחרונה: {timeAgo(row.updated_timestamp)}</div>
-            </div>
-          </SectionCard>
-
-
-          <SectionCard title="פעולות">
-            <div className="grid grid-cols-1 gap-2">
-              <QuickSheetButton
-                label="WhatsApp"
-                href={buildWhatsAppLink(row.candidate_phone ?? '')}
-                disabled={!normalizeDigits(row.candidate_phone ?? '')}
-              />
-              <QuickSheetButton label="Open CV" href={row.cv_link ?? '#'} onClick={() => openApplicationCv(row)} disabled={!applicationHasCv(row)} />
-              <QuickSheetRouteButton
-                label="Open Candidate 360"
-                to={row.candidate_link ? `/admin/candidates/${row.candidate_link}` : ''}
-                disabled={!row.candidate_link}
-              />
-              <QuickSheetRouteButton
-                label="Open Job Details"
-                to={row.job_code ? `/admin/jobs/${row.job_code}` : ''}
-                disabled={!row.job_code}
-              />
-            </div>
-          </SectionCard>
-        </div>
-      </aside>
-    </div>
-  )
-}
-
-
-function SectionCard({
-  title,
-  children,
-}: {
-  title: string
-  children: React.ReactNode
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h4 className="mb-4 text-[16px] font-bold text-slate-900">{title}</h4>
-      {children}
-    </div>
-  )
-}
-
-
-function DetailsGrid({
-  items,
-}: {
-  items: Array<{ label: string; value: React.ReactNode }>
-}) {
-  return (
-    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-      {items.map((item, index) => (
-        <div key={`${item.label}-${index}`} className="rounded-xl bg-slate-50 p-3">
-          <div className="text-[12px] font-semibold text-slate-500">{item.label}</div>
-          <div className="mt-1 text-[13px] font-semibold text-slate-900">{item.value ?? '—'}</div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-
-function InlineSignal({
-  children,
-  tone,
-}: {
-  children: React.ReactNode
-  tone: 'warning' | 'danger' | 'success'
-}) {
-  const style =
-    tone === 'warning'
-      ? 'bg-[#FFFBEB] text-[#D97706]'
-      : tone === 'danger'
-        ? 'bg-[#FEF2F2] text-[#DC2626]'
-        : 'bg-[#F0FDF4] text-[#16A34A]'
-
-
-  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${style}`}>{children}</span>
-}
-
-
 function QuickIconLink({
   title,
   href,
@@ -1233,74 +1056,56 @@ function QuickRouteLink({
 }
 
 
-function QuickSheetButton({
-  label,
-  href,
-  disabled,
-  onClick,
-}: {
-  label: string
-  href: string
-  disabled?: boolean
-  onClick?: () => void
-}) {
-  if (disabled) {
-    return (
-      <button
-        type="button"
-        disabled
-        className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-slate-400"
-      >
-        {label}
-      </button>
-    )
-  }
-
-
-  return (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      onClick={onClick ? (e) => { e.preventDefault(); onClick() } : undefined}
-      className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-    >
-      {label}
-    </a>
-  )
+function buildWhatsAppLink(phone: string) {
+  const normalized = normalizeDigits(phone)
+  if (!normalized) return ''
+  return `https://wa.me/${normalized}`
 }
 
 
-function QuickSheetRouteButton({
-  label,
-  to,
-  disabled,
+function isOnOrAfter(value?: string | null, limit?: string) {
+  if (!value || !limit) return false
+  return new Date(value).getTime() >= new Date(limit).getTime()
+}
+
+
+function isOnOrBefore(value?: string | null, limit?: string) {
+  if (!value || !limit) return false
+  return new Date(value).getTime() <= new Date(limit).getTime() + 24 * 60 * 60 * 1000 - 1
+}
+
+
+function isStale(value?: string | null, days = 5) {
+  if (!value) return true
+  const ts = new Date(value).getTime()
+  if (Number.isNaN(ts)) return true
+  return ts < Date.now() - days * 24 * 60 * 60 * 1000
+}
+
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+
+
+
+
+function InlineSignal({
+  children,
+  tone,
 }: {
-  label: string
-  to: string
-  disabled?: boolean
+  children: React.ReactNode
+  tone: 'warning' | 'danger' | 'success'
 }) {
-  if (disabled) {
-    return (
-      <button
-        type="button"
-        disabled
-        className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 text-sm font-semibold text-slate-400"
-      >
-        {label}
-      </button>
-    )
-  }
+  const style =
+    tone === 'warning'
+      ? 'bg-[#FFFBEB] text-[#D97706]'
+      : tone === 'danger'
+        ? 'bg-[#FEF2F2] text-[#DC2626]'
+        : 'bg-[#F0FDF4] text-[#16A34A]'
 
-
-  return (
-    <Link
-      to={to}
-      className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-    >
-      {label}
-    </Link>
-  )
+  return <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${style}`}>{children}</span>
 }
 
 
@@ -1335,38 +1140,3 @@ function normalizeSearchText(value: string) {
 function normalizeDigits(value: string) {
   return String(value ?? '').replace(/\D/g, '')
 }
-
-
-function buildWhatsAppLink(phone: string) {
-  const normalized = normalizeDigits(phone)
-  if (!normalized) return ''
-  return `https://wa.me/${normalized}`
-}
-
-
-function isOnOrAfter(value?: string | null, limit?: string) {
-  if (!value || !limit) return false
-  return new Date(value).getTime() >= new Date(limit).getTime()
-}
-
-
-function isOnOrBefore(value?: string | null, limit?: string) {
-  if (!value || !limit) return false
-  return new Date(value).getTime() <= new Date(limit).getTime() + 24 * 60 * 60 * 1000 - 1
-}
-
-
-function isStale(value?: string | null, days = 5) {
-  if (!value) return true
-  const ts = new Date(value).getTime()
-  if (Number.isNaN(ts)) return true
-  return ts < Date.now() - days * 24 * 60 * 60 * 1000
-}
-
-
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-
-
