@@ -11,7 +11,7 @@ const supabase = createClient(
   process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY,
 )
 
-// תמונת ברירת המחדל של המותג — עדכני לתמונה שתבחרי (למשל /share-default.jpg)
+// תמונת ברירת המחדל של המותג — משמשת גם את דף הבית (/) וגם כל נתיב ללא תמונה ייעודית
 const DEFAULT_IMAGE = 'https://www.alldent.co.il/share-default.jpg'
 const SITE_NAME = 'AllDent'
 
@@ -57,6 +57,13 @@ const ROLE_OG = {
 
 // דפי מסלול נוספים (לא תפקידים) — כל אחד עם נתיב קבוע משלו
 const PAGE_OG = {
+  jobs: {
+    path: '/jobs',
+    title: 'משרות דנטליות | AllDent',
+    description:
+      'לוח המשרות של AllDent — מרפאות שיניים, סקטור פרטי, בפריסה ארצית. משרות לרופאים, סייעות, שינניות, מזכירות וטכנאים.',
+    image: 'https://www.alldent.co.il/images/jobs-og/jobs.jpg',
+  },
   employers: {
     path: '/employers',
     title: 'AllDent Employers | גיוס עובדים בעולם הדנטל',
@@ -93,9 +100,9 @@ export default async function handler(req, res) {
   const rolePage = slug ? ROLE_OG[slug.trim()] : undefined
   const pageEntry = pageKey ? PAGE_OG[pageKey] : undefined
 
-  let title = 'AllDent | השמה וגיוס למרפאות שיניים'
+  let title = 'AllDent | הבית המקצועי של אנשי הדנטל בישראל'
   let description =
-    'חברת ההשמה המובילה בישראל לרפואת שיניים. משרות לרופאים, סייעות, שינניות, מזכירות ומנהלים.'
+    'קריירה, קהילה, למידה והתפתחות מקצועית — הכל בפלטפורמה אחת לאנשי הדנטל בישראל.'
   let imageUrl = DEFAULT_IMAGE
 
   if (pageEntry) {
