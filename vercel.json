@@ -21,13 +21,6 @@
   ],
   "rewrites": [
     {
-      "source": "/",
-      "has": [
-        { "type": "header", "key": "user-agent", "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Applebot|SkypeUriPreview|Embedly|Iframely|Googlebot|bingbot).*" }
-      ],
-      "destination": "/api/og"
-    },
-    {
       "source": "/jobs",
       "has": [
         { "type": "header", "key": "user-agent", "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Applebot|SkypeUriPreview|Embedly|Iframely|Googlebot|bingbot).*" }

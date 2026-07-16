@@ -9,6 +9,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&family=Frank+Ruhl+Libre:wght@500;700;800;900&family=JetBrains+Mono:wght@400;600&family=Nunito:wght@700;800;900&display=swap" rel="stylesheet" />
     <title>AllDent — פלטפורמה מקצועית דנטלית</title>
     <meta name="description" content="AllDent — פלטפורמת גיוס, השמה ולוח משרות לענף הדנטלי בישראל. משרות אנונימיות ודיסקרטיות במרפאות, מעבדות וחברות דנטליות." />
+
+    <!-- תצוגה מקדימה בשיתוף (וואטסאפ/פייסבוק/לינקדאין) עבור דף הבית.
+         התגיות כאן סטטיות ולא ב-api/og.js, כי Vercel מגיש את index.html מהקבצים
+         הסטטיים לפני שהוא מגיע לכללי ה-rewrite — כלומר rewrite על "/" לעולם לא ירוץ.
+         נתיבים ללא קובץ סטטי (למשל /jobs) כן עוברים ל-api/og.js. -->
+    <meta property="og:site_name" content="AllDent" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="AllDent | הבית המקצועי של אנשי הדנטל בישראל" />
+    <meta property="og:description" content="קריירה, קהילה, למידה והתפתחות מקצועית — הכל בפלטפורמה אחת לאנשי הדנטל בישראל." />
+    <meta property="og:image" content="https://www.alldent.co.il/share-default.jpg" />
+    <meta property="og:url" content="https://www.alldent.co.il/" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="AllDent | הבית המקצועי של אנשי הדנטל בישראל" />
+    <meta name="twitter:description" content="קריירה, קהילה, למידה והתפתחות מקצועית — הכל בפלטפורמה אחת לאנשי הדנטל בישראל." />
+    <meta name="twitter:image" content="https://www.alldent.co.il/share-default.jpg" />
   </head>
   <body>
     <div id="root"></div>
