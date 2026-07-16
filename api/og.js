@@ -124,7 +124,9 @@ export default async function handler(req, res) {
         .maybeSingle()
 
       if (!error && job) {
-        title = `${job.job_title || 'משרה'} | AllDent`
+        // קוד המשרה ראשון בכותרת — כך הוא נשאר גלוי גם כשוואטסאפ קוטע כותרות ארוכות,
+        // ומאפשר לזהות משרה מתוך הצ'אט בלי להיכנס ללינק. התמונה לא מושפעת.
+        title = `${jobCode} · ${job.job_title || 'משרה'} | AllDent`
         description =
           job.public_excerpt || 'לפרטים המלאים והגשת מועמדות למשרה, היכנסו לאתר AllDent.'
         if (job.public_image_url) imageUrl = job.public_image_url
