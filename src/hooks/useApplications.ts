@@ -190,7 +190,7 @@ export function useApplicationKPIs() {
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })
-            .eq('application_status', 13),
+            .eq('application_status', 15),
         ])
       return {
         total: total.count ?? 0,

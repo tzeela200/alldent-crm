@@ -221,7 +221,7 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
           )}
           {row.job_code && (
             <a
-              href={`/admin/jobs?job=${row.job_code}`}
+              href={`/admin/jobs/${row.job_code}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1 rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100"

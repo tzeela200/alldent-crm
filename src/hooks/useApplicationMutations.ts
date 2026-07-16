@@ -30,12 +30,14 @@ export function useApplicationMutations() {
       /** Caller must pass job_code when updating application_status to 12. */
       jobCode?: string | null
     }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('applications')
         .update({ ...updates, updated_timestamp: new Date().toISOString() })
         .eq('application_id', applicationId)
+        .select('application_id')
       if (error) throw error
-
+      if (!data || data.length === 0)
+        throw new Error('העדכון לא נשמר — ייתכן שהרשומה לא קיימת או שאין הרשאה')
     },
     onSuccess: () => invalidate(),
     onError: (err: Error) => toast.error(err.message),
@@ -158,31 +160,52 @@ export function useApplicationMutations() {
         .maybeSingle()
       const approvedId = approvedRes?.id ?? 3
 
-      const { data: contact, error: contactError } = await supabase
-        .from('contact')
-        .insert({
-          full_name: app.candidate_name,
-          display_name: app.candidate_name,
-          phone: app.candidate_phone,
-          phone_norm: app.phone_norm,
-          email: app.candidate_email,
-          cv_link: app.cv_link,
-          cv_storage_path: app.cv_storage_path ?? null,
-          has_cv: app.has_cv ?? false,
-          cv_received_date: app.cv_received_date ?? null,
-          source: app.source ?? null,
-          candidate_availability_ids: app.candidate_availability_ids ?? null,
-          candidate_salary_type_ids: app.candidate_salary_type_ids ?? null,
-          check_status: approvedId,
-        })
-        .select('contact_id')
-        .single()
-      if (contactError) throw contactError
+      // contact.phone_norm is UNIQUE — reuse an existing contact instead of
+      // inserting a duplicate (which would fail on the unique constraint).
+      let contactId: number | null = null
+      if (app.phone_norm) {
+        const { data: existing } = await supabase
+          .from('contact')
+          .select('contact_id')
+          .eq('phone_norm', app.phone_norm)
+          .maybeSingle()
+        if (existing) contactId = existing.contact_id as number
+      }
+
+      if (contactId == null) {
+        const { data: contact, error: contactError } = await supabase
+          .from('contact')
+          .insert({
+            full_name: app.candidate_name,
+            display_name: app.candidate_name,
+            phone: app.candidate_phone,
+            phone_norm: app.phone_norm,
+            email: app.candidate_email,
+            cv_link: app.cv_link,
+            cv_storage_path: app.cv_storage_path ?? null,
+            has_cv: app.has_cv ?? false,
+            cv_received_date: app.cv_received_date ?? null,
+            source: app.source ?? null,
+            candidate_availability_ids: app.candidate_availability_ids ?? null,
+            candidate_salary_type_ids: app.candidate_salary_type_ids ?? null,
+            check_status: approvedId,
+          })
+          .select('contact_id')
+          .single()
+        if (contactError) throw contactError
+        contactId = contact.contact_id as number
+      } else {
+        // Existing contact — mark it approved too.
+        await supabase
+          .from('contact')
+          .update({ check_status: approvedId })
+          .eq('contact_id', contactId)
+      }
 
       const { error: updateError } = await supabase
         .from('applications')
         .update({
-          candidate_link: contact.contact_id,
+          candidate_link: contactId,
           is_new_candidate: false,
           check_status: approvedId,
           updated_timestamp: new Date().toISOString(),
@@ -190,7 +213,7 @@ export function useApplicationMutations() {
         .eq('application_id', app.application_id)
       if (updateError) throw updateError
 
-      return contact.contact_id as number
+      return contactId as number
     },
     onSuccess: () => {
       invalidate()
@@ -232,13 +255,23 @@ export function useApplicationMutations() {
   /** Send application data as a new lead to inbox_v2 (application stays in applications). */
   const sendToLeadsV2 = useMutation({
     mutationFn: async (app: ApplicationRow) => {
+      // No DB unique constraint on inbox_v2.source_unique_key — dedupe here so a
+      // double click doesn't create duplicate leads.
+      const sourceKey = `application_${app.application_id}_${app.job_code}`
+      const { data: existingLead } = await supabase
+        .from('inbox_v2')
+        .select('lead_id')
+        .eq('source_unique_key', sourceKey)
+        .maybeSingle()
+      if (existingLead) throw new Error('הגשה זו כבר נשלחה ללידים')
+
       const { error } = await supabase.from('inbox_v2').insert({
         display_name: app.candidate_name,
         phone: app.candidate_phone,
         phone_norm: app.phone_norm,
         email: app.candidate_email,
         source_name: 'הגשת מועמדות באתר',
-        source_unique_key: `application_${app.application_id}_${app.job_code}`,
+        source_unique_key: sourceKey,
         notes: `הגשה ממשרה ${app.job_code ?? ''}${app.candidate_notes ? ' — ' + app.candidate_notes : ''}`,
         raw_payload: {
           application_id: app.application_id,

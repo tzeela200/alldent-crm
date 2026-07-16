@@ -307,9 +307,9 @@ export default function AdminApplicationsPage() {
         <KpiCard
           label="ארכיון"
           value={kpis?.archived ?? 0}
-          hint="סטטוס 13"
+          hint="סטטוס 15"
           onClick={() => {
-            setFilters({ application_status: 13 })
+            setFilters({ application_status: 15 })
             setPage(0)
           }}
         />
