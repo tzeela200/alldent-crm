@@ -201,8 +201,9 @@ export function useApplicationMutations() {
             has_cv: app.has_cv ?? false,
             cv_received_date: app.cv_received_date ?? null,
             source: app.source ?? null,
-            candidate_availability_ids: app.candidate_availability_ids ?? null,
-            candidate_salary_type_ids: app.candidate_salary_type_ids ?? null,
+            // contact.* array columns are NOT NULL DEFAULT '{}' too — never send null.
+            candidate_availability_ids: app.candidate_availability_ids ?? [],
+            candidate_salary_type_ids: app.candidate_salary_type_ids ?? [],
             check_status: approvedId,
           })
           .select('contact_id')
@@ -210,11 +211,16 @@ export function useApplicationMutations() {
         if (contactError) throw contactError
         contactId = contact.contact_id as number
       } else {
-        // Existing contact — mark it approved too.
-        await supabase
+        // Existing contact — mark it approved too. Verify it actually applied,
+        // otherwise we would report full success on a partial update.
+        const { data: updatedContact, error: contactUpdateError } = await supabase
           .from('contact')
           .update({ check_status: approvedId })
           .eq('contact_id', contactId)
+          .select('contact_id')
+        if (contactUpdateError) throw contactUpdateError
+        if (!updatedContact || updatedContact.length === 0)
+          throw new Error('עדכון איש הקשר הקיים נכשל — ייתכן שאין הרשאה')
       }
 
       const { error: updateError } = await supabase

@@ -100,6 +100,30 @@
 | 7 | ייצוא CSV מייצא את **כל** התוצאות המסוננות (`fetchAllApplicationRows`), לא רק 20 | `useApplications.ts`, `AdminApplicationsPage.tsx` |
 | 8 | שמירת מצב משתמשת ב-localStorage: פילטרים, מיון, עמודות, תצוגה | `AdminApplicationsPage.tsx` |
 
+---
+
+## לוג תיקונים — INC-3106 (20.7.2026) — SmartMatch + אישור למאגר
+
+סקירה על ATS/SmartMatch/Dashboard אומתה; תוקנו קודם הבאגים הקריטיים בלבד.
+אומת ב-`tsc -b` + `vite build` נקי. ללא שינוי Supabase.
+
+| # | תיקון | קובץ |
+|---|---|---|
+| 1 | **קריטי** — יצירת הגשה ב-SmartMatch נכשלה תמיד: `candidate_salary_type_ids: null` (ו-`availability_ids` נופל ל-null) לשדות `NOT NULL DEFAULT '{}'`. עכשיו מערכים | `SmartMatchPage.tsx` |
+| 2 | SmartMatch איבד את הקו״ח — `cv_storage_path`/`cv_received_date` היו `null` קשיח; עכשיו מועברים, ו-`has_cv` מחושב לפי 3 המקורות | `SmartMatchPage.tsx` |
+| 3 | "אישור למאגר" (מסלול איש קשר קיים) דיווח הצלחה בלי לבדוק error/rowcount — פער שנוצר ב-INC-3104 | `useApplicationMutations.ts` |
+| 4 | אותו באג מערכים גם ב-insert ל-`contact` (`?? null` → `?? []`) — עמודות `contact` הן NOT NULL DEFAULT '{}' גם כן. באג רדום, נסגר | `useApplicationMutations.ts` |
+
+### ממצאים שאומתו ונשארו פתוחים (סבב נפרד)
+**ATS:** מיפוי עמודות (5/10), מדיניות מעברים ליניארית, `pending_employer_feedback` כולל 5, לייבלים מקומיים.
+**SmartMatch:** דריפת `candidate.availability` (11 מופעים — עמודה מחוקה), מערכים כ-CSV טקסט, `sub_role` כסקלר,
+זיהוי קו״ח בלי `cv_storage_path` (11 מקומות, לא משתמש ב-`cv.ts`), תגיות mock (`INITIAL_TAGS_BY_CONTACT` משמש כפילטר חי),
+"AI" מקומי, 3 כפתורים מתים, כפילות TOCTOU בלי unique constraint.
+**Dashboard:** "מועמדים פעילים" תמיד 0 (עמודה מחוקה), "מעסיקים פעילים" לפי `account_status===1` במקום 7/8,
+`useInbox()` stub שמחזיר `[]` (5 מדדים מתים), 13 מתוך 15 קישורי query-param מתעלמים,
+קישור שבור `/candidates/:id`, "יצירת מועמד" מוביל לרשימה, רענון בלי await, שליפת 31,372 אנשי קשר לקליינט.
+> שני קיצורי דרך קיימים כבר בקוד: דפוס `state={{ applyFilters }}` (ש-`AdminJobsPage` קורא) ו-`useDashboardKPI` עם `count: 'exact'` — שניהם קיימים ולא בשימוש.
+
 ### נדחה בכוונה (דורש אישור/החלטה נפרדת — לא נגעתי כדי לא להכניס באג)
 - **סינון גלובלי + `total`** — הפילטרים `job_status`/`work_status`/`availability` על שדות מועשרים; דורש View/RPC או ארכיטקטורה, לא תיקון מהיר.
 - **אטומיות אישור-למאגר** — אטומיות אמיתית דורשת RPC אחד (שינוי Supabase). (התיקון ב-#4 מקטין את הסיכון.)

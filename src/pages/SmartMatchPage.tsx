@@ -521,13 +521,19 @@ export default function SmartMatchPage() {
         account_link: selectedJob.account_link ?? null,
         follow_up_date: null,
         assigned_to: null,
-        has_cv: Boolean(candidate.has_cv),
-        cv_storage_path: null,
-        cv_received_date: null,
+        // Carry the real CV over — a candidate whose CV lives only in the private
+        // bucket would otherwise get an application with no openable CV.
+        has_cv: Boolean(candidate.has_cv || candidate.cv_link || candidate.cv_storage_path),
+        cv_storage_path: candidate.cv_storage_path ?? null,
+        cv_received_date: candidate.cv_received_date ?? null,
+        // NOT NULL DEFAULT '{}' in Supabase — an explicit null overrides the
+        // default and fails the insert, so always send an array.
         candidate_availability_ids: Array.isArray(candidate.candidate_availability_ids)
           ? candidate.candidate_availability_ids
-          : null,
-        candidate_salary_type_ids: null,
+          : [],
+        candidate_salary_type_ids: Array.isArray(candidate.candidate_salary_type_ids)
+          ? candidate.candidate_salary_type_ids
+          : [],
       })
 
 
