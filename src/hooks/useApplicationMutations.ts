@@ -52,12 +52,15 @@ export function useApplicationMutations() {
       applicationIds: number[]
       status: number
     }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('applications')
         .update({ application_status: status, updated_timestamp: new Date().toISOString() })
         .in('application_id', applicationIds)
+        .select('application_id')
       if (error) throw error
-
+      if (!data || data.length === 0)
+        throw new Error('אף הגשה לא עודכנה — ייתכן שאין הרשאה')
+      return data.length
     },
     onSuccess: () => invalidate(),
     onError: (err: Error) => toast.error(err.message),
@@ -72,11 +75,15 @@ export function useApplicationMutations() {
       applicationIds: number[]
       checkStatus: number
     }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('applications')
         .update({ check_status: checkStatus, updated_timestamp: new Date().toISOString() })
         .in('application_id', applicationIds)
+        .select('application_id')
       if (error) throw error
+      if (!data || data.length === 0)
+        throw new Error('אף הגשה לא עודכנה — ייתכן שאין הרשאה')
+      return data.length
     },
     onSuccess: () => invalidate(),
     onError: (err: Error) => toast.error(err.message),
@@ -91,11 +98,15 @@ export function useApplicationMutations() {
       applicationIds: number[]
       assignedTo: string | null
     }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('applications')
         .update({ assigned_to: assignedTo, updated_timestamp: new Date().toISOString() })
         .in('application_id', applicationIds)
+        .select('application_id')
       if (error) throw error
+      if (!data || data.length === 0)
+        throw new Error('אף הגשה לא עודכנה — ייתכן שאין הרשאה')
+      return data.length
     },
     onSuccess: () => invalidate(),
     onError: (err: Error) => toast.error(err.message),
@@ -110,11 +121,15 @@ export function useApplicationMutations() {
       applicationIds: number[]
       date: string
     }) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('applications')
         .update({ follow_up_date: date, updated_timestamp: new Date().toISOString() })
         .in('application_id', applicationIds)
+        .select('application_id')
       if (error) throw error
+      if (!data || data.length === 0)
+        throw new Error('אף הגשה לא עודכנה — ייתכן שאין הרשאה')
+      return data.length
     },
     onSuccess: () => invalidate(),
     onError: (err: Error) => toast.error(err.message),
@@ -235,7 +250,7 @@ export function useApplicationMutations() {
         .maybeSingle()
       const spamId = spamRes?.id ?? 2
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('applications')
         .update({
           check_status: spamId,
@@ -243,7 +258,10 @@ export function useApplicationMutations() {
           updated_timestamp: new Date().toISOString(),
         })
         .eq('application_id', app.application_id)
+        .select('application_id')
       if (error) throw error
+      if (!data || data.length === 0)
+        throw new Error('הסימון לא נשמר — ייתכן שהרשומה לא קיימת או שאין הרשאה')
     },
     onSuccess: () => {
       invalidate()
@@ -295,11 +313,14 @@ export function useApplicationMutations() {
   /** Set application status to 15 = "לא דנטלי - ארכיון". */
   const archiveApplication = useMutation({
     mutationFn: async (applicationId: number) => {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('applications')
         .update({ application_status: ARCHIVE_STATUS, updated_timestamp: new Date().toISOString() })
         .eq('application_id', applicationId)
+        .select('application_id')
       if (error) throw error
+      if (!data || data.length === 0)
+        throw new Error('הארכוב לא נשמר — ייתכן שהרשומה לא קיימת או שאין הרשאה')
     },
     onSuccess: () => {
       invalidate()

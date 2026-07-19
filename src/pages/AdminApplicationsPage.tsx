@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, ChevronsUpDown, ClipboardList, Columns3, Download, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react'
 import { RoleBadge } from '@/components/admin/RoleBadge'
@@ -12,6 +12,7 @@ import {
 import {
   useApplicationRows,
   useApplicationKPIs,
+  fetchAllApplicationRows,
   APPLICATIONS_PAGE_SIZE,
 } from '@/hooks/useApplications'
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
@@ -61,6 +62,26 @@ const DEFAULT_VISIBLE: ColumnKey[] = [
   'notes',
 ]
 
+// ─── Persisted view state ─────────────────────────────────────────────
+
+const VIEW_STORAGE_KEY = 'alldent:applications:view'
+
+interface PersistedView {
+  filters?: ApplicationFilters
+  sortBy?: string
+  sortDir?: 'asc' | 'desc'
+  visibleColumns?: ColumnKey[]
+  viewMode?: ViewMode
+}
+
+function loadPersistedView(): PersistedView {
+  try {
+    return JSON.parse(localStorage.getItem(VIEW_STORAGE_KEY) ?? '{}') as PersistedView
+  } catch {
+    return {}
+  }
+}
+
 // ─── CSV helper ───────────────────────────────────────────────────────
 
 function toCsv(rows: Record<string, unknown>[]): string {
@@ -77,11 +98,17 @@ function toCsv(rows: Record<string, unknown>[]): string {
 
 export default function AdminApplicationsPage() {
   const qc = useQueryClient()
-  const [filters, setFilters] = useState<ApplicationFilters>({})
+  const [filters, setFilters] = useState<ApplicationFilters>(
+    () => loadPersistedView().filters ?? {}
+  )
   const [page, setPage] = useState(0)
-  const [viewMode, setViewMode] = useState<ViewMode>('table')
-  const [sortBy, setSortBy] = useState('submission_date')
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const [viewMode, setViewMode] = useState<ViewMode>(
+    () => loadPersistedView().viewMode ?? 'table'
+  )
+  const [sortBy, setSortBy] = useState(() => loadPersistedView().sortBy ?? 'submission_date')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>(
+    () => loadPersistedView().sortDir ?? 'desc'
+  )
   const handleSort = (key: string) => {
     if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortBy(key); setSortDir('asc') }
@@ -92,11 +119,26 @@ export default function AdminApplicationsPage() {
   const [bulkStatus, setBulkStatus] = useState<number | ''>('')
   const [bulkCheck, setBulkCheck] = useState<number | ''>('')
   const [bulkFollowUp, setBulkFollowUp] = useState('')
-  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(DEFAULT_VISIBLE)
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(
+    () => loadPersistedView().visibleColumns ?? DEFAULT_VISIBLE
+  )
+  const [exporting, setExporting] = useState(false)
 
-  const { data, isLoading } = useApplicationRows(filters, page, sortBy, sortDir)
+  // Persist the user's working view (filters / sort / columns / layout).
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        VIEW_STORAGE_KEY,
+        JSON.stringify({ filters, sortBy, sortDir, visibleColumns, viewMode })
+      )
+    } catch {
+      /* storage full or unavailable — non-fatal */
+    }
+  }, [filters, sortBy, sortDir, visibleColumns, viewMode])
+
+  const { data, isLoading, error } = useApplicationRows(filters, page, sortBy, sortDir)
   const { data: kpis } = useApplicationKPIs()
-  const { data: dicts } = useApplicationDicts()
+  const { data: dicts, error: dictsError } = useApplicationDicts()
   const {
     bulkUpdateStatus,
     bulkUpdateCheckStatus,
@@ -133,8 +175,13 @@ export default function AdminApplicationsPage() {
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     )
 
-  const exportCsv = (onlySelected = false) => {
-    const source = onlySelected ? rows.filter((r) => selectedIds.includes(r.application_id)) : rows
+  const exportCsv = async (onlySelected = false) => {
+    setExporting(true)
+    try {
+    // "Export all" pulls the whole filtered result set, not just this page.
+    const source = onlySelected
+      ? rows.filter((r) => selectedIds.includes(r.application_id))
+      : await fetchAllApplicationRows(filters, sortBy, sortDir)
     const prepared = source.map((r) => ({
       'מזהה הגשה': r.application_id,
       'שם מועמד': r.candidate_name ?? '',
@@ -168,7 +215,12 @@ export default function AdminApplicationsPage() {
     a.click()
     document.body.removeChild(a)
     URL.revokeObjectURL(url)
-    toast.success('הייצוא הושלם')
+    toast.success(`הייצוא הושלם — ${source.length.toLocaleString()} רשומות`)
+    } catch (err) {
+      toast.error(`ייצוא נכשל: ${err instanceof Error ? err.message : 'שגיאה לא ידועה'}`)
+    } finally {
+      setExporting(false)
+    }
   }
 
   const runBulkStatus = async () => {
@@ -176,8 +228,11 @@ export default function AdminApplicationsPage() {
       toast.error('יש לבחור רשומות וסטטוס')
       return
     }
-    await bulkUpdateStatus.mutateAsync({ applicationIds: selectedIds, status: Number(bulkStatus) })
-    toast.success(`${selectedIds.length} הגשות עודכנו`)
+    const updated = await bulkUpdateStatus.mutateAsync({
+      applicationIds: selectedIds,
+      status: Number(bulkStatus),
+    })
+    toast.success(`${updated} הגשות עודכנו`)
     setSelectedIds([])
     setBulkStatus('')
   }
@@ -187,11 +242,11 @@ export default function AdminApplicationsPage() {
       toast.error('יש לבחור רשומות וסטטוס בדיקה')
       return
     }
-    await bulkUpdateCheckStatus.mutateAsync({
+    const updated = await bulkUpdateCheckStatus.mutateAsync({
       applicationIds: selectedIds,
       checkStatus: Number(bulkCheck),
     })
-    toast.success(`${selectedIds.length} הגשות עודכנו`)
+    toast.success(`${updated} הגשות עודכנו`)
     setSelectedIds([])
     setBulkCheck('')
   }
@@ -201,8 +256,11 @@ export default function AdminApplicationsPage() {
       toast.error('יש לבחור רשומות ותאריך')
       return
     }
-    await bulkSetFollowUp.mutateAsync({ applicationIds: selectedIds, date: bulkFollowUp })
-    toast.success(`פעולה הבאה נקבעה ל-${selectedIds.length} הגשות`)
+    const updated = await bulkSetFollowUp.mutateAsync({
+      applicationIds: selectedIds,
+      date: bulkFollowUp,
+    })
+    toast.success(`פעולה הבאה נקבעה ל-${updated} הגשות`)
     setSelectedIds([])
     setBulkFollowUp('')
   }
@@ -239,8 +297,13 @@ export default function AdminApplicationsPage() {
           >
             רענון
           </ActionButton>
-          <ActionButton variant="ghost" icon={Download} onClick={() => exportCsv(false)}>
-            ייצוא
+          <ActionButton
+            variant="ghost"
+            icon={Download}
+            onClick={() => exportCsv(false)}
+            disabled={exporting}
+          >
+            {exporting ? 'מייצא...' : 'ייצוא'}
           </ActionButton>
           <ActionButton variant="primary" icon={Plus} onClick={() => setShowCreate(true)}>
             הגשה ידנית
@@ -248,6 +311,15 @@ export default function AdminApplicationsPage() {
         </div>
       }
     >
+      {/* Dictionary load failure — labels would otherwise render as raw IDs */}
+      {dictsError && (
+        <div className="rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+          <span className="font-semibold">שגיאה בטעינת המילונים.</span>{' '}
+          {dictsError instanceof Error ? dictsError.message : ''} — ייתכן שיוצגו מזהים
+          מספריים במקום שמות.
+        </div>
+      )}
+
       {/* KPI Row */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
         <KpiCard label="סה״כ" value={kpis?.total ?? 0} hint="כל ההגשות" />
@@ -453,7 +525,24 @@ export default function AdminApplicationsPage() {
           </div>
         )}
 
-        {isLoading ? (
+        {error ? (
+          <div className="flex flex-col items-center gap-3 rounded-2xl bg-red-50 py-12 text-center ring-1 ring-red-200">
+            <p className="text-sm font-semibold text-red-800">שגיאה בטעינת ההגשות</p>
+            <p className="max-w-md text-xs text-red-600">
+              {error instanceof Error ? error.message : 'שגיאה לא ידועה'}
+            </p>
+            <p className="text-xs text-red-500">
+              זו תקלת טעינה — אין להסיק מכך שאין הגשות במערכת.
+            </p>
+            <ActionButton
+              variant="secondary"
+              icon={RefreshCw}
+              onClick={() => qc.invalidateQueries({ queryKey: ['applications'] })}
+            >
+              נסה שוב
+            </ActionButton>
+          </div>
+        ) : isLoading ? (
           <div className="flex items-center justify-center py-12">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-teal-600" />
           </div>

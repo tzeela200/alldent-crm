@@ -4,26 +4,20 @@ import type { ApplicationRow, ApplicationFilters, ApplicationKPIs } from '@/type
 
 export const APPLICATIONS_PAGE_SIZE = 20
 
-export function useApplicationRows(
-  filters: ApplicationFilters,
-  page: number,
-  sortBy = 'submission_date',
-  sortDir: 'asc' | 'desc' = 'desc'
-) {
-  return useQuery({
-    queryKey: ['applications', filters, page, sortBy, sortDir],
-    queryFn: async () => {
-      let query = supabase
-        .from('applications')
-        .select('*', { count: 'exact' })
-        .order(sortBy, { ascending: sortDir === 'asc' })
-        .range(page * APPLICATIONS_PAGE_SIZE, (page + 1) * APPLICATIONS_PAGE_SIZE - 1)
-
+/**
+ * Apply every server-side filter to an `applications` query.
+ * Shared by the paged list and the "export all" fetch so both stay in sync.
+ */
+function applyApplicationFilters<T>(queryIn: T, filters: ApplicationFilters): T {
+  let query = queryIn as any
+  {
       if (filters.search) {
-        const s = filters.search.trim()
-        query = query.or(
-          `candidate_name.ilike.%${s}%,candidate_phone.ilike.%${s}%,phone_norm.ilike.%${s}%,candidate_email.ilike.%${s}%,job_code.ilike.%${s}%,account_name.ilike.%${s}%`
-        )
+        // Strip characters that break PostgREST's or() filter grammar.
+        const s = filters.search.trim().replace(/[,()%*"\\]/g, ' ').trim()
+        if (s)
+          query = query.or(
+            `candidate_name.ilike.%${s}%,candidate_phone.ilike.%${s}%,phone_norm.ilike.%${s}%,candidate_email.ilike.%${s}%,job_code.ilike.%${s}%,account_name.ilike.%${s}%`
+          )
       }
       if (filters.application_status != null)
         query = query.eq('application_status', filters.application_status)
@@ -41,10 +35,15 @@ export function useApplicationRows(
         query = query.gte('submission_date', filters.date_from)
       if (filters.date_to)
         query = query.lte('submission_date', filters.date_to + 'T23:59:59')
+      // Must mirror applicationHasCv() in src/lib/cv.ts — a CV may live in any of
+      // has_cv / cv_link / cv_storage_path, otherwise filter and display disagree.
       if (filters.cv_state === 'with')
-        query = query.eq('has_cv', true)
+        query = query.or('has_cv.eq.true,cv_link.not.is.null,cv_storage_path.not.is.null')
       if (filters.cv_state === 'without')
-        query = query.or('has_cv.is.null,has_cv.eq.false')
+        query = query
+          .or('has_cv.is.null,has_cv.eq.false')
+          .is('cv_link', null)
+          .is('cv_storage_path', null)
       if (filters.is_manual != null)
         query = query.eq('is_manual', filters.is_manual)
       if (filters.is_new_candidate != null)
@@ -65,12 +64,14 @@ export function useApplicationRows(
       }
       if (filters.account_name_search)
         query = query.ilike('account_name', `%${filters.account_name_search}%`)
+  }
+  return query as T
+}
 
-      const { data, count, error } = await query
-      if (error) throw error
-
-      let rows = (data ?? []) as ApplicationRow[]
-
+/** Attach related contact + job fields onto application rows. */
+async function enrichApplicationRows(rowsIn: ApplicationRow[]): Promise<ApplicationRow[]> {
+  let rows = rowsIn
+  {
       // Enrich with contact data
       const candidateIds = [...new Set(rows.map((r) => r.candidate_link).filter(Boolean))] as number[]
       if (candidateIds.length > 0) {
@@ -124,18 +125,86 @@ export function useApplicationRows(
         }
       }
 
-      // Client-side filters on enriched fields (job_status, work_status, availability)
-      if (filters.job_status != null)
-        rows = rows.filter((r) => r.job_status === filters.job_status)
-      if (filters.contact_work_status != null)
-        rows = rows.filter((r) => r.contact_work_status === filters.contact_work_status)
-      if (filters.contact_availability != null)
-        rows = rows.filter((r) => r.contact_availability === filters.contact_availability)
+  }
+  return rows
+}
 
-      return { rows, total: count ?? 0 }
+/**
+ * Filters that depend on enriched (joined) fields, so they cannot run in the
+ * Supabase query. NOTE: on the paged list these only see the current page —
+ * tracked as a known limitation until a joined View/RPC exists.
+ */
+function applyEnrichedFilters(
+  rowsIn: ApplicationRow[],
+  filters: ApplicationFilters
+): ApplicationRow[] {
+  let rows = rowsIn
+  if (filters.job_status != null)
+    rows = rows.filter((r) => r.job_status === filters.job_status)
+  if (filters.contact_work_status != null)
+    rows = rows.filter((r) => r.contact_work_status === filters.contact_work_status)
+  if (filters.contact_availability != null)
+    rows = rows.filter((r) => r.contact_availability === filters.contact_availability)
+  return rows
+}
+
+export function useApplicationRows(
+  filters: ApplicationFilters,
+  page: number,
+  sortBy = 'submission_date',
+  sortDir: 'asc' | 'desc' = 'desc'
+) {
+  return useQuery({
+    queryKey: ['applications', filters, page, sortBy, sortDir],
+    queryFn: async () => {
+      const query = applyApplicationFilters(
+        supabase
+          .from('applications')
+          .select('*', { count: 'exact' })
+          .order(sortBy, { ascending: sortDir === 'asc' })
+          .range(page * APPLICATIONS_PAGE_SIZE, (page + 1) * APPLICATIONS_PAGE_SIZE - 1),
+        filters
+      )
+
+      const { data, count, error } = await query
+      if (error) throw error
+
+      const enriched = await enrichApplicationRows((data ?? []) as ApplicationRow[])
+      return { rows: applyEnrichedFilters(enriched, filters), total: count ?? 0 }
     },
     staleTime: 30_000,
   })
+}
+
+/**
+ * Fetch every application matching `filters` across all pages — used by CSV
+ * export so it exports the whole filtered result set, not just the current page.
+ */
+export async function fetchAllApplicationRows(
+  filters: ApplicationFilters,
+  sortBy = 'submission_date',
+  sortDir: 'asc' | 'desc' = 'desc',
+  maxRows = 5000
+): Promise<ApplicationRow[]> {
+  const CHUNK = 1000
+  let all: ApplicationRow[] = []
+  for (let from = 0; from < maxRows; from += CHUNK) {
+    const query = applyApplicationFilters(
+      supabase
+        .from('applications')
+        .select('*')
+        .order(sortBy, { ascending: sortDir === 'asc' })
+        .range(from, from + CHUNK - 1),
+      filters
+    )
+    const { data, error } = await query
+    if (error) throw error
+    const batch = (data ?? []) as ApplicationRow[]
+    all = all.concat(batch)
+    if (batch.length < CHUNK) break
+  }
+  const enriched = await enrichApplicationRows(all)
+  return applyEnrichedFilters(enriched, filters)
 }
 
 export function useApplicationRow(applicationId: number | null) {
@@ -182,7 +251,9 @@ export function useApplicationKPIs() {
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })
-            .or('has_cv.is.null,has_cv.eq.false'),
+            .or('has_cv.is.null,has_cv.eq.false')
+            .is('cv_link', null)
+            .is('cv_storage_path', null),
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })

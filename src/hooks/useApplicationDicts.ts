@@ -32,6 +32,23 @@ export function useApplicationDicts() {
           supabase.from('dict_cities').select('id, name').order('name'),
           supabase.from('dict_languages').select('id, name').order('name'),
         ])
+      // Surface dictionary failures instead of silently returning empty lists
+      // (which would render raw IDs and look like missing data).
+      const failed = Object.entries({
+        dict_application_statuses: appStatuses,
+        dict_check_statuses: checkStatuses,
+        dict_sources: sources,
+        dict_regions: regions,
+        dict_roles: roles,
+        dict_contact_work_statuses: workStatuses,
+        dict_availability: availabilities,
+        dict_job_statuses: jobStatuses,
+        dict_cities: cities,
+        dict_languages: languages,
+      }).find(([, res]) => res.error)
+      if (failed)
+        throw new Error(`טעינת מילון נכשלה (${failed[0]}): ${failed[1].error?.message ?? ''}`)
+
       return {
         applicationStatuses: (appStatuses.data ?? []) as DictItem[],
         checkStatuses: (checkStatuses.data ?? []) as DictItem[],

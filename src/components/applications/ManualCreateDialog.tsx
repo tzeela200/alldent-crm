@@ -68,7 +68,7 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
       if (contactSearch.length < 2) return []
       const { data } = await supabase
         .from('contact')
-        .select('contact_id, display_name, full_name, phone, phone_norm, email, role, city_id, region_id, candidate_availability_ids, cv_link, has_cv')
+        .select('contact_id, display_name, full_name, phone, phone_norm, email, role, city_id, region_id, candidate_availability_ids, cv_link, cv_storage_path, has_cv')
         .or(
           `full_name.ilike.%${contactSearch}%,display_name.ilike.%${contactSearch}%,phone.ilike.%${contactSearch}%,phone_norm.ilike.%${contactSearch}%`
         )
@@ -164,10 +164,12 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
         follow_up_date: followUpDate || null,
         assigned_to: null,
         has_cv: selectedContact.has_cv ?? false,
-        cv_storage_path: null,
+        cv_storage_path: selectedContact.cv_storage_path ?? null,
         cv_received_date: null,
-        candidate_availability_ids: null,
-        candidate_salary_type_ids: null,
+        // NOT NULL DEFAULT '{}' in Supabase — an explicit null overrides the
+        // default and fails the insert, so always send an array.
+        candidate_availability_ids: selectedContact.candidate_availability_ids ?? [],
+        candidate_salary_type_ids: [],
       })
       toast.success('הגשה ידנית נוצרה בהצלחה')
       onCreated(id)

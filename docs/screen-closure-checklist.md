@@ -47,18 +47,18 @@
 | קטגוריה | פריט | מצב | הערה |
 |---|---|---|---|
 | נתונים | מקור חי | ✅ | `useApplications.ts` מול Supabase |
-| נתונים | מילונים SSOT | ⚠️ | מילונים חיים ✅, אבל פילטר תפקיד בטקסט חופשי (`ilike job_role`) |
+| נתונים | מילונים SSOT | ⚠️ | מילונים חיים ✅; כשלי טעינה נחשפים (INC-3105). נותר: פילטר תפקיד בטקסט חופשי (`ilike job_role`) |
 | נתונים | קריאה גלובלית | ❌ | סינון `job_status`/`work_status`/`availability` בקליינט על 20 שורות בלבד |
 | נתונים | מונים מדויקים | ⚠️ | ✅ תוקן (INC-3104): KPI "ארכיון" 13→15. נותר: "בראיונות" סופר 6-8 אך לוחץ 7; `total` שגוי בסינון מועשר |
 | פעולות | כל כפתור עובד | ✅ | רענון/ייצוא/יצירה/Bulk/פעולות פאנל — כולם מחוברים |
 | פעולות | שמירה נשמרת | ✅ | mutations כותבים ל-`applications` |
-| פעולות | אימות כתיבה | ✅ | תוקן (INC-3104): `updateApplication` מוסיף `.select()` ובודק rowcount |
+| פעולות | אימות כתיבה | ✅ | תוקן (INC-3104 + INC-3105): rowcount נבדק **בכל** ה-mutations (יחיד, 4 Bulk, ספאם, ארכוב); Bulk מדווח מספר אמיתי |
 | פעולות | אטומיות | ❌ | "אישור למאגר" = 2 כתיבות ללא transaction/RPC |
 | פעולות | מניעת כפילות | ⚠️ | ✅ תוקן (INC-3104): אישור-למאגר מחפש contact לפי `phone_norm` ומקשר במקום insert; שלח-ללידים בודק `source_unique_key` לפני insert. נותר (Supabase): להוסיף UNIQUE על `inbox_v2.source_unique_key` להגנה ברמת DB |
 | מצבי מסך | פאנל/דיאלוג | ✅ | נפתח/נסגר/טוען |
-| מצבי מסך | יצירה | ⚠️ | עובד; אך `master_role/city/region` נשמרים כ-ID-string, `candidate_availability_ids`/`cv_storage_path`=null |
+| מצבי מסך | יצירה | ✅ | תוקן (INC-3105): היה **שבור** — נשלח `null` לשדות `NOT NULL DEFAULT '{}'`. עכשיו `[]` + מועתק `cv_storage_path`. נותר קוסמטי: `master_role/city/region` כ-ID-string |
 | מצבי מסך | עריכה | ✅ | כשל שמירה משאיר עריכה פתוחה |
-| מצבי מסך | טעינה/ריק/שגיאה | ⚠️ | אין מצב שגיאה אמיתי — כשל שליפה מציג "אין הגשות" |
+| מצבי מסך | טעינה/ריק/שגיאה | ✅ | תוקן (INC-3105): מצב שגיאה נפרד עם הודעה + "נסה שוב", ובאנר נפרד לכשל טעינת מילונים |
 | עקביות | קישורים | ✅ | תוקן (INC-3104): "פרטי משרה"→`/admin/jobs/:code`. השאר תקין |
 | עקביות | חוקים עסקיים | ❌ | `active/closed` לא עקבי; השמה (12) לא מעדכנת משרה |
 | עקביות | סנכרון בין מסכים | ⚠️ | invalidate רק `applications*`; שלח-ללידים בלי invalidate |
@@ -82,6 +82,23 @@
 | 3 | אימות כתיבה: `updateApplication` מוסיף `.select()` + בדיקת rowcount (משפיע גם על מסך הצינור) | `src/hooks/useApplicationMutations.ts` |
 | 4 | אישור-למאגר מחפש contact לפי `phone_norm` ומקשר במקום insert (מונע כשל על ה-UNIQUE) | `src/hooks/useApplicationMutations.ts` |
 | 5 | שלח-ללידים בודק `source_unique_key` לפני insert (מונע לידים כפולים) | `src/hooks/useApplicationMutations.ts` |
+
+---
+
+## לוג תיקונים — INC-3105 (16.7.2026)
+
+תוקן בקוד (אומת ב-`tsc -b` + `vite build` נקי). לא בוצע שינוי Supabase/סכמה/RLS/נתונים.
+
+| # | תיקון | קובץ |
+|---|---|---|
+| 1 | **קריטי** — יצירה ידנית הייתה שבורה: `null` לשדות `NOT NULL DEFAULT '{}'`. עכשיו `[]`, + מועתק `cv_storage_path` מהמועמד | `ManualCreateDialog.tsx`, `src/types/index.ts` |
+| 2 | rowcount בכל שאר ה-mutations (4 Bulk, ספאם, ארכוב); Bulk מחזיר ומדווח מספר אמיתי | `useApplicationMutations.ts`, `AdminApplicationsPage.tsx` |
+| 3 | מילונים זורקים שגיאה במקום להחזיר רשימה ריקה בשקט | `useApplicationDicts.ts` |
+| 4 | מצב שגיאה נפרד לרשימה + באנר כשל מילונים (לא עוד "אין הגשות" על תקלה) | `AdminApplicationsPage.tsx` |
+| 5 | פילטר קו״ח ו-KPI "חסר קו״ח" מיושרים ל-`applicationHasCv` (3 מקורות) | `useApplications.ts` |
+| 6 | הקשחת חיפוש — ניקוי תווים ששוברים `.or()` | `useApplications.ts` |
+| 7 | ייצוא CSV מייצא את **כל** התוצאות המסוננות (`fetchAllApplicationRows`), לא רק 20 | `useApplications.ts`, `AdminApplicationsPage.tsx` |
+| 8 | שמירת מצב משתמשת ב-localStorage: פילטרים, מיון, עמודות, תצוגה | `AdminApplicationsPage.tsx` |
 
 ### נדחה בכוונה (דורש אישור/החלטה נפרדת — לא נגעתי כדי לא להכניס באג)
 - **סינון גלובלי + `total`** — הפילטרים `job_status`/`work_status`/`availability` על שדות מועשרים; דורש View/RPC או ארכיטקטורה, לא תיקון מהיר.

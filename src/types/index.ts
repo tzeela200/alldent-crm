@@ -36,6 +36,8 @@ export interface Contact {
   region_id: number | null // → dict_regions
   city_id: number | null // → dict_cities
   cv_link: string | null
+  /** Path in the private `candidate-cvs` bucket (optional on partial selects). */
+  cv_storage_path?: string | null
   has_cv: boolean
   cv_received_date: string | null
   account_link: number | null // → accounts.account_id (FK קנוני)
