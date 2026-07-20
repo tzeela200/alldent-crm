@@ -9,7 +9,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Send, Upload, FileSpreadsheet, X, AlertTriangle, CheckCircle2, Loader2, RotateCcw, Columns3 } from 'lucide-react'
+import { Send, Upload, FileSpreadsheet, X, AlertTriangle, CheckCircle2, Loader2, RotateCcw, Columns3, Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { Shell, Toolbar, SearchBar, ActionButton, StatusPill, KPICard } from '@/components/layout/Shell'
@@ -34,6 +34,7 @@ const VISIBLE_COLUMNS_STORAGE_KEY = 'alldent.fixPublications.visibleColumns.v1'
 
 const ALL_COLUMNS: { key: string; label: string }[] = [
   { key: 'entity_name',          label: 'שם' },
+  { key: 'entity_type',          label: 'סוג רשומה' },
   { key: 'phone',                label: 'נייד' },
   { key: 'role_name',            label: 'תפקיד' },
   { key: 'region_name',          label: 'אזור' },
@@ -55,7 +56,7 @@ const ALL_COLUMNS: { key: string; label: string }[] = [
 const ALL_COLUMN_KEYS = new Set(ALL_COLUMNS.map((c) => c.key))
 
 const DEFAULT_COLUMNS = [
-  'entity_name', 'phone', 'role_name', 'region_name', 'city_name',
+  'entity_name', 'entity_type', 'phone', 'role_name', 'region_name', 'city_name',
   'last_delivery_status', 'last_sent_at', 'campaign_name', 'social_status_name',
 ]
 
@@ -143,38 +144,71 @@ export default function AdminFixPublicationsPage() {
     {
       key: 'entity_name', label: 'שם', sortable: true, minWidth: '180px',
       render: (row) => {
-        const name = row.contact?.full_name || row.contact?.display_name || row.full_name_raw || '—'
-        return row.contact_id ? (
-          <button
-            type="button"
-            onClick={(e) => { e.stopPropagation(); navigate(`/admin/contacts/${row.contact_id}`) }}
-            className="font-medium text-[#008080] hover:underline"
-          >
-            {name}
-          </button>
-        ) : (
+        if (row.contact_id) {
+          return (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); navigate(`/admin/contacts/${row.contact_id}`) }}
+              className="font-medium text-[#008080] hover:underline"
+            >
+              {row.contact?.full_name || row.contact?.display_name || row.full_name_raw || '—'}
+            </button>
+          )
+        }
+        if (row.account_id) {
+          return (
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); navigate(`/admin/accounts/${row.account_id}`) }}
+              className="inline-flex items-center gap-1.5 font-medium text-[#008080] hover:underline"
+            >
+              <Building2 className="h-3.5 w-3.5 flex-shrink-0" />
+              {row.account?.account_name || row.full_name_raw || '—'}
+            </button>
+          )
+        }
+        return (
           <span className="flex items-center gap-1.5 text-[#6B6B6B]">
-            {name}
+            {row.full_name_raw || '—'}
             <span title="לא נמצא במאגר" className="text-[#E8A85C]"><AlertTriangle className="h-3.5 w-3.5" /></span>
           </span>
         )
       },
     },
     {
+      key: 'entity_type', label: 'סוג רשומה', nowrap: true,
+      render: (row) =>
+        row.contact_id ? 'איש קשר' : row.account_id ? 'ארגון' : <span className="text-[#6B6B6B]">—</span>,
+    },
+    {
       key: 'phone', label: 'נייד', sortable: true, nowrap: true,
-      render: (row) => formatPhone(row.contact?.phone || row.phone_raw) || '—',
+      render: (row) => formatPhone(row.contact?.phone || row.account?.phone || row.phone_raw) || '—',
     },
     {
       key: 'role_name', label: 'תפקיד',
-      render: (row) => (row.contact?.role ? dicts.data?.roleById.get(Number(row.contact.role)) ?? '—' : '—'),
+      // לארגון אין תפקיד מקצועי — מוצג סוג הארגון במקום, ולא ניחוש
+      render: (row) => {
+        if (row.contact?.role) return dicts.data?.roleById.get(Number(row.contact.role)) ?? '—'
+        if (row.account?.account_type) {
+          const name = dicts.data?.accountTypeById.get(Number(row.account.account_type))
+          return name ? <span className="text-[#6B6B6B]">{name}</span> : '—'
+        }
+        return '—'
+      },
     },
     {
       key: 'region_name', label: 'אזור',
-      render: (row) => (row.contact?.region_id ? dicts.data?.regionById.get(Number(row.contact.region_id)) ?? '—' : '—'),
+      render: (row) => {
+        const id = row.contact?.region_id ?? row.account?.region_id
+        return id ? dicts.data?.regionById.get(Number(id)) ?? '—' : '—'
+      },
     },
     {
       key: 'city_name', label: 'עיר',
-      render: (row) => (row.contact?.city_id ? dicts.data?.cityById.get(Number(row.contact.city_id)) ?? '—' : '—'),
+      render: (row) => {
+        const id = row.contact?.city_id ?? row.account?.city_id
+        return id ? dicts.data?.cityById.get(Number(id)) ?? '—' : '—'
+      },
     },
     {
       key: 'last_delivery_status', label: 'סטטוס שליחה', sortable: true, nowrap: true,
@@ -273,7 +307,10 @@ export default function AdminFixPublicationsPage() {
               label="פרסום אחרון"
               value={campaigns.data?.[0]?.sent_at ? formatDateTime(campaigns.data[0].sent_at).split(' ')[0] : '—'}
             />
-            <KPICard label="לא נמצאו במאגר" value={(overview.data?.rows.filter((r) => !r.contact_id).length ?? 0)} />
+            <KPICard
+              label="לא נמצאו במאגר"
+              value={overview.data?.rows.filter((r) => !r.contact_id && !r.account_id).length ?? 0}
+            />
           </div>
 
           <Toolbar className="space-y-4">
@@ -472,8 +509,8 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
             <KPICard label="שורות בקובץ" value={preview.counts.total} />
             <KPICard label="נמצאו במאגר" value={preview.counts.matched} />
             <KPICard label="לא נמצאו" value={preview.counts.notFound} />
-            <KPICard label="נייד לא תקין" value={preview.counts.invalidPhone} />
-            <KPICard label="חסר נייד" value={preview.counts.missingPhone} />
+            <KPICard label="נייד לא תקין" value={preview.counts.invalidPhone + preview.counts.missingPhone} />
+            <KPICard label="כפילות נייד" value={preview.counts.ambiguous} />
           </div>
 
           <Toolbar className="space-y-4">
@@ -537,12 +574,14 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
 function PreviewTable({ preview }: { preview: CampaignPreview }) {
   const [showOnlyIssues, setShowOnlyIssues] = useState(false)
   const rows = useMemo(
-    () => (showOnlyIssues ? preview.rows.filter((r) => r.matchResult !== 'matched_contact') : preview.rows).slice(0, 200),
+    () => (showOnlyIssues ? preview.rows.filter((r) => r.matchResult !== 'matched_contact' && r.matchResult !== 'matched_account') : preview.rows).slice(0, 200),
     [preview.rows, showOnlyIssues],
   )
 
   const issueLabels: Record<string, string> = {
-    matched_contact: 'נמצא במאגר',
+    matched_contact: 'איש קשר',
+    matched_account: 'ארגון',
+    ambiguous_match: 'כפילות נייד — לבדיקה',
     not_found: 'לא נמצא במאגר',
     invalid_phone: 'נייד לא תקין',
     missing_phone: 'חסר נייד',
@@ -564,14 +603,16 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
       render: (r) => (
         <StatusPill
           label={issueLabels[r.matchResult] ?? r.matchResult}
-          variant={r.matchResult === 'matched_contact' ? 'success' : 'warning'}
+          variant={
+            r.matchResult === 'matched_contact' || r.matchResult === 'matched_account' ? 'success' : 'warning'
+          }
         />
       ),
     },
     { key: 'fixStatusRaw', label: 'סטטוס ב-Fix', render: (r) => r.fixStatusRaw ?? '—' },
   ]
 
-  const issueCount = preview.rows.filter((r) => r.matchResult !== 'matched_contact').length
+  const issueCount = preview.rows.filter((r) => r.matchResult !== 'matched_contact' && r.matchResult !== 'matched_account').length
 
   return (
     <div className="space-y-3">

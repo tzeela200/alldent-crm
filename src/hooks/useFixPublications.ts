@@ -49,6 +49,7 @@ export interface PublicationRow {
   recipient_id: number
   campaign_id: number
   contact_id: number | null
+  account_id: number | null
   phone_norm: string | null
   phone_raw: string | null
   full_name_raw: string | null
@@ -72,6 +73,14 @@ export interface PublicationRow {
     region_id: number | null
     city_id: number | null
     social_status: number | null
+  } | null
+  account: {
+    account_id: number
+    account_name: string
+    phone: string | null
+    account_type: number | null
+    region_id: number | null
+    city_id: number | null
   } | null
 }
 
@@ -105,19 +114,21 @@ export function usePublicationDicts() {
     queryKey: FIX_PUBLICATIONS_KEYS.dicts,
     staleTime: 600_000,
     queryFn: async () => {
-      const [roles, regions, cities, socialStatuses] = await Promise.all([
+      const [roles, regions, cities, socialStatuses, accountTypes] = await Promise.all([
         fetchAllPages<DictRow>('dict_roles', 'id, name'),
         fetchAllPages<DictRow>('dict_regions', 'id, name'),
         fetchAllPages<DictRow>('dict_cities', 'id, name, region_id'),
         fetchAllPages<DictRow>('dict_social_statuses', 'id, name'),
+        fetchAllPages<DictRow>('dict_account_types', 'id, name'),
       ])
       const byId = (rows: DictRow[]) => new Map(rows.map((r) => [Number(r.id), r.name]))
       return {
-        roles, regions, cities, socialStatuses,
+        roles, regions, cities, socialStatuses, accountTypes,
         roleById: byId(roles),
         regionById: byId(regions),
         cityById: byId(cities),
         socialStatusById: byId(socialStatuses),
+        accountTypeById: byId(accountTypes),
       }
     },
   })
@@ -145,11 +156,12 @@ export function usePublicationsOverview(
       let query = supabase
         .from('whatsapp_campaign_recipients')
         .select(
-          `recipient_id, campaign_id, contact_id, phone_norm, phone_raw, full_name_raw,
+          `recipient_id, campaign_id, contact_id, account_id, phone_norm, phone_raw, full_name_raw,
            sent_at, delivery_status, delivery_status_raw, fix_status_raw, fix_process_raw,
            email_raw, fix_digital_id, fix_lead_number, fix_file_code, match_result,
            campaign:whatsapp_campaigns!inner(campaign_id, campaign_name),
-           ${contactJoin}(contact_id, full_name, display_name, phone, role, region_id, city_id, social_status)`,
+           ${contactJoin}(contact_id, full_name, display_name, phone, role, region_id, city_id, social_status),
+           account:accounts(account_id, account_name, phone, account_type, region_id, city_id)`,
           { count: 'exact' },
         )
 
@@ -207,6 +219,8 @@ export interface CampaignPreview {
   counts: {
     total: number
     matched: number
+    matchedAccounts: number
+    ambiguous: number
     notFound: number
     invalidPhone: number
     missingPhone: number
@@ -236,22 +250,48 @@ export async function buildCampaignPreview(file: File): Promise<CampaignPreview>
   const rows = parseCampaignRows(rawRows)
 
   // התאמה לפי phone_norm בלבד — לא לפי שם ולא לפי אימייל.
+  // מחפשים בשני המקורות: contact ואז accounts. אותה פעולה, שתי טבלאות.
   const phones = Array.from(new Set(rows.map((r) => r.phoneNorm).filter(Boolean))) as string[]
-  const byPhone = new Map<string, number>()
+  const contactByPhone = new Map<string, number>()
+  const accountByPhone = new Map<string, number>()
+  const duplicatePhones = new Set<string>()
+
   for (let i = 0; i < phones.length; i += 500) {
     const chunk = phones.slice(i, i + 500)
-    const { data, error } = await supabase
-      .from('contact').select('contact_id, phone_norm').in('phone_norm', chunk)
-    if (error) throw error
-    for (const c of data ?? []) {
-      if (c.phone_norm) byPhone.set(c.phone_norm, Number(c.contact_id))
+    const [contacts, accounts] = await Promise.all([
+      supabase.from('contact').select('contact_id, phone_norm').in('phone_norm', chunk),
+      supabase.from('accounts').select('account_id, phone_norm').in('phone_norm', chunk),
+    ])
+    if (contacts.error) throw contacts.error
+    if (accounts.error) throw accounts.error
+    for (const c of contacts.data ?? []) {
+      if (c.phone_norm) contactByPhone.set(c.phone_norm, Number(c.contact_id))
+    }
+    for (const a of accounts.data ?? []) {
+      if (!a.phone_norm) continue
+      // כלל הפרויקט: נייד = רשומת אב אחת. שתי רשומות לאותו נייד הן
+      // שגיאת נתונים שמוצגת למשתמשת, ולא משהו שנכריע עליו בשקט.
+      if (accountByPhone.has(a.phone_norm)) duplicatePhones.add(a.phone_norm)
+      else accountByPhone.set(a.phone_norm, Number(a.account_id))
     }
   }
 
   for (const row of rows) {
     if (!row.phoneNorm) continue
-    const id = byPhone.get(row.phoneNorm)
-    if (id != null) { row.contactId = id; row.matchResult = 'matched_contact' }
+    const contactId = contactByPhone.get(row.phoneNorm)
+    const accountId = accountByPhone.get(row.phoneNorm)
+
+    if (duplicatePhones.has(row.phoneNorm) || (contactId != null && accountId != null)) {
+      row.matchResult = 'ambiguous_match'
+      continue
+    }
+    if (contactId != null) {
+      row.contactId = contactId
+      row.matchResult = 'matched_contact'
+    } else if (accountId != null) {
+      row.accountId = accountId
+      row.matchResult = 'matched_account'
+    }
   }
 
   const byStatus: Record<string, number> = {}
@@ -266,7 +306,9 @@ export async function buildCampaignPreview(file: File): Promise<CampaignPreview>
     rows,
     counts: {
       total: rows.length,
-      matched: rows.filter((r) => r.matchResult === 'matched_contact').length,
+      matched: rows.filter((r) => r.matchResult === 'matched_contact' || r.matchResult === 'matched_account').length,
+      matchedAccounts: rows.filter((r) => r.matchResult === 'matched_account').length,
+      ambiguous: rows.filter((r) => r.matchResult === 'ambiguous_match').length,
       notFound: rows.filter((r) => r.matchResult === 'not_found').length,
       invalidPhone: rows.filter((r) => r.matchResult === 'invalid_phone').length,
       missingPhone: rows.filter((r) => r.matchResult === 'missing_phone').length,
@@ -331,6 +373,7 @@ export function useCommitCampaign() {
       const payload = storable.map((r) => ({
         campaign_id: campaignId,
         contact_id: r.contactId,
+        account_id: r.accountId,
         phone_norm: r.phoneNorm,
         phone_raw: r.phoneRaw,
         full_name_raw: r.fullNameRaw,
@@ -353,41 +396,70 @@ export function useCommitCampaign() {
         if (error) throw error
       }
 
-      // שדה סיכום בלבד — מקור האמת להיסטוריה הוא whatsapp_campaign_recipients.
-      // עדכון רק כאשר התאריך החדש מאוחר מהקיים.
-      const matched = storable.filter((r) => r.contactId != null && (r.sentAt ?? campaignSentAt))
-      const ids = Array.from(new Set(matched.map((r) => r.contactId as number)))
-      const current = new Map<number, string | null>()
-      for (let i = 0; i < ids.length; i += 500) {
-        const { data } = await supabase
-          .from('contact').select('contact_id, whatsapp_campaign_last_sent').in('contact_id', ids.slice(i, i + 500))
-        for (const c of data ?? []) current.set(Number(c.contact_id), c.whatsapp_campaign_last_sent)
+      // שדות סיכום בטבלאות הליבה — אותה פעולה בדיוק לאיש קשר ולארגון:
+      // תאריך השליחה והסטטוס מתעדכנים יחד, ורק אם השליחה מאוחרת מהקיים.
+      // מקור האמת להיסטוריה נשאר whatsapp_campaign_recipients.
+      const syncSummary = async (
+        table: 'contact' | 'accounts',
+        idColumn: 'contact_id' | 'account_id',
+        dateColumn: 'whatsapp_campaign_last_sent' | 'whatsapp_last_sent',
+        pickId: (r: ParsedCampaignRow) => number | null,
+      ) => {
+        const matched = storable.filter((r) => pickId(r) != null && (r.sentAt ?? campaignSentAt))
+        if (!matched.length) return 0
+
+        const ids = Array.from(new Set(matched.map((r) => pickId(r) as number)))
+        const current = new Map<number, string | null>()
+        for (let i = 0; i < ids.length; i += 500) {
+          const { data, error } = await supabase
+            .from(table).select(`${idColumn}, ${dateColumn}`).in(idColumn, ids.slice(i, i + 500))
+          if (error) throw error
+          for (const row of (data ?? []) as Record<string, unknown>[]) {
+            current.set(Number(row[idColumn]), (row[dateColumn] as string | null) ?? null)
+          }
+        }
+
+        const toUpdate = new Map<number, { stamp: string; status: DeliveryStatusCode }>()
+        for (const r of matched) {
+          const id = pickId(r) as number
+          const stamp = (r.sentAt ?? campaignSentAt) as string
+          const staged = toUpdate.get(id)
+          const prev = staged?.stamp ?? current.get(id) ?? null
+
+          if (!prev || new Date(stamp) > new Date(prev)) {
+            toUpdate.set(id, { stamp, status: r.deliveryStatus })
+          } else if (staged && new Date(stamp).getTime() === new Date(staged.stamp).getTime()) {
+            // אותה שליחה מופיעה יותר מפעם אחת בקובץ — נשמר הסטטוס המתקדם יותר
+            toUpdate.set(id, { stamp, status: pickHigherStatus(staged.status, r.deliveryStatus) })
+          }
+        }
+
+        const updates = Array.from(toUpdate.entries())
+        for (let i = 0; i < updates.length; i += 25) {
+          await Promise.all(
+            updates.slice(i, i + 25).map(([id, { stamp, status }]) =>
+              supabase.from(table)
+                .update({ [dateColumn]: stamp, whatsapp_last_delivery_status: status })
+                .eq(idColumn, id),
+            ),
+          )
+        }
+        return updates.length
       }
 
-      const toUpdate = new Map<number, string>()
-      for (const r of matched) {
-        const id = r.contactId as number
-        const stamp = (r.sentAt ?? campaignSentAt) as string
-        const prev = toUpdate.get(id) ?? current.get(id) ?? null
-        if (!prev || new Date(stamp) > new Date(prev)) toUpdate.set(id, stamp)
-      }
+      const contactsUpdated = await syncSummary(
+        'contact', 'contact_id', 'whatsapp_campaign_last_sent', (r) => r.contactId,
+      )
+      const accountsUpdated = await syncSummary(
+        'accounts', 'account_id', 'whatsapp_last_sent', (r) => r.accountId,
+      )
 
-      const updates = Array.from(toUpdate.entries())
-      for (let i = 0; i < updates.length; i += 25) {
-        await Promise.all(
-          updates.slice(i, i + 25).map(([contactId, stamp]) =>
-            supabase.from('contact')
-              .update({ whatsapp_campaign_last_sent: stamp })
-              .eq('contact_id', contactId),
-          ),
-        )
-      }
-
-      return { campaignId, saved: payload.length, contactsUpdated: updates.length }
+      return { campaignId, saved: payload.length, contactsUpdated, accountsUpdated }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['fix-publications'] })
       qc.invalidateQueries({ queryKey: ['contacts-v2'] })
+      qc.invalidateQueries({ queryKey: ['accounts'] })
     },
   })
 }

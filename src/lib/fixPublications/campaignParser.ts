@@ -17,7 +17,10 @@ const CAMPAIGN_KNOWN_HEADERS = [
   'fullname', 'email', 'phone', 'process', 'status', 'sending_time', 'sending_status',
 ]
 
-export type MatchResult = 'matched_contact' | 'not_found' | 'invalid_phone' | 'missing_phone'
+export type MatchResult =
+  | 'matched_contact' | 'matched_account'
+  | 'ambiguous_match'   // אותו נייד בשתי רשומות — שגיאת נתונים, לא הכרעה אוטומטית
+  | 'not_found' | 'invalid_phone' | 'missing_phone'
 
 export interface ParsedCampaignRow {
   rowNumber: number
@@ -32,6 +35,7 @@ export interface ParsedCampaignRow {
   deliveryStatus: DeliveryStatusCode
   matchResult: MatchResult
   contactId: number | null
+  accountId: number | null
   rawPayload: RawRow
 }
 
@@ -128,6 +132,7 @@ export function parseCampaignRows(rows: RawRow[]): ParsedCampaignRow[] {
       deliveryStatus: mapDeliveryStatus(deliveryStatusRaw),
       matchResult: !phoneRaw ? 'missing_phone' : validPhone ? 'not_found' : 'invalid_phone',
       contactId: null,
+      accountId: null,
       rawPayload: raw,
     }
   })

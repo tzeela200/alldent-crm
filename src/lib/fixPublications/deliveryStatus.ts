@@ -21,24 +21,51 @@ export type DeliveryStatusCode =
 
 export type DeliveryTone = 'success' | 'warning' | 'danger' | 'default'
 
+/**
+ * קבוצת התצוגה — ארבע קבוצות מוסכמות:
+ *   🟢 הצלחה          — נקרא / נמסר / נשלח
+ *   🔴 נכשל בגלל מכשיר — Rejected (Not suitable device / Message Undeliverable)
+ *   🟠 נכשל אחר        — Provider error / Auto-limiting / Message Blocked / כל Rejected אחר
+ *   ⚪ ללא סטטוס       — ערך ריק
+ */
+export type DeliveryGroup = 'success' | 'device_failure' | 'other_failure' | 'unknown'
+
+interface DeliveryGroupMeta {
+  label: string
+  tone: DeliveryTone
+}
+
+export const DELIVERY_GROUPS: Record<DeliveryGroup, DeliveryGroupMeta> = {
+  success:        { label: 'הצלחה',           tone: 'success' },
+  device_failure: { label: 'נכשל בגלל מכשיר', tone: 'danger'  },
+  other_failure:  { label: 'נכשל אחר',        tone: 'warning' },
+  unknown:        { label: 'ללא סטטוס',       tone: 'default' },
+}
+
 interface DeliveryStatusMeta {
   code: DeliveryStatusCode
   label: string
+  group: DeliveryGroup
   tone: DeliveryTone
   /** דירוג קדימות — סטטוס גבוה יותר לעולם לא נדרס ע"י נמוך ממנו */
   rank: number
 }
 
 export const DELIVERY_STATUSES: Record<DeliveryStatusCode, DeliveryStatusMeta> = {
-  read:              { code: 'read',              label: 'נקרא',                  tone: 'success', rank: 5 },
-  delivered:         { code: 'delivered',         label: 'נמסר',                  tone: 'success', rank: 4 },
-  submitted:         { code: 'submitted',         label: 'נשלח',                  tone: 'warning', rank: 3 },
-  failed_device:     { code: 'failed_device',     label: 'נכשל – מכשיר לא מתאים', tone: 'danger',  rank: 2 },
-  failed_rate_limit: { code: 'failed_rate_limit', label: 'נכשל – הגבלת ספק',      tone: 'danger',  rank: 2 },
-  failed_blocked:    { code: 'failed_blocked',    label: 'נכשל – נחסם',           tone: 'danger',  rank: 2 },
-  failed_provider:   { code: 'failed_provider',   label: 'נכשל – שגיאת ספק',      tone: 'danger',  rank: 2 },
-  failed_other:      { code: 'failed_other',      label: 'נכשל – סיבה אחרת',      tone: 'danger',  rank: 2 },
-  no_status:         { code: 'no_status',         label: 'ללא סטטוס',             tone: 'default', rank: 1 },
+  read:              { code: 'read',              label: 'נקרא',                  group: 'success',        tone: 'success', rank: 5 },
+  delivered:         { code: 'delivered',         label: 'נמסר',                  group: 'success',        tone: 'success', rank: 4 },
+  submitted:         { code: 'submitted',         label: 'נשלח',                  group: 'success',        tone: 'success', rank: 3 },
+  failed_device:     { code: 'failed_device',     label: 'נכשל – מכשיר לא מתאים', group: 'device_failure', tone: 'danger',  rank: 2 },
+  failed_provider:   { code: 'failed_provider',   label: 'נכשל – שגיאת ספק',      group: 'other_failure',  tone: 'warning', rank: 2 },
+  failed_rate_limit: { code: 'failed_rate_limit', label: 'נכשל – הגבלת ספק',      group: 'other_failure',  tone: 'warning', rank: 2 },
+  failed_blocked:    { code: 'failed_blocked',    label: 'נכשל – נחסם',           group: 'other_failure',  tone: 'warning', rank: 2 },
+  failed_other:      { code: 'failed_other',      label: 'נכשל – סיבה אחרת',      group: 'other_failure',  tone: 'warning', rank: 2 },
+  no_status:         { code: 'no_status',         label: 'ללא סטטוס',             group: 'unknown',        tone: 'default', rank: 1 },
+}
+
+/** כל הקודים השייכים לקבוצת תצוגה — לשימוש בפילטר לפי קבוצה */
+export function statusCodesInGroup(group: DeliveryGroup): DeliveryStatusCode[] {
+  return DELIVERY_STATUS_ORDER.filter((code) => DELIVERY_STATUSES[code].group === group)
 }
 
 export const DELIVERY_STATUS_ORDER: DeliveryStatusCode[] = [

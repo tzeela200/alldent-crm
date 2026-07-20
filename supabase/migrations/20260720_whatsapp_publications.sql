@@ -34,7 +34,10 @@ create table if not exists public.whatsapp_campaign_recipients (
   campaign_id         bigint      not null
                         references public.whatsapp_campaigns(campaign_id) on delete cascade,
   -- ההתאמה היא לפי נייד מנורמל בלבד. לא לפי שם, לא לפי אימייל.
-  contact_id          bigint      references public.contact(contact_id) on delete set null,
+  -- הרשומה יכולה להיות איש קשר או ארגון — אותה פעולה, שני מקורות.
+  -- contact קודם (phone_norm שם UNIQUE), ואם אין — accounts.
+  contact_id          bigint      references public.contact(contact_id)  on delete set null,
+  account_id          bigint      references public.accounts(account_id) on delete set null,
   phone_norm          text        not null,
   phone_raw           text,
   full_name_raw       text,
@@ -81,6 +84,8 @@ create unique index if not exists whatsapp_recipients_campaign_phone_uidx
 
 create index if not exists whatsapp_recipients_contact_idx
   on public.whatsapp_campaign_recipients (contact_id);
+create index if not exists whatsapp_recipients_account_idx
+  on public.whatsapp_campaign_recipients (account_id);
 create index if not exists whatsapp_recipients_sent_at_idx
   on public.whatsapp_campaign_recipients (sent_at desc nulls last);
 create index if not exists whatsapp_recipients_status_idx
@@ -89,6 +94,43 @@ create index if not exists whatsapp_recipients_phone_norm_idx
   on public.whatsapp_campaign_recipients (phone_norm);
 create index if not exists whatsapp_campaigns_sent_at_idx
   on public.whatsapp_campaigns (sent_at desc nulls last);
+
+-- ──────────────── שדות סיכום בטבלאות הליבה ────────────────
+-- עמודות התאריך כבר קיימות ואינן נוצרות מחדש:
+--   contact.whatsapp_campaign_last_sent
+--   accounts.whatsapp_last_sent
+-- מתווסף רק סטטוס השליחה האחרון, בשם זהה בשתי הטבלאות.
+--
+-- אלה שדות סיכום/Cache בלבד. מקור האמת להיסטוריה הוא
+-- whatsapp_campaign_recipients, שבה נשמרת כל שליחה בנפרד.
+alter table public.contact
+  add column if not exists whatsapp_last_delivery_status text;
+
+alter table public.accounts
+  add column if not exists whatsapp_last_delivery_status text;
+
+comment on column public.contact.whatsapp_last_delivery_status is
+  'סטטוס השליחה האחרון ב-WhatsApp. שדה סיכום — מקור האמת הוא whatsapp_campaign_recipients.';
+comment on column public.accounts.whatsapp_last_delivery_status is
+  'סטטוס השליחה האחרון ב-WhatsApp. שדה סיכום — מקור האמת הוא whatsapp_campaign_recipients.';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'contact_whatsapp_status_chk') then
+    alter table public.contact add constraint contact_whatsapp_status_chk
+      check (whatsapp_last_delivery_status is null or whatsapp_last_delivery_status in (
+        'read','delivered','submitted',
+        'failed_device','failed_rate_limit','failed_blocked','failed_provider','failed_other',
+        'no_status'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'accounts_whatsapp_status_chk') then
+    alter table public.accounts add constraint accounts_whatsapp_status_chk
+      check (whatsapp_last_delivery_status is null or whatsapp_last_delivery_status in (
+        'read','delivered','submitted',
+        'failed_device','failed_rate_limit','failed_blocked','failed_provider','failed_other',
+        'no_status'));
+  end if;
+end $$;
 
 -- ─────────────────────────────── RLS ───────────────────────────────
 -- מדיניות זהה לשאר טבלאות ה-CRM (contact / accounts): גישה למשתמש מחובר.
