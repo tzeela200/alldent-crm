@@ -12,6 +12,7 @@ import {
   Sparkles,
   Settings,
   DatabaseZap,
+  Send,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -35,6 +36,7 @@ const navGroups: { title?: string; items: NavItem[] }[] = [
       { to: '/admin/inbox-v2', label: 'טריאז\' נתונים', icon: DatabaseZap },
       { to: '/admin/contacts', label: 'ניהול מאגר', icon: Users },
       { to: '/admin/candidates', label: 'מועמדים', icon: UserCheck },
+      { to: '/admin/fix-publications', label: 'פרסומי WhatsApp', icon: Send },
     ],
   },
   {
