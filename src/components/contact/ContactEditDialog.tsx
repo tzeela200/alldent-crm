@@ -15,6 +15,14 @@ import {
   deriveRegionFromCity,
   type FormState,
 } from "@/lib/contactForm";
+import { supabase } from "@/lib/supabase";
+import { openApplicationCv } from "@/lib/cv";
+import { toast } from "sonner";
+
+/** Sanitize a filename for a storage key (mirrors the upload-candidate-cv edge fn). */
+function safeCvName(name: string): string {
+  return (name || "cv").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
+}
 
 interface Props {
   open: boolean;
@@ -31,6 +39,7 @@ const selectClassName =
 export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved }: Props) {
   const [adminForm, setAdminForm] = useState<FormState>({});
   const [saving, setSaving] = useState(false);
+  const [uploadingCv, setUploadingCv] = useState(false);
 
   useEffect(() => {
     if (!open || !contact) return;
@@ -41,6 +50,35 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
 
   const setAf = (field: string, value: unknown) =>
     setAdminForm((previous) => ({ ...previous, [field]: value }));
+
+  // Admin CV upload: pushes the file to the private candidate-cvs bucket, then
+  // stages cv_storage_path / has_cv / cv_received_date on the form. The row is
+  // persisted through the normal patch flow when the admin clicks Save.
+  async function handleCvUpload(file: File | null) {
+    const contactId = contact?.contact_id;
+    if (!file || !contactId) return;
+    setUploadingCv(true);
+    try {
+      const path = `${contactId}/${Date.now()}_${safeCvName(file.name)}`;
+      const { error } = await supabase.storage
+        .from("candidate-cvs")
+        .upload(path, file, {
+          contentType: file.type || "application/octet-stream",
+          upsert: true,
+        });
+      if (error) throw error;
+      setAf("cv_storage_path", path);
+      setAf("has_cv", true);
+      setAf("cv_received_date", new Date().toISOString().slice(0, 10));
+      toast.success("הקובץ הועלה. לחצי על שמירה כדי לשמור בכרטסת.");
+    } catch (err) {
+      toast.error(
+        "העלאת הקובץ נכשלה: " + (err instanceof Error ? err.message : String(err)),
+      );
+    } finally {
+      setUploadingCv(false);
+    }
+  }
 
   async function handleSave() {
     if (!contact) return;
@@ -544,6 +582,38 @@ export function ContactEditDialog({ open, onOpenChange, contact, dicts, onSaved 
                   onChange={(event) => setAf("cv_received_date", event.target.value || null)}
                   className={inputClassName}
                 />
+              )}
+            />
+            <AdminPanelField
+              label="העלאת קובץ קו״ח"
+              mode="edit"
+              fullWidth
+              editValue={(
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="file"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    disabled={uploadingCv}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0] ?? null;
+                      handleCvUpload(file);
+                      event.target.value = "";
+                    }}
+                    className="block w-full text-sm text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-teal-600 file:px-3 file:py-1.5 file:text-white hover:file:bg-teal-700 disabled:opacity-50"
+                  />
+                  {uploadingCv && <span className="text-xs text-slate-500">מעלה…</span>}
+                  {!uploadingCv && Boolean(adminForm.cv_storage_path) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        openApplicationCv({ cv_storage_path: String(adminForm.cv_storage_path) })
+                      }
+                      className="rounded-lg border border-teal-600 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-50"
+                    >
+                      צפייה בקובץ
+                    </button>
+                  )}
+                </div>
               )}
             />
             <AdminPanelField

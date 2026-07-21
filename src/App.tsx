@@ -8,6 +8,9 @@ import { AuthProvider } from '@/contexts/AuthContext'
 import AuthGuard from '@/components/auth/AuthGuard'
 import LoginPage from '@/pages/LoginPage'
 
+// Global in-app CV (Word) viewer — mounted once, driven by cvViewerStore
+import { CvViewerDialog } from '@/components/cv/CvViewerDialog'
+
 // Layouts
 import AdminLayout from '@/components/layout/AdminLayout'
 import PublicLayout from '@/components/layout/PublicLayout'
@@ -104,6 +107,7 @@ function JobsSlugDispatch() {
 export default function App() {
   return (
     <AuthProvider>
+    <CvViewerDialog />
     <PublicLaunchGate>
     <Routes>
       {/* ─── Public routes (with PublicLayout) ─── */}

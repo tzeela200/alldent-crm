@@ -112,6 +112,7 @@ export function buildContactPatch(form: FormState, original: FormState): Record<
     current_employer: nullableString(form, "current_employer"),
     work_schedule_text: nullableString(form, "work_schedule_text"),
     cv_link: nullableString(form, "cv_link"),
+    cv_storage_path: nullableString(form, "cv_storage_path"),
     cv_received_date: nullableString(form, "cv_received_date"),
     has_cv: Boolean(form.has_cv),
     portfolio_url: nullableString(form, "portfolio_url"),
