@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { UserPlus, X } from 'lucide-react'
 import { ActionButton } from '@/components/layout/Shell'
 import { useInboxV2Row, useInboxV2Mutations } from '@/hooks/useInboxV2'
-import { supabase } from '@/lib/supabase'
+import { useContactMutations } from '@/hooks/useContactMutations'
+import { INBOX_ACTION } from '@/lib/inbox-v2-dicts'
 import { toast } from 'sonner'
 
 interface Props {
@@ -13,6 +14,7 @@ interface Props {
 export function CreateFromLeadDialog({ leadId, onClose }: Props) {
   const { data: row } = useInboxV2Row(leadId)
   const { updateRow, logAction } = useInboxV2Mutations()
+  const { insertContact } = useContactMutations()
   const [saving, setSaving] = useState(false)
 
   const [form, setForm] = useState({
@@ -53,23 +55,27 @@ export function CreateFromLeadDialog({ leadId, onClose }: Props) {
 
     setSaving(true)
     try {
-      const { data: newContact, error } = await supabase
-        .from('contact')
-        .insert({
-          display_name: form.display_name.trim(),
-          first_name: form.first_name.trim() || null,
-          last_name: form.last_name.trim() || null,
-          phone: form.phone.trim() || null,
-          phone_norm: row?.phone_norm || null,
-          email: form.email.trim() || null,
-          facebook_url: form.facebook_url.trim() || null,
-          facebook_id: form.facebook_id.trim() || null,
-          linkedin_url: form.linkedin_url.trim() || null,
-        })
-        .select('contact_id')
-        .single()
+      // איחוד עמודת שם: full_name (שדה ההתאמה של match_inbox_row) לצד display_name.
+      const fullName =
+        [form.first_name.trim(), form.last_name.trim()].filter(Boolean).join(' ') ||
+        form.display_name.trim()
 
+      const payload = {
+        display_name: form.display_name.trim(),
+        full_name: fullName,
+        first_name: form.first_name.trim() || null,
+        last_name: form.last_name.trim() || null,
+        phone: form.phone.trim() || null,
+        phone_norm: row?.phone_norm || null,
+        email: form.email.trim() || null,
+        facebook_url: form.facebook_url.trim() || null,
+        facebook_id: form.facebook_id.trim() || null,
+        linkedin_url: form.linkedin_url.trim() || null,
+      }
+
+      const { data: newContact, error } = await insertContact(payload)
       if (error) throw error
+      if (!newContact) throw new Error('לא התקבל מזהה איש קשר')
 
       await updateRow.mutateAsync({
         leadId,
@@ -83,8 +89,8 @@ export function CreateFromLeadDialog({ leadId, onClose }: Props) {
         lead_id: leadId,
         target_type: 'contact',
         target_id: newContact.contact_id,
-        action_type: 2,
-        updates_applied: form,
+        action_type: INBOX_ACTION.CREATE_CONTACT,
+        updates_applied: payload,
         approved_by: null,
       })
 

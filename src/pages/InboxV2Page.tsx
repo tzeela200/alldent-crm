@@ -1,18 +1,39 @@
-import { useState, useMemo, useCallback } from 'react'
-import { ChevronDown, ChevronUp, DatabaseZap, RefreshCw, Sparkles } from 'lucide-react'
-import { Shell, KPICard, EmptyState, Pagination, ActionButton } from '@/components/layout/Shell'
-import { useInboxV2Rows, useInboxV2Batches, PAGE_SIZE } from '@/hooks/useInboxV2'
+import { useState, useCallback } from 'react'
+import { ChevronDown, ChevronUp, Columns3, DatabaseZap, RefreshCw, Sparkles } from 'lucide-react'
+import { Shell, KPICard, ActionButton } from '@/components/layout/Shell'
+import { useInboxV2Rows, useInboxV2Batches, useInboxV2Stats, PAGE_SIZE } from '@/hooks/useInboxV2'
 import { useInboxV2Upload } from '@/hooks/useInboxV2Upload'
 import { useInboxV2Matching } from '@/hooks/useInboxV2Matching'
 import { UploadZone } from '@/components/inbox-v2/UploadZone'
 import { InboxV2FiltersBar } from '@/components/inbox-v2/InboxV2Filters'
-import { InboxV2Table } from '@/components/inbox-v2/InboxV2Table'
+import {
+  InboxV2Table,
+  ALL_COLUMNS,
+  DEFAULT_COLUMNS,
+  INBOX_V2_COLUMNS_STORAGE_KEY,
+} from '@/components/inbox-v2/InboxV2Table'
+import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
 import { InboxV2QuickActions } from '@/components/inbox-v2/InboxV2QuickActions'
 import { InboxV2RowDetail } from '@/components/inbox-v2/InboxV2RowDetail'
 import { MergePanel } from '@/components/inbox-v2/MergePanel'
 import { CreateFromLeadDialog } from '@/components/inbox-v2/CreateFromLeadDialog'
 import { AIChatPanel } from '@/components/inbox-v2/AIChatPanel'
 import type { InboxV2Filters } from '@/types/inbox-v2'
+
+const ALL_COLUMN_KEYS = new Set(ALL_COLUMNS.map((c) => c.key))
+
+function loadStoredVisibleColumns(): string[] {
+  try {
+    const raw = localStorage.getItem(INBOX_V2_COLUMNS_STORAGE_KEY)
+    if (!raw) return [...DEFAULT_COLUMNS]
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return [...DEFAULT_COLUMNS]
+    const valid = parsed.filter((k) => typeof k === 'string' && ALL_COLUMN_KEYS.has(k))
+    return valid.length ? valid : [...DEFAULT_COLUMNS]
+  } catch {
+    return [...DEFAULT_COLUMNS]
+  }
+}
 
 export default function InboxV2Page() {
   const [filters, setFilters] = useState<InboxV2Filters>({})
@@ -23,9 +44,11 @@ export default function InboxV2Page() {
   const [mergeLeadId, setMergeLeadId] = useState<number | null>(null)
   const [createLeadId, setCreateLeadId] = useState<number | null>(null)
   const [showAiChat, setShowAiChat] = useState(false)
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(loadStoredVisibleColumns)
 
   const { data, isLoading } = useInboxV2Rows(filters, page)
   const { data: batches } = useInboxV2Batches()
+  const { data: stats } = useInboxV2Stats()
   const { matchBatch } = useInboxV2Matching()
 
   const handleBatchReady = useCallback(
@@ -40,39 +63,88 @@ export default function InboxV2Page() {
 
   const rows = data?.rows ?? []
   const total = data?.total ?? 0
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
-  const kpis = useMemo(() => {
-    return {
-      total,
-      pending: rows.filter((r) => r.merge_status === 1 || r.merge_status === 2).length,
-      matched: rows.filter((r) => r.merge_status === 3 || r.merge_status === 4).length,
-      merged: rows.filter((r) => r.merge_status === 6).length,
+  const hasActiveFilters = !!(
+    filters.search ||
+    filters.status?.length ||
+    filters.source_type?.length ||
+    filters.batch_id ||
+    filters.role ||
+    filters.confidence_min != null ||
+    filters.has_new_info ||
+    filters.open_only ||
+    filters.date_from ||
+    filters.date_to
+  )
+
+  const rematchBatchId = filters.batch_id ?? lastBatchId
+
+  const persistColumns = (next: string[]) => {
+    setVisibleColumns(next)
+    try {
+      localStorage.setItem(INBOX_V2_COLUMNS_STORAGE_KEY, JSON.stringify(next))
+    } catch {
+      /* ignore quota / privacy-mode */
     }
-  }, [rows, total])
+  }
+
+  const toggleColumn = (key: string) =>
+    persistColumns(
+      visibleColumns.includes(key)
+        ? visibleColumns.filter((k) => k !== key)
+        : [...visibleColumns, key]
+    )
 
   return (
     <Shell
       title="מרכז טריאז' נתונים"
-      subtitle="ייבוא, ניתוח והתאמת רשומות לפני מיזוג למאגר"
+      subtitle="שער הכניסה של רשומות לפני מיזוג למאגר — אין עדכון ליבה ללא אישור"
       icon={DatabaseZap}
       actions={
         <div className="flex items-center gap-2">
+          <details className="relative">
+            <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50">
+              <Columns3 className="h-4 w-4" />
+              בחירת עמודות
+            </summary>
+            <div className="absolute left-0 top-full z-30 mt-2 max-h-[70vh] w-80 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-md">
+              <div className="mb-3 text-[13px] font-bold text-slate-900">בחירת עמודות</div>
+              <button
+                type="button"
+                onClick={() => persistColumns([...DEFAULT_COLUMNS])}
+                className="mb-3 text-[12px] font-semibold text-[#008080] hover:underline"
+              >
+                איפוס לברירת המחדל
+              </button>
+              <div className="grid gap-2">
+                {ALL_COLUMNS.map((column) => (
+                  <label
+                    key={column.key}
+                    className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-[13px]"
+                  >
+                    <span>{column.label}</span>
+                    <input
+                      type="checkbox"
+                      checked={visibleColumns.includes(column.key)}
+                      onChange={() => toggleColumn(column.key)}
+                      className="h-4 w-4 rounded border-slate-300 text-[#008080] focus:ring-[#008080]"
+                    />
+                  </label>
+                ))}
+              </div>
+            </div>
+          </details>
+
           <span title="בקרוב">
-            <ActionButton
-              variant="secondary"
-              icon={Sparkles}
-              onClick={() => setShowAiChat(true)}
-              disabled
-            >
+            <ActionButton variant="secondary" icon={Sparkles} onClick={() => setShowAiChat(true)} disabled>
               צ׳אט AI
             </ActionButton>
           </span>
-          {lastBatchId && (
+          {rematchBatchId && (
             <ActionButton
               variant="secondary"
               icon={RefreshCw}
-              onClick={() => matchBatch.mutate(lastBatchId)}
+              onClick={() => matchBatch.mutate(rematchBatchId)}
               disabled={matchBatch.isPending}
             >
               {matchBatch.isPending ? 'מנתח...' : 'הרץ התאמה מחדש'}
@@ -81,12 +153,12 @@ export default function InboxV2Page() {
         </div>
       }
     >
-      {/* KPI Row */}
+      {/* KPI Row — ספירה גלובלית אמיתית */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <KPICard label="סה״כ רשומות" value={kpis.total} />
-        <KPICard label="ממתינות" value={kpis.pending} />
-        <KPICard label="התאמות" value={kpis.matched} />
-        <KPICard label="מוזגו" value={kpis.merged} />
+        <KPICard label="סה״כ רשומות" value={stats?.total ?? '—'} />
+        <KPICard label="פתוחים בשער" value={stats?.open ?? '—'} />
+        <KPICard label="התאמות" value={stats?.matched ?? '—'} />
+        <KPICard label="מוזגו" value={stats?.merged ?? '—'} />
       </div>
 
       {/* Upload Zone */}
@@ -118,43 +190,32 @@ export default function InboxV2Page() {
         batches={batches ?? []}
       />
 
-      {/* Quick Actions */}
-      {selectedIds.length > 0 && (
-        <InboxV2QuickActions
-          selectedIds={selectedIds}
-          onClearSelection={() => setSelectedIds([])}
-        />
-      )}
-
-      {/* Table */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-teal-600" />
-        </div>
-      ) : rows.length === 0 ? (
-        <EmptyState
-          icon={DatabaseZap}
-          title="אין רשומות"
-          description="העלו קובץ או הדביקו נתונים כדי להתחיל"
-        />
-      ) : (
-        <>
-          <InboxV2Table
-            rows={rows}
+      {/* Table (מטפל בעצמו במצבי טעינה/ריק/סינון + bulk + pagination) */}
+      <InboxV2Table
+        rows={rows}
+        visibleColumns={visibleColumns}
+        isLoading={isLoading}
+        hasActiveFilter={hasActiveFilters}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        onRowClick={setDetailLeadId}
+        bulkActions={
+          <InboxV2QuickActions
             selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            onRowClick={setDetailLeadId}
+            onClearSelection={() => setSelectedIds([])}
           />
-          <Pagination
-            page={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-            totalItems={total}
+        }
+        pagination={
+          <AdminTablePagination
+            page={page + 1}
+            pageSize={PAGE_SIZE}
+            total={total}
+            onPageChange={(n) => setPage(n - 1)}
           />
-        </>
-      )}
+        }
+      />
 
-      {/* Slide-over panels */}
+      {/* Slide-over / modals */}
       {detailLeadId != null && (
         <InboxV2RowDetail
           leadId={detailLeadId}

@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { OPEN_STATUS_IDS } from '@/lib/inbox-v2-dicts'
 import type { InboxV2Row, InboxV2Filters, InboxImportBatch, InboxMergeAction } from '@/types/inbox-v2'
 
 const PAGE_SIZE = 20
@@ -20,6 +21,7 @@ export function useInboxV2Rows(filters: InboxV2Filters, page: number) {
         )
       }
       if (filters.status?.length) query = query.in('merge_status', filters.status)
+      else if (filters.open_only) query = query.in('merge_status', OPEN_STATUS_IDS)
       if (filters.source_type?.length) query = query.in('source_type', filters.source_type)
       if (filters.batch_id) query = query.eq('import_batch_id', filters.batch_id)
       if (filters.role) query = query.eq('temp_role', filters.role)
@@ -69,18 +71,48 @@ export function useInboxV2Batches() {
   })
 }
 
+/**
+ * KPI גלובליים — ספירה אמיתית מול כל הטבלה (count/head), לא מ-20 שורות העמוד.
+ */
+export function useInboxV2Stats() {
+  return useQuery({
+    queryKey: ['inbox-v2-stats'],
+    queryFn: async () => {
+      const base = () => supabase.from('inbox_v2').select('*', { count: 'exact', head: true })
+      const [total, open, matched, merged] = await Promise.all([
+        base(),
+        base().in('merge_status', OPEN_STATUS_IDS),
+        base().in('merge_status', [3, 4]),
+        base().eq('merge_status', 6),
+      ])
+      const firstError = total.error ?? open.error ?? matched.error ?? merged.error
+      if (firstError) throw firstError
+      return {
+        total: total.count ?? 0,
+        open: open.count ?? 0,
+        matched: matched.count ?? 0,
+        merged: merged.count ?? 0,
+      }
+    },
+    staleTime: 30_000,
+  })
+}
+
 export function useInboxV2Mutations() {
   const qc = useQueryClient()
+
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['inbox-v2'] })
+    qc.invalidateQueries({ queryKey: ['inbox-v2-row'] })
+    qc.invalidateQueries({ queryKey: ['inbox-v2-stats'] })
+  }
 
   const updateRow = useMutation({
     mutationFn: async ({ leadId, updates }: { leadId: number; updates: Partial<InboxV2Row> }) => {
       const { error } = await supabase.from('inbox_v2').update(updates).eq('lead_id', leadId)
       if (error) throw error
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['inbox-v2'] })
-      qc.invalidateQueries({ queryKey: ['inbox-v2-row'] })
-    },
+    onSuccess: invalidate,
   })
 
   const bulkUpdateStatus = useMutation({
@@ -91,27 +123,31 @@ export function useInboxV2Mutations() {
         .in('lead_id', leadIds)
       if (error) throw error
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['inbox-v2'] }),
+    onSuccess: invalidate,
   })
 
   const bulkAddTag = useMutation({
     mutationFn: async ({ leadIds, tag }: { leadIds: number[]; tag: string }) => {
+      // read-modify-write לכל שורה. איסוף שגיאות — לא לבלוע ולהציג "הצלחה".
+      // (הפיכה ל-RPC אטומי = חוב שלב 2)
       for (const id of leadIds) {
-        const { data } = await supabase
+        const { data, error: readError } = await supabase
           .from('inbox_v2')
           .select('tags')
           .eq('lead_id', id)
           .single()
+        if (readError) throw readError
         const currentTags: string[] = (data?.tags as string[]) ?? []
         if (!currentTags.includes(tag)) {
-          await supabase
+          const { error: updateError } = await supabase
             .from('inbox_v2')
             .update({ tags: [...currentTags, tag] })
             .eq('lead_id', id)
+          if (updateError) throw updateError
         }
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['inbox-v2'] }),
+    onSuccess: invalidate,
   })
 
   const logAction = useMutation({

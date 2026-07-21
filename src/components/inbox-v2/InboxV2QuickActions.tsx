@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Ban, CheckCircle2, Eye, EyeOff, Tag, XCircle } from 'lucide-react'
 import { ActionButton } from '@/components/layout/Shell'
 import { useInboxV2Mutations } from '@/hooks/useInboxV2'
+import { INBOX_ACTION } from '@/lib/inbox-v2-dicts'
 import { toast } from 'sonner'
 
 interface Props {
@@ -9,50 +10,90 @@ interface Props {
   onClearSelection: () => void
 }
 
+/**
+ * פעולות אצווה — מוצג בתוך משבצת ה-bulk של AdminTable (הספירה "N נבחרו" מגיעה משם).
+ * הבחנה מחייבת (מקור אמת dict tables):
+ *  - "סמן לאישור" = סטטוס (merge_status=5).
+ *  - "לבדיקה" = פעולה (action_type=7) הנרשמת ביומן, ללא שינוי סטטוס.
+ * כל פעולת אצווה נרשמת ב-inbox_merge_actions.
+ */
 export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
-  const { bulkUpdateStatus, bulkAddTag } = useInboxV2Mutations()
+  const { bulkUpdateStatus, bulkAddTag, logAction } = useInboxV2Mutations()
   const [tagInput, setTagInput] = useState('')
   const [showTagInput, setShowTagInput] = useState(false)
 
   const count = selectedIds.length
+  const isPending = bulkUpdateStatus.isPending || bulkAddTag.isPending || logAction.isPending
 
-  const doAction = async (status: number, label: string) => {
+  const logBulk = async (actionType: number | null, updates: Record<string, unknown>) => {
+    await Promise.all(
+      selectedIds.map((id) =>
+        logAction.mutateAsync({
+          lead_id: id,
+          target_type: null,
+          target_id: null,
+          action_type: actionType,
+          updates_applied: updates,
+          approved_by: null,
+        })
+      )
+    )
+  }
+
+  const setStatus = async (status: number, label: string, actionType: number | null) => {
     await bulkUpdateStatus.mutateAsync({ leadIds: selectedIds, status })
+    await logBulk(actionType, { merge_status: status })
     toast.success(`${count} רשומות עודכנו ל-${label}`)
+    onClearSelection()
+  }
+
+  const flagForReview = async () => {
+    // פעולה בלבד — לא משנה סטטוס (כך המילון מגדיר "סימון לבדיקה").
+    await logBulk(INBOX_ACTION.FLAG_REVIEW, { flagged_for_review: true })
+    toast.success(`${count} רשומות סומנו לבדיקה (ללא שינוי סטטוס)`)
     onClearSelection()
   }
 
   const doAddTag = async () => {
     if (!tagInput.trim()) return
-    await bulkAddTag.mutateAsync({ leadIds: selectedIds, tag: tagInput.trim() })
-    toast.success(`תגית "${tagInput.trim()}" נוספה ל-${count} רשומות`)
-    setTagInput('')
-    setShowTagInput(false)
-    onClearSelection()
+    try {
+      await bulkAddTag.mutateAsync({ leadIds: selectedIds, tag: tagInput.trim() })
+      toast.success(`תגית "${tagInput.trim()}" נוספה ל-${count} רשומות`)
+      setTagInput('')
+      setShowTagInput(false)
+      onClearSelection()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'שגיאה בהוספת תגית')
+    }
   }
 
-  const isPending = bulkUpdateStatus.isPending || bulkAddTag.isPending
-
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl bg-teal-50 p-3 ring-1 ring-teal-200">
-      <span className="text-sm font-semibold text-teal-800">{count} רשומות נבחרו</span>
-      <div className="mx-1 h-5 w-px bg-teal-200" />
-
+    <div className="flex flex-wrap items-center gap-2" dir="rtl">
       <ActionButton
         variant="secondary"
         icon={CheckCircle2}
         size="sm"
-        onClick={() => doAction(5, 'ממתין לאישור')}
+        onClick={() => setStatus(5, 'ממתין לאישור', null)}
         disabled={isPending}
       >
-        אשר
+        סמן לאישור
+      </ActionButton>
+
+      <ActionButton
+        variant="secondary"
+        icon={Eye}
+        size="sm"
+        onClick={flagForReview}
+        disabled={isPending}
+      >
+        לבדיקה
       </ActionButton>
 
       <ActionButton
         variant="secondary"
         icon={XCircle}
         size="sm"
-        onClick={() => doAction(7, 'נדחה')}
+        onClick={() => setStatus(7, 'נדחה', INBOX_ACTION.REJECT)}
         disabled={isPending}
       >
         דחה
@@ -62,7 +103,7 @@ export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
         variant="secondary"
         icon={EyeOff}
         size="sm"
-        onClick={() => doAction(8, 'התעלמות')}
+        onClick={() => setStatus(8, 'התעלמות', INBOX_ACTION.IGNORE)}
         disabled={isPending}
       >
         התעלם
@@ -72,23 +113,11 @@ export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
         variant="secondary"
         icon={Ban}
         size="sm"
-        onClick={() => doAction(9, 'לא דנטלי')}
+        onClick={() => setStatus(9, 'לא דנטלי', null)}
         disabled={isPending}
       >
         לא דנטלי
       </ActionButton>
-
-      <ActionButton
-        variant="secondary"
-        icon={Eye}
-        size="sm"
-        onClick={() => doAction(5, 'סימון לבדיקה')}
-        disabled={isPending}
-      >
-        לבדיקה
-      </ActionButton>
-
-      <div className="mx-1 h-5 w-px bg-teal-200" />
 
       {showTagInput ? (
         <div className="flex items-center gap-1">
@@ -96,7 +125,7 @@ export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
             value={tagInput}
             onChange={(e) => setTagInput(e.target.value)}
             placeholder="שם תגית..."
-            className="h-8 w-32 rounded-lg border border-teal-300 bg-white px-2 text-xs outline-none focus:border-teal-500"
+            className="h-8 w-32 rounded-lg border border-[#99D6D6] bg-white px-2 text-xs outline-none focus:border-[#008080]"
             onKeyDown={(e) => e.key === 'Enter' && doAddTag()}
             autoFocus
           />
@@ -122,14 +151,12 @@ export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
         </ActionButton>
       )}
 
-      <div className="mr-auto">
-        <button
-          onClick={onClearSelection}
-          className="text-xs font-medium text-teal-600 hover:text-teal-800"
-        >
-          נקה בחירה
-        </button>
-      </div>
+      <button
+        onClick={onClearSelection}
+        className="ms-auto text-xs font-medium text-[#008080] hover:text-[#006D6D]"
+      >
+        נקה בחירה
+      </button>
     </div>
   )
 }

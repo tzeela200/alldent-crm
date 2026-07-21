@@ -24,6 +24,7 @@ export function InboxV2FiltersBar({ filters, onChange, batches }: Props) {
     filters.role ||
     filters.confidence_min != null ||
     filters.has_new_info ||
+    filters.open_only ||
     filters.date_from ||
     filters.date_to
   )
@@ -64,6 +65,17 @@ export function InboxV2FiltersBar({ filters, onChange, batches }: Props) {
           }))}
           placeholder="אצווה"
         />
+
+        <button
+          onClick={() => set({ open_only: filters.open_only ? undefined : true })}
+          className={`flex h-11 items-center gap-1 rounded-xl border px-4 text-sm font-medium transition-colors ${
+            filters.open_only
+              ? 'border-teal-500 bg-teal-50 text-teal-700'
+              : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          פתוחים בלבד {filters.open_only ? '✓' : ''}
+        </button>
 
         {hasActiveFilters && (
           <button

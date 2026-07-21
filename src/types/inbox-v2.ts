@@ -98,6 +98,8 @@ export interface InboxV2Filters {
   seen_count_min?: number
   date_from?: string
   date_to?: string
+  /** מסגור שומר הסף: הצג רק רשומות שעדיין דורשות החלטה (OPEN_STATUS_IDS) */
+  open_only?: boolean
 }
 
 export interface UploadMeta {
