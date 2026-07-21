@@ -46,6 +46,7 @@ import { BlockCRM } from "@/components/contact/BlockCRM";
 import { AdminStatusBar } from "@/components/contact/AdminStatusBar";
 import { ContactEditDialog } from "@/components/contact/ContactEditDialog";
 import { BlockEmployer } from "@/components/contact/BlockEmployer";
+import { CvUploadCard } from "@/components/contact/CvUploadCard";
 
 const BRAND = { primary: "#008080", pageBg: "#F3F4F6", cardBorder: "#E2E8F0" };
 
@@ -704,6 +705,9 @@ export default function Candidate360Page() {
           </div>
         </CardContent>
       </Card>
+
+      {/* ===== קורות חיים (גרירה/העלאה גלויה) ===== */}
+      <CvUploadCard contactId={resolvedId} contact={contact} />
 
       {/* ===== הודעות מהמועמד + היסטוריית שינויים ===== */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">

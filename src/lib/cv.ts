@@ -13,6 +13,11 @@ export function applicationHasCv(row: AppCvSource): boolean {
   return Boolean(row.has_cv || row.cv_link || row.cv_storage_path)
 }
 
+/** Sanitize a filename for a storage key (mirrors the upload-candidate-cv edge fn). */
+export function safeCvName(name: string): string {
+  return (name || 'cv').replace(/[^a-zA-Z0-9._-]/g, '_').slice(-80)
+}
+
 /** Lowercase file extension of a storage path (without the dot), or '' if none. */
 function cvExtension(path: string): string {
   const match = path.toLowerCase().match(/\.([a-z0-9]+)(?:\?.*)?$/)

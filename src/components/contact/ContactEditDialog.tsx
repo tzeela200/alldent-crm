@@ -16,13 +16,8 @@ import {
   type FormState,
 } from "@/lib/contactForm";
 import { supabase } from "@/lib/supabase";
-import { openApplicationCv } from "@/lib/cv";
+import { openApplicationCv, safeCvName } from "@/lib/cv";
 import { toast } from "sonner";
-
-/** Sanitize a filename for a storage key (mirrors the upload-candidate-cv edge fn). */
-function safeCvName(name: string): string {
-  return (name || "cv").replace(/[^a-zA-Z0-9._-]/g, "_").slice(-80);
-}
 
 interface Props {
   open: boolean;
