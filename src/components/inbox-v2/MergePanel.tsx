@@ -121,7 +121,8 @@ export function MergePanel({ leadId, onClose }: Props) {
     if (suggested?.conflict) return 'conflict'
     const existing = getExistingValue(key)
     const incoming = getIncomingValue(key)
-    if (incoming == null && existing == null) return 'none'
+    // אין ערך חדש מהקובץ → אין מה למזג. לא להציג ובוודאי לא להציע "דריסה" בערך ריק.
+    if (incoming == null) return 'none'
     if (existing === incoming) return 'same'
     if (existing == null) return 'complete'
     const displayName = contact ? (contact as unknown as Record<string, unknown>).display_name : null
@@ -213,6 +214,10 @@ export function MergePanel({ leadId, onClose }: Props) {
               </p>
             ) : !contact ? (
               <p className="py-12 text-center text-sm text-slate-400">לא נמצא איש קשר מותאם</p>
+            ) : MERGE_FIELDS.every((f) => classify(f.key) === 'none') ? (
+              <div className="rounded-xl bg-[#E6F3F3] px-4 py-6 text-center text-[13px] text-[#008080]">
+                אין שדות חדשים מהקובץ למיזוג — הרשומה תואמת לאיש קשר קיים. ניתן לסמן כמוזג.
+              </div>
             ) : (
               <div className="space-y-2">
                 <div className="grid grid-cols-[1.1fr_1fr_1fr_1.2fr] gap-2 px-3 text-[12px] font-semibold text-[#6B6B6B]">

@@ -38,7 +38,7 @@ Excel · CSV · טקסט חופשי · רשימות ניידים · רשימות
 | `inbox_v2` | טבלת עבודה ראשית — כל רשומה שנקלטה: מידע גולמי, מנותח, התאמות, סטטוס, תגיות, הצעות מיזוג, היסטוריית הופעות |
 | `inbox_import_batches` | אצוות ייבוא — כל העלאת קובץ או הדבקת נתונים |
 | `inbox_merge_actions` | יומן פעולות — כל פעולה שאושרה (מיזוג, יצירה, דחייה, התעלמות, עדכון) |
-| `inbox_ai_chat` | שיחות AI לפי אצווה או רשומה — **הטבלה טרם קיימת ב-DB; ה-UI stub** (ראה חוב #7) |
+| `inbox_ai_chat` | לא בשימוש במסך זה — AI Chat שייך לדשבורד, לא ל-Inbox V2 |
 
 ---
 
@@ -127,15 +127,16 @@ Excel · CSV · טקסט חופשי · רשימות ניידים · רשימות
 `seen_count` · `last_seen_at` · `source_unique_key`. אם רשומה הופיעה שוב ואין מידע חדש — לא מעדכנים ליבה, רק מגדילים `seen_count` ומעדכנים `last_seen_at`.
 **חוב ידוע:** אין UNIQUE על `source_unique_key` → העלאה חוזרת יוצרת כפילויות. ראה חוב #9.
 
-## AI Chat
-חלון פנימי להסברים בלבד ("כמה רשומות חדשות?", "למה סומן כהתאמה?"). **לא מעדכן ליבה.**
-**חוב ידוע:** stub בלבד; הכפתור `disabled`; אין טבלת `inbox_ai_chat`. ראה חוב #7.
+## AI Chat — מחוץ לסקופ מסך זה
+**AI Chat אינו חלק מ-Inbox V2.** הוחלט שהוא ייבנה במסך הדשבורד. הכפתור/פאנל ה-stub שנותרו במסך יוסרו. אין להתייחס אליו כחוב של מסך זה.
 
 ---
 
 ## מבנה UI מחייב
 
-1. Zone Upload · 2. Zone Paste · 3. Quick Actions · 4. Filters · 5. Inbox Table · 6. Merge Panel · 7. AI Chat Panel
+1. Zone Upload · 2. Zone Paste · 3. Quick Actions · 4. Filters · 5. Inbox Table · 6. Merge Panel
+
+(AI Chat אינו חלק ממסך זה — נמצא בדשבורד.)
 
 **רכיבים משותפים (חובה):** `AdminTable` · `AdminTablePagination` · `SortableTh` · `AdminActionsMenu` · `AdminPanelSection` · `AdminPanelField` · `AdminPanelActions` · `StatusBadge` · `SidePanel`. אין לבנות טבלה/פאנל מקומיים.
 
@@ -183,7 +184,6 @@ SECURITY DEFINER, אומת 2026-07-21. **הלוגיקה תקינה ואינה ד
 | 4 | דיקטים מקושחים ב-`inbox-v2-dicts.ts` בעוד קיימים חיים ב-DB | קוד |
 | 5 | `bulkAddTag` read-modify-write race | קוד/RPC |
 | 6 | שדות לא מזוהים לא מוצגים כ"שדה לא ממופה" (נשמרים ב-`raw_payload`) | קוד |
-| 7 | `AIChatPanel` stub; אין טבלת `inbox_ai_chat` | מוצר |
 | 8 | `industry_relevance_score` — עמודה קיימת, לא נכתב/נקרא | מוצר |
 | 9 | אין UNIQUE על `source_unique_key` → כפילויות בהעלאה חוזרת | Migration |
 | 10 | **יצירת אנשי קשר בכמות** (מקובץ/רשימה) — לא מומש; היום יצירה אחד-אחד בלבד. שלב נפרד אחרי שלב 1: דורש דדופ מול קיימים, בחירת שדות, `check_status` ברירת מחדל | קוד (שלב נפרד) |
