@@ -9,12 +9,12 @@ import {
   Home,
   Loader2,
   Mail,
-  MessageCircle,
   Phone,
   Send,
   ShieldCheck,
   Sparkles,
 } from 'lucide-react'
+import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon'
 import { supabase } from '@/lib/supabase'
 
 type ContactFormState = {
@@ -54,7 +54,7 @@ const CONTACT_METHODS: Array<{
   label: string
   icon: LucideIcon
 }> = [
-  { value: 'whatsapp', label: 'WhatsApp', icon: MessageCircle },
+  { value: 'whatsapp', label: 'WhatsApp', icon: WhatsAppIcon },
   { value: 'phone', label: 'טלפון', icon: Phone },
   { value: 'email', label: 'אימייל', icon: Mail },
 ]
@@ -351,7 +351,7 @@ export default function ContactPage() {
               <div className="mt-7 space-y-3">
                 <ContactLink
                   href="https://wa.me/972533951003"
-                  icon={MessageCircle}
+                  icon={WhatsAppIcon}
                   label="WhatsApp"
                   value="053-3951003"
                   external

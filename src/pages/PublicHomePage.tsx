@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Award, Briefcase, GraduationCap, MapPin, MessageCircle, Users, Wrench } from 'lucide-react'
+import { Award, Briefcase, GraduationCap, MapPin, Users, Wrench } from 'lucide-react'
+import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon'
 import { usePublicJobs } from '@/hooks/usePublicJobs'
 import type { PublicJob } from '@/services/publicJobsService'
 import PublicJobCard from '@/components/public/PublicJobCard'
@@ -139,7 +140,7 @@ function PremiumHero() {
               rel="noopener noreferrer"
               className="group inline-flex min-h-[52px] items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-6 py-3.5 text-[15px] font-bold text-white backdrop-blur-md transition duration-300 hover:-translate-y-0.5 hover:border-[#25D366]/45 hover:bg-white/[0.11] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#25D366] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0b0d0c]"
             >
-              <MessageCircle className="h-[18px] w-[18px] text-[#4ade80] transition-transform duration-300 group-hover:scale-105" />
+              <WhatsAppIcon className="h-[18px] w-[18px] text-[#25D366] transition-transform duration-300 group-hover:scale-105" />
               WhatsApp
             </a>
           </div>
