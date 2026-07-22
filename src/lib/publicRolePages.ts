@@ -29,7 +29,7 @@ export const SLUG_TO_JOB_ROLE_IDS: Record<RolePageSlug, number[]> = {
   hygienists:         [10],
   assistants:         [9],
   secretaries:        [13],
-  'management-sales': [12, 15, 17],
+  'management-sales': [12, 14, 15, 17],
   technicians:        [11],
 }
 
