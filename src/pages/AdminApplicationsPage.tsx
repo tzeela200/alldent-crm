@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronUp, ChevronsUpDown, ClipboardList, Columns3, Download, LayoutGrid, List, Plus, RefreshCw } from 'lucide-react'
 import { RoleBadge } from '@/components/admin/RoleBadge'
@@ -115,6 +116,19 @@ export default function AdminApplicationsPage() {
   }
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [detailAppId, setDetailAppId] = useState<number | null>(null)
+
+  // Deep link from Contact 360: /admin/applications?application=<id> opens the
+  // existing detail panel. Read once, then drop the param so closing the panel
+  // does not immediately reopen it. No new route is introduced.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const requested = Number(searchParams.get('application'))
+    if (!Number.isFinite(requested) || requested <= 0) return
+    setDetailAppId(requested)
+    const next = new URLSearchParams(searchParams)
+    next.delete('application')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams])
   const [showCreate, setShowCreate] = useState(false)
   const [bulkStatus, setBulkStatus] = useState<number | ''>('')
   const [bulkCheck, setBulkCheck] = useState<number | ''>('')

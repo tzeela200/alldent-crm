@@ -71,14 +71,14 @@ export function DictionaryMultiSelect({
 
   return (
     <div className="space-y-2" dir="rtl">
-      {label ? <label className="text-xs text-slate-500">{label}</label> : null}
+      {label ? <label className="text-[13px] text-slate-500">{label}</label> : null}
 
       {selectedOptions.length ? (
         <div className="flex flex-wrap gap-1.5">
           {selectedOptions.map((option) => (
             <span
               key={option.id}
-              className="inline-flex items-center gap-1 rounded-full border border-teal-100 bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800"
+              className="inline-flex items-center gap-1 rounded-full border border-teal-100 bg-teal-50 px-2.5 py-1 text-[13px] font-medium text-teal-800"
             >
               {option.name}
               <button
@@ -129,7 +129,7 @@ export function DictionaryMultiSelect({
               );
             })
           ) : (
-            <div className="py-3 text-center text-xs text-slate-400">{emptyText}</div>
+            <div className="py-3 text-center text-[13px] text-slate-400">{emptyText}</div>
           )}
         </div>
       </div>

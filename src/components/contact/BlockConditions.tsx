@@ -1,93 +1,107 @@
-import React from "react";
 import type { ContactRow, Contact360Dicts } from "@/hooks/useContact360";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { RegionBadge } from "@/components/admin/RegionBadge";
+import { InlineEditableField, InlineEditableMultiSelect } from "@/components/contact/InlineEditableField";
 
 interface Props {
   contact: ContactRow;
   dicts: Contact360Dicts;
+  onUpdate: (patch: Record<string, unknown>) => Promise<void>;
 }
 
 function dictName(list: { id: number; name: string }[], id: unknown): string {
   if (id == null || id === "") return "—";
-  return list.find((d) => Number(d.id) === Number(id))?.name ?? "—";
+  return list.find((item) => Number(item.id) === Number(id))?.name ?? "—";
 }
 
-function toNumberArray(value: unknown): number[] {
-  if (!Array.isArray(value)) return [];
-  return value.map(Number).filter(Number.isFinite);
+function money(value: number | null | undefined): string | null {
+  return value == null ? null : `₪${Number(value).toLocaleString("he-IL")}`;
 }
 
-function dictNames(list: { id: number; name: string }[], value: unknown): string[] {
-  return toNumberArray(value)
-    .map((id) => dictName(list, id))
-    .filter((name) => name !== "—");
-}
-
-function LV({ label, value }: { label: string; value?: React.ReactNode }) {
-  if (value == null || value === "" || value === "—") return null;
+export default function BlockConditions({ contact, dicts, onUpdate }: Props) {
   return (
-    <div className="flex items-start justify-between gap-2 border-b border-slate-100 py-1.5 last:border-0">
-      <span className="shrink-0 text-sm text-slate-500">{label}</span>
-      <span className="text-right text-sm font-medium text-slate-800">{value}</span>
-    </div>
-  );
-}
-
-function Chips({ label, values }: { label: string; values: string[] }) {
-  if (!values.length) return null;
-  return (
-    <div className="mt-3">
-      <div className="mb-2 text-sm text-slate-500">{label}</div>
-      <div className="flex flex-wrap gap-1.5">
-        {values.map((name) => (
-          <Badge key={name} className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600 shadow-none">
-            {name}
-          </Badge>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-export default function BlockConditions({ contact, dicts }: Props) {
-  const preferredRegionIds = toNumberArray(contact.preferred_regions);
-  const preferredCityNames = dictNames(dicts.cities, contact.preferred_cities);
-  const availabilityNames = dictNames(dicts.availability, contact.candidate_availability_ids);
-  const scopeNames = dictNames(dicts.scopes, contact.preferred_scope);
-  const salaryTypeNames = dictNames(dicts.salaryTypes, contact.candidate_salary_type_ids);
-
-  return (
-    <Card className="rounded-3xl border border-slate-200 bg-white shadow-sm">
-      <CardContent className="p-5">
-        <h3 className="mb-4 text-lg font-bold text-slate-900">תנאים והעדפות לתעסוקה</h3>
-        <div className="divide-y divide-slate-100">
-          <LV label="ניידות" value={dictName(dicts.mobility, contact.mobility_id)} />
-          <LV label="מיסוי" value={dictName(dicts.taxTypes, contact.tax_type_id)} />
-          <LV label="שכר חודשי" value={contact.salary_expectation_monthly ? `₪${contact.salary_expectation_monthly.toLocaleString("he-IL")}` : undefined} />
-          <LV label="שכר שעתי" value={contact.salary_expectation_hourly ? `₪${contact.salary_expectation_hourly.toLocaleString("he-IL")}` : undefined} />
-          <LV label="הערות ימים ושעות" value={contact.work_schedule_text} />
-          <LV label="רלוונטי לכל הארץ" value={contact.preferred_all_country ? "כן" : undefined} />
+    <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+      <CardContent className="p-6">
+        <h2 className="mb-3 text-lg font-semibold leading-[1.3] text-slate-900">תנאים והעדפות לתעסוקה</h2>
+        <div>
+          <InlineEditableField
+            label="נגישות / אופן הגעה"
+            value={contact.mobility_id}
+            displayValue={dictName(dicts.mobility, contact.mobility_id)}
+            type="select"
+            options={dicts.mobility}
+            onSave={(value) => onUpdate({ mobility_id: value })}
+          />
+          <InlineEditableField
+            label="סוג העסקה / מיסוי"
+            value={contact.tax_type_id}
+            displayValue={dictName(dicts.taxTypes, contact.tax_type_id)}
+            type="select"
+            options={dicts.taxTypes}
+            onSave={(value) => onUpdate({ tax_type_id: value })}
+          />
+          <InlineEditableField
+            label="ציפיות שכר חודשי"
+            value={contact.salary_expectation_monthly}
+            displayValue={money(contact.salary_expectation_monthly)}
+            type="number"
+            onSave={(value) => onUpdate({ salary_expectation_monthly: value })}
+          />
+          <InlineEditableField
+            label="ציפיות שכר שעתי"
+            value={contact.salary_expectation_hourly}
+            displayValue={money(contact.salary_expectation_hourly)}
+            type="number"
+            onSave={(value) => onUpdate({ salary_expectation_hourly: value })}
+          />
+          <InlineEditableField
+            label="אילוצים בימים ובשעות"
+            value={contact.work_schedule_text}
+            type="textarea"
+            onSave={(value) => onUpdate({ work_schedule_text: value })}
+          />
+          <InlineEditableField
+            label="פתוח/ה לעבודה בכל הארץ"
+            value={Boolean(contact.preferred_all_country)}
+            displayValue={contact.preferred_all_country ? "כן" : "לא"}
+            type="boolean"
+            onSave={(value) => onUpdate({ preferred_all_country: value })}
+          />
+          <InlineEditableMultiSelect
+            label="זמינות"
+            values={contact.candidate_availability_ids}
+            options={dicts.availability}
+            placeholder="חיפוש זמינות..."
+            onSave={(values) => onUpdate({ candidate_availability_ids: values })}
+          />
+          <InlineEditableMultiSelect
+            label="היקף משרה"
+            values={contact.preferred_scope}
+            options={dicts.scopes}
+            placeholder="חיפוש היקף..."
+            onSave={(values) => onUpdate({ preferred_scope: values })}
+          />
+          <InlineEditableMultiSelect
+            label="סוגי שכר"
+            values={contact.candidate_salary_type_ids}
+            options={dicts.salaryTypes}
+            placeholder="חיפוש סוג שכר..."
+            onSave={(values) => onUpdate({ candidate_salary_type_ids: values })}
+          />
+          <InlineEditableMultiSelect
+            label="אזורים מתאימים לעבודה"
+            values={contact.preferred_regions}
+            options={dicts.regions}
+            placeholder="חיפוש אזור..."
+            onSave={(values) => onUpdate({ preferred_regions: values })}
+          />
+          <InlineEditableMultiSelect
+            label="ערים מתאימות לעבודה"
+            values={contact.preferred_cities}
+            options={dicts.cities}
+            placeholder="חיפוש עיר..."
+            onSave={(values) => onUpdate({ preferred_cities: values })}
+          />
         </div>
-        <Chips label="זמינות מועמד/ת" values={availabilityNames} />
-        <Chips label="היקפי משרה רלוונטיים" values={scopeNames} />
-        <Chips label="סוגי שכר רלוונטיים" values={salaryTypeNames} />
-        {preferredRegionIds.length > 0 && (
-          <div className="mt-3">
-            <div className="mb-2 text-sm text-slate-500">אזורים רלוונטיים לעבודה</div>
-            <div className="flex flex-wrap gap-1.5">
-              {preferredRegionIds.map((regionId) => (
-                <RegionBadge
-                  key={regionId}
-                  regionId={regionId}
-                  label={dictName(dicts.regions, regionId)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-        <Chips label="ערים רלוונטיות לעבודה" values={preferredCityNames} />
       </CardContent>
     </Card>
   );

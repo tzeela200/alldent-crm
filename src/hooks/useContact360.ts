@@ -125,7 +125,10 @@ export interface ApplicationRow {
   application_status: number | null;
   check_status: number | null;
   submission_date: string | null;
+  /** Internal recruiter note on the application. Not the candidate's own text. */
   internal_notes: string | null;
+  /** What the candidate wrote in the public application form. Display only. */
+  candidate_notes: string | null;
   created_timestamp: string | null;
   updated_timestamp: string | null;
   account_name: string | null;
@@ -136,6 +139,15 @@ export interface ApplicationRow {
   has_cv: boolean | null;
   cv_link: string | null;
   cv_storage_path: string | null;
+  /**
+   * Live job_status pulled from `job` via the job_code FK — never the stale
+   * text copies kept on the application row. Null when the job is missing.
+   */
+  job_status_live: number | null;
+}
+
+export interface ContactProfileRow {
+  profile_type_id: number;
 }
 
 export interface ContactTagRow {
@@ -213,14 +225,21 @@ async function fetchContact360(contactId: number) {
 
   const applicationsQuery = supabase
     .from("applications")
-    .select("*")
+    // job(job_status) rides the applications_job_code_fkey relationship so the
+    // table can show the *current* job status instead of the text snapshot
+    // frozen on the application row.
+    .select("*, job(job_status)")
     .order("submission_date", { ascending: false });
   const scopedApplicationsQuery = contact.phone_norm
     ? applicationsQuery.or(`candidate_link.eq.${contact.contact_id},phone_norm.eq.${contact.phone_norm}`)
     : applicationsQuery.eq("candidate_link", contact.contact_id);
 
-  const [applicationsRes, tagsRes, accountRes, jobsRes, linkedJobsRes] = await Promise.all([
+  const [applicationsRes, profilesRes, tagsRes, accountRes, jobsRes, linkedJobsRes] = await Promise.all([
     scopedApplicationsQuery,
+    supabase
+      .from("rel_contact_profiles")
+      .select("profile_type_id")
+      .eq("contact_id", contact.contact_id),
     supabase
       .from("contact_tags")
       .select("id, contact_id, tag_id, tag, created_at")
@@ -244,6 +263,7 @@ async function fetchContact360(contactId: number) {
   ]);
 
   throwQueryError("טעינת ההגשות נכשלה", applicationsRes.error);
+  throwQueryError("טעינת סוגי הפרופיל נכשלה", profilesRes.error);
   throwQueryError("טעינת התגיות נכשלה", tagsRes.error);
   throwQueryError("טעינת הארגון המקושר נכשלה", accountRes.error);
   throwQueryError("טעינת המשרות הפעילות נכשלה", jobsRes.error);
@@ -265,9 +285,21 @@ async function fetchContact360(contactId: number) {
     };
   });
 
+  const applications: ApplicationRow[] = (applicationsRes.data ?? []).map((row: Record<string, unknown>) => {
+    const { job: jobData, ...rest } = row;
+    return {
+      ...(rest as Omit<ApplicationRow, "job_status_live">),
+      job_status_live: (jobData as { job_status: number | null } | null)?.job_status ?? null,
+    };
+  });
+
   return {
     contact,
-    applications: (applicationsRes.data ?? []) as ApplicationRow[],
+    applications,
+    profileTypeIds: Array.from(new Set([
+      ...(profilesRes.data ?? []).map((row: ContactProfileRow) => Number(row.profile_type_id)),
+      ...(contact.profile_type ? [Number(contact.profile_type)] : []),
+    ].filter(Number.isFinite))),
     tags: (tagsRes.data ?? []) as ContactTagRow[],
     account: (accountRes.data ?? null) as AccountRow | null,
     jobs,

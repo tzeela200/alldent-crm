@@ -8,7 +8,7 @@ interface PhotoUploadProps {
   currentUrl?: string | null;
   /** Fallback letter shown when there is no photo. */
   initial?: string;
-  onUploaded: (url: string) => void;
+  onUploaded: (url: string) => void | Promise<void>;
 }
 
 function fileToBase64(file: File): Promise<{ base64: string; mediaType: string }> {
@@ -51,7 +51,7 @@ export default function PhotoUpload({
         });
         if (fnErr) throw fnErr;
         if (data?.error) throw new Error(data.error);
-        onUploaded(data.url as string);
+        await onUploaded(data.url as string);
       } else {
         // Admin (authenticated) flow → upload directly, RLS-gated.
         const ext = mediaType.split("/")[1] || "jpg";
@@ -62,8 +62,7 @@ export default function PhotoUpload({
           .upload(path, bytes, { contentType: mediaType, upsert: true });
         if (upErr) throw upErr;
         const { data: pub } = supabase.storage.from("candidate-photos").getPublicUrl(path);
-        await supabase.from("contact").update({ photo_url: pub.publicUrl }).eq("contact_id", contactId);
-        onUploaded(pub.publicUrl);
+        await onUploaded(pub.publicUrl);
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "שגיאה בהעלאה");
@@ -99,7 +98,7 @@ export default function PhotoUpload({
           if (f) handleFile(f);
         }}
       />
-      {error && <p className="absolute -bottom-5 right-0 whitespace-nowrap text-[10px] text-red-600 no-print">{error}</p>}
+      {error && <p className="absolute -bottom-5 right-0 whitespace-nowrap text-[13px] text-red-600 no-print">{error}</p>}
     </div>
   );
 }
