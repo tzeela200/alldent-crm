@@ -3,20 +3,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { DictionaryMultiSelect } from "@/components/ui/DictionaryMultiSelect";
-import { CityCombobox } from "@/components/ui/CityRegionPicker";
+import { CityRegionPicker } from "@/components/ui/CityRegionPicker";
 import { Loader2, Check, X } from "lucide-react";
 import type { CityItem, DictItem } from "@/hooks/useContact360";
 
-export type FieldType = "text" | "number" | "textarea" | "select" | "multiselect" | "city";
+export type FieldType = "text" | "number" | "textarea" | "select" | "multiselect" | "cityregion";
 
 export interface FieldDef {
   field: string;
   label: string;
   type: FieldType;
   options?: DictItem[]; // for select / multiselect
-  /** Live dict_cities rows — required for type "city". */
+  /** Live dict_cities rows — required for type "cityregion". */
   cities?: CityItem[];
-  /** Companion field written alongside a "city" selection. */
+  /** Live dict_regions rows — required for type "cityregion". */
+  regions?: DictItem[];
+  /**
+   * The region column written alongside the city. Region is derived from
+   * dict_cities.region_id and is never chosen in a way that contradicts the
+   * selected city, so the two travel together as one field.
+   */
   regionField?: string;
   placeholder?: string;
   dir?: "rtl" | "ltr";
@@ -34,7 +40,7 @@ function toLocal(type: FieldType, v: unknown): unknown {
   if (type === "multiselect") {
     return Array.isArray(v) ? (v as number[]).map(Number) : [];
   }
-  if (type === "city") {
+  if (type === "cityregion") {
     return v == null ? null : Number(v);
   }
   if (type === "select") {
@@ -52,7 +58,7 @@ function toStored(type: FieldType, v: unknown): unknown {
     const arr = (v as number[]) ?? [];
     return arr.length ? arr : null;
   }
-  if (type === "city") {
+  if (type === "cityregion") {
     return v == null ? null : Number(v);
   }
   if (type === "select") {
@@ -73,7 +79,14 @@ export default function ProfileSectionEditForm({
 }: ProfileSectionEditFormProps) {
   const [state, setState] = useState<Record<string, unknown>>(() => {
     const init: Record<string, unknown> = {};
-    for (const f of fields) init[f.field] = toLocal(f.type, values[f.field]);
+    for (const f of fields) {
+      init[f.field] = toLocal(f.type, values[f.field]);
+      // Region is not a field of its own; seed it so the picker opens on the
+      // person's current region instead of blank.
+      if (f.type === "cityregion" && f.regionField) {
+        init[f.regionField] = values[f.regionField] == null ? null : Number(values[f.regionField]);
+      }
+    }
     return init;
   });
   const [saving, setSaving] = useState(false);
@@ -85,7 +98,14 @@ export default function ProfileSectionEditForm({
   async function handleSave() {
     setSaving(true);
     const patch: Record<string, unknown> = {};
-    for (const f of fields) patch[f.field] = toStored(f.type, state[f.field]);
+    for (const f of fields) {
+      patch[f.field] = toStored(f.type, state[f.field]);
+      // Region rides along with the city; it is not a field of its own.
+      if (f.type === "cityregion" && f.regionField) {
+        const region = state[f.regionField];
+        patch[f.regionField] = region == null ? null : Number(region);
+      }
+    }
     try {
       await onSave(patch);
     } finally {
@@ -97,7 +117,10 @@ export default function ProfileSectionEditForm({
     <div className="rounded-xl border border-teal-200 bg-teal-50/30 p-4 space-y-4 no-print">
       {fields.map((f) => (
         <div key={f.field} className="space-y-1.5">
-          <label className="block text-sm font-bold text-slate-700">{f.label}</label>
+          {/* CityRegionPicker carries its own "עיר" / "אזור" labels. */}
+          {f.type !== "cityregion" && (
+            <label className="block text-sm font-bold text-slate-700">{f.label}</label>
+          )}
 
           {f.type === "textarea" && (
             <Textarea
@@ -135,19 +158,15 @@ export default function ProfileSectionEditForm({
             </select>
           )}
 
-          {f.type === "city" && (
-            <CityCombobox
+          {f.type === "cityregion" && (
+            <CityRegionPicker
+              cityId={(state[f.field] as number | null) ?? null}
+              regionId={f.regionField ? ((state[f.regionField] as number | null) ?? null) : null}
+              onCityChange={(cityId) => set(f.field, cityId)}
+              onRegionChange={(regionId) => f.regionField && set(f.regionField, regionId)}
               cities={f.cities ?? []}
-              value={(state[f.field] as number | null) ?? null}
-              onChange={(cityId, regionId) => {
-                set(f.field, cityId);
-                // The city dictates the region, exactly as in Contact 360.
-                if (f.regionField) set(f.regionField, regionId);
-              }}
-              // "filter" renders the bare combobox; the form supplies the label,
-              // so the field is not labelled twice.
-              variant="filter"
-              placeholder="חיפוש עיר..."
+              regions={f.regions ?? []}
+              variant="edit"
             />
           )}
 

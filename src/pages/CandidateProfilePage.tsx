@@ -301,6 +301,9 @@ export default function CandidateProfilePage() {
   const hasLinks = Boolean(
     profile.facebook_url || profile.linkedin_url || profile.portfolio_url || profile.recommendations_url,
   );
+  const hasPersonalInfo = Boolean(
+    genderText !== "—" || profile.birth_year || profile.candidate_notes,
+  );
   const hasSkills =
     languageNames.length > 0 || systemNames.length > 0 || procedureNames.length > 0 ||
     Boolean(profile.additional_skills_notes);
@@ -585,15 +588,70 @@ export default function CandidateProfilePage() {
               </div>
             </Section>
 
+            {/* Availability & Preferences */}
+            <Section
+              title="זמינות והעדפות"
+              sectionKey="availability"
+              editingSection={editingSection}
+              onEditToggle={setEditingSection}
+              fields={[
+                { field: "candidate_availability_ids", label: "זמינות", type: "multiselect", options: d?.availability ?? [] },
+                { field: "preferred_scope", label: "היקף משרה", type: "multiselect", options: d?.scopes ?? [] },
+                { field: "candidate_salary_type_ids", label: "סוג שכר", type: "multiselect", options: d?.salaryTypes ?? [] },
+                { field: "salary_expectation_monthly", label: "ציפיית שכר חודשי (₪)", type: "number" },
+                { field: "salary_expectation_hourly", label: "ציפיית שכר שעתי (₪)", type: "number" },
+                { field: "work_status", label: "סטטוס תעסוקתי", type: "select", options: d?.workStatuses ?? [] },
+                { field: "work_schedule_text", label: "הערות זמינות / משמרות", type: "textarea" },
+                { field: "mobility_id", label: "ניידות", type: "select", options: d?.mobility ?? [] },
+                { field: "tax_type_id", label: "סוג העסקה", type: "select", options: d?.taxTypes ?? [] },
+                { field: "preferred_regions", label: "אזורים מועדפים", type: "multiselect", options: d?.regions ?? [] },
+                { field: "preferred_cities", label: "ערים מועדפות", type: "multiselect", options: d?.cities ?? [] },
+              ]}
+              values={values}
+              onSave={handleSave}
+            >
+              <div className="space-y-2 text-sm">
+                <Row label="זמינות" value={availText} />
+                {scopeNames.length > 0 && <Row label="היקף" value={scopeNames.join(", ")} />}
+                {salaryTypeNames.length > 0 && <Row label="סוג שכר" value={salaryTypeNames.join(", ")} />}
+                {profile.salary_expectation_monthly && (
+                  <Row label="שכר חודשי" value={`₪${profile.salary_expectation_monthly.toLocaleString()}`} />
+                )}
+                {profile.salary_expectation_hourly && (
+                  <Row label="שכר שעתי" value={`₪${profile.salary_expectation_hourly}`} />
+                )}
+                {workStatusText !== "—" && <Row label="סטטוס" value={workStatusText} />}
+                {mobilityText !== "—" && <Row label="ניידות" value={mobilityText} />}
+                {taxTypeText !== "—" && <Row label="סוג העסקה" value={taxTypeText} />}
+                {experienceText !== "—" && <Row label="שנות ניסיון" value={experienceText} />}
+                {profile.work_schedule_text && (
+                  <div className="pt-1">
+                    <span className="text-slate-500">הערות זמינות</span>
+                    <div className="text-slate-700 mt-0.5 whitespace-pre-wrap">{profile.work_schedule_text}</div>
+                  </div>
+                )}
+                {(regionPrefNames.length > 0 || cityPrefNames.length > 0 || profile.preferred_all_country) && (
+                  <div className="pt-1">
+                    <span className="text-slate-500">אזורים רלוונטיים</span>
+                    <div className="text-slate-700 mt-0.5">
+                      {profile.preferred_all_country
+                        ? "כל הארץ"
+                        : [...regionPrefNames, ...cityPrefNames].join(", ") || "—"}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Section>
+
             {/* Messages box — candidate only, never printed */}
             {isTokenMode && token && <CandidateMessagesBox token={token} />}
           </div>
 
           {/* SIDEBAR (visually on the left under RTL) */}
           <div className="space-y-6">
-            {/* Contact info */}
+            {/* Personal details + contact — one card */}
             <Section
-              title="פרטי קשר"
+              title="פרטים אישיים ופרטי קשר"
               sectionKey="contact"
               editingSection={editingSection}
               onEditToggle={setEditingSection}
@@ -602,37 +660,58 @@ export default function CandidateProfilePage() {
                 { field: "second_phone", label: "נייד נוסף", type: "text", dir: "ltr" },
                 { field: "email", label: "אימייל", type: "text", dir: "ltr" },
                 { field: "second_email", label: "אימייל נוסף", type: "text", dir: "ltr" },
-                { field: "city_id", label: "עיר", type: "city", cities: d?.cities ?? [], regionField: "region_id" },
-                { field: "region_id", label: "אזור", type: "select", options: d?.regions ?? [] },
+                {
+                  field: "city_id",
+                  label: "עיר ואזור",
+                  type: "cityregion",
+                  cities: d?.cities ?? [],
+                  regions: d?.regions ?? [],
+                  regionField: "region_id",
+                },
+                { field: "gender", label: "מגדר", type: "select", options: d?.genders ?? [] },
+                { field: "birth_year", label: "שנת לידה", type: "number" },
+                { field: "candidate_notes", label: "הערות / משהו נוסף שתרצה/י לספר", type: "textarea" },
               ]}
               values={values}
               onSave={handleSave}
             >
-              {hasContactInfo ? (
+              {hasContactInfo || hasPersonalInfo ? (
                 <div className="space-y-2.5 text-sm">
                   {(cityText !== "—" || regionText !== "—") && (
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <MapPin className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-2 text-[#111827]">
+                      <MapPin className="h-4 w-4 shrink-0" style={{ color: "#008080" }} />
                       <span>{[cityText, regionText].filter((t) => t !== "—").join(" · ")}</span>
                     </div>
                   )}
                   {profile.phone && (
-                    <div className="flex items-center gap-2 text-slate-700">
-                      <Phone className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <div className="flex items-center gap-2 text-[#111827]">
+                      <Phone className="h-4 w-4 shrink-0" style={{ color: "#008080" }} />
                       <span dir="ltr">{profile.phone}</span>
                     </div>
                   )}
                   {profile.email && (
-                    <div className="flex items-center gap-2 text-slate-700 min-w-0">
-                      <Mail className="h-3.5 w-3.5 text-slate-400 shrink-0" />
+                    <div className="flex min-w-0 items-center gap-2 text-[#111827]">
+                      <Mail className="h-4 w-4 shrink-0" style={{ color: "#008080" }} />
                       <span dir="ltr" className="truncate">{profile.email}</span>
+                    </div>
+                  )}
+                  {hasPersonalInfo && (
+                    <div className="space-y-2 border-t border-[#E5E7EB] pt-2.5">
+                      {genderText !== "—" && <Row label="מגדר" value={genderText} />}
+                      {profile.birth_year && <Row label="שנת לידה" value={String(profile.birth_year)} />}
+                      {profile.candidate_notes && (
+                        <div className="pt-1">
+                          <span className="text-[#4B5563]">הערות</span>
+                          <div className="mt-0.5 whitespace-pre-wrap text-[#111827]">{profile.candidate_notes}</div>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
               ) : (
                 <EmptyState
                   text="דרכי ההתקשרות שלך — כך מעסיקים יוכלו לחזור אליך."
-                  actionLabel="הוספת פרטי קשר"
+                  actionLabel="הוספת פרטים ופרטי קשר"
                   onAction={() => setEditingSection("contact")}
                 />
               )}
@@ -746,94 +825,6 @@ export default function CandidateProfilePage() {
                   onAction={() => setEditingSection("skills")}
                 />
               )}
-            </Section>
-
-            {/* Availability & Preferences */}
-            <Section
-              title="זמינות והעדפות"
-              sectionKey="availability"
-              editingSection={editingSection}
-              onEditToggle={setEditingSection}
-              fields={[
-                { field: "candidate_availability_ids", label: "זמינות", type: "multiselect", options: d?.availability ?? [] },
-                { field: "preferred_scope", label: "היקף משרה", type: "multiselect", options: d?.scopes ?? [] },
-                { field: "candidate_salary_type_ids", label: "סוג שכר", type: "multiselect", options: d?.salaryTypes ?? [] },
-                { field: "salary_expectation_monthly", label: "ציפיית שכר חודשי (₪)", type: "number" },
-                { field: "salary_expectation_hourly", label: "ציפיית שכר שעתי (₪)", type: "number" },
-                { field: "work_status", label: "סטטוס תעסוקתי", type: "select", options: d?.workStatuses ?? [] },
-                { field: "work_schedule_text", label: "הערות זמינות / משמרות", type: "textarea" },
-                { field: "mobility_id", label: "ניידות", type: "select", options: d?.mobility ?? [] },
-                { field: "tax_type_id", label: "סוג העסקה", type: "select", options: d?.taxTypes ?? [] },
-                { field: "preferred_regions", label: "אזורים מועדפים", type: "multiselect", options: d?.regions ?? [] },
-                { field: "preferred_cities", label: "ערים מועדפות", type: "multiselect", options: d?.cities ?? [] },
-              ]}
-              values={values}
-              onSave={handleSave}
-            >
-              <div className="space-y-2 text-sm">
-                <Row label="זמינות" value={availText} />
-                {scopeNames.length > 0 && <Row label="היקף" value={scopeNames.join(", ")} />}
-                {salaryTypeNames.length > 0 && <Row label="סוג שכר" value={salaryTypeNames.join(", ")} />}
-                {profile.salary_expectation_monthly && (
-                  <Row label="שכר חודשי" value={`₪${profile.salary_expectation_monthly.toLocaleString()}`} />
-                )}
-                {profile.salary_expectation_hourly && (
-                  <Row label="שכר שעתי" value={`₪${profile.salary_expectation_hourly}`} />
-                )}
-                {workStatusText !== "—" && <Row label="סטטוס" value={workStatusText} />}
-                {mobilityText !== "—" && <Row label="ניידות" value={mobilityText} />}
-                {taxTypeText !== "—" && <Row label="סוג העסקה" value={taxTypeText} />}
-                {experienceText !== "—" && <Row label="שנות ניסיון" value={experienceText} />}
-                {profile.work_schedule_text && (
-                  <div className="pt-1">
-                    <span className="text-slate-500">הערות זמינות</span>
-                    <div className="text-slate-700 mt-0.5 whitespace-pre-wrap">{profile.work_schedule_text}</div>
-                  </div>
-                )}
-                {(regionPrefNames.length > 0 || cityPrefNames.length > 0 || profile.preferred_all_country) && (
-                  <div className="pt-1">
-                    <span className="text-slate-500">אזורים רלוונטיים</span>
-                    <div className="text-slate-700 mt-0.5">
-                      {profile.preferred_all_country
-                        ? "כל הארץ"
-                        : [...regionPrefNames, ...cityPrefNames].join(", ") || "—"}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </Section>
-
-            {/* Personal */}
-            <Section
-              title="פרטים אישיים"
-              sectionKey="personal"
-              editingSection={editingSection}
-              onEditToggle={setEditingSection}
-              fields={[
-                { field: "gender", label: "מגדר", type: "select", options: d?.genders ?? [] },
-                { field: "birth_year", label: "שנת לידה", type: "number" },
-                { field: "candidate_notes", label: "הערות / משהו נוסף שתרצה/י לספר", type: "textarea" },
-              ]}
-              values={values}
-              onSave={handleSave}
-            >
-              <div className="space-y-2 text-sm">
-                {genderText !== "—" && <Row label="מגדר" value={genderText} />}
-                {profile.birth_year && <Row label="שנת לידה" value={String(profile.birth_year)} />}
-                {profile.candidate_notes && (
-                  <div className="pt-1">
-                    <span className="text-slate-500">הערות</span>
-                    <div className="text-slate-700 mt-0.5 whitespace-pre-wrap">{profile.candidate_notes}</div>
-                  </div>
-                )}
-                {genderText === "—" && !profile.birth_year && !profile.candidate_notes && (
-                  <EmptyState
-                    text="פרטים אישיים בסיסיים, אם תרצה/י לשתף אותם."
-                    actionLabel="הוספת פרטים אישיים"
-                    onAction={() => setEditingSection("personal")}
-                  />
-                )}
-              </div>
             </Section>
 
             {/* Documents */}
