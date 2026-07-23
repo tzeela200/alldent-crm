@@ -29,6 +29,7 @@ import type { DictItem } from "@/hooks/useContact360";
 import ProfileSectionEditForm from "@/components/candidate/ProfileSectionEditForm";
 import type { FieldDef } from "@/components/candidate/ProfileSectionEditForm";
 import PhotoUpload from "@/components/candidate/PhotoUpload";
+import { EmptyState } from "@/components/ui/EmptyState";
 import CandidateMessagesBox from "@/components/candidate/CandidateMessagesBox";
 import AIProfileWriter from "@/components/candidate/AIProfileWriter";
 import AIDocumentScanner from "@/components/candidate/AIDocumentScanner";
@@ -56,17 +57,17 @@ const COMPLETION_FIELDS = [
 const COMPLETION_FIELD_LABELS: Record<string, string> = {
   full_name: "שם מלא",
   professional_title: "כותרת מקצועית",
-  phone: "טלפון",
+  phone: "נייד",
   email: "אימייל",
   role: "תפקיד",
-  experience: "שנות ניסיון",
+  experience: "ניסיון",
   candidate_availability_ids: "זמינות",
   region_id: "אזור",
-  personal_summary: "פרופיל מקצועי",
+  personal_summary: "סיכום מקצועי",
   languages: "שפות",
-  systems_used: "מערכות",
-  academic_education: "השכלה",
-  salary_expectation_monthly: "ציפיות שכר",
+  systems_used: "מערכות ותוכנות",
+  academic_education: "השכלה אקדמית",
+  salary_expectation_monthly: "ציפיות שכר חודשי",
   photo_url: "תמונה",
 };
 
@@ -132,38 +133,6 @@ function ProgressCircle({ pct }: { pct: number }) {
         </text>
       </svg>
       <span className="text-[13px] font-medium text-[#4B5563]">פרופיל הושלם</span>
-    </div>
-  );
-}
-
-// ─── empty state ────────────────────────────────────────────────────────────
-
-/**
- * A missing field is an invitation, not an error. Each empty section says what
- * belongs there and offers the edit that fills it, instead of repeating
- * "לא הוזן עדיין" down the page.
- */
-function EmptyState({
-  text,
-  actionLabel,
-  onAction,
-}: {
-  text: string;
-  actionLabel?: string;
-  onAction?: () => void;
-}) {
-  return (
-    <div className="rounded-xl border border-dashed border-[#E5E7EB] bg-[#F9FAFB] px-4 py-5 text-center">
-      <p className="text-[14px] leading-6 text-[#4B5563]">{text}</p>
-      {actionLabel && onAction && (
-        <button
-          type="button"
-          onClick={onAction}
-          className="no-print mt-2 rounded-lg text-[14px] font-semibold text-[#008080] transition hover:text-[#006666] hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-200"
-        >
-          {actionLabel}
-        </button>
-      )}
     </div>
   );
 }
@@ -397,7 +366,7 @@ export default function CandidateProfilePage() {
 
                   {locationText && (
                     <div className="mt-2 flex items-center gap-1.5 text-[14px] text-[#4B5563]">
-                      <MapPin className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                      <MapPin className="h-4 w-4 shrink-0" style={{ color: "#008080" }} aria-hidden="true" />
                       <span>{locationText}</span>
                     </div>
                   )}
@@ -629,11 +598,11 @@ export default function CandidateProfilePage() {
               editingSection={editingSection}
               onEditToggle={setEditingSection}
               fields={[
-                { field: "phone", label: "טלפון", type: "text", dir: "ltr" },
-                { field: "second_phone", label: "טלפון נוסף", type: "text", dir: "ltr" },
+                { field: "phone", label: "נייד", type: "text", dir: "ltr" },
+                { field: "second_phone", label: "נייד נוסף", type: "text", dir: "ltr" },
                 { field: "email", label: "אימייל", type: "text", dir: "ltr" },
                 { field: "second_email", label: "אימייל נוסף", type: "text", dir: "ltr" },
-                { field: "city_id", label: "עיר", type: "select", options: d?.cities ?? [] },
+                { field: "city_id", label: "עיר", type: "city", cities: d?.cities ?? [], regionField: "region_id" },
                 { field: "region_id", label: "אזור", type: "select", options: d?.regions ?? [] },
               ]}
               values={values}

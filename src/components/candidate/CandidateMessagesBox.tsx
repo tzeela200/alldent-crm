@@ -57,7 +57,7 @@ export default function CandidateMessagesBox({ token }: { token: string }) {
           <div className="h-[2px] w-8 rounded-full bg-[#008080]" />
         </div>
 
-        <p className="mb-3 text-xs text-slate-500">
+        <p className="mb-3 text-[14px] leading-6 text-[#4B5563]">
           יש לך בקשה, שאלה על משרה, או משהו שתרצה/י לספר לנו? כתוב/כתבי כאן ונחזור אליך.
         </p>
 
@@ -81,7 +81,7 @@ export default function CandidateMessagesBox({ token }: { token: string }) {
                   }`}
                 >
                   <div className="whitespace-pre-wrap leading-6">{m.body}</div>
-                  <div className="mt-1 text-[10px] text-slate-400">
+                  <div className="mt-1 text-[13px] text-[#4B5563]">
                     {m.sender === "admin" ? "צוות AllDent · " : ""}{fmt(m.created_at)}
                   </div>
                 </div>
@@ -101,7 +101,7 @@ export default function CandidateMessagesBox({ token }: { token: string }) {
             className="rounded-xl border-slate-200 bg-white text-sm"
           />
           {sendMutation.isError && (
-            <p className="text-xs text-red-600">שליחת ההודעה נכשלה, נסה/י שוב.</p>
+            <p className="text-[13px] text-red-600">שליחת ההודעה נכשלה, נסה/י שוב.</p>
           )}
           <div className="flex justify-end">
             <Button

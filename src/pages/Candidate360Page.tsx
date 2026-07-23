@@ -45,6 +45,7 @@ import { RoleSubRolePicker } from "@/components/ui/RoleSubRolePicker";
 import { useQueryClient } from "@tanstack/react-query";
 import { AdminTable, type AdminColumn } from "@/components/admin/AdminTable";
 import { AdminActionsMenu } from "@/components/admin/AdminActionsMenu";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { jobStatusColors } from "@/lib/statusColors";
 
 import BlockIdentity from "@/components/contact/BlockIdentity";
@@ -1143,16 +1144,11 @@ export default function Candidate360Page() {
           />
         ) : (
           <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-            <CardContent className="flex flex-col items-center justify-center gap-3 p-10 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#F8FAFC]">
-                <Building2 className="h-6 w-6 text-slate-400" />
-              </div>
-              <div>
-                <h2 className="text-lg font-semibold leading-[1.3] text-slate-900">אין ארגון מקושר</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-500">
-                  לאיש קשר זה אין ארגון מקושר ואין משרות שבהן הוא מוגדר כמעסיק או כמגייס.
-                </p>
-              </div>
+            <CardContent className="p-6">
+              <EmptyState
+                icon={<Building2 className="h-6 w-6" />}
+                text="לאיש קשר זה אין ארגון מקושר ואין משרות שבהן הוא מוגדר כמעסיק או כמגייס."
+              />
             </CardContent>
           </Card>
         )}

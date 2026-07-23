@@ -2,16 +2,22 @@ import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { DictionaryMultiSelect } from "@/components/ui/DictionaryMultiSelect";
+import { CityCombobox } from "@/components/ui/CityRegionPicker";
 import { Loader2, Check, X } from "lucide-react";
-import type { DictItem } from "@/hooks/useContact360";
+import type { CityItem, DictItem } from "@/hooks/useContact360";
 
-export type FieldType = "text" | "number" | "textarea" | "select" | "multiselect";
+export type FieldType = "text" | "number" | "textarea" | "select" | "multiselect" | "city";
 
 export interface FieldDef {
   field: string;
   label: string;
   type: FieldType;
   options?: DictItem[]; // for select / multiselect
+  /** Live dict_cities rows — required for type "city". */
+  cities?: CityItem[];
+  /** Companion field written alongside a "city" selection. */
+  regionField?: string;
   placeholder?: string;
   dir?: "rtl" | "ltr";
 }
@@ -28,6 +34,9 @@ function toLocal(type: FieldType, v: unknown): unknown {
   if (type === "multiselect") {
     return Array.isArray(v) ? (v as number[]).map(Number) : [];
   }
+  if (type === "city") {
+    return v == null ? null : Number(v);
+  }
   if (type === "select") {
     return v == null ? "" : String(v);
   }
@@ -42,6 +51,9 @@ function toStored(type: FieldType, v: unknown): unknown {
   if (type === "multiselect") {
     const arr = (v as number[]) ?? [];
     return arr.length ? arr : null;
+  }
+  if (type === "city") {
+    return v == null ? null : Number(v);
   }
   if (type === "select") {
     return v === "" || v == null ? null : Number(v);
@@ -68,14 +80,6 @@ export default function ProfileSectionEditForm({
 
   function set(field: string, value: unknown) {
     setState((s) => ({ ...s, [field]: value }));
-  }
-
-  function toggleMulti(field: string, id: number) {
-    setState((s) => {
-      const cur = (s[field] as number[]) ?? [];
-      const next = cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
-      return { ...s, [field]: next };
-    });
   }
 
   async function handleSave() {
@@ -131,27 +135,32 @@ export default function ProfileSectionEditForm({
             </select>
           )}
 
-          {f.type === "multiselect" && (
-            <div className="flex flex-wrap gap-1.5">
-              {(f.options ?? []).map((o) => {
-                const active = ((state[f.field] as number[]) ?? []).includes(Number(o.id));
-                return (
-                  <button
-                    key={o.id}
-                    type="button"
-                    onClick={() => toggleMulti(f.field, Number(o.id))}
-                    className={`rounded-full border px-2.5 py-0.5 text-[11px] font-medium transition ${
-                      active
-                        ? "border-[#008080] bg-[#008080] text-white"
-                        : "border-slate-200 bg-white text-slate-600 hover:border-teal-300"
-                    }`}
-                  >
-                    {o.name}
-                  </button>
-                );
-              })}
-            </div>
+          {f.type === "city" && (
+            <CityCombobox
+              cities={f.cities ?? []}
+              value={(state[f.field] as number | null) ?? null}
+              onChange={(cityId, regionId) => {
+                set(f.field, cityId);
+                // The city dictates the region, exactly as in Contact 360.
+                if (f.regionField) set(f.regionField, regionId);
+              }}
+              // "filter" renders the bare combobox; the form supplies the label,
+              // so the field is not labelled twice.
+              variant="filter"
+              placeholder="חיפוש עיר..."
+            />
           )}
+
+          {f.type === "multiselect" && (
+            <DictionaryMultiSelect
+              options={f.options ?? []}
+              value={((state[f.field] as number[]) ?? []).map(Number)}
+              onChange={(ids) => set(f.field, ids)}
+              placeholder={f.placeholder ?? "חיפוש..."}
+              maxHeightClassName="max-h-44"
+            />
+          )}
+
         </div>
       ))}
 
