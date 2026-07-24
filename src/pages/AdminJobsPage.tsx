@@ -251,6 +251,36 @@ export default function AdminJobsPage() {
     staleTime: 60_000,
   })
 
+  // INC-3110: live applicants count per job — job.total_applicants is never
+  // maintained by any DB trigger/RPC, so it's overridden below from real
+  // `applications` rows instead of trusting the stale column. Status-agnostic
+  // by design (צאלה): total applicants = every application the job ever had;
+  // application_status can change later without changing who applied.
+  const {
+    data: allApplicationsForCount = [],
+    refetch: refetchApplicationCounts,
+    isError: applicationCountsError,
+  } = useQuery<Array<{ job_code: string | null }>>({
+    queryKey: ['applications-for-job-counts'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('applications')
+        .select('job_code')
+      if (error) throw error
+      return data ?? []
+    },
+    staleTime: 60_000,
+  })
+
+  const applicationCountByJobCode = useMemo(() => {
+    const map = new Map<string, number>()
+    allApplicationsForCount.forEach((app) => {
+      if (!app.job_code) return
+      map.set(app.job_code, (map.get(app.job_code) ?? 0) + 1)
+    })
+    return map
+  }, [allApplicationsForCount])
+
   const { data: accountsList = [], isError: accountsError } = useQuery<Array<{ account_id: number; account_name: string | null; phone: string | null; second_phone: string | null }>>({
     queryKey: ['accounts-for-admin-jobs-v4'],
     queryFn: async () => {
@@ -341,7 +371,8 @@ export default function AdminJobsPage() {
   const screenLoading = jobsLoading
   const screenError =
     jobsError || accountsError || contactsError ||
-    jobStatusesError || publicStatusesError || rolesError || regionsError || citiesError
+    jobStatusesError || publicStatusesError || rolesError || regionsError || citiesError ||
+    applicationCountsError
 
   const accountsMap = useMemo(() => {
     const map = new Map<number, { name: string; phone: string | null; second_phone: string | null }>()
@@ -379,9 +410,11 @@ export default function AdminJobsPage() {
         employer_contact_phone: employerContact?.phone ?? null,
         recruiter_contact_name: recruiterContact?.name ?? null,
         recruiter_contact_phone: recruiterContact?.phone ?? null,
+        // INC-3110: override the stale job.total_applicants with a live count from applications.
+        total_applicants: applicationCountByJobCode.get(String(job.job_code)) ?? 0,
       }
     })
-  }, [allJobs, accountsMap, contactsMap])
+  }, [allJobs, accountsMap, contactsMap, applicationCountByJobCode])
 
   useEffect(() => setLocalJobs(allJobsWithLookups), [allJobsWithLookups])
   useEffect(() => setPage(0), [filters])
@@ -921,7 +954,7 @@ export default function AdminJobsPage() {
             variant="ghost"
             icon={RefreshCw}
             onClick={async () => {
-              const result = await refetchJobs()
+              const [result] = await Promise.all([refetchJobs(), refetchApplicationCounts()])
               if (result.isError) showToast('שגיאה ברענון הרשימה. נסי שוב.', 'error')
               else showToast('הרשימה רועננה', 'success')
             }}

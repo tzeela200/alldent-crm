@@ -1883,9 +1883,31 @@ export default function Employer360Page() {
   }, []);
 
   const account = accountQuery.data ?? null;
-  const jobs = jobsQuery.data ?? [];
   const contacts = contactsQuery.data ?? [];
   const applications = applicationsQuery.data ?? [];
+
+  // INC-3110: total_applicants on `job` is never maintained by any DB
+  // trigger/RPC — overridden here with a live count of every application tied
+  // to the job_code (status-agnostic: an application counts regardless of its
+  // current application_status, since status changes over time but doesn't
+  // change whether the candidate applied). Reuses `applications`, already
+  // fetched for this account — no extra query.
+  const jobApplicantCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    applications.forEach((application) => {
+      if (!application.job_code) return;
+      map.set(application.job_code, (map.get(application.job_code) ?? 0) + 1);
+    });
+    return map;
+  }, [applications]);
+
+  const jobs = useMemo(
+    () => (jobsQuery.data ?? []).map((job) => ({
+      ...job,
+      total_applicants: jobApplicantCounts.get(job.job_code) ?? 0,
+    })),
+    [jobsQuery.data, jobApplicantCounts],
+  );
 
   const activeJobs = useMemo(() => jobs.filter((job) => isActiveJob(job)), [dicts, jobs]);
   const completion = useMemo(() => (account ? computeAccountCompletion(account) : 0), [account]);
