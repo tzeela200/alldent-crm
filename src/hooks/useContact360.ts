@@ -342,6 +342,32 @@ async function fetchContact360(contactId: number) {
   };
 }
 
+/**
+ * dict_cities has ~1300 rows; PostgREST caps any single request at 1000
+ * regardless of .limit(), so a plain select silently drops everything past
+ * row 1000 alphabetically (e.g. "תל-אביב"). Paginate in 1000-row pages until
+ * a short page confirms the end — same pattern already used by
+ * CityRegionPicker's useCitiesAll.
+ */
+async function fetchAllCities(): Promise<{ data: CityItem[] | null; error: { message: string } | null }> {
+  const PAGE = 1000;
+  const all: CityItem[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await supabase
+      .from("dict_cities")
+      .select("id, name, region_id")
+      .order("name")
+      .range(from, from + PAGE - 1);
+    if (error) return { data: null, error };
+    const batch = (data ?? []) as CityItem[];
+    all.push(...batch);
+    if (batch.length < PAGE) break;
+    from += PAGE;
+  }
+  return { data: all, error: null };
+}
+
 async function fetchAllDicts(): Promise<Contact360Dicts> {
   const [
     rolesRes,
@@ -370,7 +396,7 @@ async function fetchAllDicts(): Promise<Contact360Dicts> {
     supabase.from("dict_roles").select("id, name").order("id"),
     supabase.from("dict_sub_roles").select("id, name, role_id").order("id"),
     supabase.from("dict_availability").select("id, name").order("id"),
-    supabase.from("dict_cities").select("id, name, region_id").order("name").limit(5000),
+    fetchAllCities(),
     supabase.from("dict_regions").select("id, name").order("id"),
     supabase.from("dict_sources").select("id, name").order("id"),
     supabase.from("dict_check_statuses").select("id, name").order("id"),
