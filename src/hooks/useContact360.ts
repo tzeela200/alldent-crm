@@ -144,6 +144,12 @@ export interface ApplicationRow {
    * text copies kept on the application row. Null when the job is missing.
    */
   job_status_live: number | null;
+  /** job.address, for the WhatsApp handoff template. Null when job missing or unset. */
+  job_address: string | null;
+  /** accounts.website_url for the job's employer, for the handoff template. */
+  org_website_url: string | null;
+  /** contact.full_name of job.rel_recruiter_contact, resolved separately. */
+  recruiter_name: string | null;
 }
 
 export interface ContactProfileRow {
@@ -225,10 +231,11 @@ async function fetchContact360(contactId: number) {
 
   const applicationsQuery = supabase
     .from("applications")
-    // job(job_status) rides the applications_job_code_fkey relationship so the
-    // table can show the *current* job status instead of the text snapshot
-    // frozen on the application row.
-    .select("*, job(job_status)")
+    // job(...) rides the applications_job_code_fkey relationship so the table
+    // can show the *current* job status/address/employer instead of the text
+    // snapshots frozen on the application row (used for the WhatsApp handoff
+    // template — see recruiter lookup below for rel_recruiter_contact's name).
+    .select("*, job(job_status, address, rel_recruiter_contact, accounts(website_url))")
     .order("submission_date", { ascending: false });
   const scopedApplicationsQuery = contact.phone_norm
     ? applicationsQuery.or(`candidate_link.eq.${contact.contact_id},phone_norm.eq.${contact.phone_norm}`)
@@ -285,11 +292,38 @@ async function fetchContact360(contactId: number) {
     };
   });
 
-  const applications: ApplicationRow[] = (applicationsRes.data ?? []).map((row: Record<string, unknown>) => {
+  type EmbeddedJob = {
+    job_status: number | null;
+    address: string | null;
+    rel_recruiter_contact: number | null;
+    accounts: { website_url: string | null } | null;
+  } | null;
+
+  const rawApplications = (applicationsRes.data ?? []) as Array<Record<string, unknown>>;
+  const recruiterIds = Array.from(new Set(
+    rawApplications
+      .map((row) => (row.job as EmbeddedJob)?.rel_recruiter_contact)
+      .filter((id): id is number => id != null),
+  ));
+  const recruiterNamesRes = recruiterIds.length
+    ? await supabase.from("contact").select("contact_id, full_name, display_name").in("contact_id", recruiterIds)
+    : { data: [] as Array<{ contact_id: number; full_name: string | null; display_name: string | null }>, error: null };
+  throwQueryError("טעינת שמות המגייסים נכשלה", recruiterNamesRes.error);
+  const recruiterNameById = new Map(
+    (recruiterNamesRes.data ?? []).map((row) => [Number(row.contact_id), row.full_name ?? row.display_name ?? null]),
+  );
+
+  const applications: ApplicationRow[] = rawApplications.map((row) => {
     const { job: jobData, ...rest } = row;
+    const embeddedJob = jobData as EmbeddedJob;
     return {
-      ...(rest as Omit<ApplicationRow, "job_status_live">),
-      job_status_live: (jobData as { job_status: number | null } | null)?.job_status ?? null,
+      ...(rest as Omit<ApplicationRow, "job_status_live" | "job_address" | "org_website_url" | "recruiter_name">),
+      job_status_live: embeddedJob?.job_status ?? null,
+      job_address: embeddedJob?.address ?? null,
+      org_website_url: embeddedJob?.accounts?.website_url ?? null,
+      recruiter_name: embeddedJob?.rel_recruiter_contact != null
+        ? recruiterNameById.get(Number(embeddedJob.rel_recruiter_contact)) ?? null
+        : null,
     };
   });
 

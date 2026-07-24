@@ -11,10 +11,12 @@ import {
   Briefcase,
   Building2,
   Check,
+  Copy,
   ExternalLink,
   FileText,
   History,
   Loader2,
+  MessageCircle,
   Pencil,
   Plus,
   Save,
@@ -56,6 +58,8 @@ import { Candidate360Hero } from "@/components/contact/Candidate360Hero";
 import { BlockCRM } from "@/components/contact/BlockCRM";
 import { BlockEmployer } from "@/components/contact/BlockEmployer";
 import { CvUploadCard } from "@/components/contact/CvUploadCard";
+import { JobPreviewPanel } from "@/components/contact/JobPreviewPanel";
+import { buildPublicJobUrl } from "@/lib/publicJobUtils";
 import {
   Contact360TabPanel,
   Contact360Tabs,
@@ -98,6 +102,31 @@ function formatDate(value?: string | null) {
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return String(value);
   return d.toLocaleDateString("he-IL");
+}
+
+/** Template 1 — one WhatsApp message centralizing every job the candidate applied to. */
+function buildOutreachMessage(candidateName: string, applications: ApplicationRow[]): string {
+  const links = applications
+    .filter((application) => application.job_code)
+    .map((application) => buildPublicJobUrl(application.job_code as string));
+  return [
+    `שלום ${candidateName}, מה שלומך?`,
+    "צאלה מחברת אולדנט, ראיתי שהגשת מועמדות למשרות במערכת שלי.",
+    "הגשת מועמדות למשרות הבאות:",
+    "",
+    links.join("\n"),
+  ].join("\n");
+}
+
+/** Template 2 — per-application handoff message. Missing fields are omitted, never invented. */
+function buildHandoffMessage(application: ApplicationRow): string {
+  const fragments: string[] = [];
+  if (application.account_name) fragments.push(`שייכת ל: ${application.account_name}`);
+  if (application.recruiter_name) fragments.push(application.recruiter_name);
+  if (application.job_address) fragments.push(`כתובת: ${application.job_address}`);
+  if (application.org_website_url) fragments.push(`אתר: ${application.org_website_url}`);
+  const detailsSuffix = fragments.length ? ` ${fragments.join(". ")}.` : "";
+  return `*משרה ${application.job_code}*${detailsSuffix}\nיצרו איתך קשר עד 3 ימים. שיהיה בהצלחה.`;
 }
 
 function applicationStatusClass(value?: number | string | null) {
@@ -286,6 +315,75 @@ function EditableApplicationNotes({
   );
 }
 
+function formatNoteTimestamp(date: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(date.getDate())}/${pad(date.getMonth() + 1)}/${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/**
+ * contact.notes — one general note per candidate, not tied to any single
+ * application. Shown here (in addition to the CRM tab) so admins reviewing
+ * applications don't have to switch tabs. Each addition is prepended with an
+ * automatic timestamp; existing text is never overwritten, only added to.
+ */
+function AdminGeneralNoteCard({
+  notes,
+  onSave,
+}: {
+  notes: string | null;
+  onSave: (notes: string) => Promise<void>;
+}) {
+  const [draft, setDraft] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  async function addEntry() {
+    const text = draft.trim();
+    if (!text) return;
+    const entry = `[${formatNoteTimestamp()}] ${text}`;
+    const updated = notes?.trim() ? `${entry}\n${notes}` : entry;
+    setSaving(true);
+    try {
+      await onSave(updated);
+      setDraft("");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+      <CardContent className="p-6">
+        <h2 className="mb-3 text-lg font-bold text-slate-900">הערות פנימיות על המועמד/ת</h2>
+        <div className="mb-3 max-h-40 overflow-y-auto rounded-xl border border-slate-100 bg-[#F8FAFC] p-3">
+          {notes?.trim() ? (
+            <div className="whitespace-pre-wrap text-[13px] leading-6 text-slate-700">{notes}</div>
+          ) : (
+            <span className="text-[13px] text-slate-400">אין הערות עדיין</span>
+          )}
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Textarea
+            value={draft}
+            onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setDraft(event.target.value)}
+            placeholder="הוספת הערה חדשה על המועמד/ת..."
+            className="min-h-[60px] flex-1 rounded-xl border-slate-200 text-[13px] leading-6"
+            dir="rtl"
+          />
+          <Button
+            disabled={saving || !draft.trim()}
+            onClick={addEntry}
+            className="h-10 shrink-0 rounded-xl text-white sm:self-end"
+            style={{ backgroundColor: "#008080" }}
+          >
+            {saving ? <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+            הוספת הערה
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function EditableApplicationStatus({
   application,
   statuses,
@@ -432,6 +530,7 @@ export default function Candidate360Page() {
   const [toast, setToast] = useState<ToastState>(null);
   const [selectedTagId, setSelectedTagId] = useState("");
   const [activeTab, setActiveTab] = useState<Contact360TabId>("person");
+  const [previewJobCode, setPreviewJobCode] = useState<string | null>(null);
 
   // Same query key as ContactMessagesPanel — React Query dedupes it, so the
   // CRM badge costs no extra request. No counter is invented for a badge.
@@ -441,6 +540,15 @@ export default function Candidate360Page() {
     setToast({ type, text });
     window.setTimeout(() => setToast(null), 3000);
   };
+
+  async function copyToClipboard(text: string, successMessage: string) {
+    try {
+      await navigator.clipboard.writeText(text);
+      showToast("success", successMessage);
+    } catch {
+      showToast("error", "ההעתקה ללוח נכשלה");
+    }
+  }
 
 
   const contact = data?.contact ?? null;
@@ -578,12 +686,24 @@ export default function Candidate360Page() {
       label: "קוד משרה",
       nowrap: true,
       render: (application) => application.job_code ? (
-        <Link
-          to={`/admin/jobs/${application.job_code}`}
-          className="font-mono text-[13px] font-semibold text-[#008080] hover:underline"
-        >
-          {application.job_code}
-        </Link>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => setPreviewJobCode(application.job_code)}
+            className="font-mono text-[13px] font-semibold text-[#008080] hover:underline"
+          >
+            {application.job_code}
+          </button>
+          <button
+            type="button"
+            onClick={() => copyToClipboard(buildPublicJobUrl(application.job_code as string), "לינק המשרה הועתק ללוח")}
+            className="rounded-lg p-1 text-slate-400 hover:bg-teal-50 hover:text-[#008080]"
+            aria-label={`העתקת לינק ציבורי למשרה ${application.job_code}`}
+            title="העתקת לינק ציבורי"
+          >
+            <Copy className="h-3.5 w-3.5" />
+          </button>
+        </div>
       ) : (
         <span className="font-mono text-[13px] text-slate-400">—</span>
       ),
@@ -738,6 +858,13 @@ export default function Candidate360Page() {
               label: 'צפייה בקו"ח',
               disabled: !applicationHasCv(application),
               onClick: () => void openApplicationCv(application),
+            },
+            {
+              key: "copy-handoff",
+              icon: <MessageCircle className="h-4 w-4" />,
+              label: "העברת פרטים (וואטסאפ)",
+              disabled: !application.job_code,
+              onClick: () => copyToClipboard(buildHandoffMessage(application), "הודעת העברת הפרטים הועתקה ללוח"),
             },
           ]}
         />
@@ -1069,19 +1196,38 @@ export default function Candidate360Page() {
       <section className="space-y-6">
         <SectionHeader icon="📋" title="הגשות ומשרות" subtitle="הגשות קיימות ומשרות מומלצות למועמד/ת" accentColor={roleAccentColor} />
 
+        {/* Admin general note — contact.notes, not tied to a specific application */}
+        <AdminGeneralNoteCard notes={contact.notes} onSave={(notes) => saveContactPatch({ notes })} />
+
         {/* Applications table */}
         <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
           <CardContent className="p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-900">הגשות ({applications.length})</h2>
-              <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="h-10 rounded-xl text-white" style={{ backgroundColor: BRAND.primary }}>
-                    <Plus className="me-1.5 h-3.5 w-3.5" />
-                    הגשה חדשה
+              <div className="flex items-center gap-2">
+                {applications.some((application) => application.job_code) && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-10 rounded-xl border-slate-200"
+                    onClick={() => copyToClipboard(
+                      buildOutreachMessage(contact.full_name ?? contact.display_name ?? "", applications),
+                      "הודעת הפנייה הראשונית הועתקה ללוח",
+                    )}
+                  >
+                    <MessageCircle className="me-1.5 h-3.5 w-3.5" />
+                    פנייה ראשונית
                   </Button>
-                </DialogTrigger>
-              </Dialog>
+                )}
+                <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                  <DialogTrigger asChild>
+                    <Button size="sm" className="h-10 rounded-xl text-white" style={{ backgroundColor: BRAND.primary }}>
+                      <Plus className="me-1.5 h-3.5 w-3.5" />
+                      הגשה חדשה
+                    </Button>
+                  </DialogTrigger>
+                </Dialog>
+              </div>
             </div>
             <AdminTable<ApplicationRow>
               columns={applicationColumns}
@@ -1092,6 +1238,13 @@ export default function Candidate360Page() {
             />
           </CardContent>
         </Card>
+
+        <JobPreviewPanel
+          jobCode={previewJobCode}
+          onOpenChange={(open) => { if (!open) setPreviewJobCode(null); }}
+          onEditFull={(code) => { setPreviewJobCode(null); navigate(`/admin/jobs/${code}`); }}
+          onCopyLink={(url) => copyToClipboard(url, "לינק המשרה הועתק ללוח")}
+        />
 
         {/* Recommended jobs */}
         {recommendedJobs.length > 0 && (

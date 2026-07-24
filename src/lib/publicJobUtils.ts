@@ -51,3 +51,8 @@ export function formatPublishDate(dateStr: string | null | undefined): string {
 export function buildShareText(job: PublicJob, baseUrl: string): string {
   return `משרה: ${job.job_title} [${job.job_code}]\n${baseUrl}/jobs/${job.job_code}`
 }
+
+/** Canonical public job URL, computed from the job code — never read from job.job_url. */
+export function buildPublicJobUrl(jobCode: string): string {
+  return `https://www.alldent.co.il/jobs/${jobCode}`
+}
