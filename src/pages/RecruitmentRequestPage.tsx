@@ -12,6 +12,41 @@ type DictItem = { id: number; name: string; role_id?: number | null; region_id?:
 const PLAN_TO_TRACK_ID: Record<string, number> = { discreet: 1, branding: 2 }
 const TRACK_LABEL: Record<number, string> = { 1: 'מסלול גיוס אנונימי', 2: 'מסלול מיתוג מעסיקים' }
 
+const PHONE_ERROR = 'מספר הנייד אינו תקין. יש להזין נייד ישראלי בן 10 ספרות (לדוגמה: 0501234567).'
+
+// פורט מדויק של public.normalize_il_mobile_phone — כדי שהוולידציה בצד הלקוח
+// תזהה נייד פסול לפני הקריאה ל-RPC, במקום לקבל invalid_phone מהשרת.
+function normalizeIlMobile(raw: string): string | null {
+  let digits = raw.replace(/\D/g, '')
+  if (!digits) return null
+  if (digits.startsWith('9720')) digits = '972' + digits.slice(4)
+  else if (digits.startsWith('972')) { /* כבר בפורמט בינלאומי */ }
+  else if (digits.startsWith('05')) digits = '972' + digits.slice(1)
+  else if (digits.startsWith('5')) digits = '972' + digits
+  return /^9725\d{8}$/.test(digits) ? digits : null
+}
+
+// קודי ה-raise exception של submit_public_recruitment_request.
+// רובם חסומים כבר בוולידציה שלמטה — המיפוי קיים כדי שכל דריפט עתידי
+// בין הטופס ל-RPC יוצג למשתמש כהודעה עניינית ולא כ"נסו שנית".
+const RPC_ERROR_MESSAGES: Record<string, string> = {
+  invalid_phone: PHONE_ERROR,
+  salary_required: 'יש להזין שכר גלובלי או שכר שעתי לצורך טיפול בבקשה.',
+  invalid_publication_track: 'מסלול הגיוס שנבחר אינו תקין. יש לבחור מסלול מחדש.',
+  invalid_job_role: 'התפקיד שנבחר אינו תקין. יש לבחור תפקיד מחדש.',
+  requester_company_name_required: 'שם ארגון / מרפאה הוא שדה חובה',
+  requester_contact_name_required: 'שם איש קשר הוא שדה חובה',
+  requester_phone_required: 'נייד הוא שדה חובה',
+  requester_email_required: 'אימייל הוא שדה חובה',
+  region_id_required: 'יש לבחור אזור המשרה',
+  city_id_required: 'יש לבחור עיר המשרה',
+  scope_required: 'יש לבחור היקף משרה',
+  job_description_required: 'תיאור המשרה הוא שדה חובה',
+  job_requirements_required: 'דרישות התפקיד הן שדה חובה',
+  required_experience_required: 'יש לבחור ניסיון נדרש',
+  required_languages_required: 'יש לבחור לפחות שפה אחת',
+}
+
 type FormState = {
   company_name: string
   business_id: string
@@ -150,6 +185,7 @@ export default function RecruitmentRequestPage() {
     if (!form.company_name.trim()) { setError('שם ארגון / מרפאה הוא שדה חובה'); return }
     if (!form.contact_name.trim()) { setError('שם איש קשר הוא שדה חובה'); return }
     if (!form.contact_phone.trim()) { setError('נייד הוא שדה חובה'); return }
+    if (!normalizeIlMobile(form.contact_phone)) { setError(PHONE_ERROR); return }
     if (!form.contact_email.trim()) { setError('אימייל הוא שדה חובה'); return }
     if (!form.job_role) { setError('יש לבחור תפקיד'); return }
     if (!form.region_id) { setError('יש לבחור אזור המשרה'); return }
@@ -205,8 +241,10 @@ export default function RecruitmentRequestPage() {
 
       if (rpcError) throw rpcError
       setSuccess(true)
-    } catch {
-      setError('אירעה שגיאה בשליחת הבקשה. אנא נסו שנית.')
+    } catch (e) {
+      const code = (e as { message?: string } | null)?.message ?? ''
+      console.error('[recruitment-request] submit failed:', e)
+      setError(RPC_ERROR_MESSAGES[code] ?? 'אירעה שגיאה בשליחת הבקשה. אנא נסו שנית.')
     } finally {
       setSubmitting(false)
     }
