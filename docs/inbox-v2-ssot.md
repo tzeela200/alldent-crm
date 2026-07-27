@@ -1,8 +1,14 @@
 # Inbox V2 — SSOT / חדר מיון נתונים לאדמין
 
-> **סטטוס מסמך:** מעודכן 2026-07-21 (INC-3108).
+> **סטטוס מסמך:** מעודכן 2026-07-27 (INC-3115). קודם: 2026-07-21 (INC-3108).
 > מחליף את `SSOT — Inbox V2.pdf` (OneDrive). זה מסמך מקור-האמת המנוהל-גרסאות.
 > נספחים א׳-ג׳ מאומתים מול Supabase החי (פרויקט `urcdxdcyiedbdwegcebq`) ומול קוד ה-RPC.
+>
+> **חוזה הנתונים הנכנס מ-Google Contacts:** ראה
+> [docs/integrations/google-contacts/](integrations/google-contacts/README.md) —
+> חבילת ה-SSOT של האינטגרציה, הוראת `GOOGLE-01` ל-n8n, וסטטוס הביצוע.
+> n8n אחראית על פענוח מבנה Google (שם/תפקיד/עיר/סוג רשומה) ועל `google_contact_links`;
+> המסך צורך שדות מוכנים ומחזיר החלטה מאושרת.
 
 ---
 
@@ -112,7 +118,36 @@ Excel · CSV · טקסט חופשי · רשימות ניידים · רשימות
 
 כל פעולה מאושרת נשמרת ב-**`inbox_merge_actions`** (בקובץ ה-PDF הקודם נכתב בטעות "actions_merge_inbox").
 
-> **החלטה (INC-3108):** מיזוג / יצירת `accounts` **לא ייבנה** — נדיר, ומיזוג הוא כמעט תמיד לאיש קשר. `match_account` משמש כרמז הקשר בלבד (מוצג עם הצעת "צור איש קשר חדש"). `action_type=3` נשאר לא בשימוש.
+> ~~**החלטה (INC-3108):** מיזוג / יצירת `accounts` **לא ייבנה** — נדיר, ומיזוג הוא כמעט תמיד לאיש קשר. `match_account` משמש כרמז הקשר בלבד (מוצג עם הצעת "צור איש קשר חדש"). `action_type=3` נשאר לא בשימוש.~~
+>
+> **⚠️ ההחלטה הוחלפה (INC-3115, 27.07.2026).** השער תומך גם בארגונים: מיזוג לארגון קיים **ויצירת ארגון חדש**, שניהם מאחורי אותו אישור מפורש. `action_type=3` ("יצירת ארגון") **בשימוש פעיל**.
+> `match_account` אינו "רמז הקשר" — הוא ראיית התאמה שפותחת מסלול עדכון ארגון, ולעולם לא מוביל להצעת יצירת אדם.
+
+### ניתוב הרשומה (INC-3115) — `resolveInboxRoute()` ב-`src/lib/inbox-v2-merge.ts`
+
+**`merge_status` אינו נקרא בשום ענף ניתוב.** ה-RPC כותב `merge_status=3` ("התאמה חזקה") גם כשההתאמה
+היא לארגון בלבד, ולכן הוא אינו ראיה לאדם. הניתוב נקבע מ-`match_contact` / `match_account` / `record_type`:
+
+| # | תנאי | מסלול |
+|---|---|---|
+| 1 | `match_contact` **וגם** `match_account` | `match_conflict` — **בחירה מפורשת, אין ניתוב אוטומטי לאדם** |
+| 2 | `match_contact` בלבד | `merge_contact` |
+| 3 | `match_account` בלבד | `merge_account` |
+| 4 | אין התאמה + `record_type='organization'` | `create_account` |
+| 5 | אין התאמה + `record_type='person'` | `create_contact` |
+| 6 | אין התאמה + `record_type` חסר/לא תקין | `unclassified` — **עצירה, אין יצירה עד הכרעה ידנית** |
+
+`record_type` מגיע מ-`parsed_payload.record_type` שכותבת n8n. **המסך לא מנחש סוג רשומה ואין fallback ל-`person`.**
+
+### השדות המאושרים להשוואה ולכתיבה (INC-3115)
+
+| איש קשר (10) | ארגון (9) |
+|---|---|
+| `display_name` · `phone` · `second_phone` · `email` · `second_email` · `role` · `city_id` · `facebook_name` · `facebook_id` · `facebook_url` | `account_name` · `phone` · `second_phone` · `email` · `second_email` · `city_id` · `facebook_name` · `facebook_id` · `facebook_url` |
+
+**לא נכתבים לעולם, בשום מסלול:** `full_name`, `first_name`, `last_name`, `region_id`, `license_no`
+(`region_id` נגזר בטריגר מ-`city_id`). נאכף ב-whitelist סגורה, לא רק בהיעדר UI.
+פיצול שם הוא באחריות n8n בלבד — `Google Family Name` גולמי לעולם אינו `last_name`.
 
 ## פעולות באצווה
 
@@ -197,7 +232,9 @@ SECURITY DEFINER, אומת 2026-07-21. **הלוגיקה תקינה ואינה ד
 | עריכה בפאנל, סטטוס, תגיות, הערות | `inbox_v2` בלבד | שמירה רגילה |
 | העלאה/הדבקה | `inbox_import_batches` + `inbox_v2` | — |
 | `match_inbox_batch` / `match_inbox_row` | `inbox_v2` + מוני batch | RPC, לא נוגע בליבה |
-| מיזוג מאושר | **`contact`** | רק שדות שסומנו `'incoming'`; דריסה = checkbox נוסף |
-| צור איש קשר | **`contact`** (INSERT) | דיאלוג מפורש |
-| כל פעולה מאושרת | `inbox_merge_actions` | — |
-| — | **`accounts`** | **אין נתיב כתיבה כלל** |
+| מיזוג מאושר | **`contact`** | רק שדות שנבחרו מפורשות; דריסה = checkbox נוסף |
+| צור איש קשר | **`contact`** (INSERT) | דיאלוג מפורש + checkbox אישור |
+| מיזוג מאושר לארגון | **`accounts`** | INC-3115 — אותם כללים בדיוק |
+| צור ארגון | **`accounts`** (INSERT) | INC-3115 — דיאלוג מפורש + checkbox אישור |
+| כל פעולה מאושרת | `inbox_merge_actions` | כולל `approved_by` מ-`useAuth()` |
+| — | `google_contact_links` | **אין נתיב כתיבה מהמסך** — באחריות `GOOGLE-01` ב-n8n |

@@ -28,10 +28,14 @@ export function useAccountMutations() {
     return { error }
   }
 
+  // מחזיר גם את המזהה החדש (כמו insertContact) — נדרש כדי לקשר את הארגון
+  // שנוצר חזרה ל-inbox_v2.match_account ול-inbox_merge_actions.target_id.
+  // תוספת אדיטיבית: הצרכן הקיים (AccountPanel) קורא רק { error }.
   async function insertAccount(payload: Record<string, unknown>) {
-    const { error } = await supabase.from('accounts').insert(payload)
+    const { data, error } = await supabase
+      .from('accounts').insert(payload).select('account_id').single()
     if (!error) await invalidateAllAccountQueries(queryClient)
-    return { error }
+    return { data, error }
   }
 
   async function bulkUpdateAccounts(ids: number[], patch: Record<string, unknown>) {

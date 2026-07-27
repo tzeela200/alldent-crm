@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Ban, CheckCircle2, Eye, EyeOff, Tag, XCircle } from 'lucide-react'
 import { ActionButton } from '@/components/layout/Shell'
 import { useInboxV2Mutations } from '@/hooks/useInboxV2'
+import { useAuth } from '@/contexts/AuthContext'
 import { INBOX_ACTION } from '@/lib/inbox-v2-dicts'
 import { toast } from 'sonner'
 
@@ -19,6 +20,7 @@ interface Props {
  */
 export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
   const { bulkUpdateStatus, bulkAddTag, logAction } = useInboxV2Mutations()
+  const { user } = useAuth()
   const [tagInput, setTagInput] = useState('')
   const [showTagInput, setShowTagInput] = useState(false)
 
@@ -34,7 +36,7 @@ export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
           target_id: null,
           action_type: actionType,
           updates_applied: updates,
-          approved_by: null,
+          approved_by: user?.email ?? null,
         })
       )
     )

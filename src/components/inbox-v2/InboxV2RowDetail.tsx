@@ -3,6 +3,8 @@ import {
   RefreshCw,
   GitMerge,
   UserPlus,
+  Building2,
+  HelpCircle,
   ChevronDown,
   ChevronUp,
   MoreHorizontal,
@@ -29,14 +31,26 @@ import {
   INBOX_ACTION,
 } from '@/lib/inbox-v2-dicts'
 import { normalizePhone, formatPhone } from '@/lib/normalizePhone'
+import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
+import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
+import { useAuth } from '@/contexts/AuthContext'
+import {
+  deriveEntryReason,
+  getRecordType,
+  parseGoogleSource,
+  resolveInboxRoute,
+  type MergeEntity,
+} from '@/lib/inbox-v2-merge'
 import { toast } from 'sonner'
 import type { InboxV2Row } from '@/types/inbox-v2'
 
 interface Props {
   leadId: number
   onClose: () => void
-  onOpenMerge: (leadId: number) => void
+  /** `entity` נשלח רק במסלול match_conflict — הכרעה מפורשת, ללא ניתוב אוטומטי. */
+  onOpenMerge: (leadId: number, entity?: MergeEntity) => void
   onOpenCreate: (leadId: number) => void
+  onOpenCreateAccount: (leadId: number) => void
 }
 
 type EditForm = {
@@ -74,14 +88,27 @@ function toForm(row: InboxV2Row): EditForm {
 const inputCls =
   'w-full rounded-[10px] border border-[#D9D9D9] bg-white px-3 py-2 text-[14px] text-[#2D2D2D] outline-none focus:border-[#008080]'
 
-export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }: Props) {
+export function InboxV2RowDetail({
+  leadId,
+  onClose,
+  onOpenMerge,
+  onOpenCreate,
+  onOpenCreateAccount,
+}: Props) {
   const { data: row, isLoading } = useInboxV2Row(leadId)
   const { updateRow, logAction } = useInboxV2Mutations()
   const { matchRow } = useInboxV2Matching()
+  const { data: dicts } = useApplicationDicts()
+  const { data: cities } = useInboxV2Cities()
+  const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [form, setForm] = useState<EditForm | null>(null)
   const [saving, setSaving] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
+  const [rejectReason, setRejectReason] = useState('')
+  const [askingReject, setAskingReject] = useState(false)
+  /** הכרעה ידנית של סוג הרשומה במסלול unclassified. */
+  const [manualType, setManualType] = useState<MergeEntity | null>(null)
 
   useEffect(() => {
     if (row && !isEditing) setForm(toForm(row))
@@ -100,15 +127,32 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
     onClose()
   }
 
-  const setStatus = async (status: number, label: string, actionType: number | null) => {
+  /**
+   * החלטות "סגורות" — נדחה / התעלמות / לא דנטלי.
+   * השורה לא נמחקת: source_unique_key חייב לשרוד כדי ש-Memory Gate ב-n8n
+   * לא יפתח את אותה רשומת Google שוב כל עוד ה-payload_hash לא השתנה.
+   */
+  const setStatus = async (
+    status: number,
+    label: string,
+    actionType: number | null,
+    decision: string,
+    extra: Record<string, unknown> = {}
+  ) => {
     await updateRow.mutateAsync({ leadId, updates: { merge_status: status } })
     await logAction.mutateAsync({
       lead_id: leadId,
       target_type: null,
       target_id: null,
       action_type: actionType,
-      updates_applied: { merge_status: status },
-      approved_by: null,
+      updates_applied: {
+        decision,
+        merge_status: status,
+        source_unique_key: row?.source_unique_key ?? null,
+        decided_at: new Date().toISOString(),
+        ...extra,
+      },
+      approved_by: user?.email ?? null,
     })
     toast.success(`סטטוס עודכן ל-${label}`)
   }
@@ -120,9 +164,17 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
       target_id: null,
       action_type: INBOX_ACTION.FLAG_REVIEW,
       updates_applied: { flagged_for_review: true },
-      approved_by: null,
+      approved_by: user?.email ?? null,
     })
     toast.success('סומן לבדיקה (ללא שינוי סטטוס)')
+  }
+
+  const confirmReject = async () => {
+    await setStatus(7, 'נדחה', INBOX_ACTION.REJECT, 'rejected', {
+      reason: rejectReason.trim() || null,
+    })
+    setAskingReject(false)
+    setRejectReason('')
   }
 
   // שמירת עריכה — מעדכנת inbox_v2 בלבד. אין נגיעה ב-contact/accounts.
@@ -163,6 +215,11 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
   const mode = isEditing ? 'edit' : 'view'
   const match = row ? deriveMatchResult(row) : null
   const suggestedEntries = row?.suggested_updates ? Object.entries(row.suggested_updates) : []
+  const routing = row ? resolveInboxRoute(row) : null
+  const recordType = row ? getRecordType(row) : null
+  const google = row ? parseGoogleSource(row) : null
+  const typeLabel =
+    recordType === 'organization' ? 'ארגון' : recordType === 'person' ? 'אדם' : 'לא סווג'
 
   const header = (
     <div className="px-5 py-4">
@@ -174,12 +231,13 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
             <h2 className="text-[16px] font-bold text-[#2D2D2D]">
               {row.display_name ?? 'ללא שם'}
             </h2>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
               <AdminBadge
                 label={getDictName(INBOX_STATUSES, row.merge_status)}
                 variant={inboxStatusAdminVariant[row.merge_status ?? 1] ?? 'neutral'}
               />
               {match && <AdminBadge label={match.label} variant={match.variant} />}
+              <AdminBadge label={typeLabel} variant={recordType == null ? 'amber' : 'neutral'} />
             </div>
           </div>
           <p className="mt-1 text-[12px] text-[#9CA3AF]">
@@ -221,71 +279,183 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
         </div>
       ) : (
         <>
-          {/* גיליון החלטה — פעולות בשער */}
-          {!isEditing && (
+          {/* גיליון החלטה — הפעולה הראשית נגזרת מהניתוב, לא מ-merge_status */}
+          {!isEditing && routing && (
             <AdminPanelSection title="החלטה בשער">
-              <div className="sm:col-span-2 flex flex-wrap items-center gap-2">
-                {row.match_contact ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenMerge(leadId)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[#008080] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[#006D6D]"
-                  >
-                    <GitMerge className="h-4 w-4" />
-                    אשר התאמה
-                  </button>
-                ) : (
-                  <span
-                    title="אין איש קשר תואם — צרי איש קשר חדש או הריצי התאמה"
-                    className="inline-flex items-center gap-1.5 rounded-full border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#9CA3AF]"
-                  >
-                    <GitMerge className="h-4 w-4" />
-                    אין התאמה לאישור
-                  </span>
+              <div className="sm:col-span-2 space-y-3">
+                {routing.classificationWarning && (
+                  <div className="rounded-[10px] bg-[#FFFBEB] px-3 py-2 text-[12px] font-medium text-[#92400E]">
+                    ⚠️ {routing.classificationWarning}
+                  </div>
                 )}
-                <button
-                  type="button"
-                  onClick={() => onOpenCreate(leadId)}
-                  className="inline-flex items-center gap-1.5 rounded-full border border-[#008080] px-4 py-2 text-[13px] font-semibold text-[#008080] transition hover:bg-[#E6F3F3]"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  צור איש קשר חדש
-                </button>
-                <AdminActionsMenu
-                  ariaLabel="פעולות נוספות"
-                  pending={updateRow.isPending || logAction.isPending}
-                  items={[
-                    {
-                      key: 'flag',
-                      icon: <Eye className="h-4 w-4" />,
-                      label: 'סמן לבדיקה',
-                      onClick: flagForReview,
-                    },
-                    {
-                      key: 'reject',
-                      icon: <XCircle className="h-4 w-4" />,
-                      label: 'דחה',
-                      onClick: () => setStatus(7, 'נדחה', INBOX_ACTION.REJECT),
-                      separatorBefore: true,
-                    },
-                    {
-                      key: 'ignore',
-                      icon: <EyeOff className="h-4 w-4" />,
-                      label: 'התעלם',
-                      onClick: () => setStatus(8, 'התעלמות', INBOX_ACTION.IGNORE),
-                    },
-                    {
-                      key: 'non-dental',
-                      icon: <Ban className="h-4 w-4" />,
-                      label: 'לא דנטלי',
-                      onClick: () => setStatus(9, 'לא דנטלי', null),
-                    },
-                  ]}
-                />
-                <span className="ms-auto inline-flex items-center gap-1 text-[12px] text-[#9CA3AF]">
-                  <MoreHorizontal className="h-3.5 w-3.5" />
-                  עדכון ליבה רק דרך הפעולות כאן
-                </span>
+
+                {routing.route === 'match_conflict' && (
+                  <div className="rounded-[10px] bg-[#FEF2F2] px-3 py-2 text-[12px] font-medium text-[#B91C1C]">
+                    נמצאה התאמה גם לאדם (#{row.match_contact}) וגם לארגון (#{row.match_account}) — נדרשת
+                    הכרעה. אין ניתוב אוטומטי.
+                  </div>
+                )}
+
+                {routing.route === 'unclassified' && (
+                  <div className="rounded-[10px] bg-[#FFFBEB] px-3 py-2 text-[12px] font-medium text-[#92400E]">
+                    סוג הרשומה לא נקבע — n8n לא סיווגה אותה כאדם או כארגון. יש להכריע ידנית לפני יצירה.
+                  </div>
+                )}
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {routing.route === 'match_conflict' && (
+                    <>
+                      <GateButton
+                        icon={<GitMerge className="h-4 w-4" />}
+                        label="טפל כאיש קשר"
+                        onClick={() => onOpenMerge(leadId, 'contact')}
+                      />
+                      <GateButton
+                        icon={<Building2 className="h-4 w-4" />}
+                        label="טפל כארגון"
+                        onClick={() => onOpenMerge(leadId, 'account')}
+                      />
+                    </>
+                  )}
+
+                  {routing.route === 'merge_contact' && (
+                    <GateButton
+                      icon={<GitMerge className="h-4 w-4" />}
+                      label="הצג ואשר מיזוג לאיש קשר"
+                      onClick={() => onOpenMerge(leadId)}
+                      primary
+                    />
+                  )}
+
+                  {routing.route === 'merge_account' && (
+                    <GateButton
+                      icon={<Building2 className="h-4 w-4" />}
+                      label="הצג ואשר מיזוג לארגון"
+                      onClick={() => onOpenMerge(leadId)}
+                      primary
+                    />
+                  )}
+
+                  {routing.route === 'create_contact' && (
+                    <GateButton
+                      icon={<UserPlus className="h-4 w-4" />}
+                      label="צור איש קשר חדש"
+                      onClick={() => onOpenCreate(leadId)}
+                      primary
+                    />
+                  )}
+
+                  {routing.route === 'create_account' && (
+                    <GateButton
+                      icon={<Building2 className="h-4 w-4" />}
+                      label="צור ארגון חדש"
+                      onClick={() => onOpenCreateAccount(leadId)}
+                      primary
+                    />
+                  )}
+
+                  {routing.route === 'unclassified' && (
+                    <>
+                      {manualType == null ? (
+                        <>
+                          <GateButton
+                            icon={<HelpCircle className="h-4 w-4" />}
+                            label="זו רשומת אדם"
+                            onClick={() => setManualType('contact')}
+                          />
+                          <GateButton
+                            icon={<HelpCircle className="h-4 w-4" />}
+                            label="זו רשומת ארגון"
+                            onClick={() => setManualType('account')}
+                          />
+                        </>
+                      ) : manualType === 'contact' ? (
+                        <GateButton
+                          icon={<UserPlus className="h-4 w-4" />}
+                          label="צור איש קשר חדש"
+                          onClick={() => onOpenCreate(leadId)}
+                          primary
+                        />
+                      ) : (
+                        <GateButton
+                          icon={<Building2 className="h-4 w-4" />}
+                          label="צור ארגון חדש"
+                          onClick={() => onOpenCreateAccount(leadId)}
+                          primary
+                        />
+                      )}
+                    </>
+                  )}
+
+                  <AdminActionsMenu
+                    ariaLabel="פעולות נוספות"
+                    pending={updateRow.isPending || logAction.isPending}
+                    items={[
+                      {
+                        key: 'flag',
+                        icon: <Eye className="h-4 w-4" />,
+                        label: 'סמן לבדיקה',
+                        onClick: flagForReview,
+                      },
+                      {
+                        key: 'reject',
+                        icon: <XCircle className="h-4 w-4" />,
+                        label: 'דחה כרגע',
+                        onClick: () => setAskingReject(true),
+                        separatorBefore: true,
+                      },
+                      {
+                        key: 'ignore',
+                        icon: <EyeOff className="h-4 w-4" />,
+                        label: 'התעלמות — אל תציג שוב',
+                        onClick: () => setStatus(8, 'התעלמות', INBOX_ACTION.IGNORE, 'ignored'),
+                      },
+                      {
+                        key: 'non-dental',
+                        icon: <Ban className="h-4 w-4" />,
+                        label: 'לא דנטלי — אל תציג שוב',
+                        onClick: () => setStatus(9, 'לא דנטלי', null, 'non_dental'),
+                      },
+                    ]}
+                  />
+                  <span className="ms-auto inline-flex items-center gap-1 text-[12px] text-[#9CA3AF]">
+                    <MoreHorizontal className="h-3.5 w-3.5" />
+                    עדכון ליבה רק דרך הפעולות כאן
+                  </span>
+                </div>
+
+                {askingReject && (
+                  <div className="rounded-[10px] border border-[#E5E7EB] bg-[#F8F9FA] p-3">
+                    <label className="mb-1 block text-[12px] font-semibold text-[#6B6B6B]">
+                      סיבת הדחייה (אופציונלי)
+                    </label>
+                    <input
+                      className={inputCls}
+                      value={rejectReason}
+                      onChange={(e) => setRejectReason(e.target.value)}
+                      placeholder="למשל: מספר לא תקין"
+                    />
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={confirmReject}
+                        className="rounded-full bg-[#DC2626] px-4 py-1.5 text-[12px] font-semibold text-white transition hover:bg-[#B91C1C]"
+                      >
+                        אשר דחייה
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAskingReject(false)
+                          setRejectReason('')
+                        }}
+                        className="rounded-full border border-[#D9D9D9] px-4 py-1.5 text-[12px] font-semibold text-[#6B6B6B] transition hover:bg-white"
+                      >
+                        ביטול
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </AdminPanelSection>
           )}
@@ -342,6 +512,11 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
               }
             />
             <AdminPanelField
+              label="נייד נוסף"
+              mode="view"
+              viewValue={row.second_phone ? formatPhone(row.second_phone) : null}
+            />
+            <AdminPanelField
               label="אימייל"
               mode={mode}
               viewValue={row.email}
@@ -353,6 +528,23 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
                   onChange={(e) => set('email', e.target.value)}
                 />
               }
+            />
+            <AdminPanelField label="מייל נוסף" mode="view" viewValue={row.second_email} />
+            <AdminPanelField
+              label="תפקיד (הוצע)"
+              mode="view"
+              viewValue={row.temp_role != null ? getDictLabel(dicts?.roles, row.temp_role) : null}
+              emptyLabel="לא זוהה"
+            />
+            <AdminPanelField
+              label="עיר (הוצעה)"
+              mode="view"
+              viewValue={
+                row.temp_city_id != null
+                  ? (cities?.find((c) => c.id === row.temp_city_id)?.name ?? String(row.temp_city_id))
+                  : null
+              }
+              emptyLabel="לא זוהתה"
             />
             <AdminPanelField
               label="שם פייסבוק"
@@ -438,6 +630,24 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
             />
           </AdminPanelSection>
 
+          {/* מקור Google — תצוגה בלבד, המסך לא קורא ל-Google */}
+          <AdminPanelSection title="מקור Google">
+            <AdminPanelField
+              label="חשבון Google"
+              mode="view"
+              viewValue={google?.accountKey ?? row.source_name}
+            />
+            <AdminPanelField label="מזהה רשומה ב-Google" mode="view" viewValue={google?.resourceName} />
+            <AdminPanelField
+              label="סיבת הכניסה"
+              mode="view"
+              viewValue={deriveEntryReason(row, routing!.route)}
+            />
+            <AdminPanelField label="סוג רשומה (n8n)" mode="view" viewValue={typeLabel} />
+            <AdminPanelField label="Payload hash" mode="view" viewValue={google?.payloadHash} />
+            <AdminPanelField label="etag" mode="view" viewValue={google?.etag} />
+          </AdminPanelSection>
+
           {/* התאמה */}
           <AdminPanelSection title="התאמה לרשומה קיימת">
             <div className="sm:col-span-2">
@@ -481,11 +691,12 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
               label="התאמה ל"
               mode="view"
               viewValue={
-                row.match_contact
-                  ? `איש קשר #${row.match_contact}`
-                  : row.match_account
-                    ? `ארגון #${row.match_account}`
-                    : null
+                [
+                  row.match_contact ? `איש קשר #${row.match_contact}` : null,
+                  row.match_account ? `ארגון #${row.match_account}` : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ') || null
               }
             />
             <div className="sm:col-span-2">
@@ -588,5 +799,33 @@ export function InboxV2RowDetail({ leadId, onClose, onOpenMerge, onOpenCreate }:
         </>
       )}
     </SidePanel>
+  )
+}
+
+/** כפתור פעולה ראשית בשער. משני = מסגרת, ראשי = מלא. */
+function GateButton({
+  icon,
+  label,
+  onClick,
+  primary,
+}: {
+  icon: React.ReactNode
+  label: string
+  onClick: () => void
+  primary?: boolean
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={
+        primary
+          ? 'inline-flex items-center gap-1.5 rounded-full bg-[#008080] px-4 py-2 text-[13px] font-semibold text-white transition hover:bg-[#006D6D]'
+          : 'inline-flex items-center gap-1.5 rounded-full border border-[#008080] px-4 py-2 text-[13px] font-semibold text-[#008080] transition hover:bg-[#E6F3F3]'
+      }
+    >
+      {icon}
+      {label}
+    </button>
   )
 }

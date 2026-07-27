@@ -15,7 +15,9 @@ export interface InboxV2Row {
   last_name: string | null
   phone: string | null
   phone_norm: string | null
+  second_phone: string | null
   email: string | null
+  second_email: string | null
   facebook_name: string | null
   facebook_id: string | null
   facebook_url: string | null

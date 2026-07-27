@@ -17,7 +17,9 @@ import { InboxV2QuickActions } from '@/components/inbox-v2/InboxV2QuickActions'
 import { InboxV2RowDetail } from '@/components/inbox-v2/InboxV2RowDetail'
 import { MergePanel } from '@/components/inbox-v2/MergePanel'
 import { CreateFromLeadDialog } from '@/components/inbox-v2/CreateFromLeadDialog'
+import { CreateAccountFromLeadDialog } from '@/components/inbox-v2/CreateAccountFromLeadDialog'
 import { AIChatPanel } from '@/components/inbox-v2/AIChatPanel'
+import type { MergeEntity } from '@/lib/inbox-v2-merge'
 import type { InboxV2Filters } from '@/types/inbox-v2'
 
 const ALL_COLUMN_KEYS = new Set(ALL_COLUMNS.map((c) => c.key))
@@ -42,7 +44,10 @@ export default function InboxV2Page() {
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [detailLeadId, setDetailLeadId] = useState<number | null>(null)
   const [mergeLeadId, setMergeLeadId] = useState<number | null>(null)
+  /** נשלח רק כשהאדמינית הכריעה במסלול match_conflict. */
+  const [mergeEntity, setMergeEntity] = useState<MergeEntity | undefined>(undefined)
   const [createLeadId, setCreateLeadId] = useState<number | null>(null)
+  const [createAccountLeadId, setCreateAccountLeadId] = useState<number | null>(null)
   const [showAiChat, setShowAiChat] = useState(false)
   const [visibleColumns, setVisibleColumns] = useState<string[]>(loadStoredVisibleColumns)
 
@@ -220,23 +225,42 @@ export default function InboxV2Page() {
         <InboxV2RowDetail
           leadId={detailLeadId}
           onClose={() => setDetailLeadId(null)}
-          onOpenMerge={(id) => {
+          onOpenMerge={(id, entity) => {
             setDetailLeadId(null)
+            setMergeEntity(entity)
             setMergeLeadId(id)
           }}
           onOpenCreate={(id) => {
             setDetailLeadId(null)
             setCreateLeadId(id)
           }}
+          onOpenCreateAccount={(id) => {
+            setDetailLeadId(null)
+            setCreateAccountLeadId(id)
+          }}
         />
       )}
 
       {mergeLeadId != null && (
-        <MergePanel leadId={mergeLeadId} onClose={() => setMergeLeadId(null)} />
+        <MergePanel
+          leadId={mergeLeadId}
+          forcedEntity={mergeEntity}
+          onClose={() => {
+            setMergeLeadId(null)
+            setMergeEntity(undefined)
+          }}
+        />
       )}
 
       {createLeadId != null && (
         <CreateFromLeadDialog leadId={createLeadId} onClose={() => setCreateLeadId(null)} />
+      )}
+
+      {createAccountLeadId != null && (
+        <CreateAccountFromLeadDialog
+          leadId={createAccountLeadId}
+          onClose={() => setCreateAccountLeadId(null)}
+        />
       )}
 
       {showAiChat && <AIChatPanel onClose={() => setShowAiChat(false)} />}
