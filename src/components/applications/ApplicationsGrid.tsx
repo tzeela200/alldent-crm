@@ -2,7 +2,7 @@ import { StatusBadge } from '@/components/admin/StatusBadge'
 import { RegionBadge } from '@/components/admin/RegionBadge'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { formatPhone } from '@/lib/normalizePhone'
-import { openApplicationCv, applicationHasCv } from '@/lib/cv'
+import { openApplicationCv, personHasCv } from '@/lib/cv'
 import { formatDate } from '@/lib/timeAgo'
 import type { ApplicationRow } from '@/types/applications'
 
@@ -49,7 +49,7 @@ export function ApplicationsGrid({ rows, onRowClick }: Props) {
             <p className="text-[12px] text-[#9CA3AF]">{formatDate(row.submission_date)}</p>
           </div>
 
-          {applicationHasCv(row) && (
+          {personHasCv(row) && (
             <button
               type="button"
               onClick={(e) => {

@@ -10,7 +10,7 @@ import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon'
 import { getDictLabel, type useApplicationDicts } from '@/hooks/useApplicationDicts'
 import { formatDate } from '@/lib/timeAgo'
 import { whatsappLink, formatPhone } from '@/lib/normalizePhone'
-import { openApplicationCv, applicationHasCv } from '@/lib/cv'
+import { openApplicationCv, personHasCv } from '@/lib/cv'
 import type { ApplicationRow } from '@/types/applications'
 import type { ColumnKey } from './applicationColumns'
 
@@ -189,16 +189,22 @@ export function ApplicationsTable({
         colKey: 'cv',
         label: 'קו"ח',
         render: (row) =>
-          applicationHasCv(row) ? (
+          personHasCv(row) ? (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation()
                 openApplicationCv(row)
               }}
+              // מקור הקו"ח מסומן: של ההגשה עצמה, או מכרטיס המועמד במאגר.
+              title={
+                row.has_cv || row.cv_link || row.cv_storage_path
+                  ? 'קו"ח שצורפו להגשה'
+                  : 'קו"ח מכרטיס המועמד במאגר'
+              }
               className="whitespace-nowrap text-[13px] font-semibold text-[#3B82F6] hover:underline"
             >
-              צפייה ↗
+              {row.has_cv || row.cv_link || row.cv_storage_path ? 'צפייה ↗' : 'מהמאגר ↗'}
             </button>
           ) : (
             <span className="text-[#D1D5DB]">—</span>

@@ -16,10 +16,67 @@ export const TERMINAL_STATUSES: number[] = [5, 10, 13, 14, 15]
 export const INTERVIEW_STAGE_STATUSES: number[] = [6, 7, 8]
 
 /**
+ * Contacts that are linked from some application AND have a CV on their own card.
+ *
+ * "חסר קו״ח" must mean "we have no CV for this person anywhere", not "this
+ * application row has no CV". A CV uploaded to the candidate's card is not
+ * copied back onto older application rows, so counting the row alone reported
+ * 39 missing when 24 of them did have a CV in the מאגר (INC-3116).
+ *
+ * The linked set is small (one id per application), so this is two tiny queries
+ * rather than a join — no schema change required.
+ */
+export async function fetchLinkedContactsWithCv(): Promise<number[]> {
+  const { data: links, error: linkErr } = await supabase
+    .from('applications')
+    .select('candidate_link')
+    .not('candidate_link', 'is', null)
+  if (linkErr) throw linkErr
+
+  const ids = [...new Set((links ?? []).map((r) => r.candidate_link as number))]
+  if (!ids.length) return []
+
+  const withCv: number[] = []
+  const CHUNK = 200
+  for (let i = 0; i < ids.length; i += CHUNK) {
+    const { data, error } = await supabase
+      .from('contact')
+      .select('contact_id')
+      .in('contact_id', ids.slice(i, i + CHUNK))
+      .or('has_cv.eq.true,cv_link.not.is.null,cv_storage_path.not.is.null')
+    if (error) throw error
+    withCv.push(...(data ?? []).map((c) => c.contact_id as number))
+  }
+  return withCv
+}
+
+/**
+ * Narrow a query to applications that have no CV anywhere — not on the row and
+ * not on the linked contact. `contactsWithCv` comes from
+ * fetchLinkedContactsWithCv(). Shared by the KPI and the "ללא קו״ח" filter so
+ * the card count and the list can never disagree.
+ */
+function applyMissingCvFilter<T>(queryIn: T, contactsWithCv: number[]): T {
+  let query = queryIn as any
+  query = query
+    .or('has_cv.is.null,has_cv.eq.false')
+    .is('cv_link', null)
+    .is('cv_storage_path', null)
+  if (contactsWithCv.length)
+    query = query.or(`candidate_link.is.null,candidate_link.not.in.(${contactsWithCv.join(',')})`)
+  return query as T
+}
+
+/**
  * Apply every server-side filter to an `applications` query.
  * Shared by the paged list and the "export all" fetch so both stay in sync.
  */
-function applyApplicationFilters<T>(queryIn: T, filters: ApplicationFilters): T {
+function applyApplicationFilters<T>(
+  queryIn: T,
+  filters: ApplicationFilters,
+  /** From fetchLinkedContactsWithCv(); only needed when cv_state is set. */
+  contactsWithCv: number[] = [],
+): T {
   let query = queryIn as any
   {
       if (filters.search) {
@@ -50,15 +107,18 @@ function applyApplicationFilters<T>(queryIn: T, filters: ApplicationFilters): T 
         query = query.gte('submission_date', filters.date_from)
       if (filters.date_to)
         query = query.lte('submission_date', filters.date_to + 'T23:59:59')
-      // Must mirror applicationHasCv() in src/lib/cv.ts — a CV may live in any of
-      // has_cv / cv_link / cv_storage_path, otherwise filter and display disagree.
+      // "יש/אין קו״ח" is about the *person*, not the row: a CV may sit on the
+      // application (has_cv / cv_link / cv_storage_path) or on the linked
+      // contact's card. Counting the row alone marked 24 candidates who do have
+      // a CV in the מאגר as "חסר קו״ח" (INC-3116).
       if (filters.cv_state === 'with')
-        query = query.or('has_cv.eq.true,cv_link.not.is.null,cv_storage_path.not.is.null')
+        query = contactsWithCv.length
+          ? query.or(
+              `has_cv.eq.true,cv_link.not.is.null,cv_storage_path.not.is.null,candidate_link.in.(${contactsWithCv.join(',')})`
+            )
+          : query.or('has_cv.eq.true,cv_link.not.is.null,cv_storage_path.not.is.null')
       if (filters.cv_state === 'without')
-        query = query
-          .or('has_cv.is.null,has_cv.eq.false')
-          .is('cv_link', null)
-          .is('cv_storage_path', null)
+        query = applyMissingCvFilter(query, contactsWithCv)
       if (filters.is_manual != null)
         query = query.eq('is_manual', filters.is_manual)
       if (filters.is_new_candidate != null)
@@ -95,7 +155,7 @@ async function enrichApplicationRows(rowsIn: ApplicationRow[]): Promise<Applicat
       if (candidateIds.length > 0) {
         const { data: contacts } = await supabase
           .from('contact')
-          .select('contact_id, work_status, candidate_availability_ids, profile_type, role, city_id, region_id, has_cv, cv_link, cv_received_date, display_name')
+          .select('contact_id, work_status, candidate_availability_ids, profile_type, role, city_id, region_id, has_cv, cv_link, cv_storage_path, cv_received_date, display_name')
           .in('contact_id', candidateIds)
         if (contacts) {
           const contactMap = new Map(contacts.map((c) => [c.contact_id, c]))
@@ -112,6 +172,7 @@ async function enrichApplicationRows(rowsIn: ApplicationRow[]): Promise<Applicat
               contact_region_id: c.region_id ?? null,
               contact_has_cv: c.has_cv ?? null,
               contact_cv_link: c.cv_link ?? null,
+              contact_cv_storage_path: c.cv_storage_path ?? null,
               contact_cv_received_date: c.cv_received_date ?? null,
               contact_display_name: c.display_name ?? null,
             }
@@ -175,13 +236,16 @@ export function useApplicationRows(
   return useQuery({
     queryKey: ['applications', filters, page, sortBy, sortDir],
     queryFn: async () => {
+      // Only needed for the CV filter — skip the extra round-trips otherwise.
+      const contactsWithCv = filters.cv_state ? await fetchLinkedContactsWithCv() : []
       const query = applyApplicationFilters(
         supabase
           .from('applications')
           .select('*', { count: 'exact' })
           .order(sortBy, { ascending: sortDir === 'asc' })
           .range(page * APPLICATIONS_PAGE_SIZE, (page + 1) * APPLICATIONS_PAGE_SIZE - 1),
-        filters
+        filters,
+        contactsWithCv
       )
 
       const { data, count, error } = await query
@@ -206,6 +270,7 @@ export async function fetchAllApplicationRows(
 ): Promise<ApplicationRow[]> {
   const CHUNK = 1000
   let all: ApplicationRow[] = []
+  const contactsWithCv = filters.cv_state ? await fetchLinkedContactsWithCv() : []
   for (let from = 0; from < maxRows; from += CHUNK) {
     const query = applyApplicationFilters(
       supabase
@@ -213,7 +278,8 @@ export async function fetchAllApplicationRows(
         .select('*')
         .order(sortBy, { ascending: sortDir === 'asc' })
         .range(from, from + CHUNK - 1),
-      filters
+      filters,
+      contactsWithCv
     )
     const { data, error } = await query
     if (error) throw error
@@ -247,6 +313,9 @@ export function useApplicationKPIs() {
   return useQuery({
     queryKey: ['applications-kpis'],
     queryFn: async () => {
+      // Same definition the "ללא קו״ח" filter uses, so the card and the list it
+      // opens can never disagree (INC-3116).
+      const contactsWithCv = await fetchLinkedContactsWithCv()
       const [total, newApps, waitingHandling, advanced, hires, missingCv, waitingEmployer, archived] =
         await Promise.all([
           supabase.from('applications').select('application_id', { count: 'exact', head: true }),
@@ -266,12 +335,12 @@ export function useApplicationKPIs() {
             .from('applications')
             .select('application_id', { count: 'exact', head: true })
             .eq('application_status', 12),
-          supabase
-            .from('applications')
-            .select('application_id', { count: 'exact', head: true })
-            .or('has_cv.is.null,has_cv.eq.false')
-            .is('cv_link', null)
-            .is('cv_storage_path', null),
+          applyMissingCvFilter(
+            supabase
+              .from('applications')
+              .select('application_id', { count: 'exact', head: true }),
+            contactsWithCv
+          ),
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })

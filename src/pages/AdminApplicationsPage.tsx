@@ -24,7 +24,7 @@ import {
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { formatDate } from '@/lib/timeAgo'
-import { applicationHasCv } from '@/lib/cv'
+import { personHasCv } from '@/lib/cv'
 import { ApplicationFiltersBar } from '@/components/applications/ApplicationFiltersBar'
 import { ApplicationDetailPanel } from '@/components/applications/ApplicationDetailPanel'
 import { ManualCreateDialog } from '@/components/applications/ManualCreateDialog'
@@ -190,7 +190,8 @@ export default function AdminApplicationsPage() {
         'מקור': getDictLabel(dicts?.sources, r.source),
         'תאריך הגשה': formatDate(r.submission_date),
         'תאריך פעולה הבאה': formatDate(r.follow_up_date),
-        'עם קו"ח': applicationHasCv(r) ? 'כן' : 'לא',
+        'עם קו"ח': personHasCv(r) ? 'כן' : 'לא',
+        'מקור קו"ח': personHasCv(r) ? (r.has_cv || r.cv_link || r.cv_storage_path ? 'הגשה' : 'כרטיס מועמד') : '',
         'ידני': r.is_manual ? 'כן' : 'לא',
         'הערות פנימיות': r.internal_notes ?? '',
       }))
@@ -328,7 +329,13 @@ export default function AdminApplicationsPage() {
   return (
     <Shell
       title="הגשות"
-      subtitle={`${total.toLocaleString()} הגשות במאגר`}
+      // כשיש סינון פעיל `total` הוא מספר התוצאות המסוננות — לא "במאגר".
+      // הכיתוב הישן הציג "34 הגשות במאגר" בזמן שבמאגר היו 160 (INC-3116).
+      subtitle={
+        hasActiveFilter
+          ? `${total.toLocaleString()} תוצאות מסוננות · ${(kpis?.total ?? 0).toLocaleString()} הגשות במאגר`
+          : `${total.toLocaleString()} הגשות במאגר`
+      }
       icon={ClipboardList}
       actions={
         <div className="flex items-center gap-2">

@@ -51,6 +51,7 @@ export interface ApplicationRow {
   contact_region_id?: number | null
   contact_has_cv?: boolean | null
   contact_cv_link?: string | null
+  contact_cv_storage_path?: string | null
   contact_cv_received_date?: string | null
   contact_display_name?: string | null
 
