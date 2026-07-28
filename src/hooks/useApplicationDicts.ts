@@ -15,11 +15,35 @@ interface ApplicationDicts {
   languages: DictItem[]
 }
 
+/**
+ * `dict_cities` holds ~1,283 rows and PostgREST caps every single request at
+ * 1000 regardless of .limit(), so a plain select silently drops 283 cities
+ * alphabetically — including "תל אביב". That silent truncation was the root of
+ * INC-3113; this screen was the last unpaginated reader left (INC-3116).
+ * Paginate until a short page proves the end — same pattern as
+ * useInboxV2Cities / useContact360.fetchAllCities / CityRegionPicker.
+ */
+async function fetchAllDictPages(table: string, orderBy: string): Promise<DictItem[]> {
+  const PAGE = 1000
+  const all: DictItem[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select('id, name')
+      .order(orderBy)
+      .range(from, from + PAGE - 1)
+    if (error) throw new Error(`טעינת מילון נכשלה (${table}): ${error.message}`)
+    const batch = (data ?? []) as DictItem[]
+    all.push(...batch)
+    if (batch.length < PAGE) return all
+  }
+}
+
 export function useApplicationDicts() {
   return useQuery({
     queryKey: ['application-dicts'],
     queryFn: async (): Promise<ApplicationDicts> => {
-      const [appStatuses, checkStatuses, sources, regions, roles, workStatuses, availabilities, jobStatuses, cities, languages] =
+      const [appStatuses, checkStatuses, sources, regions, roles, workStatuses, availabilities, jobStatuses, languages, cities] =
         await Promise.all([
           supabase.from('dict_application_statuses').select('id, name').order('id'),
           supabase.from('dict_check_statuses').select('id, name').order('id'),
@@ -29,8 +53,10 @@ export function useApplicationDicts() {
           supabase.from('dict_contact_work_statuses').select('id, name').order('id'),
           supabase.from('dict_availability').select('id, name').order('id'),
           supabase.from('dict_job_statuses').select('id, name').order('id'),
-          supabase.from('dict_cities').select('id, name').order('name'),
           supabase.from('dict_languages').select('id, name').order('name'),
+          // Paginated — see fetchAllDictPages. Throws on failure rather than
+          // returning a { data, error } pair like the plain selects above.
+          fetchAllDictPages('dict_cities', 'name'),
         ])
       // Surface dictionary failures instead of silently returning empty lists
       // (which would render raw IDs and look like missing data).
@@ -43,7 +69,6 @@ export function useApplicationDicts() {
         dict_contact_work_statuses: workStatuses,
         dict_availability: availabilities,
         dict_job_statuses: jobStatuses,
-        dict_cities: cities,
         dict_languages: languages,
       }).find(([, res]) => res.error)
       if (failed)
@@ -58,7 +83,7 @@ export function useApplicationDicts() {
         workStatuses: (workStatuses.data ?? []) as DictItem[],
         availabilities: (availabilities.data ?? []) as DictItem[],
         jobStatuses: (jobStatuses.data ?? []) as DictItem[],
-        cities: (cities.data ?? []) as DictItem[],
+        cities,
         languages: (languages.data ?? []) as DictItem[],
       }
     },

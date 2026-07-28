@@ -5,16 +5,32 @@ import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import type { ApplicationFilters } from '@/types/applications'
 import type { DictItem } from '@/types'
 
-const ROLE_CHIPS = [
-  { label: 'הכל', value: '' },
-  { label: 'סייעות', value: 'סייעת' },
-  { label: 'שינניות', value: 'שיננית' },
-  { label: 'טכנאים', value: 'טכנאי' },
-  { label: 'רופאים', value: 'רופא' },
-  { label: 'מומחים', value: 'מומחה' },
-  { label: 'מזכירות', value: 'מזכיר' },
-  { label: 'מכירות', value: 'מכירות' },
+/**
+ * Role groups by dict_roles id — mirrors KPI_ROLE_BLUEPRINTS in
+ * AdminContactsPage so both screens group roles identically. Covers all 18
+ * roles, so no role is unreachable (the old chips left "מנהל/ת דנטלי" with no
+ * chip at all, and 3 chips that matched nothing).
+ *
+ * The ids are resolved to exact `dict_roles.name` values at render time and
+ * matched with `.in()` — verified against Supabase that every non-null
+ * `applications.job_role` equals a dict_roles.name (INC-3116).
+ */
+const ROLE_GROUPS = [
+  { key: 'doctor', label: 'רופאי שיניים', roleIds: [1] },
+  { key: 'experts', label: 'מומחים', roleIds: [2, 3, 4, 5, 6, 7, 8] },
+  { key: 'assistant', label: 'סייעות', roleIds: [9] },
+  { key: 'hygienist', label: 'שינניות', roleIds: [10] },
+  { key: 'technician', label: 'טכנאים', roleIds: [11] },
+  { key: 'secretary', label: 'מזכירות', roleIds: [13] },
+  { key: 'manager', label: 'ניהול / גיוס', roleIds: [12, 14, 15, 16, 17, 18] },
 ] as const
+
+/** Same set of names, order-insensitive — used to light up the active chip. */
+function sameNames(a: string[] | undefined, b: string[]): boolean {
+  if (!a || a.length !== b.length) return false
+  const set = new Set(a)
+  return b.every((name) => set.has(name))
+}
 
 interface Props {
   filters: ApplicationFilters
@@ -49,11 +65,12 @@ export function ApplicationFiltersBar({
   const hasActive = !!(
     filters.search ||
     filters.application_status != null ||
+    filters.application_status_in?.length ||
     filters.check_status != null ||
     filters.source != null ||
     filters.job_region_id != null ||
     filters.job_city_id != null ||
-    filters.job_role ||
+    filters.job_role_names?.length ||
     filters.job_status != null ||
     filters.contact_work_status != null ||
     filters.contact_availability != null ||
@@ -75,19 +92,38 @@ export function ApplicationFiltersBar({
     <div className="space-y-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-slate-200">
       {/* Role chips */}
       <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-3">
-        {ROLE_CHIPS.map((chip) => (
-          <button
-            key={chip.value}
-            onClick={() => set({ job_role: chip.value || undefined })}
-            className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
-              (filters.job_role ?? '') === chip.value
-                ? 'bg-teal-600 text-white'
-                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-            }`}
-          >
-            {chip.label}
-          </button>
-        ))}
+        <button
+          onClick={() => set({ job_role_names: undefined })}
+          className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+            !filters.job_role_names?.length
+              ? 'bg-teal-600 text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          הכל
+        </button>
+        {ROLE_GROUPS.map((group) => {
+          const names = group.roleIds
+            .map((id) => roles.find((r) => r.id === id)?.name)
+            .filter((n): n is string => !!n)
+          // A group whose roles are missing from the live dict would filter on
+          // an empty list and return nothing — hide it instead.
+          if (!names.length) return null
+          const active = sameNames(filters.job_role_names, names)
+          return (
+            <button
+              key={group.key}
+              onClick={() => set({ job_role_names: active ? undefined : names })}
+              className={`rounded-full px-3 py-1 text-xs font-medium transition-colors ${
+                active
+                  ? 'bg-teal-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+              }`}
+            >
+              {group.label}
+            </button>
+          )
+        })}
       </div>
 
       {/* Row 1 */}

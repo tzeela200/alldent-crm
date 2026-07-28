@@ -472,7 +472,13 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
             />
             <Field
               label="זמינות"
-              value={getDictLabel(dicts?.availabilities, contact.availability)}
+              value={getDictLabel(
+                dicts?.availabilities,
+                // contact.availability was dropped from the DB (June 2026) and is
+                // always undefined at runtime, so this field always rendered "—".
+                // candidate_availability_ids is the canonical column (INC-3116).
+                contact.candidate_availability_ids?.[0]
+              )}
             />
             <Field
               label="תפקיד מועמד"

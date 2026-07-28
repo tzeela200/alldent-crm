@@ -5,6 +5,17 @@ import type { ApplicationRow, ApplicationFilters, ApplicationKPIs } from '@/type
 export const APPLICATIONS_PAGE_SIZE = 20
 
 /**
+ * Statuses that end an application's life:
+ * 5 לא ענה / נעלם · 10 הברזה מראיון · 13 הסיר מועמדות · 14 אין התאמה · 15 לא דנטלי - ארכיון.
+ * Single source for both "active only" (excludes these) and "closed only"
+ * (includes these) so the two filters stay complementary.
+ */
+export const TERMINAL_STATUSES: number[] = [5, 10, 13, 14, 15]
+
+/** Statuses the "בראיונות" KPI counts — card count and click filter share this. */
+export const INTERVIEW_STAGE_STATUSES: number[] = [6, 7, 8]
+
+/**
  * Apply every server-side filter to an `applications` query.
  * Shared by the paged list and the "export all" fetch so both stay in sync.
  */
@@ -21,6 +32,8 @@ function applyApplicationFilters<T>(queryIn: T, filters: ApplicationFilters): T 
       }
       if (filters.application_status != null)
         query = query.eq('application_status', filters.application_status)
+      if (filters.application_status_in?.length)
+        query = query.in('application_status', filters.application_status_in)
       if (filters.check_status != null)
         query = query.eq('check_status', filters.check_status)
       if (filters.source != null)
@@ -29,8 +42,10 @@ function applyApplicationFilters<T>(queryIn: T, filters: ApplicationFilters): T 
         query = query.eq('job_region_id', filters.job_region_id)
       if (filters.job_city_id != null)
         query = query.eq('job_city_id', filters.job_city_id)
-      if (filters.job_role)
-        query = query.ilike('job_role', `%${filters.job_role}%`)
+      // Exact match, never ilike: '%רופא%' also matched "סייעת רופא שיניים",
+      // so the "רופאים" chip returned every assistant row too (INC-3116).
+      if (filters.job_role_names?.length)
+        query = query.in('job_role', filters.job_role_names)
       if (filters.date_from)
         query = query.gte('submission_date', filters.date_from)
       if (filters.date_to)
@@ -54,10 +69,13 @@ function applyApplicationFilters<T>(queryIn: T, filters: ApplicationFilters): T 
         query = query.not('candidate_link', 'is', null).eq('is_new_candidate', false)
       if (filters.in_db === 'new')
         query = query.or('is_new_candidate.eq.true,candidate_link.is.null')
+      // Both branches must use the same set, otherwise a status belongs to
+      // neither filter — status 10 ("הברזה מראיון") used to fall through the
+      // gap and was invisible in both views (INC-3116).
       if (filters.active_apps_only)
-        query = query.not('application_status', 'in', '(5,10,13,14,15)')
+        query = query.not('application_status', 'in', `(${TERMINAL_STATUSES.join(',')})`)
       if (filters.closed_apps_only)
-        query = query.in('application_status', [5, 13, 14, 15])
+        query = query.in('application_status', TERMINAL_STATUSES)
       if (filters.overdue_follow_up) {
         const today = new Date().toISOString().slice(0, 10)
         query = query.not('follow_up_date', 'is', null).lte('follow_up_date', today)
@@ -243,7 +261,7 @@ export function useApplicationKPIs() {
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })
-            .in('application_status', [6, 7, 8]),
+            .in('application_status', INTERVIEW_STAGE_STATUSES),
           supabase
             .from('applications')
             .select('application_id', { count: 'exact', head: true })

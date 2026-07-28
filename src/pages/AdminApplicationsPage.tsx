@@ -15,6 +15,7 @@ import {
   useApplicationKPIs,
   fetchAllApplicationRows,
   APPLICATIONS_PAGE_SIZE,
+  INTERVIEW_STAGE_STATUSES,
 } from '@/hooks/useApplications'
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
@@ -360,7 +361,9 @@ export default function AdminApplicationsPage() {
           value={kpis?.advanced ?? 0}
           hint="שלבים 6-8"
           onClick={() => {
-            setFilters({ application_status: 7 })
+            // Must select the same range the card counts, or the card shows a
+            // number and the click lands on an empty list (INC-3116).
+            setFilters({ application_status_in: INTERVIEW_STAGE_STATUSES })
             setPage(0)
           }}
         />

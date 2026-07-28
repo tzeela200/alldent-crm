@@ -20,6 +20,10 @@ export interface ApplicationRow {
   master_role: string | null
   master_city: string | null
   master_region: string | null
+  /** Nullable id columns paired with master_city / master_region.
+   *  Optional: not every writer populates them. */
+  master_city_id?: number | null
+  master_region_id?: number | null
   internal_notes: string | null
   created_timestamp: string | null
   updated_timestamp: string | null
@@ -64,10 +68,22 @@ export type InDbFilter = 'existing' | 'new'
 export interface ApplicationFilters {
   search?: string
   application_status?: number
+  /**
+   * Match any of these statuses. Used where a KPI card counts a range of
+   * statuses — the click filter must select the same range, or the card and
+   * the list disagree (INC-3116).
+   */
+  application_status_in?: number[]
   check_status?: number
   source?: number
   job_region_id?: number
-  job_role?: string
+  /**
+   * Exact `applications.job_role` names to match. Replaces the old free-text
+   * `ilike '%…%'` filter, which made "רופאים" also return every
+   * "סייעת רופא שיניים" row (INC-3116). Names are resolved from the live
+   * `dict_roles` — verified: every non-null job_role equals a dict_roles.name.
+   */
+  job_role_names?: string[]
   job_city_id?: number
   job_status?: number
   contact_work_status?: number

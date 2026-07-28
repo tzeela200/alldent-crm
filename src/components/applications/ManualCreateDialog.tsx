@@ -35,6 +35,16 @@ function getDictLabel(items: DictItem[] | undefined, id: number | null | undefin
   return items.find((item) => item.id === id)?.name ?? String(id)
 }
 
+/**
+ * Resolve a dict id to its name for *storage*, never a fallback string.
+ * getDictLabel above falls back to String(id), which is fine for display but
+ * would write "1181" into a text column that holds a city name (INC-3116).
+ */
+function dictNameOrNull(items: DictItem[] | undefined, id: number | null | undefined): string | null {
+  if (!items || id == null) return null
+  return items.find((item) => item.id === id)?.name ?? null
+}
+
 export function ManualCreateDialog({ onClose, onCreated }: Props) {
   const { createApplication } = useApplicationMutations()
   const { data: dicts } = useApplicationDicts()
@@ -140,9 +150,12 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
         job_link: selectedJob.job_url ?? null,
         account_name: selectedJob.account_name ?? null,
         account_link: selectedJob.account_link ?? null,
-        job_role: jobRoleLabel !== '—' ? jobRoleLabel : null,
-        job_city: jobCityLabel !== '—' ? jobCityLabel : null,
-        job_region: jobRegionLabel !== '—' ? jobRegionLabel : null,
+        // Same rule as master_*: store a real name or null, never String(id).
+        // The old `!== '—'` guard let getDictLabel's String(id) fallback through
+        // whenever a dict lookup missed (INC-3116).
+        job_role: dictNameOrNull(dicts?.roles, selectedJob.job_role),
+        job_city: dictNameOrNull(cities, selectedJob.city_id),
+        job_region: dictNameOrNull(dicts?.regions, selectedJob.region_id),
         job_city_id: selectedJob.city_id ?? null,
         job_region_id: selectedJob.region_id ?? null,
         candidate_phone: selectedContact.phone ?? null,
@@ -153,9 +166,14 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
         candidate_notes: candidateNotes || null,
         check_status: checkStatus !== '' ? Number(checkStatus) : null,
         application_status: appStatus,
-        master_role: String(selectedContact.role ?? ''),
-        master_city: String(selectedContact.city_id ?? ''),
-        master_region: String(selectedContact.region_id ?? ''),
+        // These are text columns holding a *name*. They used to receive
+        // String(id) — "9" instead of "סייעת רופא שיניים" (INC-3116).
+        // The matching *_id columns carry the id.
+        master_role: dictNameOrNull(dicts?.roles, selectedContact.role),
+        master_city: dictNameOrNull(cities, selectedContact.city_id),
+        master_region: dictNameOrNull(dicts?.regions, selectedContact.region_id),
+        master_city_id: selectedContact.city_id ?? null,
+        master_region_id: selectedContact.region_id ?? null,
         internal_notes: internalNotes || null,
         phone_norm: phoneNorm,
         source: source !== '' ? Number(source) : null,
