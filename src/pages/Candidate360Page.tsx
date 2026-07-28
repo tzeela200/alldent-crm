@@ -531,6 +531,7 @@ export default function Candidate360Page() {
   const [selectedTagId, setSelectedTagId] = useState("");
   const [activeTab, setActiveTab] = useState<Contact360TabId>("person");
   const [previewJobCode, setPreviewJobCode] = useState<string | null>(null);
+  const [messagePreview, setMessagePreview] = useState<{ title: string; text: string } | null>(null);
 
   // Same query key as ContactMessagesPanel — React Query dedupes it, so the
   // CRM badge costs no extra request. No counter is invented for a badge.
@@ -765,6 +766,7 @@ export default function Candidate360Page() {
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] }),
               queryClient.invalidateQueries({ queryKey: ["applications"] }),
+              queryClient.invalidateQueries({ queryKey: ["applications-kpis"] }),
             ]);
             showToast("success", "סטטוס ההגשה עודכן");
           }}
@@ -797,6 +799,7 @@ export default function Candidate360Page() {
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] }),
               queryClient.invalidateQueries({ queryKey: ["applications"] }),
+              queryClient.invalidateQueries({ queryKey: ["applications-kpis"] }),
             ]);
             showToast("success", "הערת האדמין נשמרה");
           }}
@@ -864,7 +867,10 @@ export default function Candidate360Page() {
               icon: <MessageCircle className="h-4 w-4" />,
               label: "העברת פרטים (וואטסאפ)",
               disabled: !application.job_code,
-              onClick: () => copyToClipboard(buildHandoffMessage(application), "הודעת העברת הפרטים הועתקה ללוח"),
+              onClick: () => setMessagePreview({
+                title: `תצוגה מקדימה — העברת פרטים למשרה ${application.job_code}`,
+                text: buildHandoffMessage(application),
+              }),
             },
           ]}
         />
@@ -1210,10 +1216,10 @@ export default function Candidate360Page() {
                     size="sm"
                     variant="outline"
                     className="h-10 rounded-xl border-slate-200"
-                    onClick={() => copyToClipboard(
-                      buildOutreachMessage(contact.full_name ?? contact.display_name ?? "", applications),
-                      "הודעת הפנייה הראשונית הועתקה ללוח",
-                    )}
+                    onClick={() => setMessagePreview({
+                      title: "תצוגה מקדימה — פנייה ראשונית",
+                      text: buildOutreachMessage(contact.full_name ?? contact.display_name ?? "", applications),
+                    })}
                   >
                     <MessageCircle className="me-1.5 h-3.5 w-3.5" />
                     פנייה ראשונית
@@ -1245,6 +1251,30 @@ export default function Candidate360Page() {
           onEditFull={(code) => { setPreviewJobCode(null); navigate(`/admin/jobs/${code}`); }}
           onCopyLink={(url) => copyToClipboard(url, "לינק המשרה הועתק ללוח")}
         />
+
+        <Dialog open={!!messagePreview} onOpenChange={(open) => { if (!open) setMessagePreview(null); }}>
+          <DialogContent className="max-w-lg rounded-2xl" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="text-right text-lg font-bold">{messagePreview?.title}</DialogTitle>
+              <DialogDescription className="text-right text-xs text-slate-400">
+                בדקי את ההודעה לפני העתקה — שדות חסרים כבר הושמטו אוטומטית
+              </DialogDescription>
+            </DialogHeader>
+            <div className="max-h-[50vh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-slate-100 bg-[#F8FAFC] p-4 text-sm leading-6 text-slate-800" dir="rtl">
+              {messagePreview?.text}
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                className="h-10 rounded-xl text-white"
+                style={{ backgroundColor: BRAND.primary }}
+                onClick={() => messagePreview && copyToClipboard(messagePreview.text, "ההודעה הועתקה ללוח")}
+              >
+                <Copy className="me-1.5 h-3.5 w-3.5" />
+                העתקה ללוח
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Recommended jobs */}
         {recommendedJobs.length > 0 && (
