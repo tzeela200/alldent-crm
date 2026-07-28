@@ -150,17 +150,73 @@
 | 5 | `active_apps_only` הוציא (5,10,13,14,15) אך `closed_apps_only` הכניס (5,13,14,15) — **סטטוס 10 לא שייך לאף אחד**. שניהם חולקים `TERMINAL_STATUSES` | מניעתי: 0 שורות בסטטוס 10 היום. פעיל(151)+סגור(6)=סה״כ(157) | `useApplications.ts` |
 | 6 | יצירה ידנית שמרה `master_role/city/region` כ-`String(id)`, ושומר ה-`job_*` אפשר ל-`String(id)` לעבור | `dictNameOrNull` — שם אמיתי או null בלבד; בנוסף מאוכלסות `master_city_id`/`master_region_id` הקיימות | `ManualCreateDialog.tsx`, `types/applications.ts` |
 
-**עדיין פתוח אחרי INC-3116** (לא בסקופ שאושר):
-- **רכיבים משותפים** — המסך היחיד באדמין שלא הוסב. טבלה ידנית, `SortableTh` משוכפל,
-  `PanelShell` במקום `SidePanel`, `<span>` במקום `StatusBadge`, `RegionBadge`/`formatPhone`/
-  `AdminActionsMenu`/`dropdown-menu` לא בשימוש, ומפת `getRoleBorderColor` מקומית שלא תואמת
-  את `lib/roleColors`. **← הסבב הבא שאושר: הפאנל.**
-- **סנכרון בין מסכים** — `AdminCandidatesPage:845` מוסיף הגשה ב-insert ישיר בלי invalidate;
-  `['applications-kpis']` לא מבוטל על ידי אף מסך אחר; `sendToLeadsV2` לא מרענן את Inbox 2;
-  מפתחות הפאנל (`['contact', id]`) לא מיושרים ל-`['contacts']` של ה-mutation hooks.
-- **סינון גלובלי + `total`** — `job_status`/`work_status`/`availability` עדיין מסוננים בקליינט
-  על 20 שורות; דורש View/RPC.
-- **אטומיות אישור-למאגר**, **RLS לפי תפקיד**, **UNIQUE על `source_unique_key`**,
-  **השמה→עדכון משרה**, **מובייל** — כולם דורשים החלטה או שינוי Supabase.
-- **אימות ריצה בדפדפן** — עדיין חסום ב-Auth. דף ההתחברות נטען ללא שגיאות Console/שרת,
-  אך המסך עצמו לא נצפה. **האירוע אינו סגור בנוסח המלא.**
+---
+
+## לוג תיקונים — INC-3116 שלב 2+3 (28.7.2026) — הסבה לרכיבים משותפים + סנכרון
+
+קוד בלבד. `tsc -b` + `vite build` נקיים. נדחף: `b8170f5`.
+המסך היה **האחרון באדמין** שעדיין רץ על טבלה/פאנל/תגים/תפריטים מקומיים.
+
+### פאנל — `ApplicationDetailPanel.tsx`
+| לפני | אחרי |
+|---|---|
+| `PanelShell` מקומי | `SidePanel` המשותף + **`isDirty`** — סגירה באמצע עריכה מזהירה במקום למחוק בשקט |
+| `Section`/`FieldGrid`/`Field` מקומיים | `AdminPanelSection` / `AdminPanelField` / `AdminPanelActions` |
+| **3 כפתורי "שמור" נפרדים** | מצב view/edit אחד עם שמירה אחת; כשל משאיר את העריכה פתוחה עם הטקסט |
+| `<span>` עם `badge.bg` (תווית קשיחה) | `StatusBadge` — התווית מהמילון החי, לא יכולה להתיישן מול Supabase |
+| טקסט אזור/תפקיד רגיל | `RegionBadge` / `RoleBadge` |
+| טלפון גולמי (`972…`), אימוג'י 💬 | `formatPhone`, `WhatsAppIcon` |
+
+`check_status` שומר על סמנטיקת שער: **"מאושר למאגר" ו-"ספאם" נשארו כפתורי פעולה
+ייעודיים** (הם יוצרים/מקשרים איש קשר או מארכבים), ושאר ערכי המילון נשארו שדה עריכה
+רגיל. תואם ל-`PipelinePanel`.
+
+### טבלה — `ApplicationsTable.tsx` (קובץ חדש)
+- הוצאה מהדף בן 1,032 השורות (יחד עם `ApplicationsGrid.tsx` ו-`applicationColumns.ts`)
+  כדי שההסבה תהיה נקודתית.
+- `<table>` ידני → `AdminTable`; העותק המקומי של `SortableTh` שהוגדר **בתוך גוף הרינדור**
+  (זהות רכיב חדשה בכל render) נמחק. כפתורי טקסט ב-10px → `AdminActionsMenu`.
+  `Shell.Pagination` → `AdminTablePagination`.
+- **"ארכיון" זמין כעת לכל שורה** — קודם הוצג רק ל"חדש למאגר", ולכן הגשה של מועמד קיים
+  לא ניתנת לארכוב מהטבלה בכלל.
+- **confirm על ספאם/ארכיון** — שינוי סטטוס בלחיצה אחת בלי undo.
+- **הוסר פס צבע התפקיד** (`getRoleBorderColor`) — מפת צבעים שנייה שגווניה לא תאמו את
+  ה-`RoleBadge` באותה שורה. עמודת התפקיד כבר נושאת את הצבע הקנוני מ-`lib/roleColors`.
+
+### דף — `AdminApplicationsPage.tsx`
+- **1,032 → 501 שורות**. בורר עמודות `<details>` → `dropdown-menu` המשותף.
+  `KpiCard` מקומי → `KPICard` המשותף, שהורחב ב-`hint`/`onClick` **תוספתיים**
+  (3 הצרכנים הקיימים לא נגעו).
+- **באג נוסף מאותה משפחה:** הכרטיס "ממתינות לטיפול" ספר סטטוסים 1-2 אך הלחיצה סיננה
+  `active_apps_only` (= 151 שורות, כל מה שאינו טרמינלי). תוקן ל-`[1,2]`.
+- `ApplicationFiltersBar` איבד 3 props שהועברו ומעולם לא נקראו.
+
+### סנכרון בין מסכים
+| מה היה שבור | תוקן |
+|---|---|
+| `sendToLeadsV2` לא ריענן את Inbox 2 | מבטל `['inbox-v2']` + `['inbox-v2-stats']` |
+| `AdminCandidatesPage` כותב הגשה ב-insert ישיר ומבטל רק מפתח משלו → ההגשה לא הופיעה במסך ההגשות | מבטל `['applications']` + `['applications-kpis']` |
+| SmartMatch/ATS/Candidate360 ביטלו `applications` בלבד → **8 כרטיסי KPI תקועים** אחרי שינוי מבחוץ | כולם מבטלים גם `['applications-kpis']` |
+
+### יצירה ידנית
+- typeahead מקומי → **`ContactPicker`** המשותף (חיפוש נייד מנורמל, server-side),
+  עם שאילתת המשך לשדות שה-insert צריך.
+- נוסף **שומר שינויים לא-שמורים** — לחיצה על הרקע כבר לא מוחקת טופס מלא.
+
+---
+
+## מה עדיין פתוח — דורש אישור Supabase נפרד
+
+- **סינון גלובלי + `total`** — `job_status`/`work_status`/`availability` עדיין מסוננים
+  בקליינט אחרי ה-paging (20 שורות) בעוד `total` מדווח לפני הסינון. דורש View/RPC —
+  יפתור גם את ה-N+1 ב-`enrichApplicationRows`.
+- **אטומיות "אישור למאגר"** — עדיין 2-3 כתיבות ללא transaction; דורש RPC אחד.
+- **RLS לפי תפקיד** — מדיניות אחת `ALL/using=true`; כל authenticated = CRUD מלא.
+- **UNIQUE על `inbox_v2.source_unique_key`** — ההגנה קיימת בקוד בלבד.
+- **השמה (12) → עדכון משרה** — הוחלט כפתור ידני; טרם מומש.
+- **יצירה ידנית למועמד שאינו במאגר** — חסום בכוונה; דורש החלטה (phone_norm UNIQUE + טריגרים).
+- **מובייל** — הטבלה `min-w-1500px`; תצוגת Grid לא נבחרת אוטומטית במסך צר.
+
+**אימות ריצה בדפדפן — עדיין חסום ב-Auth.** דף ההתחברות נטען ללא שגיאות Console/שרת,
+אך המסך עצמו לא נצפה מול סשן מחובר.
+לכן: **האירוע אינו סגור בנוסח המלא. החסם שנותר הוא אימות ריצה מול סשן מחובר.**
