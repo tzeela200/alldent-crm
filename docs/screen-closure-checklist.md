@@ -132,3 +132,35 @@
 - **UNIQUE על `inbox_v2.source_unique_key`** — שינוי Supabase.
 - **הפרדת הרשאות/RLS** — כרגע כל authenticated = CRUD מלא; החלטה עסקית + שינוי Supabase.
 - **אימות ריצה בדפדפן** — דורש סשן מחובר (Auth).
+
+---
+
+## לוג תיקונים — INC-3116 (28.7.2026) — 6 באגי נתונים חיים
+
+סקירת "מסך סגור" חוזרת. כל ממצא אומת מול Supabase החי לפני התיקון.
+קוד בלבד — ללא שינוי סכמה/RLS/נתוני production. `tsc -b` + `vite build` נקיים.
+נדחף: `c9c9abf`.
+
+| # | תיקון | ראיה חיה | קובץ |
+|---|---|---|---|
+| 1 | הפאנל קרא `contact.availability` — **עמודה מחוקה** (מסומנת `@deprecated ... always undefined at runtime`). הזמינות הוצגה כ-"—" לכל מועמד. הוחלף ל-`candidate_availability_ids[0]` | 27 מתוך 121 הגשות מקושרות מקבלות ערך אמיתי | `ApplicationDetailPanel.tsx` |
+| 2 | `dict_cities` נשלף בלי עימוד — 1,283 שורות מול תקרת PostgREST של 1000 → **283 ערים נחתכו**, כולל תל-אביב. ה-hook האחרון שנשאר לא-מעומד אחרי INC-3113 | **18 ערי משרה** נפגעו: תל-אביב, רמת-גן, ראשון-לציון, פתח-תקוה, רחובות, רעננה ועוד — כולן הוצגו כמספר | `useApplicationDicts.ts` |
+| 3 | KPI "בראיונות" סופר 6,7,8 אך הלחיצה סיננה 7 בלבד | הכרטיס הציג 6, כולן בסטטוס 6 → הלחיצה נחתה על רשימה ריקה. שני הצדדים חולקים `INTERVIEW_STAGE_STATUSES` | `useApplications.ts`, `AdminApplicationsPage.tsx` |
+| 4 | צ'יפי תפקיד סיננו `ilike '%…%'` → "רופאים" תפס גם "סייעת רופא שיניים" | **97 שורות במקום 62**. הצ'יפים עברו לקבוצות מהמילון עם `.in()` מדויק, במראה של `KPI_ROLE_BLUEPRINTS`. אומת: כל `job_role` לא-null שווה ל-`dict_roles.name`. "מנהל/ת דנטלי" נגיש כעת | `ApplicationFiltersBar.tsx`, `useApplications.ts` |
+| 5 | `active_apps_only` הוציא (5,10,13,14,15) אך `closed_apps_only` הכניס (5,13,14,15) — **סטטוס 10 לא שייך לאף אחד**. שניהם חולקים `TERMINAL_STATUSES` | מניעתי: 0 שורות בסטטוס 10 היום. פעיל(151)+סגור(6)=סה״כ(157) | `useApplications.ts` |
+| 6 | יצירה ידנית שמרה `master_role/city/region` כ-`String(id)`, ושומר ה-`job_*` אפשר ל-`String(id)` לעבור | `dictNameOrNull` — שם אמיתי או null בלבד; בנוסף מאוכלסות `master_city_id`/`master_region_id` הקיימות | `ManualCreateDialog.tsx`, `types/applications.ts` |
+
+**עדיין פתוח אחרי INC-3116** (לא בסקופ שאושר):
+- **רכיבים משותפים** — המסך היחיד באדמין שלא הוסב. טבלה ידנית, `SortableTh` משוכפל,
+  `PanelShell` במקום `SidePanel`, `<span>` במקום `StatusBadge`, `RegionBadge`/`formatPhone`/
+  `AdminActionsMenu`/`dropdown-menu` לא בשימוש, ומפת `getRoleBorderColor` מקומית שלא תואמת
+  את `lib/roleColors`. **← הסבב הבא שאושר: הפאנל.**
+- **סנכרון בין מסכים** — `AdminCandidatesPage:845` מוסיף הגשה ב-insert ישיר בלי invalidate;
+  `['applications-kpis']` לא מבוטל על ידי אף מסך אחר; `sendToLeadsV2` לא מרענן את Inbox 2;
+  מפתחות הפאנל (`['contact', id]`) לא מיושרים ל-`['contacts']` של ה-mutation hooks.
+- **סינון גלובלי + `total`** — `job_status`/`work_status`/`availability` עדיין מסוננים בקליינט
+  על 20 שורות; דורש View/RPC.
+- **אטומיות אישור-למאגר**, **RLS לפי תפקיד**, **UNIQUE על `source_unique_key`**,
+  **השמה→עדכון משרה**, **מובייל** — כולם דורשים החלטה או שינוי Supabase.
+- **אימות ריצה בדפדפן** — עדיין חסום ב-Auth. דף ההתחברות נטען ללא שגיאות Console/שרת,
+  אך המסך עצמו לא נצפה. **האירוע אינו סגור בנוסח המלא.**
