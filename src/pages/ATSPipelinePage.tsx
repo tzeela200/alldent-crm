@@ -532,6 +532,7 @@ export default function ATSPipelinePage() {
             onClick={() => {
               // רענון אמיתי מ-Supabase לפני הודעת ההצלחה
               queryClient.invalidateQueries({ queryKey: ['applications'] })
+              queryClient.invalidateQueries({ queryKey: ['applications-kpis'] })
               queryClient.invalidateQueries({ queryKey: ['jobs'] })
               showToast('הלוח רוענן', 'success')
             }}

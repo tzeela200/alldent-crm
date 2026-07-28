@@ -633,6 +633,9 @@ export default function SmartMatchPage() {
               queryClient.invalidateQueries({ queryKey: ['jobs'] })
               queryClient.invalidateQueries({ queryKey: ['contacts'] })
               queryClient.invalidateQueries({ queryKey: ['applications'] })
+              // KPI ההגשות נשען על מפתח נפרד — בלעדיו הכרטיסים במסך ההגשות
+              // נשארים תקועים אחרי שינוי שנעשה כאן (INC-3116).
+              queryClient.invalidateQueries({ queryKey: ['applications-kpis'] })
               showToast('הרשימה רועננה', 'success')
             }}
           >

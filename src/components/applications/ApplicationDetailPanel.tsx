@@ -1,23 +1,53 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { X, Phone, FileText, MessageCircle, UserRound, Briefcase } from 'lucide-react'
-import { ActionButton } from '@/components/layout/Shell'
+import { Phone, FileText, UserRound, Briefcase } from 'lucide-react'
+import SidePanel from '@/components/ui/SidePanel'
+import { AdminPanelSection } from '@/components/admin/AdminPanelSection'
+import { AdminPanelField } from '@/components/admin/AdminPanelField'
+import { AdminPanelActions } from '@/components/admin/AdminPanelActions'
+import { StatusBadge } from '@/components/admin/StatusBadge'
+import { RegionBadge } from '@/components/admin/RegionBadge'
+import { RoleBadge } from '@/components/admin/RoleBadge'
+import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon'
 import { useApplicationRow } from '@/hooks/useApplications'
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
-import { whatsappLink } from '@/lib/normalizePhone'
+import { whatsappLink, formatPhone } from '@/lib/normalizePhone'
 import { openApplicationCv, applicationHasCv } from '@/lib/cv'
 import { formatDate } from '@/lib/timeAgo'
-import { applicationStatusColors, checkStatusColors, jobStatusColors, getStatusBadge } from '@/lib/statusColors'
 import { toast } from 'sonner'
 import type { Contact, Account, Job } from '@/types'
+
+// פאנל הגשה — קנוני: SidePanel + AdminPanelSection/Field/Actions + StatusBadge.
+// עריכה: מצב view/edit אחד עם שמירה אחת (במקום 3 כפתורי "שמור" נפרדים),
+// ו-isDirty שמונע איבוד שינויים בסגירה.
+// check_status = שער אישור ברמת אדם — נשאר בכפתורי פעולה ייעודיים ולא ב-select
+// חופשי, בהתאם למודל הזהות (ראו project_person_identity_model).
 
 interface Props {
   applicationId: number
   onClose: () => void
 }
+
+const editInput =
+  'w-full rounded-lg border border-[#D9D9D9] bg-white px-3 py-2 text-[14px] outline-none focus:border-[#008080]'
+
+interface EditableFields {
+  application_status: string
+  check_status: string
+  follow_up_date: string
+  internal_notes: string
+}
+
+/**
+ * "מאושר למאגר" ו-"ספאם" הם שער אישור ברמת אדם — הם יוצרים/מקשרים איש קשר
+ * או מארכבים, ולכן מטופלים בכפתורי פעולה ייעודיים ולא כערך ב-select.
+ * שאר ערכי המילון (ממתין לבדיקה / בבדיקה מול המועמד) הם סימון פנימי ונשארים
+ * ניתנים לעריכה רגילה.
+ */
+const GATE_CHECK_STATUS_NAMES = ['מאושר למאגר', 'ספאם']
 
 function isValidUrl(url: string | null | undefined): boolean {
   if (!url) return false
@@ -34,11 +64,8 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
   const { data: row, isLoading } = useApplicationRow(applicationId)
   const { data: dicts } = useApplicationDicts()
   const { updateApplication, createContactFromApplication, markSpam } = useApplicationMutations()
-  const [editingNotes, setEditingNotes] = useState(false)
-  const [internalNotes, setInternalNotes] = useState('')
-  const [appStatus, setAppStatus] = useState<number | ''>('')
-  const [checkStatus, setCheckStatus] = useState<number | ''>('')
-  const [followUpDate, setFollowUpDate] = useState('')
+  const [mode, setMode] = useState<'view' | 'edit'>('view')
+  const [saving, setSaving] = useState(false)
 
   const { data: contact } = useQuery({
     queryKey: ['contact', row?.candidate_link],
@@ -86,23 +113,19 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
     staleTime: 60_000,
   })
 
-  const saveField = async (
-    field: string,
-    value: unknown,
-    label: string,
-    jobCodeOverride?: string | null
-  ) => {
-    await updateApplication.mutateAsync({
-      applicationId: row!.application_id,
-      updates: { [field]: value } as any,
-      jobCode: jobCodeOverride ?? row?.job_code,
-    })
-    toast.success(`${label} עודכן`)
-  }
+  const initial: EditableFields = useMemo(
+    () => ({
+      application_status: row?.application_status != null ? String(row.application_status) : '',
+      check_status: row?.check_status != null ? String(row.check_status) : '',
+      follow_up_date: row?.follow_up_date ? String(row.follow_up_date).slice(0, 10) : '',
+      internal_notes: row?.internal_notes ?? '',
+    }),
+    [row],
+  )
+  const [draft, setDraft] = useState<EditableFields>(initial)
 
-  // ── Unified review flow (check_status is the single source of truth) ──────
-  // "מאושר למאגר" → create + link contact, navigate to its card.
-  // "ספאם" → archive + exclude from counts. Other values → plain field update.
+  const isDirty = mode === 'edit' && JSON.stringify(draft) !== JSON.stringify(initial)
+
   const checkStatusName = (id: number | null | undefined) =>
     dicts?.checkStatuses?.find((s) => s.id === id)?.name ?? null
 
@@ -118,515 +141,536 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
     markSpam.mutate(row)
   }
 
-  const handleCheckStatusSave = (value: number) => {
-    const name = checkStatusName(value)
-    if (name === 'מאושר למאגר') {
-      if (!row?.candidate_link) return approveToRegistry()
-      return saveField('check_status', value, 'סטטוס בדיקה')
+  const startEdit = () => {
+    setDraft(initial)
+    setMode('edit')
+  }
+  const cancelEdit = () => {
+    setDraft(initial)
+    setMode('view')
+  }
+
+  // שמירה אחת לכל השדות שהשתנו. כשל משאיר את מצב העריכה פתוח עם הטקסט —
+  // ולא מאפס את הטופס — כדי שלא ייאבד מה שהוקלד.
+  const save = async () => {
+    if (!row) return
+    const updates: Record<string, unknown> = {}
+    if (draft.application_status !== initial.application_status)
+      updates.application_status = draft.application_status ? Number(draft.application_status) : null
+    if (draft.check_status !== initial.check_status)
+      updates.check_status = draft.check_status ? Number(draft.check_status) : null
+    if (draft.follow_up_date !== initial.follow_up_date)
+      updates.follow_up_date = draft.follow_up_date || null
+    if (draft.internal_notes !== initial.internal_notes)
+      updates.internal_notes = draft.internal_notes || null
+
+    if (Object.keys(updates).length === 0) {
+      setMode('view')
+      return
     }
-    if (name === 'ספאם') return handleSpam()
-    return saveField('check_status', value, 'סטטוס בדיקה')
+
+    setSaving(true)
+    try {
+      await updateApplication.mutateAsync({
+        applicationId: row.application_id,
+        updates: updates as any,
+        jobCode: row.job_code,
+      })
+      toast.success('ההגשה עודכנה')
+      setMode('view')
+    } catch {
+      // ה-mutation כבר הציג toast עם השגיאה; נשארים במצב עריכה.
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (isLoading || !row) {
     return (
-      <PanelShell onClose={onClose}>
+      <SidePanel
+        open
+        onClose={onClose}
+        header={<div className="px-5 py-4 text-[15px] font-bold text-[#2D2D2D]">פרטי הגשה</div>}
+      >
         <div className="flex items-center justify-center py-20">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-teal-600" />
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#F3F4F6] border-t-[#008080]" />
         </div>
-      </PanelShell>
+      </SidePanel>
     )
   }
 
-  const appBadge = getStatusBadge(applicationStatusColors, row.application_status)
-  const checkBadge = getStatusBadge(checkStatusColors, row.check_status)
-  const appStatusLabel =
-    getDictLabel(dicts?.applicationStatuses, row.application_status) || appBadge.label
-  const checkStatusLabel =
-    getDictLabel(dicts?.checkStatuses, row.check_status) || checkBadge.label
+  const phone = row.candidate_phone
+  const inRegistry = row.candidate_link != null
 
-  const jobStatusBadge = job?.job_status ? getStatusBadge(jobStatusColors, job.job_status) : null
-
-  return (
-    <PanelShell onClose={onClose}>
-      {/* Header */}
-      <div className="space-y-2 border-b border-slate-200 pb-4">
-        <div className="flex items-start justify-between gap-2">
-          <div>
-            <h2 className="text-lg font-bold text-slate-900">
-              {row.candidate_name ?? 'ללא שם'}
-            </h2>
-            <p className="text-xs text-slate-500">
-              הגשה #{row.application_id} · {formatDate(row.submission_date)}
-            </p>
-          </div>
-          <div className="flex flex-col items-end gap-1">
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-semibold ${appBadge.bg} ${appBadge.text}`}
-            >
-              {appStatusLabel}
-            </span>
-            {row.check_status != null && (
-              <span
-                className={`rounded-full px-2 py-0.5 text-xs font-medium ${checkBadge.bg} ${checkBadge.text}`}
-              >
-                {checkStatusLabel}
-              </span>
-            )}
-          </div>
+  const header = (
+    <div className="px-5 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-[17px] font-bold text-[#2D2D2D]">{row.candidate_name ?? 'ללא שם'}</h2>
+          <p className="mt-0.5 text-[12px] text-[#6B6B6B]">
+            הגשה #{row.application_id} · {formatDate(row.submission_date)}
+          </p>
         </div>
-
-        {/* Quick links */}
-        <div className="flex flex-wrap gap-2">
-          {row.candidate_phone && (
-            <a
-              href={whatsappLink(row.candidate_phone)}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 rounded-lg bg-green-50 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-100"
-            >
-              <MessageCircle className="h-3 w-3" />
-              WhatsApp
-            </a>
-          )}
-          {row.candidate_phone && (
-            <a
-              href={`tel:${row.candidate_phone}`}
-              className="flex items-center gap-1 rounded-lg bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
-            >
-              <Phone className="h-3 w-3" />
-              {row.candidate_phone}
-            </a>
-          )}
-          {applicationHasCv(row) && (
-            <button
-              type="button"
-              onClick={() => openApplicationCv(row)}
-              className="flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-100"
-            >
-              <FileText className="h-3 w-3" />
-              פתח קו"ח
-            </button>
-          )}
-          {row.candidate_link && (
-            <a
-              href={`/admin/candidates/${row.candidate_link}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 rounded-lg bg-teal-50 px-3 py-1.5 text-xs font-medium text-teal-700 hover:bg-teal-100"
-            >
-              <UserRound className="h-3 w-3" />
-              כרטיס מועמד
-            </a>
-          )}
-          {row.job_code && (
-            <a
-              href={`/admin/jobs/${row.job_code}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 rounded-lg bg-purple-50 px-3 py-1.5 text-xs font-medium text-purple-700 hover:bg-purple-100"
-            >
-              <Briefcase className="h-3 w-3" />
-              פרטי משרה
-            </a>
+        <div className="flex flex-col items-end gap-1">
+          <StatusBadge statusType="application" statusId={row.application_status} />
+          {row.check_status != null && (
+            <StatusBadge statusType="check" statusId={row.check_status} />
           )}
         </div>
       </div>
 
-      {/* Application snapshot */}
-      <Section title="פרטי הגשה">
-        <FieldGrid>
-          <Field label="שם מועמד" value={row.candidate_name} />
-          <Field label="נייד" value={row.candidate_phone} dir="ltr" />
-          <Field label="אימייל" value={row.candidate_email} dir="ltr" />
-          <Field label="תאריך הגשה" value={formatDate(row.submission_date)} />
-          <Field label="קוד משרה" value={row.job_code} />
-          <Field label="ארגון" value={row.account_name} />
-          <Field label="תפקיד משרה" value={row.job_role} />
-          <Field label="עיר משרה" value={row.job_city} />
-          <Field label="אזור משרה" value={row.job_region} />
-          <Field label="שם טופס" value={row.form_title} />
-          <Field label="מקור" value={getDictLabel(dicts?.sources, row.source)} />
-          <Field label="תאריך פעולה הבאה" value={formatDate(row.follow_up_date)} />
-        </FieldGrid>
+      {/* קישורים מהירים */}
+      <div className="mt-3 flex flex-wrap gap-2">
+        {phone && (
+          <a
+            href={whatsappLink(phone)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg bg-[#E7F7EE] px-3 py-1.5 text-[12px] font-semibold text-[#128C7E] transition hover:bg-[#D5F0E2]"
+          >
+            <WhatsAppIcon className="h-3.5 w-3.5" />
+            WhatsApp
+          </a>
+        )}
+        {phone && (
+          <a
+            href={`tel:${phone}`}
+            dir="ltr"
+            className="flex items-center gap-1.5 rounded-lg bg-[#F3F4F6] px-3 py-1.5 text-[12px] font-semibold text-[#6B6B6B] transition hover:bg-[#E5E7EB]"
+          >
+            <Phone className="h-3.5 w-3.5" />
+            {formatPhone(phone)}
+          </a>
+        )}
+        {applicationHasCv(row) && (
+          <button
+            type="button"
+            onClick={() => openApplicationCv(row)}
+            className="flex items-center gap-1.5 rounded-lg bg-[#EFF6FF] px-3 py-1.5 text-[12px] font-semibold text-[#3B82F6] transition hover:bg-[#DBEAFE]"
+          >
+            <FileText className="h-3.5 w-3.5" />
+            פתח קו"ח
+          </button>
+        )}
+        {row.candidate_link && (
+          <a
+            href={`/admin/candidates/${row.candidate_link}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg bg-[#E6F3F3] px-3 py-1.5 text-[12px] font-semibold text-[#008080] transition hover:bg-[#CCE7E7]"
+          >
+            <UserRound className="h-3.5 w-3.5" />
+            כרטיס מועמד
+          </a>
+        )}
+        {row.job_code && (
+          <a
+            href={`/admin/jobs/${row.job_code}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 rounded-lg bg-[#F5F0FF] px-3 py-1.5 text-[12px] font-semibold text-[#7C3AED] transition hover:bg-[#EDE4FF]"
+          >
+            <Briefcase className="h-3.5 w-3.5" />
+            פרטי משרה
+          </a>
+        )}
+      </div>
+    </div>
+  )
+
+  const footer = (
+    <AdminPanelActions
+      mode={mode}
+      onClose={onClose}
+      onEdit={startEdit}
+      onCancelEdit={cancelEdit}
+      onSave={save}
+      saving={saving}
+      primaryAction={
+        row.candidate_link
+          ? {
+              label: 'כרטיס מועמד',
+              onClick: () => navigate(`/admin/candidates/${row.candidate_link}`),
+            }
+          : undefined
+      }
+    />
+  )
+
+  return (
+    <SidePanel
+      open
+      onClose={onClose}
+      header={header}
+      footer={footer}
+      isDirty={isDirty}
+      confirmCloseMessage="יש שינויים שלא נשמרו בהגשה. לסגור בכל זאת?"
+    >
+      {/* פרטי הגשה */}
+      <AdminPanelSection title="פרטי הגשה">
+        <AdminPanelField label="שם מועמד" mode="view" viewValue={row.candidate_name} />
+        <AdminPanelField
+          label="נייד"
+          mode="view"
+          viewValue={phone ? <span dir="ltr">{formatPhone(phone)}</span> : null}
+        />
+        <AdminPanelField
+          label="אימייל"
+          mode="view"
+          viewValue={row.candidate_email ? <span dir="ltr">{row.candidate_email}</span> : null}
+        />
+        <AdminPanelField label="תאריך הגשה" mode="view" viewValue={formatDate(row.submission_date)} />
+        <AdminPanelField label="קוד משרה" mode="view" viewValue={row.job_code} />
+        <AdminPanelField label="ארגון" mode="view" viewValue={row.account_name} />
+        <AdminPanelField
+          label="תפקיד משרה"
+          mode="view"
+          viewValue={
+            row.job_role ? <RoleBadge roleId={row.job_role_id ?? job?.job_role} label={row.job_role} /> : null
+          }
+        />
+        <AdminPanelField label="עיר משרה" mode="view" viewValue={row.job_city} />
+        <AdminPanelField
+          label="אזור משרה"
+          mode="view"
+          viewValue={
+            row.job_region ? <RegionBadge regionId={row.job_region_id} label={row.job_region} /> : null
+          }
+        />
+        <AdminPanelField label="שם טופס" mode="view" viewValue={row.form_title} />
+        <AdminPanelField
+          label="מקור"
+          mode="view"
+          viewValue={getDictLabel(dicts?.sources, row.source)}
+        />
+        <AdminPanelField
+          label="מצב במאגר"
+          mode="view"
+          viewValue={inRegistry ? 'קיים במאגר' : 'חדש למאגר'}
+        />
+      </AdminPanelSection>
+
+      {/* שדות ניתנים לעריכה */}
+      <AdminPanelSection title="מעקב וסטטוס">
+        <AdminPanelField
+          label="סטטוס הגשה"
+          mode={mode}
+          viewValue={<StatusBadge statusType="application" statusId={row.application_status} />}
+          editValue={
+            <select
+              dir="rtl"
+              className={editInput}
+              value={draft.application_status}
+              onChange={(e) => setDraft({ ...draft, application_status: e.target.value })}
+            >
+              <option value="">לא הוגדר</option>
+              {(dicts?.applicationStatuses ?? []).map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          }
+        />
+        <AdminPanelField
+          label="סטטוס בדיקה"
+          mode={mode}
+          viewValue={
+            row.check_status != null ? (
+              <StatusBadge statusType="check" statusId={row.check_status} />
+            ) : null
+          }
+          helperText={
+            mode === 'edit' ? 'אישור למאגר וסימון ספאם מתבצעים בכפתורי הפעולה' : undefined
+          }
+          editValue={
+            <select
+              dir="rtl"
+              className={editInput}
+              value={draft.check_status}
+              onChange={(e) => setDraft({ ...draft, check_status: e.target.value })}
+            >
+              <option value="">לא הוגדר</option>
+              {(dicts?.checkStatuses ?? [])
+                // ערכי השער נשלטים בכפתורים בלבד — אבל אם זה הערך הנוכחי,
+                // הוא נשאר ברשימה כדי שהתצוגה לא תיפול ל-"לא הוגדר".
+                .filter(
+                  (s) =>
+                    !GATE_CHECK_STATUS_NAMES.includes(s.name) ||
+                    String(s.id) === initial.check_status,
+                )
+                .map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+          }
+        />
+        <AdminPanelField
+          label="תאריך פעולה הבאה"
+          mode={mode}
+          viewValue={row.follow_up_date ? formatDate(row.follow_up_date) : null}
+          editValue={
+            <input
+              type="date"
+              className={editInput}
+              value={draft.follow_up_date}
+              onChange={(e) => setDraft({ ...draft, follow_up_date: e.target.value })}
+            />
+          }
+        />
+        <AdminPanelField
+          label="הערות פנימיות"
+          mode={mode}
+          fullWidth
+          viewValue={row.internal_notes}
+          editValue={
+            <textarea
+              rows={3}
+              className={`${editInput} resize-none`}
+              placeholder="הערה פנימית לצוות..."
+              value={draft.internal_notes}
+              onChange={(e) => setDraft({ ...draft, internal_notes: e.target.value })}
+            />
+          }
+        />
         {row.candidate_notes && (
-          <div className="mt-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-            <span className="font-medium">הערות מועמד: </span>
-            {row.candidate_notes}
-          </div>
+          <AdminPanelField label="הערות מועמד" mode="view" fullWidth viewValue={row.candidate_notes} />
         )}
         {row.cv_link && !isValidUrl(row.cv_link) && (
-          <p className="mt-1 text-xs text-red-500">⚠ קישור קו"ח אינו תקני</p>
+          <AdminPanelField
+            label="אזהרה"
+            mode="view"
+            fullWidth
+            viewValue={<span className="text-[#DC2626]">⚠ קישור קו"ח אינו תקני</span>}
+          />
         )}
-      </Section>
+      </AdminPanelSection>
 
-      {/* Inline edits */}
-      <Section title="עדכון שדות">
-        <div className="space-y-3">
-          {/* application_status */}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-xs text-slate-500">סטטוס הגשה</label>
-              <select
-                dir="rtl"
-                value={appStatus !== '' ? String(appStatus) : String(row.application_status ?? '')}
-                onChange={(e) => setAppStatus(e.target.value ? Number(e.target.value) : '')}
-                className="mt-1 h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500"
-              >
-                <option value="">בחר...</option>
-                {(dicts?.applicationStatuses ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
+      {/* שער בדיקה — רק כשהמועמד עוד לא במאגר */}
+      {!inRegistry && (
+        <AdminPanelSection title="החלטת בדיקה">
+          <div className="sm:col-span-2">
+            <div className="rounded-lg bg-[#FDF3E7] p-3 text-[13px] text-[#92400E]">
+              מועמד זה טרם קיים במאגר — נדרשת בדיקה
+              {row.check_status != null && (
+                <span className="mt-0.5 block text-[12px]">
+                  סטטוס נוכחי: {checkStatusName(row.check_status) ?? '—'}
+                </span>
+              )}
             </div>
-            <ActionButton
-              variant="primary"
-              size="sm"
-              onClick={() =>
-                appStatus !== '' &&
-                saveField('application_status', Number(appStatus), 'סטטוס הגשה')
-              }
-              disabled={appStatus === '' || updateApplication.isPending}
-            >
-              שמור
-            </ActionButton>
-          </div>
-
-          {/* check_status */}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-xs text-slate-500">סטטוס בדיקה</label>
-              <select
-                dir="rtl"
-                value={checkStatus !== '' ? String(checkStatus) : String(row.check_status ?? '')}
-                onChange={(e) => setCheckStatus(e.target.value ? Number(e.target.value) : '')}
-                className="mt-1 h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500"
-              >
-                <option value="">בחר...</option>
-                {(dicts?.checkStatuses ?? []).map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              onClick={() => checkStatus !== '' && handleCheckStatusSave(Number(checkStatus))}
-              disabled={
-                checkStatus === '' ||
-                updateApplication.isPending ||
-                createContactFromApplication.isPending ||
-                markSpam.isPending
-              }
-            >
-              שמור
-            </ActionButton>
-          </div>
-
-          {/* follow_up_date */}
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="text-xs text-slate-500">תאריך פעולה הבאה</label>
-              <input
-                type="date"
-                value={followUpDate !== '' ? followUpDate : (row.follow_up_date?.slice(0, 10) ?? '')}
-                onChange={(e) => setFollowUpDate(e.target.value)}
-                className="mt-1 h-9 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-teal-500"
-              />
-            </div>
-            <ActionButton
-              variant="secondary"
-              size="sm"
-              onClick={() => saveField('follow_up_date', followUpDate || null, 'תאריך פעולה הבאה')}
-              disabled={updateApplication.isPending}
-            >
-              שמור
-            </ActionButton>
-          </div>
-        </div>
-      </Section>
-
-      {/* Internal notes */}
-      <Section title="הערות פנימיות">
-        {editingNotes ? (
-          <div className="space-y-2">
-            <textarea
-              value={internalNotes}
-              onChange={(e) => setInternalNotes(e.target.value)}
-              className="h-20 w-full resize-none rounded-xl border border-slate-200 bg-white p-3 text-sm outline-none focus:border-teal-500"
-              placeholder="הוסף הערות פנימיות..."
-            />
-            <div className="flex gap-2">
-              <ActionButton
-                variant="primary"
-                size="sm"
-                onClick={async () => {
-                  await saveField('internal_notes', internalNotes || null, 'הערות')
-                  setEditingNotes(false)
-                }}
-                disabled={updateApplication.isPending}
-              >
-                שמור
-              </ActionButton>
+            <div className="mt-3 flex gap-2">
               <button
-                onClick={() => setEditingNotes(false)}
-                className="text-xs text-slate-500 hover:text-slate-700"
+                type="button"
+                onClick={approveToRegistry}
+                disabled={createContactFromApplication.isPending || markSpam.isPending}
+                className="flex-1 rounded-full bg-[#008080] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#006D6D] disabled:opacity-60"
               >
-                ביטול
+                {createContactFromApplication.isPending ? 'מאשר…' : 'מאושר למאגר ←'}
+              </button>
+              <button
+                type="button"
+                onClick={handleSpam}
+                disabled={createContactFromApplication.isPending || markSpam.isPending}
+                className="rounded-full border border-[#FECACA] bg-[#FEF2F2] px-4 py-2.5 text-[13px] font-semibold text-[#DC2626] transition hover:bg-[#FEE2E2] disabled:opacity-60"
+              >
+                {markSpam.isPending ? 'מסמן…' : 'ספאם / לא רלוונטי'}
               </button>
             </div>
           </div>
-        ) : (
-          <div
-            onClick={() => {
-              setInternalNotes(row.internal_notes ?? '')
-              setEditingNotes(true)
-            }}
-            className="min-h-[48px] cursor-pointer rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3 text-sm text-slate-600 hover:border-teal-400 hover:bg-teal-50/30"
-          >
-            {row.internal_notes || <span className="text-slate-400">לחץ להוספת הערה...</span>}
-          </div>
-        )}
-      </Section>
-
-      {/* החלטת בדיקה / פעולות המשך */}
-      {!row.candidate_link && (
-        <Section title="החלטת בדיקה">
-          <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
-            מועמד זה טרם קיים במאגר — נדרשת בדיקה
-            {row.check_status != null && (
-              <span className="block text-xs text-amber-600">
-                סטטוס נוכחי: {checkStatusName(row.check_status) ?? '—'}
-              </span>
-            )}
-          </div>
-          <div className="mt-2 flex gap-2">
-            <button
-              onClick={approveToRegistry}
-              disabled={createContactFromApplication.isPending || markSpam.isPending}
-              className="flex-1 rounded-xl bg-teal-600 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 disabled:opacity-60"
-            >
-              {createContactFromApplication.isPending ? 'מאשר...' : 'מאושר למאגר ←'}
-            </button>
-            <button
-              onClick={handleSpam}
-              disabled={createContactFromApplication.isPending || markSpam.isPending}
-              className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
-            >
-              {markSpam.isPending ? 'מסמן...' : 'ספאם / לא רלוונטי'}
-            </button>
-          </div>
-        </Section>
-      )}
-      {row.candidate_link && (
-        <Section title="פעולות המשך">
-          <div className="flex flex-wrap gap-2">
-            <a
-              href={`/admin/candidates/${row.candidate_link}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 rounded-lg bg-teal-50 px-3 py-2 text-xs font-semibold text-teal-700 hover:bg-teal-100"
-            >
-              <UserRound className="h-3 w-3" />
-              פתח לעריכה
-            </a>
-            {row.account_link && (
-              <a
-                href={`/admin/accounts/${row.account_link}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1 rounded-lg bg-purple-50 px-3 py-2 text-xs font-semibold text-purple-700 hover:bg-purple-100"
-              >
-                <Briefcase className="h-3 w-3" />
-                פרופיל 360 מעסיק
-              </a>
-            )}
-            <a
-              href={`/admin/candidates/${row.candidate_link}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1 rounded-lg bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700 hover:bg-blue-100"
-            >
-              <FileText className="h-3 w-3" />
-              המשך השלמת פרופיל
-            </a>
-          </div>
-        </Section>
+        </AdminPanelSection>
       )}
 
-      {/* Live contact data */}
+      {/* פרטי מועמד מהמאגר */}
       {contact && (
-        <Section title="פרטי מועמד (מאגר)">
-          <FieldGrid>
-            <Field label="שם מלא" value={contact.full_name ?? contact.display_name} />
-            <Field label="נייד" value={contact.phone} dir="ltr" />
-            <Field label="אימייל" value={contact.email} dir="ltr" />
-            <Field label={'עם קו"ח'} value={contact.has_cv ? 'כן' : 'לא'} />
-            <Field
-              label="סטטוס תעסוקה"
-              value={getDictLabel(dicts?.workStatuses, contact.work_status)}
-            />
-            <Field
-              label="זמינות"
-              value={getDictLabel(
-                dicts?.availabilities,
-                // contact.availability was dropped from the DB (June 2026) and is
-                // always undefined at runtime, so this field always rendered "—".
-                // candidate_availability_ids is the canonical column (INC-3116).
-                contact.candidate_availability_ids?.[0]
-              )}
-            />
-            <Field
-              label="תפקיד מועמד"
-              value={getDictLabel(dicts?.roles, contact.role)}
-            />
-            <Field
-              label="עיר מועמד"
-              value={getDictLabel(dicts?.cities, contact.city_id)}
-            />
-            <Field
-              label="אזור מועמד"
-              value={getDictLabel(dicts?.regions, contact.region_id)}
-            />
-          </FieldGrid>
+        <AdminPanelSection title="פרטי מועמד (מאגר)">
+          <AdminPanelField
+            label="שם מלא"
+            mode="view"
+            viewValue={contact.full_name ?? contact.display_name}
+          />
+          <AdminPanelField
+            label="נייד"
+            mode="view"
+            viewValue={contact.phone ? <span dir="ltr">{formatPhone(contact.phone)}</span> : null}
+          />
+          <AdminPanelField
+            label="אימייל"
+            mode="view"
+            viewValue={contact.email ? <span dir="ltr">{contact.email}</span> : null}
+          />
+          <AdminPanelField label={'עם קו"ח'} mode="view" viewValue={contact.has_cv ? 'כן' : 'לא'} />
+          <AdminPanelField
+            label="סטטוס תעסוקה"
+            mode="view"
+            viewValue={getDictLabel(dicts?.workStatuses, contact.work_status)}
+          />
+          <AdminPanelField
+            label="זמינות"
+            mode="view"
+            // contact.availability נמחקה מה-DB (יוני 2026) ותמיד undefined —
+            // candidate_availability_ids היא העמודה הקנונית (INC-3116).
+            viewValue={getDictLabel(dicts?.availabilities, contact.candidate_availability_ids?.[0])}
+          />
+          <AdminPanelField
+            label="תפקיד מועמד"
+            mode="view"
+            viewValue={
+              contact.role != null ? (
+                <RoleBadge roleId={contact.role} label={getDictLabel(dicts?.roles, contact.role)} />
+              ) : null
+            }
+          />
+          <AdminPanelField
+            label="עיר מועמד"
+            mode="view"
+            viewValue={getDictLabel(dicts?.cities, contact.city_id)}
+          />
+          <AdminPanelField
+            label="אזור מועמד"
+            mode="view"
+            viewValue={
+              contact.region_id != null ? (
+                <RegionBadge
+                  regionId={contact.region_id}
+                  label={getDictLabel(dicts?.regions, contact.region_id)}
+                />
+              ) : null
+            }
+          />
           {contact.cv_link && isValidUrl(contact.cv_link) && (
-            <a
-              href={contact.cv_link}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 flex items-center gap-1 text-xs text-blue-600 hover:underline"
-            >
-              <FileText className="h-3 w-3" />
-              קו"ח עדכני במאגר
-            </a>
-          )}
-        </Section>
-      )}
-
-      {/* Job data */}
-      {job && (
-        <Section title="פרטי משרה">
-          <FieldGrid>
-            <Field label="קוד משרה" value={job.job_code} />
-            <Field label="כותרת משרה" value={job.job_title} />
-            <Field
-              label="סטטוס משרה"
-              value={jobStatusBadge?.label ?? getDictLabel(dicts?.jobStatuses, job.job_status)}
-            />
-            <Field
-              label="תפקיד משרה"
-              value={getDictLabel(dicts?.roles, job.job_role)}
-            />
-            <Field
-              label="עיר משרה"
-              value={getDictLabel(dicts?.cities, job.city_id)}
-            />
-            <Field
-              label="אזור משרה"
-              value={getDictLabel(dicts?.regions, job.region_id)}
-            />
-            <Field label="ניסיון נדרש" value={job.required_experience != null ? String(job.required_experience) : undefined} />
-            <Field
-              label="שפות"
-              value={
-                Array.isArray(job.required_languages)
-                  ? (job.required_languages as number[])
-                      .map((id) => getDictLabel(dicts?.languages, id))
-                      .filter((v) => v !== '—')
-                      .join(', ') || '—'
-                  : job.required_languages != null
-                    ? getDictLabel(dicts?.languages, job.required_languages as unknown as number)
-                    : undefined
+            <AdminPanelField
+              label={'קו"ח במאגר'}
+              mode="view"
+              fullWidth
+              viewValue={
+                <a
+                  href={contact.cv_link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[#3B82F6] hover:underline"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  קו"ח עדכני במאגר
+                </a>
               }
             />
-          </FieldGrid>
+          )}
+        </AdminPanelSection>
+      )}
+
+      {/* פרטי משרה */}
+      {job && (
+        <AdminPanelSection title="פרטי משרה">
+          <AdminPanelField label="קוד משרה" mode="view" viewValue={job.job_code} />
+          <AdminPanelField label="כותרת משרה" mode="view" viewValue={job.job_title} />
+          <AdminPanelField
+            label="סטטוס משרה"
+            mode="view"
+            viewValue={<StatusBadge statusType="job" statusId={job.job_status} />}
+          />
+          <AdminPanelField
+            label="תפקיד משרה"
+            mode="view"
+            viewValue={
+              job.job_role != null ? (
+                <RoleBadge roleId={job.job_role} label={getDictLabel(dicts?.roles, job.job_role)} />
+              ) : null
+            }
+          />
+          <AdminPanelField
+            label="עיר משרה"
+            mode="view"
+            viewValue={getDictLabel(dicts?.cities, job.city_id)}
+          />
+          <AdminPanelField
+            label="אזור משרה"
+            mode="view"
+            viewValue={
+              job.region_id != null ? (
+                <RegionBadge
+                  regionId={job.region_id}
+                  label={getDictLabel(dicts?.regions, job.region_id)}
+                />
+              ) : null
+            }
+          />
+          <AdminPanelField
+            label="ניסיון נדרש"
+            mode="view"
+            viewValue={job.required_experience != null ? String(job.required_experience) : null}
+          />
+          <AdminPanelField
+            label="שפות"
+            mode="view"
+            viewValue={
+              Array.isArray(job.required_languages)
+                ? (job.required_languages as number[])
+                    .map((id) => getDictLabel(dicts?.languages, id))
+                    .filter((v) => v !== '—')
+                    .join(', ') || null
+                : job.required_languages != null
+                  ? getDictLabel(dicts?.languages, job.required_languages as unknown as number)
+                  : null
+            }
+          />
           {job.job_status !== 3 && job.job_status != null && (
-            <div className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-              ⚠ המשרה אינה פעילה כרגע
-            </div>
+            <AdminPanelField
+              label="שימי לב"
+              mode="view"
+              fullWidth
+              viewValue={<span className="text-[#B45309]">⚠ המשרה אינה פעילה כרגע</span>}
+            />
           )}
           {job.job_description && (
-            <div className="mt-2 max-h-32 overflow-y-auto rounded-lg bg-slate-50 p-3 text-xs text-slate-700">
-              {job.job_description}
-            </div>
+            <AdminPanelField
+              label="תיאור משרה"
+              mode="view"
+              fullWidth
+              viewValue={
+                <div className="max-h-32 overflow-y-auto whitespace-pre-wrap rounded-lg bg-[#F8F9FA] p-3 text-[13px] text-[#2D2D2D]">
+                  {job.job_description}
+                </div>
+              }
+            />
           )}
-        </Section>
+        </AdminPanelSection>
       )}
 
-      {/* Account data */}
+      {/* פרטי ארגון */}
       {account && (
-        <Section title="פרטי ארגון">
-          <FieldGrid>
-            <Field label="שם ארגון" value={account.account_name} />
-            <Field label="טלפון" value={account.phone} dir="ltr" />
-            <Field label="אימייל" value={account.email} dir="ltr" />
-          </FieldGrid>
-        </Section>
+        <AdminPanelSection title="פרטי ארגון">
+          <AdminPanelField label="שם ארגון" mode="view" viewValue={account.account_name} />
+          <AdminPanelField
+            label="טלפון"
+            mode="view"
+            viewValue={account.phone ? <span dir="ltr">{formatPhone(account.phone)}</span> : null}
+          />
+          <AdminPanelField
+            label="אימייל"
+            mode="view"
+            viewValue={account.email ? <span dir="ltr">{account.email}</span> : null}
+          />
+          {row.account_link && (
+            <AdminPanelField
+              label="פרופיל"
+              mode="view"
+              viewValue={
+                <a
+                  href={`/admin/accounts/${row.account_link}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-[#7C3AED] hover:underline"
+                >
+                  <Briefcase className="h-3.5 w-3.5" />
+                  פרופיל 360 מעסיק
+                </a>
+              }
+            />
+          )}
+        </AdminPanelSection>
       )}
-    </PanelShell>
-  )
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────
-
-function PanelShell({
-  onClose,
-  children,
-}: {
-  onClose: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <>
-      <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
-      <div className="fixed bottom-0 right-0 top-0 z-50 flex w-[520px] flex-col overflow-y-auto bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-3">
-          <h3 className="text-sm font-semibold text-slate-700">פרטי הגשה</h3>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex-1 space-y-5 overflow-y-auto p-5">{children}</div>
-      </div>
-    </>
-  )
-}
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h4>
-      {children}
-    </div>
-  )
-}
-
-function FieldGrid({ children }: { children: React.ReactNode }) {
-  return <div className="grid grid-cols-2 gap-2">{children}</div>
-}
-
-function Field({
-  label,
-  value,
-  dir,
-}: {
-  label: string
-  value: string | null | undefined
-  dir?: string
-}) {
-  return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2">
-      <p className="text-[10px] font-medium text-slate-400">{label}</p>
-      <p className={`text-sm ${value ? 'text-slate-700' : 'text-slate-300'}`} dir={dir}>
-        {value ?? '—'}
-      </p>
-    </div>
+    </SidePanel>
   )
 }

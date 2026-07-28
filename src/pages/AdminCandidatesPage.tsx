@@ -857,6 +857,10 @@ export default function AdminCandidatesPage() {
       }
 
       queryClient.invalidateQueries({ queryKey: ['candidate_applications_bulk'] })
+      // ההגשה נכתבת ישירות לטבלת applications — בלי הביטולים האלה היא לא
+      // מופיעה במסך ההגשות והכרטיסים שם נשארים תקועים עד רענון ידני (INC-3116).
+      queryClient.invalidateQueries({ queryKey: ['applications'] })
+      queryClient.invalidateQueries({ queryKey: ['applications-kpis'] })
       showToast('ההגשה נוצרה בהצלחה', 'success')
       closeCreateApplication()
     } finally {

@@ -312,7 +312,13 @@ export function useApplicationMutations() {
       })
       if (error) throw error
     },
-    onSuccess: () => toast.success('נשלח ללידים בהצלחה'),
+    onSuccess: () => {
+      // The new lead lands in inbox_v2 — Inbox 2 must refresh, or the lead is
+      // invisible there until a manual reload (INC-3116).
+      qc.invalidateQueries({ queryKey: ['inbox-v2'] })
+      qc.invalidateQueries({ queryKey: ['inbox-v2-stats'] })
+      toast.success('נשלח ללידים בהצלחה')
+    },
     onError: (err: Error) => toast.error(err.message),
   })
 

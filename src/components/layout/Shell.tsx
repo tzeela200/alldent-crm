@@ -128,17 +128,21 @@ interface KPICardProps {
   icon?: LucideIcon
   trend?: 'up' | 'down' | 'neutral'
   trendValue?: string
+  /** משפט הסבר קצר מתחת למספר (למשל "סטטוסים 1-2") */
+  hint?: string
+  /** הופך את הכרטיס ללחיץ (למשל "הצג רק את הרשומות שנספרו כאן") */
+  onClick?: () => void
 }
 
-export function KPICard({ label, value, icon: Icon, trend, trendValue }: KPICardProps) {
+export function KPICard({ label, value, icon: Icon, trend, trendValue, hint, onClick }: KPICardProps) {
   const trendColors = {
     up: 'text-emerald-600',
     down: 'text-rose-600',
     neutral: 'text-[#6B6B6B]',
   }
 
-  return (
-    <div className="rounded-[18px] bg-white p-4 border border-[#D9D9D9]">
+  const body = (
+    <>
       <div className="flex items-center justify-between">
         <div className="text-sm text-[#6B6B6B]">{label}</div>
         {Icon && (
@@ -148,10 +152,24 @@ export function KPICard({ label, value, icon: Icon, trend, trendValue }: KPICard
         )}
       </div>
       <div className="mt-2 text-3xl font-bold text-[#2D2D2D]">{value}</div>
+      {hint && <div className="mt-0.5 text-[11px] text-[#9CA3AF]">{hint}</div>}
       {trend && trendValue && (
         <div className={`mt-1 text-xs ${trendColors[trend]}`}>{trendValue}</div>
       )}
-    </div>
+    </>
+  )
+
+  const base = 'rounded-[18px] bg-white p-4 border border-[#D9D9D9]'
+  if (!onClick) return <div className={base}>{body}</div>
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${base} w-full cursor-pointer text-right transition hover:border-[#008080] hover:shadow-[2px_2px_6px_rgba(0,0,0,0.08)]`}
+    >
+      {body}
+    </button>
   )
 }
 

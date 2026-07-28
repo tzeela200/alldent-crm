@@ -32,15 +32,15 @@ function sameNames(a: string[] | undefined, b: string[]): boolean {
   return b.every((name) => set.has(name))
 }
 
+// `regions` ו-`cities` הוסרו: הם הועברו כ-props ולא היו בשימוש —
+// CityRegionPicker טוען את המילונים שלו בעצמו (מעומד).
 interface Props {
   filters: ApplicationFilters
   onChange: (f: ApplicationFilters) => void
   applicationStatuses: DictItem[]
   checkStatuses: DictItem[]
   sources: DictItem[]
-  regions: DictItem[]
   roles: DictItem[]
-  cities: DictItem[]
   jobStatuses: DictItem[]
   workStatuses: DictItem[]
   availabilities: DictItem[]
@@ -52,9 +52,7 @@ export function ApplicationFiltersBar({
   applicationStatuses,
   checkStatuses,
   sources,
-  regions,
   roles,
-  cities,
   jobStatuses,
   workStatuses,
   availabilities,

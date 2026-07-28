@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Plus, X, Search, AlertTriangle } from 'lucide-react'
 import { ActionButton } from '@/components/layout/Shell'
+import { ContactPicker } from '@/components/ui/ContactPicker'
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { useApplicationDicts } from '@/hooks/useApplicationDicts'
 import { supabase } from '@/lib/supabase'
@@ -48,9 +49,8 @@ function dictNameOrNull(items: DictItem[] | undefined, id: number | null | undef
 export function ManualCreateDialog({ onClose, onCreated }: Props) {
   const { createApplication } = useApplicationMutations()
   const { data: dicts } = useApplicationDicts()
-  const [contactSearch, setContactSearch] = useState('')
   const [jobSearch, setJobSearch] = useState('')
-  const [selectedContact, setSelectedContact] = useState<Contact | null>(null)
+  const [selectedContactId, setSelectedContactId] = useState<number | null>(null)
   const [selectedJob, setSelectedJob] = useState<JobResult | null>(null)
   const [submissionDate, setSubmissionDate] = useState(todayInputValue())
   const [appStatus, setAppStatus] = useState<number>(1)
@@ -60,6 +60,26 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
   const [candidateNotes, setCandidateNotes] = useState('')
   const [internalNotes, setInternalNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [confirmingClose, setConfirmingClose] = useState(false)
+
+  // "יש מה לאבד" = נבחר מועמד/משרה או הוקלד טקסט. תאריך ההגשה וסטטוס ברירת
+  // המחדל לא נחשבים, אחרת כל פתיחה הייתה נחשבת "מלוכלכת".
+  const isDirty =
+    selectedContactId != null ||
+    selectedJob != null ||
+    checkStatus !== '' ||
+    source !== '' ||
+    followUpDate !== '' ||
+    candidateNotes.trim() !== '' ||
+    internalNotes.trim() !== ''
+
+  const requestClose = () => {
+    if (isDirty) {
+      setConfirmingClose(true)
+      return
+    }
+    onClose()
+  }
 
   // Cities and jobStatuses are now part of useApplicationDicts
   const cities = dicts?.cities
@@ -71,22 +91,21 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
   const jobRegionLabel = getDictLabel(dicts?.regions, selectedJob?.region_id)
   const isInactiveJob = selectedJob?.job_status != null && selectedJob.job_status !== 3
 
-  // Live contact search
-  const { data: contactResults } = useQuery({
-    queryKey: ['contact-search', contactSearch],
+  // הבחירה נעשית ב-ContactPicker המשותף (חיפוש שם/נייד מנורמל, server-side).
+  // הוא מחזיר רק שדות זיהוי, ולכן שולפים כאן את שאר השדות הדרושים ל-insert.
+  const { data: selectedContact } = useQuery({
+    queryKey: ['contact-for-application', selectedContactId],
     queryFn: async () => {
-      if (contactSearch.length < 2) return []
+      if (!selectedContactId) return null
       const { data } = await supabase
         .from('contact')
         .select('contact_id, display_name, full_name, phone, phone_norm, email, role, city_id, region_id, candidate_availability_ids, cv_link, cv_storage_path, has_cv')
-        .or(
-          `full_name.ilike.%${contactSearch}%,display_name.ilike.%${contactSearch}%,phone.ilike.%${contactSearch}%,phone_norm.ilike.%${contactSearch}%`
-        )
-        .limit(10)
-      return (data ?? []) as Contact[]
+        .eq('contact_id', selectedContactId)
+        .maybeSingle()
+      return data as Contact | null
     },
-    enabled: contactSearch.length >= 2,
-    staleTime: 10_000,
+    enabled: !!selectedContactId,
+    staleTime: 60_000,
   })
 
   // Live job search — resolves city/region via dicts at render time (no dict joins needed)
@@ -199,7 +218,7 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 bg-black/30" onClick={onClose} />
+      <div className="fixed inset-0 z-50 bg-black/30" onClick={requestClose} />
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
         <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white shadow-2xl">
           {/* Header */}
@@ -209,72 +228,44 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
               <h2 className="text-base font-bold text-slate-900">יצירת הגשה ידנית</h2>
             </div>
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
             >
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <div className="space-y-5 p-6">
-            {/* Contact selector */}
-            <div>
-              <label className="mb-1 block text-xs font-medium text-slate-500">
-                מועמד קיים במאגר
-              </label>
-              {selectedContact ? (
-                <div className="flex items-center justify-between rounded-xl border border-teal-300 bg-teal-50 px-3 py-2">
-                  <div>
-                    <p className="text-sm font-medium text-teal-800">
-                      {selectedContact.full_name ?? selectedContact.display_name}
-                    </p>
-                    <p className="text-xs text-teal-600" dir="ltr">
-                      {selectedContact.phone}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() => setSelectedContact(null)}
-                    className="text-teal-400 hover:text-teal-600"
-                  >
-                    <X className="h-4 w-4" />
-                  </button>
-                </div>
-              ) : (
-                <div className="relative">
-                  <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
-                    <Search className="h-4 w-4 shrink-0 text-slate-400" />
-                    <input
-                      type="text"
-                      value={contactSearch}
-                      onChange={(e) => setContactSearch(e.target.value)}
-                      placeholder="חיפוש לפי שם / טלפון..."
-                      className="h-10 flex-1 bg-transparent text-sm outline-none"
-                    />
-                  </div>
-                  {contactResults && contactResults.length > 0 && (
-                    <div className="absolute top-full z-10 mt-1 w-full rounded-xl border border-slate-200 bg-white shadow-lg">
-                      {contactResults.map((c) => (
-                        <button
-                          key={c.contact_id}
-                          onClick={() => {
-                            setSelectedContact(c)
-                            setContactSearch('')
-                          }}
-                          className="flex w-full items-center justify-between px-3 py-2 text-right hover:bg-slate-50"
-                        >
-                          <span className="text-sm font-medium">
-                            {c.full_name ?? c.display_name}
-                          </span>
-                          <span className="text-xs text-slate-400" dir="ltr">
-                            {c.phone}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+          {/* אזהרת סגירה עם נתונים שלא נשמרו — לא לאבד טופס מלא בלחיצה על הרקע */}
+          {confirmingClose && (
+            <div className="border-b border-[#FECACA] bg-[#FEF2F2] px-6 py-3">
+              <p className="text-[13px] font-semibold text-[#991B1B]">
+                יש פרטים שהוזנו ולא נשמרו. לסגור בכל זאת?
+              </p>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => setConfirmingClose(false)}
+                  className="rounded-full border border-[#D9D9D9] bg-white px-4 py-1.5 text-[13px] font-semibold text-[#2D2D2D] hover:bg-[#F3F4F6]"
+                >
+                  להישאר
+                </button>
+                <button
+                  onClick={onClose}
+                  className="rounded-full bg-[#DC2626] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#B91C1C]"
+                >
+                  לסגור בלי לשמור
+                </button>
+              </div>
             </div>
+          )}
+
+          <div className="space-y-5 p-6">
+            {/* Contact selector — הרכיב המשותף, לא typeahead מקומי */}
+            <ContactPicker
+              label="מועמד קיים במאגר"
+              value={selectedContactId}
+              onChange={(id) => setSelectedContactId(id)}
+              placeholder="חיפוש לפי שם או נייד..."
+            />
 
             {/* Job selector */}
             <div>
@@ -461,7 +452,7 @@ export function ManualCreateDialog({ onClose, onCreated }: Props) {
           {/* Footer */}
           <div className="flex items-center justify-between border-t border-slate-200 px-6 py-4">
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="rounded-xl px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50"
             >
               ביטול
