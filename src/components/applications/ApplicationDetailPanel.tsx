@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Phone, FileText, UserRound, Briefcase } from 'lucide-react'
+import { Phone, FileText, UserRound, Briefcase, AlertTriangle } from 'lucide-react'
 import SidePanel from '@/components/ui/SidePanel'
+import { ContactPicker } from '@/components/ui/ContactPicker'
 import { AdminPanelSection } from '@/components/admin/AdminPanelSection'
 import { AdminPanelField } from '@/components/admin/AdminPanelField'
 import { AdminPanelActions } from '@/components/admin/AdminPanelActions'
@@ -14,7 +15,7 @@ import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
-import { whatsappLink, formatPhone } from '@/lib/normalizePhone'
+import { whatsappLink, formatPhone, isValidIlMobile } from '@/lib/normalizePhone'
 import { openApplicationCv, applicationHasCv } from '@/lib/cv'
 import { formatDate } from '@/lib/timeAgo'
 import { toast } from 'sonner'
@@ -63,9 +64,18 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
   const navigate = useNavigate()
   const { data: row, isLoading } = useApplicationRow(applicationId)
   const { data: dicts } = useApplicationDicts()
-  const { updateApplication, createContactFromApplication, markSpam } = useApplicationMutations()
+  const {
+    updateApplication,
+    createContactFromApplication,
+    linkApplicationToContact,
+    updateApplicationPhone,
+    markSpam,
+  } = useApplicationMutations()
   const [mode, setMode] = useState<'view' | 'edit'>('view')
   const [saving, setSaving] = useState(false)
+  const [linkContactId, setLinkContactId] = useState<number | null>(null)
+  const [phoneDraft, setPhoneDraft] = useState('')
+  const [editingPhone, setEditingPhone] = useState(false)
 
   const { data: contact } = useQuery({
     queryKey: ['contact', row?.candidate_link],
@@ -141,6 +151,28 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
     markSpam.mutate(row)
   }
 
+  const savePhone = async () => {
+    if (!row) return
+    try {
+      await updateApplicationPhone.mutateAsync({
+        applicationId: row.application_id,
+        phone: phoneDraft,
+        jobCode: row.job_code,
+      })
+      setEditingPhone(false)
+    } catch {
+      // ה-mutation הציג את השגיאה; נשארים בעריכה עם מה שהוקלד.
+    }
+  }
+
+  const linkToExisting = () => {
+    if (!row || !linkContactId) return
+    linkApplicationToContact.mutate(
+      { applicationId: row.application_id, contactId: linkContactId },
+      { onSuccess: () => setLinkContactId(null) },
+    )
+  }
+
   const startEdit = () => {
     setDraft(initial)
     setMode('edit')
@@ -201,6 +233,8 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
 
   const phone = row.candidate_phone
   const inRegistry = row.candidate_link != null
+  // נייד פסול = "מאושר למאגר" ייכשל, כי הוא מחפש/יוצר לפי phone_norm.
+  const phoneIsValid = isValidIlMobile(phone)
 
   const header = (
     <div className="px-5 py-4">
@@ -312,7 +346,55 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
         <AdminPanelField
           label="נייד"
           mode="view"
-          viewValue={phone ? <span dir="ltr">{formatPhone(phone)}</span> : null}
+          fullWidth={editingPhone || !phoneIsValid}
+          viewValue={
+            editingPhone ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  dir="ltr"
+                  value={phoneDraft}
+                  onChange={(e) => setPhoneDraft(e.target.value)}
+                  placeholder="0501234567"
+                  className={`${editInput} max-w-[200px] text-left`}
+                />
+                <button
+                  type="button"
+                  onClick={savePhone}
+                  disabled={updateApplicationPhone.isPending}
+                  className="rounded-full bg-[#008080] px-4 py-1.5 text-[13px] font-semibold text-white transition hover:bg-[#006D6D] disabled:opacity-60"
+                >
+                  {updateApplicationPhone.isPending ? 'שומר…' : 'שמור נייד'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setEditingPhone(false)}
+                  className="text-[13px] font-semibold text-[#6B6B6B] hover:underline"
+                >
+                  ביטול
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <span dir="ltr">{phone ? formatPhone(phone) : '—'}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPhoneDraft(phone ?? '')
+                    setEditingPhone(true)
+                  }}
+                  className="text-[12px] font-semibold text-[#008080] hover:underline"
+                >
+                  תיקון
+                </button>
+                {!phoneIsValid && (
+                  <span className="inline-flex items-center gap-1 rounded-[6px] bg-[#FEF2F2] px-2 py-0.5 text-[12px] font-semibold text-[#DC2626]">
+                    <AlertTriangle className="h-3 w-3" />
+                    נייד לא תקין — לא ניתן לאשר למאגר
+                  </span>
+                )}
+              </div>
+            )
+          }
         />
         <AdminPanelField
           label="אימייל"
@@ -464,8 +546,11 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
               <button
                 type="button"
                 onClick={approveToRegistry}
-                disabled={createContactFromApplication.isPending || markSpam.isPending}
-                className="flex-1 rounded-full bg-[#008080] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#006D6D] disabled:opacity-60"
+                disabled={
+                  createContactFromApplication.isPending || markSpam.isPending || !phoneIsValid
+                }
+                title={!phoneIsValid ? 'יש לתקן את הנייד לפני אישור למאגר' : undefined}
+                className="flex-1 rounded-full bg-[#008080] px-4 py-2.5 text-[13px] font-semibold text-white transition hover:bg-[#006D6D] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {createContactFromApplication.isPending ? 'מאשר…' : 'מאושר למאגר ←'}
               </button>
@@ -476,6 +561,30 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
                 className="rounded-full border border-[#FECACA] bg-[#FEF2F2] px-4 py-2.5 text-[13px] font-semibold text-[#DC2626] transition hover:bg-[#FEE2E2] disabled:opacity-60"
               >
                 {markSpam.isPending ? 'מסמן…' : 'ספאם / לא רלוונטי'}
+              </button>
+            </div>
+
+            {/* קישור למועמד קיים — למקרה שהמועמד כבר הוקם ידנית במאגר
+                (למשל אחרי שהנייד בהגשה היה פגום והמספר חולץ מקורות החיים). */}
+            <div className="mt-4 border-t border-[#F3F4F6] pt-3">
+              <p className="mb-2 text-[13px] font-semibold text-[#2D2D2D]">
+                או: קישור למועמד שכבר קיים במאגר
+              </p>
+              <p className="mb-2 text-[12px] text-[#6B6B6B]">
+                מקשר את ההגשה לכרטיס קיים במקום ליצור חדש, ומסמן אותה כמאושרת למאגר.
+              </p>
+              <ContactPicker
+                value={linkContactId}
+                onChange={(id) => setLinkContactId(id)}
+                placeholder="חיפוש לפי שם או נייד..."
+              />
+              <button
+                type="button"
+                onClick={linkToExisting}
+                disabled={!linkContactId || linkApplicationToContact.isPending}
+                className="mt-2 w-full rounded-full border border-[#008080] px-4 py-2 text-[13px] font-semibold text-[#008080] transition hover:bg-[#E6F3F3] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {linkApplicationToContact.isPending ? 'מקשר…' : 'קשר להגשה זו'}
               </button>
             </div>
           </div>

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
+import { normalizeIlMobile, IL_MOBILE_ERROR } from '@/lib/normalizePhone'
 import type { ApplicationRow } from '@/types/applications'
 
 /** Status 15 = "לא דנטלי - ארכיון" */
@@ -244,6 +245,119 @@ export function useApplicationMutations() {
   })
 
   /**
+   * Link an application to a contact that already exists in the registry.
+   *
+   * Needed when the submitted phone was malformed: the approve-to-registry flow
+   * finds the contact by phone_norm, so a broken number leaves no way to attach
+   * the application to the person you created by hand (INC-3116). Mirrors the
+   * existing-contact branch of createContactFromApplication.
+   *
+   * Setting candidate_link fires `trg_application_candidate_profile`, which
+   * maintains profile_type / work_status and rel_contact_profiles — so we must
+   * not set those here.
+   */
+  const linkApplicationToContact = useMutation({
+    mutationFn: async ({
+      applicationId,
+      contactId,
+    }: {
+      applicationId: number
+      contactId: number
+    }) => {
+      const { data: approvedRes } = await supabase
+        .from('dict_check_statuses')
+        .select('id')
+        .eq('name', 'מאושר למאגר')
+        .maybeSingle()
+      const approvedId = approvedRes?.id ?? 3
+
+      const { data: contactRow, error: contactErr } = await supabase
+        .from('contact')
+        .update({ check_status: approvedId })
+        .eq('contact_id', contactId)
+        .select('contact_id')
+      if (contactErr) throw contactErr
+      if (!contactRow || contactRow.length === 0)
+        throw new Error('איש הקשר לא נמצא — ייתכן שנמחק או שאין הרשאה')
+
+      const { data, error } = await supabase
+        .from('applications')
+        .update({
+          candidate_link: contactId,
+          is_new_candidate: false,
+          check_status: approvedId,
+          updated_timestamp: new Date().toISOString(),
+        })
+        .eq('application_id', applicationId)
+        .select('application_id')
+      if (error) throw error
+      if (!data || data.length === 0)
+        throw new Error('הקישור לא נשמר — ייתכן שהרשומה לא קיימת או שאין הרשאה')
+      return contactId
+    },
+    onSuccess: () => {
+      invalidate()
+      qc.invalidateQueries({ queryKey: ['contacts'] })
+      toast.success('ההגשה קושרה למועמד קיים')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  /**
+   * Correct the mobile on an application.
+   *
+   * Keeps candidate_phone (as typed) and phone_norm (9725XXXXXXXX) in sync —
+   * they are what the approve-to-registry lookup and the duplicate guard use, so
+   * updating one without the other would silently break both.
+   */
+  const updateApplicationPhone = useMutation({
+    mutationFn: async ({
+      applicationId,
+      phone,
+      jobCode,
+    }: {
+      applicationId: number
+      phone: string
+      jobCode?: string | null
+    }) => {
+      const normalized = normalizeIlMobile(phone)
+      if (!normalized) throw new Error(IL_MOBILE_ERROR)
+
+      // Same logical duplicate key the manual-create dialog enforces:
+      // one application per phone per job.
+      if (jobCode) {
+        const { data: clash } = await supabase
+          .from('applications')
+          .select('application_id')
+          .eq('job_code', jobCode)
+          .eq('phone_norm', normalized)
+          .neq('application_id', applicationId)
+          .limit(1)
+        if (clash && clash.length > 0)
+          throw new Error(`כבר קיימת הגשה עם נייד זה למשרה ${jobCode} (הגשה #${clash[0].application_id})`)
+      }
+
+      const { data, error } = await supabase
+        .from('applications')
+        .update({
+          candidate_phone: phone.trim(),
+          phone_norm: normalized,
+          updated_timestamp: new Date().toISOString(),
+        })
+        .eq('application_id', applicationId)
+        .select('application_id')
+      if (error) throw error
+      if (!data || data.length === 0)
+        throw new Error('הנייד לא נשמר — ייתכן שהרשומה לא קיימת או שאין הרשאה')
+    },
+    onSuccess: () => {
+      invalidate()
+      toast.success('הנייד עודכן')
+    },
+    onError: (err: Error) => toast.error(err.message),
+  })
+
+  /**
    * Mark an application as spam / not relevant ("ספאם"):
    * check_status=2 + application_status=15 (archive). Classification only — no data is deleted.
    */
@@ -349,6 +463,8 @@ export function useApplicationMutations() {
     bulkSetFollowUp,
     createApplication,
     createContactFromApplication,
+    linkApplicationToContact,
+    updateApplicationPhone,
     markSpam,
     sendToLeadsV2,
     archiveApplication,
