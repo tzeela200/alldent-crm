@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { X, Loader2, CheckCircle2, AlertCircle, Paperclip } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { normalizeIlMobile, IL_MOBILE_ERROR } from '@/lib/normalizePhone'
 
 type Props = {
   isOpen: boolean
@@ -41,6 +42,15 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
 
     if (!form.consent) return
 
+    // חוסמים נייד פגום כאן, לפני ה-RPC. הגשה עם נייד לא תקין נכנסת למאגר אבל
+    // לא ניתן לאשר אותה למאגר אחר כך (contact.phone_norm הוא UNIQUE ומצפה
+    // ל-9725XXXXXXXX), ואז צריך לחלץ את המספר האמיתי מקורות החיים — INC-3116.
+    if (!normalizeIlMobile(form.phone)) {
+      setErrorMsg(IL_MOBILE_ERROR)
+      setStatus('error')
+      return
+    }
+
     setStatus('loading')
 
     // Map known RPC/validation errors to friendly Hebrew; never surface raw DB text.
@@ -49,6 +59,8 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
       const table: Record<string, string> = {
         consent_required: 'יש לאשר את שמירת הפרטים כדי להמשיך.',
         phone_required: 'יש להזין מספר טלפון.',
+        // נחסם כבר בוולידציה שלמעלה; קיים למקרה שה-RPC יאכוף בעתיד.
+        invalid_phone: IL_MOBILE_ERROR,
         full_name_required: 'יש להזין שם מלא.',
         job_code_required: 'המשרה אינה זמינה כרגע.',
         job_not_found: 'המשרה אינה זמינה כרגע.',
@@ -188,9 +200,15 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
                 <input
                   name="phone"
                   type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   value={form.phone}
                   onChange={handleChange}
                   required
+                  // נייד ישראלי בלבד: 10 ספרות שמתחילות ב-05, או פורמט +972.
+                  // מקבילה ל-normalizeIlMobile, כדי שהדפדפן יחסום עוד לפני השליחה.
+                  pattern="^(?:\+?972[-\s]?|0)5[0-9](?:[-\s]?[0-9]){7}$"
+                  title={IL_MOBILE_ERROR}
                   placeholder="050-1234567"
                   dir="ltr"
                   className={`${inputCls} text-left`}

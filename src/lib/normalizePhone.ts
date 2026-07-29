@@ -26,6 +26,38 @@ export function normalizePhone(phone: string | null | undefined): string {
 }
 
 /**
+ * הודעת השגיאה האחידה לנייד לא תקין — זהה בכל טופס ציבורי.
+ */
+export const IL_MOBILE_ERROR =
+  'מספר הנייד אינו תקין. יש להזין נייד ישראלי בן 10 ספרות (לדוגמה: 0501234567).'
+
+/**
+ * ולידציה + נרמול של נייד ישראלי — **פורט מדויק** של פונקציית ה-DB
+ * `public.normalize_il_mobile_phone`. מחזיר `9725XXXXXXXX` או `null` אם פסול.
+ *
+ * בשונה מ-`normalizePhone` שלמעלה, שמנרמל "כמיטב יכולתו" ומחזיר מחרוזת גם
+ * לקלט שבור — הפונקציה הזו **דוחה** קלט לא תקין. זו שצריך להשתמש בה כדי למנוע
+ * שמירה של נייד פגום (INC-3116: הגשה נכנסה עם 11 ספרות ולא ניתן היה לאשר
+ * אותה למאגר, כי `contact.phone_norm` הוא UNIQUE ומצפה ל-12 תווים).
+ *
+ * מקור-אמת יחיד: אין לשכפל את הלוגיקה הזו בקומפוננטה.
+ */
+export function normalizeIlMobile(raw: string | null | undefined): string | null {
+  let digits = (raw ?? '').replace(/\D/g, '')
+  if (!digits) return null
+  if (digits.startsWith('9720')) digits = '972' + digits.slice(4)
+  else if (digits.startsWith('972')) { /* כבר בפורמט בינלאומי */ }
+  else if (digits.startsWith('05')) digits = '972' + digits.slice(1)
+  else if (digits.startsWith('5')) digits = '972' + digits
+  return /^9725\d{8}$/.test(digits) ? digits : null
+}
+
+/** נוחות: האם המחרוזת היא נייד ישראלי תקין. */
+export function isValidIlMobile(raw: string | null | undefined): boolean {
+  return normalizeIlMobile(raw) !== null
+}
+
+/**
  * פורמט טלפון לתצוגה
  * 972XXXXXXXXX → 05X-XXXXXXX
  */

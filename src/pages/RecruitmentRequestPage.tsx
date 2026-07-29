@@ -4,6 +4,7 @@ import { useRecruitmentRequestMutations } from '@/hooks/useRecruitmentRequestMut
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { normalizeIlMobile, IL_MOBILE_ERROR } from '@/lib/normalizePhone'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
 
@@ -12,19 +13,9 @@ type DictItem = { id: number; name: string; role_id?: number | null; region_id?:
 const PLAN_TO_TRACK_ID: Record<string, number> = { discreet: 1, branding: 2 }
 const TRACK_LABEL: Record<number, string> = { 1: 'מסלול גיוס אנונימי', 2: 'מסלול מיתוג מעסיקים' }
 
-const PHONE_ERROR = 'מספר הנייד אינו תקין. יש להזין נייד ישראלי בן 10 ספרות (לדוגמה: 0501234567).'
-
-// פורט מדויק של public.normalize_il_mobile_phone — כדי שהוולידציה בצד הלקוח
-// תזהה נייד פסול לפני הקריאה ל-RPC, במקום לקבל invalid_phone מהשרת.
-function normalizeIlMobile(raw: string): string | null {
-  let digits = raw.replace(/\D/g, '')
-  if (!digits) return null
-  if (digits.startsWith('9720')) digits = '972' + digits.slice(4)
-  else if (digits.startsWith('972')) { /* כבר בפורמט בינלאומי */ }
-  else if (digits.startsWith('05')) digits = '972' + digits.slice(1)
-  else if (digits.startsWith('5')) digits = '972' + digits
-  return /^9725\d{8}$/.test(digits) ? digits : null
-}
+// הוולידטור והודעת השגיאה עברו ל-lib/normalizePhone (מקור-אמת יחיד), כדי
+// שטופס ההגשה הציבורי וטופס הגיוס יאכפו בדיוק את אותו כלל (INC-3116).
+const PHONE_ERROR = IL_MOBILE_ERROR
 
 // קודי ה-raise exception של submit_public_recruitment_request.
 // רובם חסומים כבר בוולידציה שלמטה — המיפוי קיים כדי שכל דריפט עתידי
