@@ -4,7 +4,9 @@ import { supabase } from '@/lib/supabase'
 const JOB_QUERY_KEYS = [
   ['jobs-admin-v4'],
   ['job-detail'],
-  ['applications-for-job'],
+  // הטבלה בכרטיס המשרה עברה למפתח ['applications','for-job',code] כדי
+  // שגם invalidate של ['applications'] יתפוס אותה (INC-3116).
+  ['applications', 'for-job'],
   ['jobs', 'account-counts'],
   ['employer360', 'jobs'],
   ['active_jobs_for_apply'],

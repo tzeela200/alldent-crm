@@ -1521,7 +1521,7 @@ export default function AdminEmployersPage({
               queryClient.invalidateQueries({ queryKey: ['contacts'] })
               queryClient.invalidateQueries({ queryKey: ['jobs-admin-v4'] })
               queryClient.invalidateQueries({ queryKey: ['job-detail'] })
-              queryClient.invalidateQueries({ queryKey: ['applications-for-job'] })
+              queryClient.invalidateQueries({ queryKey: ['applications', 'for-job'] })
               queryClient.invalidateQueries({ queryKey: ['jobs', 'account-counts'] })
               queryClient.invalidateQueries({ queryKey: ['employer360', 'jobs'] })
               queryClient.invalidateQueries({ queryKey: ['active_jobs_for_apply'] })

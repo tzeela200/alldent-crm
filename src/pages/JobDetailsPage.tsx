@@ -7,6 +7,9 @@ import { useQuery } from '@tanstack/react-query'
 import { Shell, ActionButton, EmptyState } from '@/components/layout/Shell'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/timeAgo'
+import { formatPhone } from '@/lib/normalizePhone'
+import { personHasCv, openApplicationCv } from '@/lib/cv'
+import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import JobImageUpload from '@/components/admin/JobImageUpload'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
@@ -144,11 +147,19 @@ export default function JobDetailsPage() {
   const { data: applicationStatuses = [] } = useQuery({ queryKey: ['dict_application_statuses'], queryFn: () => fetchDict('dict_application_statuses'), staleTime: 600_000 })
 
   const { data: applications = [] } = useQuery({
-    queryKey: ['applications-for-job', code],
+    // Key starts with 'applications' on purpose: React Query prefix-matches by
+    // array element, so the old ['applications-for-job', code] was NEVER hit by
+    // the mutations' invalidateQueries(['applications']) — this table went stale
+    // after any status change made elsewhere (INC-3116).
+    queryKey: ['applications', 'for-job', code],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('applications')
-        .select('application_id,candidate_link,candidate_name,candidate_phone,application_status,check_status,submission_date,cv_link,contact:candidate_link(full_name,display_name)')
+        // has_cv / cv_storage_path were missing, and every CV in this DB lives in
+        // cv_storage_path (cv_link is unused), so the קו״ח column rendered "—"
+        // for every row. The contact's CV is selected too, since a CV uploaded to
+        // the candidate's card is not copied onto older application rows.
+        .select('application_id,candidate_link,candidate_name,candidate_phone,application_status,check_status,submission_date,has_cv,cv_link,cv_storage_path,contact:candidate_link(full_name,display_name,has_cv,cv_link,cv_storage_path)')
         .eq('job_code', code!)
         .order('submission_date', { ascending: false })
       if (error) throw error
@@ -158,6 +169,27 @@ export default function JobDetailsPage() {
     enabled: !!code,
     staleTime: 60_000,
   })
+
+  // עדכון סטטוס הגשה ישירות מכרטיס המשרה. עובר דרך ה-mutation המשותף, ולכן
+  // מאמת rowcount ומרענן גם את מסך ההגשות, ה-KPI ומסכי ה-360.
+  const { updateApplication } = useApplicationMutations()
+  const [savingApplicationId, setSavingApplicationId] = useState<number | null>(null)
+
+  const changeApplicationStatus = async (applicationId: number, status: number | null) => {
+    setSavingApplicationId(applicationId)
+    try {
+      await updateApplication.mutateAsync({
+        applicationId,
+        updates: { application_status: status } as any,
+        jobCode: code,
+      })
+      showToast('סטטוס ההגשה עודכן', 'success')
+    } catch {
+      // ה-mutation כבר הציג את השגיאה; ה-select יחזור לערך מה-DB ברענון.
+    } finally {
+      setSavingApplicationId(null)
+    }
+  }
 
   useEffect(() => {
     if (!cities.length || !draft) return
@@ -451,7 +483,90 @@ export default function JobDetailsPage() {
 
             <section className="rounded-2xl border border-[#D9D9D9] bg-white p-6 shadow-sm">
               <SectionTitle icon={<Users className="h-5 w-5" />} title={`מועמדים למשרה (${applications.length})`} />
-              {applications.length === 0 ? <div className="rounded-xl bg-[#FAFAF7] p-6 text-center text-[14px] text-[#6B6B6B]">אין מועמדים למשרה זו עדיין</div> : <div className="overflow-x-auto"><table className="w-full min-w-[640px] text-right text-[13px]"><thead className="bg-[#FAFAF7] text-[#6B6B6B]"><tr><th className="px-3 py-3">מועמד</th><th className="px-3 py-3">נייד</th><th className="px-3 py-3">סטטוס הגשה</th><th className="px-3 py-3">תאריך</th><th className="px-3 py-3">קו״ח</th></tr></thead><tbody className="divide-y divide-[#F3F4F6]">{(applications as any[]).map((app) => <tr key={app.application_id}><td className="px-3 py-3 font-semibold">{(() => { const name = (app as any).contact?.full_name || (app as any).contact?.display_name || app.candidate_name || 'מועמד ללא שם'; return app.candidate_link ? <Link to={`/admin/candidates/${app.candidate_link}`} className="text-[#008080] hover:underline">{name}</Link> : name })()}</td><td className="px-3 py-3 font-mono text-[12px]" dir="ltr">{app.candidate_phone ?? '—'}</td><td className="px-3 py-3">{applicationStatuses.find((s: any) => s.id === app.application_status)?.name ?? '—'}</td><td className="px-3 py-3">{app.submission_date ? formatDate(app.submission_date) : '—'}</td><td className="px-3 py-3">{app.cv_link ? <a href={app.cv_link} target="_blank" rel="noreferrer" className="text-[#008080] hover:underline">פתיחה</a> : '—'}</td></tr>)}</tbody></table></div>}
+              {applications.length === 0 ? (
+                <div className="rounded-xl bg-[#FAFAF7] p-6 text-center text-[14px] text-[#6B6B6B]">אין מועמדים למשרה זו עדיין</div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[720px] text-right text-[13px]">
+                    <thead className="bg-[#FAFAF7] text-[#6B6B6B]">
+                      <tr>
+                        <th className="px-3 py-3">מועמד</th>
+                        <th className="px-3 py-3">נייד</th>
+                        <th className="px-3 py-3">סטטוס הגשה</th>
+                        <th className="px-3 py-3">תאריך</th>
+                        <th className="px-3 py-3">קו״ח</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#F3F4F6]">
+                      {(applications as any[]).map((app) => {
+                        // ה-select מחזיר את היחס כאובייקט או כמערך בן איבר אחד, תלוי בסכמה.
+                        const contact = Array.isArray(app.contact) ? app.contact[0] : app.contact
+                        const cvSource = {
+                          has_cv: app.has_cv,
+                          cv_link: app.cv_link,
+                          cv_storage_path: app.cv_storage_path,
+                          contact_has_cv: contact?.has_cv,
+                          contact_cv_link: contact?.cv_link,
+                          contact_cv_storage_path: contact?.cv_storage_path,
+                        }
+                        const ownCv = Boolean(app.has_cv || app.cv_link || app.cv_storage_path)
+                        const name =
+                          contact?.full_name || contact?.display_name || app.candidate_name || 'מועמד ללא שם'
+                        return (
+                          <tr key={app.application_id}>
+                            <td className="px-3 py-3 font-semibold">
+                              {app.candidate_link ? (
+                                <Link to={`/admin/candidates/${app.candidate_link}`} className="text-[#008080] hover:underline">
+                                  {name}
+                                </Link>
+                              ) : (
+                                name
+                              )}
+                            </td>
+                            <td className="px-3 py-3 text-[12px]" dir="ltr">
+                              {app.candidate_phone ? formatPhone(app.candidate_phone) : '—'}
+                            </td>
+                            <td className="px-3 py-3">
+                              {/* עריכת סטטוס ההגשה ישירות מכרטיס המשרה */}
+                              <select
+                                dir="rtl"
+                                value={app.application_status ?? ''}
+                                disabled={savingApplicationId === app.application_id}
+                                onChange={(e) =>
+                                  changeApplicationStatus(app.application_id, e.target.value ? Number(e.target.value) : null)
+                                }
+                                className="h-8 rounded-lg border border-[#D9D9D9] bg-white px-2 text-[13px] outline-none transition focus:border-[#008080] disabled:opacity-50"
+                              >
+                                <option value="">לא הוגדר</option>
+                                {(applicationStatuses as any[]).map((s) => (
+                                  <option key={s.id} value={s.id}>
+                                    {s.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td className="px-3 py-3">{app.submission_date ? formatDate(app.submission_date) : '—'}</td>
+                            <td className="px-3 py-3">
+                              {personHasCv(cvSource) ? (
+                                <button
+                                  type="button"
+                                  onClick={() => openApplicationCv(cvSource)}
+                                  title={ownCv ? 'קו״ח שצורפו להגשה' : 'קו״ח מכרטיס המועמד במאגר'}
+                                  className="text-[#008080] hover:underline"
+                                >
+                                  {ownCv ? 'פתיחה' : 'מהמאגר'}
+                                </button>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </section>
           </main>
 
