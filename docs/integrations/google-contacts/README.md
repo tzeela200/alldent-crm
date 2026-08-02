@@ -23,7 +23,23 @@
 | [CHANGELOG_GOOGLE_PACKAGE_v1_to_v2_2026-07-27.md](CHANGELOG_GOOGLE_PACKAGE_v1_to_v2_2026-07-27.md) | 17 השינויים מול v1 |
 | [MANIFEST_SHA256.txt](MANIFEST_SHA256.txt) | חתימות SHA-256 |
 
-**הקבצים נשמרו בדיוק כפי שנמסרו, ללא עריכה** — כדי שהמניפסט יישאר בר-אימות:
+## מסמכי המשך (02.08.2026) — מחוץ לחבילה החתומה
+
+| קובץ | תפקיד |
+|---|---|
+| [GOOGLE-01_FINAL_EXECUTION_PROMPT_2026-08-02_v2.md](GOOGLE-01_FINAL_EXECUTION_PROMPT_2026-08-02_v2.md) | **הפרומפט הפעיל** שנמסר ל-n8n — לתקן ולהשלים את ה-Workflow הקיים `YDyYoFJHXYD1re2D` עד Draft |
+| [VERIFICATION_2026-08-02_execution_prompt.md](VERIFICATION_2026-08-02_execution_prompt.md) | אימות הפרומפט מול Supabase החי + פער אחד שנמצא |
+
+הפרומפט הזה **גובר** על `N8N_GOOGLE_01_BUILD_PROMPT_FINAL_HE_v2_2026-07-27.md` מ-27.07:
+הראשון הורה לבנות Workflow חדש, והחדש מורה **לעדכן את הקיים**.
+
+**הפער שנמצא באימות:** שני תפקידים (15 מכירות, 16 בעלים) חסרים Alias קנוני
+ב-`dict_role_aliases`, בעוד כלל ה-Outbound של Workers מסתמך על `notes='canonical'`.
+פירוט והמלצה במסמך האימות.
+
+---
+
+**קבצי החבילה החתומה נשמרו בדיוק כפי שנמסרו, ללא עריכה** — כדי שהמניפסט יישאר בר-אימות:
 
 ```bash
 cd docs/integrations/google-contacts && sha256sum -c MANIFEST_SHA256.txt
