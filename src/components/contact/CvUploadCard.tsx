@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent, type DragEvent } from "react";
 import * as mammoth from "mammoth";
 import {
   AlertCircle,
@@ -81,6 +81,26 @@ function formatDate(value?: string | null) {
   if (Number.isNaN(date.getTime())) return String(value);
   return date.toLocaleDateString("he-IL");
 }
+
+function formatDateTime(value?: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString("he-IL", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Strip the leading "<timestamp>_" that upload adds, for a readable filename. */
+function cleanCvName(name: string): string {
+  return name.replace(/^\d+_/, "");
+}
+
+type CvVersion = { path: string; name: string; created_at: string | null };
 
 function extension(name: string): string {
   return name.toLowerCase().split(".").pop() ?? "";
@@ -183,6 +203,9 @@ export function CvUploadCard({
   const [sourceCityName, setSourceCityName] = useState("");
   const [unmatchedLanguages, setUnmatchedLanguages] = useState<string[]>([]);
   const [writerInput, setWriterInput] = useState("");
+  const [versions, setVersions] = useState<CvVersion[]>([]);
+  const [versionsLoading, setVersionsLoading] = useState(false);
+  const [showVersions, setShowVersions] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const hasCv = applicationHasCv(contact);
@@ -193,6 +216,36 @@ export function CvUploadCard({
     () => visibleFields.filter((field) => selectedFields.has(field)).length,
     [selectedFields, visibleFields],
   );
+
+  // Every upload writes a new timestamped object under `${contactId}/…` (files
+  // are never overwritten), so the folder holds the full CV history. List it so
+  // admins can view older versions, not just the current cv_storage_path.
+  const loadVersions = useCallback(async () => {
+    if (!contactId) return;
+    setVersionsLoading(true);
+    try {
+      const { data, error } = await supabase.storage
+        .from("candidate-cvs")
+        .list(String(contactId), { limit: 100, sortBy: { column: "created_at", order: "desc" } });
+      if (error) throw error;
+      const files: CvVersion[] = (data ?? [])
+        .filter((item) => item.id !== null) // skip folder placeholders
+        .map((item) => ({
+          path: `${contactId}/${item.name}`,
+          name: item.name,
+          created_at: item.created_at ?? null,
+        }));
+      setVersions(files);
+    } catch {
+      setVersions([]); // non-blocking; the rest of the card still works
+    } finally {
+      setVersionsLoading(false);
+    }
+  }, [contactId]);
+
+  useEffect(() => {
+    void loadVersions();
+  }, [loadVersions]);
 
   function validateFile(file: File): string | null {
     const ext = extension(file.name);
@@ -232,6 +285,7 @@ export function CvUploadCard({
       setAiDraft({});
       setVisibleFields([]);
       setSelectedFields(new Set());
+      void loadVersions();
       toast.success("קורות החיים הועלו ונשמרו");
     } catch (err) {
       toast.error(`העלאת הקובץ נכשלה: ${err instanceof Error ? err.message : String(err)}`);
@@ -592,6 +646,55 @@ export function CvUploadCard({
           </div>
           <input ref={fileInputRef} type="file" accept={ACCEPT} onChange={handleFileChange} className="hidden" />
         </div>
+
+        {versions.length > 0 && (
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-white">
+            <button
+              type="button"
+              onClick={() => setShowVersions((value) => !value)}
+              className="flex w-full items-center justify-between px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50"
+            >
+              <span className="flex items-center gap-2">
+                <FileText className="h-4 w-4 text-slate-400" />
+                גרסאות קו״ח ({versions.length})
+                {versionsLoading && <Loader2 className="h-3.5 w-3.5 animate-spin text-slate-400" />}
+              </span>
+              <span className="text-slate-400">{showVersions ? "▲" : "▼"}</span>
+            </button>
+            {showVersions && (
+              <ul className="divide-y divide-slate-100 border-t border-slate-100">
+                {versions.map((version) => {
+                  const isCurrent = version.path === contact.cv_storage_path;
+                  return (
+                    <li key={version.path} className="flex items-center justify-between gap-3 px-4 py-2.5">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium text-slate-800" dir="ltr">{cleanCvName(version.name)}</span>
+                          {isCurrent && (
+                            <span className="inline-flex h-[22px] shrink-0 items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 text-xs font-semibold text-emerald-700">
+                              נוכחי
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-xs text-slate-400">{formatDateTime(version.created_at)}</div>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => void openApplicationCv({ cv_storage_path: version.path })}
+                        className="h-9 shrink-0 rounded-xl border-slate-200"
+                      >
+                        <Eye className="h-4 w-4" />
+                        <span className="me-1">צפייה</span>
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
 
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
