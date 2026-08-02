@@ -67,6 +67,12 @@ interface AccountPanelProps {
     rolesMap: Map<number, string>
   }
   save: (patch: Record<string, unknown>, id?: number) => Promise<{ error: unknown }>
+  /** ערכי פתיחה במצב create (למשל מילוי מוקדם מבקשת גיוס ציבורית). מתעלמים ממנו ב-view/edit. */
+  prefill?: AccountPanelPrefill
+  /** הערה קצרה שתוצג מתחת לשדה הטלפון — למשל הסבר למה הוא נשאר ריק. */
+  phoneHint?: ReactNode
+  /** כותרת חלופית במצב create (ברירת מחדל: "ארגון חדש"). */
+  createTitle?: string
 }
 
 type FormState = {
@@ -88,6 +94,9 @@ type FormState = {
   linkedin_url: string
 }
 
+/** ערכי מילוי מוקדם למצב create. כל שדה אופציונלי; מה שלא נמסר נשאר ריק. */
+export type AccountPanelPrefill = Partial<FormState>
+
 function emptyForm(): FormState {
   return {
     account_name: '', account_type: '', account_status: '', bus_id: '', notes: '',
@@ -95,6 +104,10 @@ function emptyForm(): FormState {
     phone: '', second_phone: '', email: '', second_email: '', billing_email: '',
     website_url: '', facebook_url: '', linkedin_url: '',
   }
+}
+
+function createForm(prefill?: AccountPanelPrefill): FormState {
+  return { ...emptyForm(), ...(prefill ?? {}) }
 }
 function formFrom(a: AccountPanelData): FormState {
   return {
@@ -119,25 +132,36 @@ function formFrom(a: AccountPanelData): FormState {
 
 const editInput = 'w-full rounded-lg border border-[#D9D9D9] bg-white px-3 py-2 text-[14px] outline-none focus:border-[#008080]'
 
-export function AccountPanel({ account, mode, onModeChange, onClose, navigate, dicts, save }: AccountPanelProps) {
-  const [form, setForm] = useState<FormState>(() => (account ? formFrom(account) : emptyForm()))
+export function AccountPanel({ account, mode, onModeChange, onClose, navigate, dicts, save, prefill, phoneHint, createTitle }: AccountPanelProps) {
+  // prefill מגיע כאובייקט חדש בכל render של ההורה — משווים לפי ערך כדי לא לאפס
+  // את הטופס תוך כדי הקלדה.
+  const prefillKey = JSON.stringify(prefill ?? null)
+  const [form, setForm] = useState<FormState>(() => (account ? formFrom(account) : createForm(prefill)))
   const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const isEditing = mode === 'edit' || mode === 'create'
 
   // אתחול הטופס בכל כניסה למצב עריכה/יצירה — כדי שהערכים תמיד תואמים לרשומה.
   useEffect(() => {
     if (mode === 'edit' && account) setForm(formFrom(account))
-    if (mode === 'create') setForm(emptyForm())
-  }, [mode, account])
+    if (mode === 'create') setForm(createForm(prefill))
+    setSaveError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, account, prefillKey])
 
   const initial = useMemo(() => (account ? formFrom(account) : emptyForm()), [account])
-  const isDirty = isEditing && JSON.stringify(form) !== JSON.stringify(mode === 'create' ? emptyForm() : initial)
+  // הבסיס להשוואת "שינויים שלא נשמרו" במצב create הוא הערכים שמולאו מראש,
+  // אחרת פאנל שרק נפתח היה נחשב מלוכלך ומציג אזהרת סגירה.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const createBaseline = useMemo(() => createForm(prefill), [prefillKey])
+  const isDirty = isEditing && JSON.stringify(form) !== JSON.stringify(mode === 'create' ? createBaseline : initial)
 
   const setField = (k: keyof FormState, v: FormState[keyof FormState]) => setForm((p) => ({ ...p, [k]: v }))
 
   async function handleSave() {
     if (saving) return
     setSaving(true)
+    setSaveError(null)
     const patch: Record<string, unknown> = {
       account_name: form.account_name.trim() || null,
       account_type: form.account_type ? Number(form.account_type) : null,
@@ -159,7 +183,12 @@ export function AccountPanel({ account, mode, onModeChange, onClose, navigate, d
     }
     const { error } = await save(patch, mode === 'edit' ? account?.account_id : undefined)
     setSaving(false)
-    if (error) { alert('שגיאה בשמירה'); return }
+    if (error) {
+      // חשוב להציג את השגיאה האמיתית ולא הודעה גנרית: accounts.bus_id הוא UNIQUE,
+      // ולכן ח.פ שכבר קיים נכשל — בלי הטקסט המקורי אי אפשר להבין למה.
+      setSaveError(errorMessage(error))
+      return
+    }
     if (mode === 'create') onClose()
     else onModeChange('view')
   }
@@ -183,7 +212,7 @@ export function AccountPanel({ account, mode, onModeChange, onClose, navigate, d
       <div className="min-w-0">
         <div className="mb-1 flex items-center gap-2">
           <h2 className="truncate text-[18px] font-black text-[#0F0F10]">
-            {mode === 'create' ? 'ארגון חדש' : account?.account_name || '—'}
+            {mode === 'create' ? createTitle ?? 'ארגון חדש' : account?.account_name || '—'}
           </h2>
           {account && <StatusBadge statusType="account" statusId={account.account_status} />}
         </div>
@@ -233,6 +262,12 @@ export function AccountPanel({ account, mode, onModeChange, onClose, navigate, d
 
   return (
     <SidePanel open onClose={onClose} header={header} footer={footer} isDirty={isDirty} width="max-w-[680px]">
+      {saveError && (
+        <div className="mb-4 rounded-xl border border-[#FCA5A5] bg-[#FEF2F2] px-4 py-3 text-[13px] font-semibold text-[#991B1B]">
+          {saveError}
+        </div>
+      )}
+
       {/* 1 · פרטי ארגון */}
       <AdminPanelSection title="פרטי ארגון">
         <AdminPanelField label="שם ארגון" mode={mode} viewValue={account?.account_name}
@@ -311,6 +346,9 @@ export function AccountPanel({ account, mode, onModeChange, onClose, navigate, d
       {/* 5 · פרטי קשר (always last) */}
       <AdminPanelSection title="פרטי קשר">
         <ContactField label="טלפון" mode={mode} view={formatPhone(account?.phone)} value={form.phone} onChange={(v) => setField('phone', v)} />
+        {phoneHint && isEditing && (
+          <p className="text-[12px] leading-relaxed text-[#6B6B6B] sm:col-span-2 -mt-1">{phoneHint}</p>
+        )}
         <ContactField label="טלפון נוסף" mode={mode} view={formatPhone(account?.second_phone)} value={form.second_phone} onChange={(v) => setField('second_phone', v)} />
         <ContactField label="מייל ארגון" mode={mode} view={account?.email} value={form.email} onChange={(v) => setField('email', v)} />
         <ContactField label="מייל נוסף" mode={mode} view={account?.second_email} value={form.second_email} onChange={(v) => setField('second_email', v)} />
@@ -321,6 +359,16 @@ export function AccountPanel({ account, mode, onModeChange, onClose, navigate, d
       </AdminPanelSection>
     </SidePanel>
   )
+}
+
+function errorMessage(error: unknown): string {
+  if (typeof error === 'string') return error
+  if (error && typeof error === 'object') {
+    const e = error as { message?: unknown; details?: unknown }
+    const parts = [e.message, e.details].filter((p): p is string => typeof p === 'string' && p.length > 0)
+    if (parts.length) return parts.join(' — ')
+  }
+  return 'שגיאה בשמירה'
 }
 
 function SelectInput({ value, onChange, options }: { value: string; onChange: (v: string) => void; options: DictItem[] }) {

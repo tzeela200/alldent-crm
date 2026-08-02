@@ -405,6 +405,9 @@ export default function JobDetailsPage() {
           <main className="space-y-6">
             <RecruitmentRequestPanel
               jobCode={localJob.job_code}
+              jobCityId={localJob.city_id ?? null}
+              jobRegionId={localJob.region_id ?? null}
+              jobAddress={localJob.address ?? null}
               showToast={showToast}
               onLinked={(patch) => {
                 setLocalJob((prev: any) => ({ ...prev, ...patch }))

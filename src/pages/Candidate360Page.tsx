@@ -479,6 +479,8 @@ export default function Candidate360Page() {
   const prefillContact = (location.state as any)?.prefillContact as
     | { first_name?: string; last_name?: string; phone?: string; email?: string }
     | undefined;
+  // קוד המשרה שאליה יש לחזור אחרי היצירה (הגעה מכרטיס בקשת הגיוס).
+  const returnToJob = (location.state as any)?.returnToJob as string | undefined;
 
   // ── create-new-contact form state ──
   const [newForm, setNewForm] = useState({
@@ -517,7 +519,25 @@ export default function Candidate360Page() {
       facebook_url: newForm.facebook_url.trim() || null,
     });
     setNewSaving(false);
-    if (err || !created) { setNewError("שמירת איש הקשר נכשלה. נסי שוב."); return; }
+    if (err || !created) {
+      // contact.phone_norm הוא UNIQUE — נייד שכבר קיים במערכת ייכשל כאן.
+      // בלי ההודעה המקורית זה נראה ככישלון חסר סיבה, ולכן מציגים אותה במפורש.
+      const raw = err as { message?: unknown; code?: unknown } | null;
+      const isDuplicatePhone = String(raw?.code ?? "") === "23505";
+      setNewError(
+        isDuplicatePhone
+          ? "הנייד הזה כבר קיים במערכת על איש קשר אחר. יש לבחור את איש הקשר הקיים במקום ליצור חדש."
+          : typeof raw?.message === "string" && raw.message
+            ? `שמירת איש הקשר נכשלה: ${raw.message}`
+            : "שמירת איש הקשר נכשלה. נסי שוב."
+      );
+      return;
+    }
+    // חזרה למשרה שממנה הגענו, כדי שאיש הקשר ישויך לבקשה ולא נישאר במסך אחר.
+    if (returnToJob) {
+      navigate(`/admin/jobs/${returnToJob}`, { replace: true, state: { linkContactId: created.contact_id } });
+      return;
+    }
     navigate(`/admin/contacts/${created.contact_id}`, { replace: true });
   }
 

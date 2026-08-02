@@ -234,6 +234,18 @@ function normalizeDigits(value?: string | null) {
   return String(value ?? '').replace(/\D/g, '')
 }
 
+/** שגיאות Supabase הן PostgrestError (אובייקט רגיל) ולא Error — חילוץ טקסט קריא. */
+function supabaseErrorMessage(error: unknown): string {
+  if (typeof error === 'string') return error
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object') {
+    const e = error as { message?: unknown; details?: unknown }
+    const parts = [e.message, e.details].filter((p): p is string => typeof p === 'string' && p.length > 0)
+    if (parts.length) return parts.join(' — ')
+  }
+  return ''
+}
+
 function formatPhone(value?: string | null) {
   const digits = normalizeDigits(value)
   if (!digits) return '—'
@@ -962,10 +974,13 @@ export default function AdminEmployersPage({
         const { error } = await updateAccount(sheet.accountId, payload)
         if (error) throw error
       }
-      showToast('השינויים נשמרו בהצלחה', 'success')
+      showToast(sheet.mode === 'create' ? 'הארגון נוצר בהצלחה' : 'השינויים נשמרו בהצלחה', 'success')
       closeSheet()
-    } catch {
-      showToast('שגיאה בשמירה', 'error')
+    } catch (err) {
+      // accounts.bus_id הוא UNIQUE — ח.פ קיים נכשל, ובלי ההודעה המקורית אי אפשר להבין למה.
+      // שגיאות Supabase אינן instanceof Error אלא אובייקט PostgrestError עם message/details.
+      const message = supabaseErrorMessage(err)
+      showToast(message ? `שגיאה בשמירה: ${message}` : 'שגיאה בשמירה', 'error')
     } finally {
       setSavingSheet(false)
     }
@@ -1327,12 +1342,15 @@ export default function AdminEmployersPage({
                       עריכה מהירה
                     </button>
                   )}
-                  {sheet.mode === 'edit' && (
+                  {/* create חייב כפתור שמירה בדיוק כמו edit — בלעדיו הפאנל הוא מבוי סתום
+                      ו-saveSheet (שכבר תומך ביצירה) אינו נגיש מהממשק. */}
+                  {(sheet.mode === 'edit' || sheet.mode === 'create') && (
                     <>
                       <button
                         type="button"
-                        onClick={() => setSheet((prev) => ({ ...prev, mode: 'view' }))}
-                        className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]"
+                        onClick={() => (sheet.mode === 'create' ? closeSheet() : setSheet((prev) => ({ ...prev, mode: 'view' })))}
+                        disabled={savingSheet}
+                        className="rounded-[10px] border border-[#D9D9D9] px-4 py-2 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6] disabled:opacity-60"
                       >
                         ביטול
                       </button>
@@ -1342,7 +1360,7 @@ export default function AdminEmployersPage({
                         disabled={savingSheet}
                         className="rounded-[10px] bg-[#008080] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#006D6D] disabled:opacity-60"
                       >
-                        {savingSheet ? 'שומר...' : 'שמור'}
+                        {savingSheet ? 'שומר...' : sheet.mode === 'create' ? 'צור ארגון' : 'שמור'}
                       </button>
                     </>
                   )}

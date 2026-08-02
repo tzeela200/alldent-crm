@@ -1,13 +1,21 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Building2, CheckCircle2, UserPlus, Users } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { formatDate } from '@/lib/timeAgo'
 import { ContactPicker, type ContactPickerResult } from '@/components/ui/ContactPicker'
+import { AccountPanel, type AccountPanelPrefill } from '@/components/admin/AccountPanel'
+import { useAccountMutations } from '@/hooks/useAccountMutations'
 
 const PROFILE_TYPE_EMPLOYER = 2
 const PROFILE_TYPE_RECRUITER = 3
+
+// "ארגון חדש" — הסטטוס הנכון לארגון שנוצר מבקשה ציבורית שטרם פורסמה.
+// חשוב: אסור ליצור אותו כ-7 ("מגייס פעיל"), כי הטריגר sync_account_status_from_jobs
+// דורס 7→8 ("מגייס סגור") כשאין למשרה job_status=3 — והמשרה כאן היא טיוטה (2).
+// סטטוס 10 אינו מושפע מהטריגר, ויעלה ל-7 לבד כשהמשרה תפורסם בפועל.
+const NEW_ACCOUNT_STATUS_ID = 10
 
 type IntakeRow = {
   job_code: string
@@ -30,7 +38,7 @@ type IntakeRow = {
 }
 
 type NamedRow = { id: number; name: string }
-type AccountRow = { account_id: number; account_name: string | null }
+type AccountRow = { account_id: number; account_name: string | null; city_id: number | null }
 type ContactRow = { contact_id: number; full_name: string | null; display_name: string | null; account_link: number | null }
 
 const MATCH_LABEL: Record<string, string> = {
@@ -59,18 +67,29 @@ function useIntake(jobCode: string | undefined) {
 
 export default function RecruitmentRequestPanel({
   jobCode,
+  jobCityId,
+  jobRegionId,
+  jobAddress,
   onLinked,
   showToast,
 }: {
   jobCode: string
+  /** מיקום המשרה — משמש למילוי מוקדם של מיקום הארגון בעת יצירת ארגון חדש. */
+  jobCityId?: number | null
+  jobRegionId?: number | null
+  jobAddress?: string | null
   onLinked: (patch: { account_link?: number | null; rel_employer_contact?: number | null }) => void
   showToast: (message: string, tone: 'success' | 'error' | 'info') => void
 }) {
   const navigate = useNavigate()
+  const location = useLocation()
   const queryClient = useQueryClient()
+  const { insertAccount } = useAccountMutations()
   const { data: intake, refetch } = useIntake(jobCode)
   const [busy, setBusy] = useState(false)
   const [pickedAccountId, setPickedAccountId] = useState<number | null>(null)
+  const [createAccountOpen, setCreateAccountOpen] = useState(false)
+  const [copyCityToAccount, setCopyCityToAccount] = useState(false)
 
   const { data: tracks = [] } = useQuery({
     queryKey: ['dict_publication_tracks'],
@@ -85,11 +104,32 @@ export default function RecruitmentRequestPanel({
   const { data: accounts = [] } = useQuery({
     queryKey: ['accounts-for-recruitment-panel'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('accounts').select('account_id,account_name').order('account_name')
+      const { data, error } = await supabase.from('accounts').select('account_id,account_name,city_id').order('account_name')
       if (error) throw error
       return (data ?? []) as AccountRow[]
     },
     staleTime: 60_000,
+  })
+
+  // מילונים לפאנל הארגון המשותף. מפתחות ה-query זהים לשאר המסכים כדי לחלוק cache.
+  const { data: accountStatuses = [] } = useQuery({
+    queryKey: ['dict_account_statuses'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_account_statuses').select('id,name').order('id')
+      if (error) throw error
+      return (data ?? []) as NamedRow[]
+    },
+    staleTime: 600_000,
+  })
+
+  const { data: accountTypes = [] } = useQuery({
+    queryKey: ['dict_account_types'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('dict_account_types').select('id,name').order('id')
+      if (error) throw error
+      return (data ?? []) as NamedRow[]
+    },
+    staleTime: 600_000,
   })
 
   const relevantContactIds = [intake?.matched_contact_id, intake?.confirmed_contact_id].filter(
@@ -112,18 +152,6 @@ export default function RecruitmentRequestPanel({
     staleTime: 60_000,
   })
 
-  if (!intake) return null
-
-  const accountName = (id: number | null) => accounts.find((a) => a.account_id === id)?.account_name ?? `#${id}`
-  const contactName = (id: number | null) => {
-    if (id == null) return null
-    const c = contactsById[id]
-    return c ? c.full_name || c.display_name || `#${id}` : `#${id}`
-  }
-  const trackName = tracks.find((t) => t.id === intake.publication_track_id)?.name ?? '—'
-  const matchedContact = intake.matched_contact_id != null ? contactsById[intake.matched_contact_id] : null
-  const isReviewed = !!intake.reviewed_at
-
   const markReviewed = async (extraPatch: Record<string, unknown> = {}) => {
     const { data: userData } = await supabase.auth.getUser()
     const { error } = await supabase
@@ -131,25 +159,6 @@ export default function RecruitmentRequestPanel({
       .update({ reviewed_at: new Date().toISOString(), reviewed_by: userData.user?.id ?? null, ...extraPatch })
       .eq('job_code', jobCode)
     if (error) throw error
-  }
-
-  const approveAccount = async (accountId: number) => {
-    // הערה: accounts.account_status לא מתעדכן כאן. אישור התאמה הוא זיהוי בלבד —
-    // הסטטוס "מגייס פעיל" נקבע רק כשהמשרה בפועל מתפרסמת (ראו publishJob ב-JobDetailsPage.tsx).
-    setBusy(true)
-    try {
-      await markReviewed({ confirmed_account_id: accountId })
-      const { error: jobError } = await supabase.from('job').update({ account_link: accountId }).eq('job_code', jobCode)
-      if (jobError) throw jobError
-
-      onLinked({ account_link: accountId })
-      await refetch()
-      showToast('הארגון שויך למשרה', 'success')
-    } catch (err) {
-      showToast(err instanceof Error ? err.message : 'שגיאה בשיוך הארגון', 'error')
-    } finally {
-      setBusy(false)
-    }
   }
 
   const approveContact = async (contactId: number) => {
@@ -163,6 +172,66 @@ export default function RecruitmentRequestPanel({
       showToast('איש הקשר שויך למשרה', 'success')
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'שגיאה בשיוך איש הקשר', 'error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // חזרה ממסך "איש קשר חדש" — משייכים את איש הקשר שנוצר ומנקים את ה-state
+  // כדי שרענון של הדף לא ישייך שוב.
+  const returnedContactId = (location.state as { linkContactId?: number } | null)?.linkContactId
+  useEffect(() => {
+    if (typeof returnedContactId !== 'number' || !intake) return
+    navigate(location.pathname, { replace: true, state: null })
+    void approveContact(returnedContactId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returnedContactId, !!intake])
+
+  if (!intake) return null
+
+  const accountName = (id: number | null) => accounts.find((a) => a.account_id === id)?.account_name ?? `#${id}`
+  const storedContactName = (id: number | null) => {
+    if (id == null) return null
+    const c = contactsById[id]
+    return (c?.full_name || c?.display_name) ?? null
+  }
+  const contactName = (id: number | null) => {
+    if (id == null) return null
+    return storedContactName(id) ?? `#${id} (ללא שם)`
+  }
+  const trackName = tracks.find((t) => t.id === intake.publication_track_id)?.name ?? '—'
+  const matchedContact = intake.matched_contact_id != null ? contactsById[intake.matched_contact_id] : null
+  const isReviewed = !!intake.reviewed_at
+
+  // עיר הבקשה ממלאת את עיר הארגון רק ביצירת ארגון חדש. לארגון קיים שכבר יש לו עיר
+  // לא נוגעים — העיר נשארת על המשרה בלבד. אם לארגון הקיים אין עיר כלל, מציעים
+  // להשלים אותה, אבל רק בסימון מפורש ולא בכתיבה שקטה.
+  const accountMissingCity = (accountId: number | null) =>
+    accountId != null && jobCityId != null && accounts.some((a) => a.account_id === accountId && a.city_id == null)
+
+  const approveAccount = async (accountId: number) => {
+    // הערה: accounts.account_status לא מתעדכן כאן. אישור התאמה הוא זיהוי בלבד —
+    // הסטטוס "מגייס פעיל" נקבע רק כשהמשרה בפועל מתפרסמת (ראו publishJob ב-JobDetailsPage.tsx).
+    setBusy(true)
+    try {
+      await markReviewed({ confirmed_account_id: accountId })
+      const { error: jobError } = await supabase.from('job').update({ account_link: accountId }).eq('job_code', jobCode)
+      if (jobError) throw jobError
+
+      let cityCopied = false
+      if (copyCityToAccount && accountMissingCity(accountId)) {
+        // region_id נגזר אוטומטית מ-city_id בטריגר trg_accounts_fill_region_from_city_id.
+        const { error: cityError } = await supabase.from('accounts').update({ city_id: jobCityId }).eq('account_id', accountId)
+        if (cityError) throw cityError
+        cityCopied = true
+        await queryClient.invalidateQueries({ queryKey: ['accounts-for-recruitment-panel'] })
+      }
+
+      onLinked({ account_link: accountId })
+      await refetch()
+      showToast(cityCopied ? 'הארגון שויך למשרה ועיר הארגון עודכנה' : 'הארגון שויך למשרה', 'success')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'שגיאה בשיוך הארגון', 'error')
     } finally {
       setBusy(false)
     }
@@ -194,17 +263,48 @@ export default function RecruitmentRequestPanel({
     }
   }
 
-  const goCreateAccount = () => {
-    navigate('/admin/employers', {
-      state: {
-        prefillAccount: {
-          account_name: intake.requester_company_name,
-          bus_id: intake.requester_business_id ?? '',
-          phone: intake.requester_phone_raw,
-          email: intake.requester_email,
-        },
-      },
-    })
+  // מילוי מוקדם לפאנל הארגון. שים לב: הטלפון נשאר ריק בכוונה — הנייד שנמסר בטופס
+  // הוא נייד אישי של איש הקשר, והעתקתו לארגון הייתה מכפילה את אותו מספר
+  // בין contact ל-accounts בניגוד לכלל "נייד = רשומה אחת".
+  const accountPrefill: AccountPanelPrefill = {
+    account_name: intake.requester_company_name,
+    bus_id: intake.requester_business_id ?? '',
+    email: intake.requester_email,
+    phone: '',
+    account_status: String(NEW_ACCOUNT_STATUS_ID),
+    city_id: jobCityId ?? null,
+    region_id: jobRegionId ?? null,
+    address: jobAddress ?? '',
+  }
+
+  // יצירת הארגון ושיוכו למשרה כפעולה אחת — כדי שלא נישאר עם ארגון "יתום"
+  // שאינו מקושר לבקשה שממנה נוצר.
+  const createAccountFromRequest = async (patch: Record<string, unknown>) => {
+    const { data, error } = await insertAccount(patch)
+    if (error) return { error }
+
+    const newAccountId = Number((data as { account_id?: number } | null)?.account_id)
+    if (!Number.isFinite(newAccountId)) {
+      return { error: { message: 'הארגון נוצר אך לא הוחזר מזהה — יש לשייך אותו למשרה ידנית' } }
+    }
+
+    // מכאן הארגון כבר קיים ב-DB. כישלון בשלבים הבאים אינו מצדיק שמירה חוזרת
+    // (שהייתה יוצרת כפילות), ולכן מדווחים הצלחה חלקית מפורשת ולא שגיאה.
+    try {
+      const { error: jobError } = await supabase.from('job').update({ account_link: newAccountId }).eq('job_code', jobCode)
+      if (jobError) throw jobError
+      await markReviewed({ confirmed_account_id: newAccountId })
+
+      onLinked({ account_link: newAccountId })
+      await refetch()
+      await queryClient.invalidateQueries({ queryKey: ['accounts-for-recruitment-panel'] })
+      showToast('הארגון נוצר ושויך למשרה', 'success')
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'שגיאה לא ידועה'
+      showToast(`הארגון נוצר (#${newAccountId}) אך השיוך למשרה נכשל: ${message}`, 'error')
+    }
+
+    return { error: null }
   }
 
   const goCreateContact = () => {
@@ -217,6 +317,8 @@ export default function RecruitmentRequestPanel({
           phone: intake.requester_phone_raw,
           email: intake.requester_email,
         },
+        // אחרי היצירה נחזור לכאן ואיש הקשר ישויך אוטומטית לבקשה ולמשרה.
+        returnToJob: jobCode,
       },
     })
   }
@@ -270,6 +372,19 @@ export default function RecruitmentRequestPanel({
               <div className="text-[12px] text-[#6B6B6B]">{intake.account_match_reason ?? 'לא נמצאה התאמה'}</div>
             )}
 
+            {/* השלמת עיר לארגון קיים — רק כשחסרה לו עיר, ורק בסימון מפורש. */}
+            {(accountMissingCity(intake.matched_account_id) || accountMissingCity(pickedAccountId)) && (
+              <label className="mt-3 flex items-start gap-2 rounded-lg bg-[#F9FAFB] p-2 text-[11px] font-semibold text-[#2D2D2D]">
+                <input
+                  type="checkbox"
+                  checked={copyCityToAccount}
+                  onChange={(e) => setCopyCityToAccount(e.target.checked)}
+                  className="mt-0.5"
+                />
+                <span>לארגון הזה אין עיר — עדכני גם את עיר הארגון לפי עיר המשרה</span>
+              </label>
+            )}
+
             <div className="mt-3 flex flex-col gap-2">
               <select
                 className="h-9 rounded-lg border border-[#D9D9D9] px-2 text-[12px]"
@@ -286,7 +401,7 @@ export default function RecruitmentRequestPanel({
                   שיוך לארגון הנבחר
                 </button>
               )}
-              <button disabled={busy} onClick={goCreateAccount} className="flex items-center justify-center gap-1 rounded-lg border border-[#D9D9D9] px-3 py-1.5 text-[12px] font-bold text-[#2D2D2D] hover:bg-[#F3F4F6]">
+              <button disabled={busy} onClick={() => setCreateAccountOpen(true)} className="flex items-center justify-center gap-1 rounded-lg border border-[#D9D9D9] px-3 py-1.5 text-[12px] font-bold text-[#2D2D2D] hover:bg-[#F3F4F6]">
                 <Building2 className="h-3.5 w-3.5" /> צור ארגון חדש
               </button>
             </div>
@@ -299,6 +414,11 @@ export default function RecruitmentRequestPanel({
               <>
                 <div className="text-[14px] font-bold text-[#2D2D2D]">{contactName(intake.matched_contact_id)}</div>
                 <div className="text-[12px] text-[#6B6B6B]">{intake.contact_match_reason}</div>
+                {!storedContactName(intake.matched_contact_id) && (
+                  <div className="mt-2 rounded-lg bg-[#FFFBEB] px-2 py-1 text-[11px] font-semibold text-[#92400E]">
+                    לרשומה הקיימת אין שם. בבקשה נמסר «{intake.requester_contact_name}» — יש להשלים ידנית ב-360 של איש הקשר.
+                  </div>
+                )}
                 {matchedContact && intake.matched_account_id && matchedContact.account_link !== intake.matched_account_id && (
                   <div className="mt-2 rounded-lg bg-[#FEF2F2] px-2 py-1 text-[11px] font-semibold text-[#991B1B]">
                     שימו לב: איש הקשר אינו משויך כרגע לארגון המוצע — לא בוצע שינוי אוטומטי.
@@ -339,6 +459,33 @@ export default function RecruitmentRequestPanel({
           </button>
         )}
       </div>
+
+      {/* יצירת ארגון נעשית כאן, על מסך המשרה — לא בניווט למסך המעסיקים,
+          כדי שהארגון שנוצר ישויך מיד למשרה ולבקשה. */}
+      {createAccountOpen && (
+        <AccountPanel
+          account={null}
+          mode="create"
+          onModeChange={() => {}}
+          onClose={() => setCreateAccountOpen(false)}
+          navigate={navigate}
+          dicts={{
+            accountTypes,
+            accountStatuses,
+            profileTypesMap: new Map(),
+            rolesMap: new Map(),
+          }}
+          save={createAccountFromRequest}
+          prefill={accountPrefill}
+          createTitle="ארגון חדש מבקשת גיוס"
+          phoneHint={
+            <>
+              הנייד שנמסר בטופס (<span dir="ltr">{intake.requester_phone_raw}</span>) שייך לאיש הקשר ולא לארגון,
+              ולכן לא הועתק לכאן. אפשר להשאיר ריק או להזין טלפון משרדי של הארגון.
+            </>
+          }
+        />
+      )}
     </section>
   )
 }
