@@ -119,14 +119,23 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
         if (error) throw error
       }
 
-      await updateRow.mutateAsync({ leadId, updates: { merge_status: 6 } })
+      // אחרי אישור חייבת להישאר בדיוק התאמה אחת: GOOGLE-01 רושם שגיאה ולא יוצר
+      // קישור כאשר שתי העמודות מלאות (SSOT §18.5), וההחלטה לא הייתה חוזרת ל-Google.
+      // רלוונטי רק למסלול הסתירה — בשאר המסלולים העמודה השנייה כבר null.
+      const rowUpdates: Record<string, unknown> = { merge_status: 6 }
+      const resolvedConflict = routing?.route === 'match_conflict'
+      if (resolvedConflict) {
+        if (entity === 'contact') rowUpdates.match_account = null
+        else rowUpdates.match_contact = null
+      }
+      await updateRow.mutateAsync({ leadId, updates: rowUpdates })
 
       await logAction.mutateAsync({
         lead_id: leadId,
         target_type: entity,
         target_id: targetId,
         action_type: changed ? INBOX_ACTION.UPDATE_EXISTING : INBOX_ACTION.MERGE,
-        updates_applied: applied,
+        updates_applied: resolvedConflict ? { ...applied, resolved_conflict_as: entity } : applied,
         approved_by: user?.email ?? null,
       })
 

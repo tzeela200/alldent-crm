@@ -151,6 +151,12 @@ export function isNumericId(value: unknown): boolean {
   return classifyFacebookValue(value) === 'id'
 }
 
+/**
+ * `dict_roles.id = 14` — "עובד/ת דנטלי" (prefix EMP), התפקיד הכללי.
+ * ה-Aliases "מועמדת" ו-"דנטל" ב-Google ממופים אליו דרך `detect_role_from_text`.
+ */
+export const GENERIC_ROLE_ID = 14
+
 // ─────────────────────────────────────────────────────
 // מפות השדות
 // ─────────────────────────────────────────────────────
@@ -518,6 +524,21 @@ function buildDict(
 
   if (t[def.to] != null && Number(t[def.to]) === incomingId) {
     base.status = 'same'
+    return base
+  }
+
+  // כלל "שמירת תפקיד מדויק" (SSOT §7): Google מחזירה את הערך הכללי 14 בעוד
+  // Supabase מחזיקה תפקיד מקצועי מדויק יותר ⇒ אין הורדה ואין פער בכלל.
+  // הכיוון ההפוך (Google מדויק מול 14 ב-Supabase) הוא פער אמיתי וממשיך רגיל.
+  const existingId = t[def.to] != null ? Number(t[def.to]) : null
+  if (
+    def.kind === 'role' &&
+    incomingId === GENERIC_ROLE_ID &&
+    existingId != null &&
+    existingId !== GENERIC_ROLE_ID
+  ) {
+    base.status = 'same'
+    base.blockedReason = 'Supabase מחזיקה תפקיד מדויק יותר — אין הורדה לערך הכללי'
     return base
   }
 
