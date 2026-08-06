@@ -1155,8 +1155,8 @@ export default function AdminContactsPage() {
       setMergeRecords([])
       setSelectedRows([])
       if (selectedId && dupIds.includes(selectedId)) setSelectedId(null)
-    } catch {
-      showToast('שגיאה במיזוג הרשומות', 'error')
+    } catch (err) {
+      showToast(err instanceof Error ? `שגיאה במיזוג הרשומות: ${err.message}` : 'שגיאה במיזוג הרשומות', 'error')
     } finally {
       setMergePending(false)
     }
@@ -1220,6 +1220,29 @@ export default function AdminContactsPage() {
       showToast('נוסף כובע מועמד — הזהות הראשית נשמרה', 'success')
     } catch {
       showToast('שגיאה בהוספת כובע מועמד', 'error')
+    } finally {
+      setCandidatePendingIds((prev) => prev.filter((id) => id !== contactId))
+    }
+  }
+
+  const removeHat = async (contactId: number, profileTypeId: number) => {
+    if (!window.confirm('להסיר את הכובע הזה מאיש הקשר?')) return
+    setCandidatePendingIds((prev) => Array.from(new Set([...prev, contactId])))
+    try {
+      const { error } = await supabase
+        .from('rel_contact_profiles')
+        .delete()
+        .eq('contact_id', contactId)
+        .eq('profile_type_id', profileTypeId)
+      if (error) throw error
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['candidate-ids'] }),
+        queryClient.invalidateQueries({ queryKey: ['contact-profile-hats-page'] }),
+        queryClient.invalidateQueries({ queryKey: ['contact360', contactId] }),
+      ])
+      showToast('הכובע הוסר', 'success')
+    } catch {
+      showToast('שגיאה בהסרת הכובע', 'error')
     } finally {
       setCandidatePendingIds((prev) => prev.filter((id) => id !== contactId))
     }
@@ -2143,7 +2166,24 @@ export default function AdminContactsPage() {
                       fullWidth
                       viewValue={selectedContact.profileTypeIds.length ? (
                         <div className="flex flex-wrap gap-2">
-                          {selectedContact.profileTypeIds.map((id) => <LightTag key={id} tone={id === 1 ? 'teal' : 'slate'}>{profileTypeName(id)}</LightTag>)}
+                          {selectedContact.profileTypeIds.map((id) => (
+                            <LightTag key={id} tone={id === 1 ? 'teal' : 'slate'}>
+                              <span className="inline-flex items-center gap-1.5">
+                                {profileTypeName(id)}
+                                {isEditing && (
+                                  <button
+                                    type="button"
+                                    aria-label={`הסרת הכובע ${profileTypeName(id)}`}
+                                    onClick={() => removeHat(Number(selectedContact.contact_id), id)}
+                                    disabled={candidatePendingIds.includes(Number(selectedContact.contact_id))}
+                                    className="opacity-60 hover:opacity-100 disabled:cursor-not-allowed disabled:opacity-30"
+                                  >
+                                    ×
+                                  </button>
+                                )}
+                              </span>
+                            </LightTag>
+                          ))}
                         </div>
                       ) : 'לא הוגדרו כובעים'}
                     />

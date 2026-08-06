@@ -227,7 +227,14 @@ export function CityRegionPicker({
   function handleRegionChange(val: string) {
     const id = val ? Number(val) : null
     onRegionChange(id)
-    onCityChange(null)
+    // Only clear the city if it no longer belongs to the newly chosen region —
+    // a still-valid selection shouldn't be wiped just because the admin
+    // re-picked (or corrected) the region.
+    if (cityId != null) {
+      const current = cities.find((c) => c.id === cityId)
+      const stillValid = current != null && (id == null || Number(current.region_id) === id)
+      if (!stillValid) onCityChange(null)
+    }
   }
 
   function handleCityChange(newCityId: number | null, newRegionId: number | null) {
