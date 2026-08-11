@@ -21,6 +21,7 @@ import { findCityCandidates, attributePhones, type CityIndexEntry } from '@/lib/
 import { matchRow, type ContactCandidate, type AccountCandidate } from '@/lib/employment-intake/matching'
 import { proposeAction } from '@/lib/employment-intake/proposals'
 import { normalizeForHash } from '@/lib/employment-intake/hashes'
+import { sourceHashKey, dedupeBySourceHash } from '@/lib/employment-intake/sourceHash'
 import { detectRole, normalizePhonesBatch, resolveCitiesBatch } from '@/hooks/useEmploymentIntakeNormalize'
 import { fetchMatchingPool } from '@/hooks/useEmploymentIntakeMatching'
 import { resolveEmploymentIdentity, fetchImportRows, type ResolveIdentityStats } from '@/hooks/useEmploymentIntakeIdentity'
@@ -44,7 +45,14 @@ export interface PipelineResult {
   importId: string
   rows: EmploymentIntakeRow[]
   identityStats: ResolveIdentityStats
+  /** הודעות שחזרו על עצמן בתוך הקובץ עצמו (הודעות מערכת של WhatsApp) */
+  duplicatesInFile: number
+  /** הודעות שכבר נקלטו בהעלאה קודמת ולכן דולגו */
+  alreadyIngested: number
 }
+
+/** גודל מנת כתיבה. קובץ ייצוא טיפוסי מגיע ל-1,200 שורות; בקשה אחת ענקית שברירה. */
+const INSERT_CHUNK_SIZE = 400
 
 /** בונה שורת Insert אחת עבור employment_intake מתוך draft + תוצאות המנועים. */
 function buildInsertRow(params: {
@@ -226,10 +234,38 @@ export async function runClassificationPipeline(input: PipelineInput): Promise<P
   })
 
   // 7. כתיבה ל-employment_intake (staging של המודול — לא ליבה)
-  if (rowsToInsert.length > 0) {
-    const { error: insertError } = await supabase.from('employment_intake').insert(rowsToInsert)
+  //
+  // ל-source_hash יש UNIQUE, וייצוא WhatsApp מכיל הודעות מערכת זהות
+  // שחוזרות באותה דקה. בלי דילוג על כפילויות, קומץ שורות כאלה מפיל את
+  // כתיבת כל האצווה. שתי שכבות: דה-דופ בצד הלקוח (כדי לדעת ולדווח כמה
+  // דולגו) + ON CONFLICT DO NOTHING במסד (כדי לכסות גם העלאה חוזרת של
+  // אותו קובץ, שהלקוח אינו יכול לראות).
+  const { unique: uniqueRows, duplicateCount } = dedupeBySourceHash(rowsToInsert, (r) =>
+    sourceHashKey({
+      sourceType: r.source_type,
+      sourceName: r.source_name,
+      sourceMessageId: r.source_message_id,
+      sourcePublishedAt: r.source_published_at,
+      sourceSeq: r.source_seq,
+      senderPhoneNorm: r.sender_phone_norm,
+      senderName: r.sender_name,
+      normalizedText: r.normalized_text,
+    }),
+  )
+
+  let insertedCount = 0
+  for (let from = 0; from < uniqueRows.length; from += INSERT_CHUNK_SIZE) {
+    const chunk = uniqueRows.slice(from, from + INSERT_CHUNK_SIZE)
+    const { data, error: insertError } = await supabase
+      .from('employment_intake')
+      .upsert(chunk, { onConflict: 'source_hash', ignoreDuplicates: true })
+      .select('id')
     if (insertError) throw supabaseError('שמירת התוצאות נכשלה', insertError)
+    insertedCount += (data ?? []).length
   }
+
+  // כבר נקלט בעבר — כל השורות דולגו, ואין מה להריץ עליו התכנסות זהות
+  const skippedAsExisting = uniqueRows.length - insertedCount
 
   // 8. התכנסות זהות — טרנזקציה אחת ב-DB, בודקת גם היסטוריה קודמת
   const identityStats = await resolveEmploymentIdentity(importId)
@@ -237,7 +273,13 @@ export async function runClassificationPipeline(input: PipelineInput): Promise<P
   // 9. שליפת המצב הסופי (עם identity_group_id/canonical_contact_id מעודכנים)
   const rows = await fetchImportRows(importId)
 
-  return { importId, rows, identityStats }
+  return {
+    importId,
+    rows,
+    identityStats,
+    duplicatesInFile: duplicateCount,
+    alreadyIngested: skippedAsExisting,
+  }
 }
 
 export function useRunClassificationPipeline() {

@@ -17,6 +17,7 @@ import { useCityIndex } from '@/hooks/useEmploymentIntakeNormalize'
 import { useRunClassificationPipeline, type PipelineResult } from '@/hooks/useEmploymentIntakePipeline'
 import { autoDetectFamily, autoDetectFamilyForFile, resolveParserFamily, type ParserFamily } from '@/lib/employment-intake/parsers'
 import { errorDuplicateFile, LOADING_LABEL } from '@/lib/employment-intake/labels'
+import { describeError } from '@/lib/employment-intake/errors'
 
 type InputMode = 'paste' | 'file'
 
@@ -60,7 +61,7 @@ export function IntakeUploadZone({ onPipelineComplete }: Props) {
       )
       setResult(res)
     } catch (err) {
-      setErrorMessage((err as Error).message)
+      setErrorMessage(describeError(err, 'קריאת הקובץ נכשלה'))
     }
   }
 
@@ -79,10 +80,16 @@ export function IntakeUploadZone({ onPipelineComplete }: Props) {
         importedBy: user?.email ?? 'לא ידוע',
         cityIndex: cityIndex.data ?? [],
       })
-      toast.success(`המיון הושלם: ${pipelineResult.rows.length} הודעות נקלטו.`)
+      // דיווח מלא: מה נקלט, מה חזר על עצמו בקובץ, ומה כבר היה במערכת.
+      // הודעות מערכת של WhatsApp חוזרות באותה דקה, ולכן דילוג הוא תקין —
+      // אבל המשתמשת צריכה לדעת שהמספר קטן מכמות ההודעות שזוהו.
+      const parts = [`${pipelineResult.rows.length} הודעות נקלטו`]
+      if (pipelineResult.duplicatesInFile > 0) parts.push(`${pipelineResult.duplicatesInFile} הודעות זהות בקובץ דולגו`)
+      if (pipelineResult.alreadyIngested > 0) parts.push(`${pipelineResult.alreadyIngested} כבר נקלטו בעבר`)
+      toast.success(`המיון הושלם: ${parts.join(' · ')}.`)
       onPipelineComplete?.(pipelineResult)
     } catch (err) {
-      setErrorMessage((err as Error).message)
+      setErrorMessage(describeError(err, 'המיון נכשל'))
     }
   }
 

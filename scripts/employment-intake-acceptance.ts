@@ -23,6 +23,7 @@ import { proposeAction } from '@/lib/employment-intake/proposals'
 import { normalizeForHash } from '@/lib/employment-intake/hashes'
 import { contactSourceForIntakeSourceType } from '@/lib/employment-intake/contactSource'
 import { computeContactMergeDiff } from '@/lib/employment-intake/mergeCompare'
+import { sourceHashKey, dedupeBySourceHash } from '@/lib/employment-intake/sourceHash'
 import { resolveParserFamily, autoDetectFamily } from '@/lib/employment-intake/parsers'
 import { parseWhatsappCopyText } from '@/lib/employment-intake/parsers/whatsappCopy'
 import { parsePlainText } from '@/lib/employment-intake/parsers/plainText'
@@ -494,6 +495,39 @@ const previewLines = L.bulkPreviewSummary({ occurrences: 20, identities: 8, toUp
 check('הודעות', 'Preview גורף — חמישה נתונים', previewLines.length, 5)
 checkTrue('הודעות', 'Preview גורף — כל השורות בעברית', previewLines.every(hebrew))
 checkTrue('הודעות', 'דוח גורף בעברית', hebrew(L.bulkResultSummary({ succeeded: 5, skipped: 2, failed: 1 })))
+
+
+// ═══════════════════════════════════════════════════════════
+// 14. חתימת המקור ודילוג על כפילויות (INC-3122)
+// ═══════════════════════════════════════════════════════════
+const baseHash = {
+  sourceType: 4,
+  sourceName: 'קבוצת דרושים',
+  sourceMessageId: null,
+  sourcePublishedAt: '2026-06-04T15:56:00.000Z',
+  sourceSeq: 7,
+  senderPhoneNorm: null,
+  senderName: null,
+  normalizedText: 'הגדרות הקבוצה השתנו',
+}
+
+check('חתימה', 'מזהה חיצוני גובר על הכול', sourceHashKey({ ...baseHash, sourceMessageId: 'abc' }), '4|קבוצת דרושים|mid|abc')
+check('חתימה', 'שתי הודעות מערכת זהות באותה דקה ⇒ אותה חתימה', sourceHashKey(baseHash) === sourceHashKey({ ...baseHash, sourceSeq: 99 }), true)
+check('חתימה', 'טקסט שונה ⇒ חתימה שונה', sourceHashKey(baseHash) === sourceHashKey({ ...baseHash, normalizedText: 'אחר' }), false)
+check('חתימה', 'זמן שונה ⇒ חתימה שונה', sourceHashKey(baseHash) === sourceHashKey({ ...baseHash, sourcePublishedAt: '2026-06-04T15:57:00.000Z' }), false)
+check('חתימה', 'שולח שונה ⇒ חתימה שונה', sourceHashKey(baseHash) === sourceHashKey({ ...baseHash, senderName: 'דנה' }), false)
+check('חתימה', 'מקור שונה ⇒ חתימה שונה (אותה מודעה בשתי קבוצות נשמרת פעמיים)', sourceHashKey(baseHash) === sourceHashKey({ ...baseHash, sourceName: 'קבוצה אחרת' }), false)
+check('חתימה', 'ללא זמן ⇒ נופל למספר סידורי', sourceHashKey({ ...baseHash, sourcePublishedAt: null }).includes('|seq|7|'), true)
+check('חתימה', 'ללא זמן — סידורי שונה ⇒ חתימה שונה', sourceHashKey({ ...baseHash, sourcePublishedAt: null }) === sourceHashKey({ ...baseHash, sourcePublishedAt: null, sourceSeq: 8 }), false)
+
+const dedupeInput = [
+  { id: 1, k: 'a' }, { id: 2, k: 'b' }, { id: 3, k: 'a' }, { id: 4, k: 'a' }, { id: 5, k: 'c' },
+]
+const deduped = dedupeBySourceHash(dedupeInput, (r) => r.k)
+check('דילוג', 'נשמר מופע ראשון בלבד', deduped.unique.map((r) => r.id), [1, 2, 5])
+check('דילוג', 'ספירת הכפילויות מדויקת', deduped.duplicateCount, 2)
+check('דילוג', 'אין כפילויות ⇒ הכול עובר', dedupeBySourceHash([{ k: 'x' }, { k: 'y' }], (r) => r.k).duplicateCount, 0)
+check('דילוג', 'רשימה ריקה', dedupeBySourceHash([], (r: { k: string }) => r.k), { unique: [], duplicateCount: 0 })
 
 // ═══════════════════════════════════════════════════════════
 console.log('')
