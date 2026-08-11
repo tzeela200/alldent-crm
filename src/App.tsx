@@ -31,6 +31,7 @@ import AdminApplicationsPage from '@/pages/AdminApplicationsPage'
 import ATSPipelinePage from '@/pages/ATSPipelinePage'
 import SmartMatchPage from '@/pages/SmartMatchPage'
 import AdminFixPublicationsPage from '@/pages/AdminFixPublicationsPage'
+import EmploymentIntakePage from '@/pages/EmploymentIntakePage'
 import InboxV2Page from '@/pages/InboxV2Page'
 import CandidateProfilePage from '@/pages/CandidateProfilePage'
 import EmployerProfilePage from '@/pages/EmployerProfilePage'
@@ -174,6 +175,7 @@ export default function App() {
         {/* Tools */}
         <Route path="smart-match" element={<SmartMatchPage />} />
         <Route path="fix-publications" element={<AdminFixPublicationsPage />} />
+        <Route path="employment-intake" element={<EmploymentIntakePage />} />
       </Route>
 
       {/* ─── Legacy multi-segment technical URL ─── */}

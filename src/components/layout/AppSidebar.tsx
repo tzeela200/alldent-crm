@@ -13,6 +13,7 @@ import {
   Settings,
   DatabaseZap,
   Send,
+  ScanSearch,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -34,6 +35,7 @@ const navGroups: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: '/admin/inbox', label: 'לידים / פניות', icon: Inbox, badge: 3 },
       { to: '/admin/inbox-v2', label: 'טריאז\' נתונים', icon: DatabaseZap },
+      { to: '/admin/employment-intake', label: 'קליטה ומיון תעסוקתי', icon: ScanSearch },
       { to: '/admin/contacts', label: 'ניהול מאגר', icon: Users },
       { to: '/admin/candidates', label: 'מועמדים', icon: UserCheck },
       { to: '/admin/fix-publications', label: 'פרסומי WhatsApp', icon: Send },
