@@ -22,10 +22,11 @@ import { fetchActionsForIdentities } from '@/hooks/useEmploymentIntakeIdentity'
 import { resolveRowIdentity } from '@/lib/employment-intake/identity'
 import { checkRepeat, buildAnchorKey } from '@/lib/employment-intake/repeatGuard'
 import { contactSourceForIntakeSourceType } from '@/lib/employment-intake/contactSource'
-import { errorGeneric, successContactCreated, successAccountCreated, successStatusUpdated, successMergeNoOverwrite } from '@/lib/employment-intake/labels'
+import { successContactCreated, successAccountCreated, successStatusUpdated, successMergeNoOverwrite } from '@/lib/employment-intake/labels'
 import type { ActionType, DetailsSentType } from '@/types/employment-intake'
 import type { ContactCompareData, AccountCompareData } from '@/lib/employment-intake/mergeCompare'
 import type { RowWithAction } from '@/hooks/useEmploymentIntakeRows'
+import { supabaseError, describeError } from '@/lib/employment-intake/errors'
 
 function invalidateIntake(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['employment-intake-rows'] })
@@ -63,7 +64,7 @@ async function insertIntakeAction(args: {
     })
     .select('action_id')
     .single()
-  if (error) throw new Error(error.message)
+  if (error) throw supabaseError('רישום הפעולה נכשל', error)
   return data.action_id as number
 }
 
@@ -72,7 +73,7 @@ async function linkActionToIntakeRow(rowId: number, actionId: number, extra: Rec
     .from('employment_intake')
     .update({ last_action_id: actionId, updated_at: new Date().toISOString(), ...extra })
     .eq('id', rowId)
-  if (error) throw new Error(error.message)
+  if (error) throw supabaseError('קישור הפעולה להודעה נכשל', error)
 }
 
 // ── יצירת Contact חדש (§3.5 פעולה 7) ────────────────────────────────────
@@ -114,7 +115,7 @@ export function useCreateContactFromIntake() {
       }
 
       const { data, error } = await insertContact(payload)
-      if (error) throw new Error(error.message)
+      if (error) throw supabaseError('יצירת איש הקשר נכשלה', error)
       const contactId = data!.contact_id as number
 
       const actionId = await insertIntakeAction({
@@ -134,7 +135,7 @@ export function useCreateContactFromIntake() {
       invalidateIntake(qc)
       toast.success(successContactCreated())
     },
-    onError: (err: Error) => toast.error(err.message || errorGeneric('יצירת איש קשר')),
+    onError: (err: unknown) => toast.error(describeError(err, 'יצירת איש קשר')),
   })
 }
 
@@ -164,7 +165,7 @@ export function useCreateAccountFromIntake() {
       }
 
       const { data, error } = await insertAccount(payload)
-      if (error) throw new Error(error.message)
+      if (error) throw supabaseError('יצירת הארגון נכשלה', error)
       const accountId = data!.account_id as number
 
       const actionId = await insertIntakeAction({
@@ -184,7 +185,7 @@ export function useCreateAccountFromIntake() {
       invalidateIntake(qc)
       toast.success(successAccountCreated())
     },
-    onError: (err: Error) => toast.error(err.message || errorGeneric('יצירת ארגון')),
+    onError: (err: unknown) => toast.error(describeError(err, 'יצירת ארגון')),
   })
 }
 
@@ -197,7 +198,7 @@ export function useLinkContactToAccount() {
   return useMutation({
     mutationFn: async ({ row, contactId, accountId }: { row: RowWithAction; contactId: number; accountId: number }) => {
       const { error } = await updateContact(contactId, { account_link: accountId })
-      if (error) throw new Error(error.message)
+      if (error) throw supabaseError('קישור האדם לארגון נכשל', error)
 
       const actionId = await insertIntakeAction({
         anchorKey: `c:${contactId}`,
@@ -215,7 +216,7 @@ export function useLinkContactToAccount() {
       invalidateIntake(qc)
       toast.success('האדם קושר לארגון בהצלחה.')
     },
-    onError: (err: Error) => toast.error(err.message || errorGeneric('קישור לארגון')),
+    onError: (err: unknown) => toast.error(describeError(err, 'קישור לארגון')),
   })
 }
 
@@ -264,7 +265,7 @@ export function useMarkLeadStatus() {
 
       const patch: Record<string, unknown> = { social_status: statusId, ...(includeWorkStatus ? { work_status: 1 } : {}) }
       const { error } = await updateContact(identity.contactId, patch)
-      if (error) throw new Error(error.message)
+      if (error) throw supabaseError('עדכון סטטוס הליד נכשל', error)
 
       const actionId = await insertIntakeAction({
         anchorKey: buildAnchorKey(identity),
@@ -282,7 +283,7 @@ export function useMarkLeadStatus() {
       invalidateIntake(qc)
       if (result.written) toast.success(successStatusUpdated(vars.statusLabel))
     },
-    onError: (err: Error) => toast.error(err.message || errorGeneric('עדכון סטטוס ליד')),
+    onError: (err: unknown) => toast.error(describeError(err, 'עדכון סטטוס ליד')),
   })
 }
 
@@ -300,7 +301,7 @@ export function useMarkIrrelevant() {
       }
 
       const { error } = await updateContact(identity.contactId, { social_status: 12 })
-      if (error) throw new Error(error.message)
+      if (error) throw supabaseError('סימון "לא רלוונטי" נכשל', error)
 
       const actionId = await insertIntakeAction({
         anchorKey: buildAnchorKey(identity),
@@ -318,7 +319,7 @@ export function useMarkIrrelevant() {
       invalidateIntake(qc)
       toast.success(result.written ? 'הרשומה סומנה כלא רלוונטית.' : 'לא נדרשת פעולה — אין רשומה קיימת לסמן.')
     },
-    onError: (err: Error) => toast.error(err.message || errorGeneric('סימון לא רלוונטי')),
+    onError: (err: unknown) => toast.error(describeError(err, 'סימון לא רלוונטי')),
   })
 }
 
@@ -332,7 +333,7 @@ export function useContactCompareData(contactId: number | null) {
     enabled: contactId != null,
     queryFn: async (): Promise<ContactCompareData> => {
       const { data, error } = await supabase.from('contact').select(CONTACT_COMPARE_FIELDS).eq('contact_id', contactId!).single()
-      if (error) throw new Error(`טעינת נתוני איש הקשר נכשלה: ${error.message}`)
+      if (error) throw supabaseError('טעינת נתוני איש הקשר נכשלה', error)
       return data as unknown as ContactCompareData
     },
   })
@@ -344,7 +345,7 @@ export function useAccountCompareData(accountId: number | null) {
     enabled: accountId != null,
     queryFn: async (): Promise<AccountCompareData> => {
       const { data, error } = await supabase.from('accounts').select(ACCOUNT_COMPARE_FIELDS).eq('account_id', accountId!).single()
-      if (error) throw new Error(`טעינת נתוני הארגון נכשלה: ${error.message}`)
+      if (error) throw supabaseError('טעינת נתוני הארגון נכשלה', error)
       return data as unknown as AccountCompareData
     },
   })
@@ -358,7 +359,7 @@ export function useMergeContactFields() {
   return useMutation({
     mutationFn: async ({ row, contactId, patch }: { row: RowWithAction; contactId: number; patch: Record<string, unknown> }) => {
       const { error } = await updateContact(contactId, patch)
-      if (error) throw new Error(error.message)
+      if (error) throw supabaseError('מיזוג המידע לאיש הקשר נכשל', error)
 
       const identity = resolveRowIdentity(row)
       const actionId = await insertIntakeAction({
@@ -376,7 +377,7 @@ export function useMergeContactFields() {
       invalidateIntake(qc)
       toast.success(successMergeNoOverwrite())
     },
-    onError: (err: Error) => toast.error(err.message || errorGeneric('מיזוג מידע לאיש קשר')),
+    onError: (err: unknown) => toast.error(describeError(err, 'מיזוג מידע לאיש קשר')),
   })
 }
 
@@ -388,7 +389,7 @@ export function useMergeAccountFields() {
   return useMutation({
     mutationFn: async ({ row, accountId, patch }: { row: RowWithAction; accountId: number; patch: Record<string, unknown> }) => {
       const { error } = await updateAccount(accountId, patch)
-      if (error) throw new Error(error.message)
+      if (error) throw supabaseError('מיזוג המידע לארגון נכשל', error)
 
       const identity = resolveRowIdentity(row)
       const actionId = await insertIntakeAction({
@@ -407,6 +408,6 @@ export function useMergeAccountFields() {
       invalidateIntake(qc)
       toast.success(successMergeNoOverwrite())
     },
-    onError: (err: Error) => toast.error(err.message || errorGeneric('מיזוג מידע לארגון')),
+    onError: (err: unknown) => toast.error(describeError(err, 'מיזוג מידע לארגון')),
   })
 }

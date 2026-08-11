@@ -165,7 +165,7 @@ export function IntakeUploadZone({ onPipelineComplete }: Props) {
             onFile={(f) => setFile(f)}
             icon={FileText}
             title={file ? file.name : 'גררי לכאן קובץ, או לחצי לבחירה'}
-            description="TXT (ייצוא WhatsApp) · CSV · Excel"
+            description="קובץ טקסט (ייצוא WhatsApp) · קובץ CSV · קובץ Excel"
           />
         )}
 

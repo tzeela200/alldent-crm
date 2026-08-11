@@ -26,6 +26,7 @@ import {
   type BulkRunReport,
 } from '@/hooks/useEmploymentIntakeBulk'
 import { DETAILS_SENT_TYPE_LABEL } from '@/lib/employment-intake/labels'
+import { describeError } from '@/lib/employment-intake/errors'
 import type { DetailsSentType } from '@/types/employment-intake'
 
 const FAMILY_TITLE: Record<BulkFamily, string> = {
@@ -104,7 +105,7 @@ export function BulkPreviewDialog({ family, selectedIds, onClose, onDone }: Prop
       setPreview(result)
       setConfirmed(false)
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'בניית התצוגה המקדימה נכשלה.')
+      toast.error(describeError(err, 'בניית התצוגה המקדימה נכשלה'))
     } finally {
       setBuilding(false)
     }
@@ -119,7 +120,7 @@ export function BulkPreviewDialog({ family, selectedIds, onClose, onDone }: Prop
           onDone(report)
           onClose()
         },
-        onError: (err: Error) => toast.error(err.message || 'ביצוע הפעולה הגורפת נכשל.'),
+        onError: (err: unknown) => toast.error(describeError(err, 'ביצוע הפעולה הגורפת נכשל')),
       },
     )
   }

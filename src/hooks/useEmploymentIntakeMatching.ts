@@ -10,6 +10,7 @@
 
 import { supabase } from '@/lib/supabase'
 import type { ContactCandidate, AccountCandidate } from '@/lib/employment-intake/matching'
+import { supabaseError } from '@/lib/employment-intake/errors'
 
 const CONTACT_SELECT =
   'contact_id, display_name, phone_norm, second_phone, email, second_email, facebook_id, facebook_url, role, city_id'
@@ -61,8 +62,8 @@ export async function fetchMatchingPool(ids: BatchIdentifiers): Promise<Matching
     supabase.from('accounts').select(ACCOUNT_SELECT).or(orFilter),
   ])
 
-  if (contactsRes.error) throw new Error(`התאמת אנשי קשר נכשלה: ${contactsRes.error.message}`)
-  if (accountsRes.error) throw new Error(`התאמת ארגונים נכשלה: ${accountsRes.error.message}`)
+  if (contactsRes.error) throw supabaseError('התאמת אנשי קשר נכשלה', contactsRes.error)
+  if (accountsRes.error) throw supabaseError('התאמת ארגונים נכשלה', accountsRes.error)
 
   return {
     contacts: (contactsRes.data ?? []) as ContactCandidate[],

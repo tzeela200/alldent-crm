@@ -13,6 +13,7 @@ import type { RawParsedMessage } from '@/types/employment-intake'
 import { runParser, type ParserFamily, type ParseInput } from '@/lib/employment-intake/parsers'
 import { computeFileHash } from '@/lib/employment-intake/hashes'
 import { quickScan, type QuickScanResult } from '@/lib/employment-intake/quickScan'
+import { supabaseError } from '@/lib/employment-intake/errors'
 
 export interface IntakePreviewInput {
   family: ParserFamily
@@ -35,7 +36,7 @@ async function checkDuplicateFile(fileHash: string) {
     .is('deleted_at', null)
     .limit(1)
     .maybeSingle()
-  if (error) throw new Error(`בדיקת קובץ כפול נכשלה: ${error.message}`)
+  if (error) throw supabaseError('בדיקת קובץ כפול נכשלה', error)
   return data
 }
 

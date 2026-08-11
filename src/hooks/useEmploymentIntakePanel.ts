@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { fetchActionsForIdentities } from '@/hooks/useEmploymentIntakeIdentity'
 import type { EmploymentIntakeRow } from '@/types/employment-intake'
+import { supabaseError } from '@/lib/employment-intake/errors'
 
 export function useIntakeActionHistory(canonicalContactId: number | null, identityGroupId: string | null) {
   return useQuery({
@@ -34,7 +35,7 @@ export function useIntakeIdentityOccurrences(rowId: number, canonicalContactId: 
         .neq('id', rowId)
         .is('deleted_at', null)
         .order('ingested_at', { ascending: false })
-      if (error) throw new Error(`טעינת הופעות הזהות נכשלה: ${error.message}`)
+      if (error) throw supabaseError('טעינת הופעות הזהות נכשלה', error)
       return (data ?? []) as EmploymentIntakeRow[]
     },
   })

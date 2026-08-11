@@ -32,6 +32,7 @@ import type {
   ResolvedIdentity,
 } from '@/types/employment-intake'
 import type { RowWithAction } from '@/hooks/useEmploymentIntakeRows'
+import { supabaseError, describeError } from '@/lib/employment-intake/errors'
 
 export type BulkFamily = 'lead_status' | 'details_sent' | 'update_field'
 
@@ -109,7 +110,7 @@ async function fetchRowsByIds(ids: number[]): Promise<RowWithAction[]> {
     .select('*, last_action:employment_intake_action!last_action_id(result, performed_at, performed_by, action_type)')
     .in('id', ids)
     .is('deleted_at', null)
-  if (error) throw new Error(`טעינת השורות שנבחרו נכשלה: ${error.message}`)
+  if (error) throw supabaseError('טעינת השורות שנבחרו נכשלה', error)
   return (data ?? []) as unknown as RowWithAction[]
 }
 
@@ -131,14 +132,14 @@ async function fetchRowsForIdentities(contactIds: number[], groupIds: string[]):
     .select('*, last_action:employment_intake_action!last_action_id(result, performed_at, performed_by, action_type)')
     .or(clauses.join(','))
     .is('deleted_at', null)
-  if (error) throw new Error(`טעינת הופעות הזהות נכשלה: ${error.message}`)
+  if (error) throw supabaseError('טעינת הופעות הזהות נכשלה', error)
   return (data ?? []) as unknown as RowWithAction[]
 }
 
 async function fetchContactsCurrent(contactIds: number[]): Promise<Map<number, ContactCurrent>> {
   if (contactIds.length === 0) return new Map()
   const { data, error } = await supabase.from('contact').select(CONTACT_CURRENT_FIELDS).in('contact_id', contactIds)
-  if (error) throw new Error(`טעינת אנשי הקשר נכשלה: ${error.message}`)
+  if (error) throw supabaseError('טעינת אנשי הקשר נכשלה', error)
   return new Map((data ?? []).map((c) => [(c as unknown as ContactCurrent).contact_id, c as unknown as ContactCurrent]))
 }
 
@@ -351,7 +352,7 @@ export function useRunBulkAction() {
         try {
           const contactId = plan.identity.contactId!
           const { error: contactError } = await updateContact(contactId, plan.patch)
-          if (contactError) throw new Error(contactError.message)
+          if (contactError) throw supabaseError('עדכון איש הקשר נכשל', contactError)
 
           // מסלול גיוס עם ארגון מקושר — רק כשסומן במפורש (§6.3)
           if (spec.family === 'details_sent' && spec.detailsSentType === 'recruiting' && spec.alsoUpdateAccount) {
@@ -361,7 +362,7 @@ export function useRunBulkAction() {
                 last_contact_date: new Date().toISOString(),
                 account_status: ACCOUNT_STATUS_POTENTIAL, // פוטנציאלי – לטיפול. לעולם לא 7 (§10)
               })
-              if (accountError) throw new Error(accountError.message)
+              if (accountError) throw supabaseError('עדכון הארגון נכשל', accountError)
             }
           }
 
@@ -389,7 +390,7 @@ export function useRunBulkAction() {
               { onConflict: 'idempotency_key', ignoreDuplicates: true },
             )
             .select('action_id')
-          if (actionError) throw new Error(actionError.message)
+          if (actionError) throw supabaseError('רישום הפעולה נכשל', actionError)
 
           // Retry עם אותו bulk_run_id: ה-UNIQUE בלע את הרישום הכפול ואין
           // action_id חדש — הכתיבה לליבה כבר בוצעה, אין מה לקשר מחדש.
@@ -399,7 +400,7 @@ export function useRunBulkAction() {
               .from('employment_intake')
               .update({ last_action_id: actionId, updated_at: new Date().toISOString() })
               .in('id', sourceIntakeIds)
-            if (linkError) throw new Error(linkError.message)
+            if (linkError) throw supabaseError('קישור הפעולה להופעות נכשל', linkError)
           }
 
           items.push({
@@ -414,7 +415,7 @@ export function useRunBulkAction() {
             key: plan.key,
             displayName: plan.displayName,
             outcome: 'failed',
-            reason: err instanceof Error ? err.message : 'שגיאה לא ידועה',
+            reason: describeError(err, `הפעולה עבור ${plan.displayName} נכשלה`),
             occurrences: plan.rows.length,
           })
         }

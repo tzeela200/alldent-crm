@@ -6,6 +6,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { supabaseError } from '@/lib/employment-intake/errors'
 
 export const EMPLOYMENT_INTAKE_KEYS = {
   dicts: ['employment-intake-dicts'] as const,
@@ -27,8 +28,8 @@ export function useEmploymentIntakeDicts() {
         supabase.from('dict_source_types').select('id, name').order('id'),
         supabase.from('dict_social_statuses').select('id, name').order('id'),
       ])
-      if (sourceTypes.error) throw new Error(`טעינת מילון מקורות נכשלה: ${sourceTypes.error.message}`)
-      if (socialStatuses.error) throw new Error(`טעינת מילון סטטוס ליד נכשלה: ${socialStatuses.error.message}`)
+      if (sourceTypes.error) throw supabaseError('טעינת מילון מקורות נכשלה', sourceTypes.error)
+      if (socialStatuses.error) throw supabaseError('טעינת מילון סטטוס ליד נכשלה', socialStatuses.error)
       return {
         sourceTypes: (sourceTypes.data ?? []) as DictRow[],
         socialStatuses: (socialStatuses.data ?? []) as DictRow[],
@@ -51,7 +52,7 @@ export function useDuplicateFileCheck(fileHash: string | null) {
         .is('deleted_at', null)
         .limit(1)
         .maybeSingle()
-      if (error) throw new Error(`בדיקת קובץ כפול נכשלה: ${error.message}`)
+      if (error) throw supabaseError('בדיקת קובץ כפול נכשלה', error)
       return data
     },
   })

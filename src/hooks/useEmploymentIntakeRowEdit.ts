@@ -9,7 +9,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import type { ContentType, MatchType } from '@/types/employment-intake'
-import { errorGeneric } from '@/lib/employment-intake/labels'
+import { supabaseError, describeError } from '@/lib/employment-intake/errors'
 
 export interface EmploymentIntakeRowPatch {
   contact_name?: string | null
@@ -60,15 +60,15 @@ export function useUpdateEmploymentIntakeRow() {
         .from('employment_intake')
         .update({ ...patch, manual_override, updated_at: new Date().toISOString() })
         .eq('id', id)
-      if (error) throw new Error(error.message)
+      if (error) throw supabaseError('עדכון שורת הקליטה נכשל', error)
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['employment-intake-rows'] })
       qc.invalidateQueries({ queryKey: ['employment-intake-summary'] })
       toast.success('השורה עודכנה בהצלחה.')
     },
-    onError: () => {
-      toast.error(errorGeneric('עדכון שורת הקליטה'))
+    onError: (err: unknown) => {
+      toast.error(describeError(err, 'עדכון שורת הקליטה נכשל'))
     },
   })
 }

@@ -8,6 +8,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { ContentType, EmploymentIntakeRow } from '@/types/employment-intake'
 import type { MatchStatus } from '@/types/employment-intake'
+import { supabaseError } from '@/lib/employment-intake/errors'
 
 export interface EmploymentIntakeFilters {
   search: string
@@ -88,7 +89,7 @@ export function useEmploymentIntakeRows(filters: EmploymentIntakeFilters, page: 
         .order('ingested_at', { ascending: sortDir === 'asc' })
         .range(from, from + PAGE_SIZE - 1)
 
-      if (error) throw new Error(`טעינת התוצאות נכשלה: ${error.message}`)
+      if (error) throw supabaseError('טעינת התוצאות נכשלה', error)
       return { rows: (data ?? []) as unknown as RowWithAction[], total: count ?? 0, pageSize: PAGE_SIZE }
     },
   })
@@ -128,7 +129,7 @@ export function useEmploymentIntakeSummary() {
       ])
 
       const failed = [total, jobSeekers, recruiters, groupJoin, irrelevant, unclear, existing, newRecords, alreadyHandled].find((r) => r.error)
-      if (failed?.error) throw new Error(`טעינת סיכום נכשלה: ${failed.error.message}`)
+      if (failed?.error) throw supabaseError('טעינת סיכום נכשלה', failed.error)
 
       // זהויות ייחודיות: ספירה מדויקת דורשת שליפת עמודות זהות; לביצועים נשלף רק בעת הצורך (ראה fetchUniqueIdentityCount)
       const uniqueIdentities = await fetchUniqueIdentityCount()
@@ -155,7 +156,7 @@ async function fetchUniqueIdentityCount(): Promise<number> {
     .from('employment_intake')
     .select('canonical_contact_id, identity_group_id')
     .is('deleted_at', null)
-  if (error) throw new Error(`ספירת זהויות נכשלה: ${error.message}`)
+  if (error) throw supabaseError('ספירת זהויות נכשלה', error)
   const keys = new Set<string>()
   for (const row of data ?? []) {
     const r = row as { canonical_contact_id: number | null; identity_group_id: string | null }

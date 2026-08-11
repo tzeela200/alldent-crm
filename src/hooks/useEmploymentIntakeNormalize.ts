@@ -12,6 +12,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import type { CityIndexEntry } from '@/lib/employment-intake/normalize'
+import { supabaseError } from '@/lib/employment-intake/errors'
 
 const PAGE = 1000
 
@@ -30,7 +31,7 @@ export function useCityIndex() {
           .from('dict_cities')
           .select('id, name, normalized_name, aliases, region_id')
           .range(from, from + PAGE - 1)
-        if (error) throw new Error(`טעינת מדד ערים נכשלה: ${error.message}`)
+        if (error) throw supabaseError('טעינת מדד ערים נכשלה', error)
         const batch = (data ?? []).map((r) => ({
           id: r.id as number,
           name: (r.name as string) ?? '',
@@ -56,7 +57,7 @@ export interface RoleDetection {
 /** detect_role_from_text — סורק את הטקסט המלא בעצמו (אומת חי). מחזיר null אם לא נמצא. */
 export async function detectRole(text: string): Promise<RoleDetection | null> {
   const { data, error } = await supabase.rpc('detect_role_from_text', { p_text: text })
-  if (error) throw new Error(`זיהוי תפקיד נכשל: ${error.message}`)
+  if (error) throw supabaseError('זיהוי תפקיד נכשל', error)
   const row = (data ?? [])[0]
   if (!row) return null
   return { roleId: row.role_id, roleName: row.role_name, matchedAlias: row.matched_alias, confidence: row.confidence }
@@ -72,7 +73,7 @@ export interface CityResolution {
 /** resolve_city — דורש מועמד מבודד (לא משפט שלם). ראה normalize.ts. */
 export async function resolveCityCandidate(candidate: string): Promise<CityResolution | null> {
   const { data, error } = await supabase.rpc('resolve_city', { input_city: candidate })
-  if (error) throw new Error(`נרמול עיר נכשל: ${error.message}`)
+  if (error) throw supabaseError('נרמול עיר נכשל', error)
   const row = (data ?? [])[0]
   if (!row) return null
   return { cityId: row.city_id, cityName: row.city_name, regionId: row.region_id ?? null, regionName: row.region_name ?? null }
@@ -81,7 +82,7 @@ export async function resolveCityCandidate(candidate: string): Promise<CityResol
 /** normalize_il_mobile_phone — מחזיר 9725XXXXXXXX או null. */
 export async function normalizePhoneRpc(raw: string): Promise<string | null> {
   const { data, error } = await supabase.rpc('normalize_il_mobile_phone', { input_phone: raw })
-  if (error) throw new Error(`נרמול טלפון נכשל: ${error.message}`)
+  if (error) throw supabaseError('נרמול טלפון נכשל', error)
   return (data as string | null) ?? null
 }
 

@@ -8,6 +8,7 @@
 
 import { supabase } from '@/lib/supabase'
 import type { EmploymentIntakeAction, EmploymentIntakeRow } from '@/types/employment-intake'
+import { supabaseError } from '@/lib/employment-intake/errors'
 
 export interface ResolveIdentityStats {
   groups_created: number
@@ -20,7 +21,7 @@ export interface ResolveIdentityStats {
 /** קורא ל-resolve_employment_identity(p_import_id) — טרנזקציה אחת, ללא נגיעה בליבה. */
 export async function resolveEmploymentIdentity(importId: string): Promise<ResolveIdentityStats> {
   const { data, error } = await supabase.rpc('resolve_employment_identity', { p_import_id: importId })
-  if (error) throw new Error(`התכנסות זהות נכשלה: ${error.message}`)
+  if (error) throw supabaseError('התכנסות זהות נכשלה', error)
   return data as ResolveIdentityStats
 }
 
@@ -32,7 +33,7 @@ export async function fetchImportRows(importId: string): Promise<EmploymentIntak
     .eq('import_id', importId)
     .is('deleted_at', null)
     .order('id')
-  if (error) throw new Error(`טעינת שורות האצווה נכשלה: ${error.message}`)
+  if (error) throw supabaseError('טעינת שורות האצווה נכשלה', error)
   return (data ?? []) as EmploymentIntakeRow[]
 }
 
@@ -53,6 +54,6 @@ export async function fetchActionsForIdentities(contactIds: number[], identityGr
     .select('*')
     .or(clauses.join(','))
     .eq('result', 'done')
-  if (error) throw new Error(`טעינת היסטוריית פעולות נכשלה: ${error.message}`)
+  if (error) throw supabaseError('טעינת היסטוריית פעולות נכשלה', error)
   return (data ?? []) as EmploymentIntakeAction[]
 }

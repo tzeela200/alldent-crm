@@ -24,6 +24,7 @@ import { normalizeForHash } from '@/lib/employment-intake/hashes'
 import { detectRole, normalizePhonesBatch, resolveCitiesBatch } from '@/hooks/useEmploymentIntakeNormalize'
 import { fetchMatchingPool } from '@/hooks/useEmploymentIntakeMatching'
 import { resolveEmploymentIdentity, fetchImportRows, type ResolveIdentityStats } from '@/hooks/useEmploymentIntakeIdentity'
+import { supabaseError } from '@/lib/employment-intake/errors'
 
 const ENGINE_VERSION = 'v1'
 const RULES_VERSION = 'v1'
@@ -227,7 +228,7 @@ export async function runClassificationPipeline(input: PipelineInput): Promise<P
   // 7. כתיבה ל-employment_intake (staging של המודול — לא ליבה)
   if (rowsToInsert.length > 0) {
     const { error: insertError } = await supabase.from('employment_intake').insert(rowsToInsert)
-    if (insertError) throw new Error(`שמירת התוצאות נכשלה: ${insertError.message}`)
+    if (insertError) throw supabaseError('שמירת התוצאות נכשלה', insertError)
   }
 
   // 8. התכנסות זהות — טרנזקציה אחת ב-DB, בודקת גם היסטוריה קודמת
