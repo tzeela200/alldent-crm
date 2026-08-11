@@ -22,6 +22,7 @@ import {
   initialChoices,
   parseGoogleSource,
   resolveInboxRoute,
+  summarizeMerge,
   type ChoiceId,
   type MergeEntity,
 } from '@/lib/inbox-v2-merge'
@@ -100,8 +101,10 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
   const setChoice = (key: string, choice: ChoiceId) =>
     setChoices({ ...activeChoices, [key]: choice })
 
-  const visible = comparisons.filter((c) => c.status !== 'none' && c.status !== 'same')
-  const sameFields = comparisons.filter((c) => c.status === 'same')
+  // כל השדות מוצגים — גם הזהים (מעומעמים). הסתרתם גרמה לכך שרשומה בלי
+  // הבדלים הציגה מסך שכולו טכני, בלי שום דבר להחליט עליו.
+  const allFields = comparisons.filter((c) => c.status !== 'none')
+  const summary = summarizeMerge(allFields, activeChoices)
   const google = row ? parseGoogleSource(row) : null
 
   const handleMerge = async () => {
@@ -235,21 +238,31 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
             </span>
           </div>
 
-          <AdminPanelSection title={`השוואת שדות מול ה${entityLabel} הקיים`}>
+          {/* הטבלה תמיד מוצגת, כולל שדות זהים. רשומה בלי הבדלים הציגה קודם
+              רק את המקטע הטכני, ולא היה על סמך מה לאשר. */}
+          <AdminPanelSection title={`השוואה מול ה${entityLabel} הקיים`}>
             <div className="sm:col-span-2 space-y-2">
-              {visible.length === 0 ? (
-                <div className="rounded-[10px] bg-[#E6F3F3] px-4 py-6 text-center text-[13px] text-[#008080]">
-                  אין שדות חדשים מ-Google — הרשומה תואמת ל{entityLabel} הקיים. ניתן לסמן כמוזג.
+              <div className="flex flex-wrap items-center gap-2 text-[12px]">
+                <AdminBadge
+                  label={summary.willChange > 0 ? `${summary.willChange} שדות יתעדכנו` : 'שום שדה לא יתעדכן'}
+                  variant={summary.willChange > 0 ? 'teal' : 'neutral'}
+                />
+                <AdminBadge label={`${summary.unchanged} ללא שינוי`} variant="neutral" />
+              </div>
+
+              {allFields.length === 0 ? (
+                <div className="rounded-[10px] bg-[#F8F9FA] px-4 py-6 text-center text-[13px] text-[#6B6B6B]">
+                  אין שדות להשוואה ברשומה זו.
                 </div>
               ) : (
                 <>
-                  <div className="hidden px-3 text-[12px] font-semibold text-[#6B6B6B] sm:grid sm:grid-cols-[1.1fr_1fr_1fr_1.3fr] sm:gap-2">
-                    <div>שדה / סוג שינוי</div>
-                    <div>קיים במערכת</div>
-                    <div>הגיע מ-Google</div>
-                    <div>בחירה</div>
+                  <div className="hidden px-3 text-[12px] font-semibold text-[#6B6B6B] sm:grid sm:grid-cols-[1fr_1fr_1fr_1.4fr] sm:gap-2">
+                    <div>שדה</div>
+                    <div>יש אצלנו</div>
+                    <div>הגיע מגוגל</div>
+                    <div>אחרי האישור</div>
                   </div>
-                  {visible.map((cmp) => (
+                  {allFields.map((cmp) => (
                     <FieldComparisonRow
                       key={cmp.key}
                       comparison={cmp}
@@ -264,63 +277,49 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
                   ))}
                 </>
               )}
-
-              {sameFields.length > 0 && (
-                <div className="pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setShowSame(!showSame)}
-                    className="flex items-center gap-1 text-[12px] font-semibold text-[#9CA3AF] transition hover:text-[#6B6B6B]"
-                  >
-                    {showSame ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-                    הצג {sameFields.length} שדות זהים
-                  </button>
-                  {showSame && (
-                    <div className="mt-2 space-y-1">
-                      {sameFields.map((cmp) => (
-                        <div
-                          key={cmp.key}
-                          className="flex items-center justify-between rounded-[8px] bg-[#F8F9FA] px-3 py-1.5 text-[12px] text-[#6B6B6B]"
-                        >
-                          <span className="font-medium">{cmp.label}</span>
-                          <span dir="auto">{cmp.incomingLabel}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
             </div>
           </AdminPanelSection>
 
-          <AdminPanelSection title="מקור Google">
-            <AdminPanelField label="חשבון Google" mode="view" viewValue={google?.accountKey ?? row.source_name} />
-            <AdminPanelField label="מזהה רשומה ב-Google" mode="view" viewValue={google?.resourceName} />
-            <AdminPanelField label="סיבת הכניסה" mode="view" viewValue={deriveEntryReason(row, routing!.route)} />
-            <AdminPanelField
-              label={`מזוהה מול ${entityLabel}`}
-              mode="view"
-              viewValue={`#${targetId}`}
-            />
-            <AdminPanelField label="Payload hash" mode="view" viewValue={google?.payloadHash} />
-            <AdminPanelField label="etag" mode="view" viewValue={google?.etag} />
-          </AdminPanelSection>
-
+          {/* כל מה שאינו נדרש להחלטה יורד לכאן, סגור כברירת מחדל. */}
           <div className="rounded-[16px] border border-[#E5E7EB] bg-white p-4">
             <button
               onClick={() => setShowRaw(!showRaw)}
               className="flex items-center gap-1 text-[12px] font-semibold text-[#9CA3AF] transition hover:text-[#6B6B6B]"
             >
               {showRaw ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
-              נתונים גולמיים (JSON) — אזור טכני
+              פרטים טכניים
             </button>
             {showRaw && (
-              <pre
-                className="mt-2 max-h-64 overflow-auto rounded-lg bg-[#F8F9FA] p-3 text-[10px] leading-relaxed text-[#6B6B6B]"
-                dir="ltr"
-              >
-                {JSON.stringify({ raw_payload: row.raw_payload, parsed_payload: row.parsed_payload }, null, 2)}
-              </pre>
+              <div className="mt-3 space-y-3">
+                <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
+                  <AdminPanelField label="חשבון Google" mode="view" viewValue={google?.accountKey ?? row.source_name} />
+                  <AdminPanelField label={`מזוהה מול ${entityLabel}`} mode="view" viewValue={`#${targetId}`} />
+                  <AdminPanelField
+                    label="מזהה הרשומה בגוגל"
+                    mode="view"
+                    fullWidth
+                    viewValue={google?.resourceName ? <span className="break-all" dir="ltr">{google.resourceName}</span> : null}
+                  />
+                  <AdminPanelField
+                    label="חתימת המידע"
+                    mode="view"
+                    fullWidth
+                    viewValue={google?.payloadHash ? <span className="break-all" dir="ltr">{google.payloadHash}</span> : null}
+                  />
+                  <AdminPanelField
+                    label="גרסת הרשומה בגוגל"
+                    mode="view"
+                    fullWidth
+                    viewValue={google?.etag ? <span className="break-all" dir="ltr">{google.etag}</span> : null}
+                  />
+                </div>
+                <pre
+                  className="max-h-64 overflow-auto rounded-lg bg-[#F8F9FA] p-3 text-[10px] leading-relaxed text-[#6B6B6B]"
+                  dir="ltr"
+                >
+                  {JSON.stringify({ raw_payload: row.raw_payload, parsed_payload: row.parsed_payload }, null, 2)}
+                </pre>
+              </div>
             )}
           </div>
         </>

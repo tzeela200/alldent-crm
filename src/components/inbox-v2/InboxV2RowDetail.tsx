@@ -36,6 +36,8 @@ import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   deriveEntryReason,
+  entryReasonLabel,
+  matchedByLabel,
   getRecordType,
   parseGoogleSource,
   resolveInboxRoute,
@@ -637,15 +639,31 @@ export function InboxV2RowDetail({
               mode="view"
               viewValue={google?.accountKey ?? row.source_name}
             />
-            <AdminPanelField label="מזהה רשומה ב-Google" mode="view" viewValue={google?.resourceName} />
             <AdminPanelField
               label="סיבת הכניסה"
               mode="view"
               viewValue={deriveEntryReason(row, routing!.route)}
             />
             <AdminPanelField label="סוג רשומה (n8n)" mode="view" viewValue={typeLabel} />
-            <AdminPanelField label="Payload hash" mode="view" viewValue={google?.payloadHash} />
-            <AdminPanelField label="etag" mode="view" viewValue={google?.etag} />
+            {/* מזהים ארוכים בשורה מלאה — בגריד הדו-טורי הם גלשו ודרסו זה את זה */}
+            <AdminPanelField
+              label="מזהה הרשומה בגוגל"
+              mode="view"
+              fullWidth
+              viewValue={google?.resourceName ? <span className="break-all" dir="ltr">{google.resourceName}</span> : null}
+            />
+            <AdminPanelField
+              label="חתימת המידע"
+              mode="view"
+              fullWidth
+              viewValue={google?.payloadHash ? <span className="break-all" dir="ltr">{google.payloadHash}</span> : null}
+            />
+            <AdminPanelField
+              label="גרסת הרשומה בגוגל"
+              mode="view"
+              fullWidth
+              viewValue={google?.etag ? <span className="break-all" dir="ltr">{google.etag}</span> : null}
+            />
           </AdminPanelSection>
 
           {/* התאמה */}
@@ -685,8 +703,8 @@ export function InboxV2RowDetail({
               )}
             </div>
             <AdminPanelField label="תוצאת התאמה" mode="view" viewValue={match?.label} />
-            <AdminPanelField label="סיבת התאמה" mode="view" viewValue={row.match_reason} />
-            <AdminPanelField label="שיטת התאמה" mode="view" viewValue={row.matched_by} />
+            <AdminPanelField label="סיבת התאמה" mode="view" viewValue={entryReasonLabel(row.match_reason)} />
+            <AdminPanelField label="שיטת התאמה" mode="view" viewValue={matchedByLabel(row.matched_by)} />
             <AdminPanelField
               label="התאמה ל"
               mode="view"

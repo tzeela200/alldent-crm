@@ -9,6 +9,7 @@ import {
   inboxStatusAdminVariant,
   deriveMatchResult,
 } from '@/lib/inbox-v2-dicts'
+import { entryReasonLabel, matchedByLabel } from '@/lib/inbox-v2-merge'
 import type { InboxV2Row } from '@/types/inbox-v2'
 
 // עמודות זמינות — מקור אמת לבחירת העמודות (בדומה ל-AdminContactsPage).
@@ -185,7 +186,7 @@ export function InboxV2Table({
       match_reason: {
         key: 'match_reason',
         label: 'סיבת התאמה',
-        render: (r) => <span className="text-[13px] text-[#6B6B6B]">{dash(r.match_reason)}</span>,
+        render: (r) => <span className="text-[13px] text-[#6B6B6B]">{dash(entryReasonLabel(r.match_reason))}</span>,
       },
       match_confidence: {
         key: 'match_confidence',
@@ -304,7 +305,7 @@ export function InboxV2Table({
         label: 'match_account',
         render: (r) => dash(r.match_account),
       },
-      matched_by: { key: 'matched_by', label: 'שיטת התאמה', render: (r) => dash(r.matched_by) },
+      matched_by: { key: 'matched_by', label: 'שיטת התאמה', render: (r) => dash(matchedByLabel(r.matched_by)) },
       seen_count: { key: 'seen_count', label: 'הופעות', render: (r) => r.seen_count },
       updated_at: {
         key: 'updated_at',

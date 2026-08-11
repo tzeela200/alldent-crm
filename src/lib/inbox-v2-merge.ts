@@ -721,6 +721,72 @@ export function initialChoices(comparisons: FieldComparison[]): Record<string, C
 }
 
 // ─────────────────────────────────────────────────────
+// "מה יישמר אחרי האישור" — תיאור בלבד
+// ─────────────────────────────────────────────────────
+
+export type MergeResultTone = 'unchanged' | 'new' | 'replaced' | 'elsewhere' | 'blocked'
+
+export interface MergeResultDescription {
+  /** הערך שיהיה בשדה אחרי האישור */
+  value: string
+  tone: MergeResultTone
+  /** הסבר קצר כשהתוצאה אינה מובנת מאליה */
+  note: string | null
+}
+
+const EMPTY_LABEL = '(ריק)'
+
+/**
+ * מתארת מה יישמר בשדה אחרי האישור, לפי הבחירה הנוכחית.
+ *
+ * תיאור בלבד — אינה כותבת דבר ואינה מחליטה דבר. היא משקפת את מה
+ * ש-`buildPatch` יעשה בפועל, כדי שהמשתמשת תראה את התוצאה במקום לדמיין
+ * אותה מתוך כפתורי הבחירה.
+ *
+ * חייבת להישאר מיושרת ל-`buildPatch`: דילוג ו"השאר קיים" אינם כותבים,
+ * ערך נכנס ריק אינו נכתב, וסטטוס `unresolved` חסום לכל בחירה מלבד הפניה.
+ */
+export function describeMergeResult(cmp: FieldComparison, choice: ChoiceId): MergeResultDescription {
+  const existing = cmp.existingLabel ?? EMPTY_LABEL
+  const incoming = cmp.incomingLabel
+  const unchanged: MergeResultDescription = { value: existing, tone: 'unchanged', note: null }
+
+  if (cmp.status === 'same') return { value: existing, tone: 'unchanged', note: 'זהה בשני המקורות' }
+  if (choice === 'skip' || choice === 'existing') return unchanged
+
+  // ערך נכנס ריק לא נכתב מעל ערך קיים (buildPatch)
+  if (incoming == null || incoming === '') return unchanged
+
+  // מידע לא מזוהה חסום לכל בחירה מלבד הפניה לשדה הנכון
+  if (cmp.status === 'unresolved' && choice !== 'redirect') {
+    return { value: existing, tone: 'blocked', note: cmp.blockedReason ?? 'חסום — נדרשת בדיקה ידנית' }
+  }
+
+  if (choice === 'incoming') {
+    return cmp.existingLabel
+      ? { value: incoming, tone: 'replaced', note: `יחליף את "${cmp.existingLabel}"` }
+      : { value: incoming, tone: 'new', note: 'השלמת מידע חסר' }
+  }
+
+  // secondary/redirect — השדה עצמו אינו משתנה; הערך נשמר בשדה אחר
+  const optionLabel = cmp.options.find((o) => o.id === choice)?.label ?? null
+  return { value: existing, tone: 'elsewhere', note: optionLabel ?? 'יישמר בשדה אחר' }
+}
+
+/** סיכום קצר לראש הפאנל: כמה שדות יתעדכנו וכמה יישארו כמו שהם. */
+export function summarizeMerge(
+  comparisons: FieldComparison[],
+  choices: Record<string, ChoiceId>
+): { willChange: number; unchanged: number } {
+  let willChange = 0
+  for (const cmp of comparisons) {
+    const tone = describeMergeResult(cmp, choices[cmp.key] ?? 'skip').tone
+    if (tone === 'new' || tone === 'replaced' || tone === 'elsewhere') willChange++
+  }
+  return { willChange, unchanged: comparisons.length - willChange }
+}
+
+// ─────────────────────────────────────────────────────
 // מקור Google — תצוגה בלבד
 // ─────────────────────────────────────────────────────
 
@@ -767,11 +833,79 @@ export function parseGoogleSource(row: InboxV2Row): GoogleSourceInfo {
 }
 
 /**
- * סיבת הכניסה לשער. קודם כל מה ש-n8n/ה-RPC כתבו — המסך לא ממציא סיבות עסקיות.
- * רק כשאין match_reason נגזרת תווית טכנית.
+ * קודי match_reason ש-n8n/ה-RPC כותבים, בעברית.
+ *
+ * הכלל: ערך טכני באנגלית לעולם אינו מוצג למשתמשת. הקוד הזה מופיע גם
+ * בכותרת פאנל המיזוג וגם בשדה "סיבת הכניסה", ולכן קוד לא מתורגם הופיע
+ * פעמיים באותו מסך.
  */
+const ENTRY_REASON_LABEL: Record<string, string> = {
+  existing_google_link: 'הרשומה כבר מקושרת לאיש קשר',
+  new_person: 'אדם חדש',
+  new_organization: 'ארגון חדש',
+  new_contact: 'איש קשר חדש',
+  new_account: 'ארגון חדש',
+  new_information: 'מידע חדש ברשומה קיימת',
+  unclassified: 'סוג הרשומה לא נקבע',
+  match_conflict: 'התאמה גם לאדם וגם לארגון',
+  phone_match: 'זוהתה התאמה לפי נייד',
+  email_match: 'זוהתה התאמה לפי מייל',
+  no_match: 'לא נמצאה התאמה במאגר',
+}
+
+/** האם המחרוזת מכילה עברית — כלומר נכתבה כהסבר ולא כקוד. */
+function looksHebrew(text: string): boolean {
+  return /[֐-׿]/.test(text)
+}
+
+/**
+ * סיבת הכניסה לשער, תמיד בעברית.
+ *
+ * שלוש דרגות: (1) n8n כתב הסבר בעברית ⇒ מוצג כמו שהוא, כדי לא לאבד סיבה
+ * עסקית אמיתית. (2) קוד מוכר ⇒ התווית העברית. (3) קוד לא מוכר ⇒ תווית
+ * כללית + אזהרה ל-Console, ולעולם לא הטקסט האנגלי על המסך.
+ */
+export function entryReasonLabel(rawReason: unknown): string | null {
+  const given = normalizeText(rawReason)
+  if (!given) return null
+  if (looksHebrew(given)) return given
+
+  const known = ENTRY_REASON_LABEL[given.toLowerCase()]
+  if (known) return known
+
+  console.warn(`[inbox-v2] קוד match_reason לא מוכר: ${given}`)
+  return 'נדרשת בדיקה ידנית'
+}
+
+/** שיטת ההתאמה (`matched_by`) — לפי איזה שדה נמצאה ההתאמה. */
+const MATCHED_BY_LABEL: Record<string, string> = {
+  phone: 'לפי נייד',
+  phone_norm: 'לפי נייד',
+  second_phone: 'לפי נייד נוסף',
+  email: 'לפי מייל',
+  second_email: 'לפי מייל נוסף',
+  facebook_id: 'לפי מזהה Facebook',
+  facebook_url: 'לפי קישור Facebook',
+  name: 'לפי שם',
+  display_name: 'לפי שם',
+  google_link: 'לפי קישור Google קיים',
+  manual: 'שיוך ידני',
+}
+
+export function matchedByLabel(rawValue: unknown): string | null {
+  const given = normalizeText(rawValue)
+  if (!given) return null
+  if (looksHebrew(given)) return given
+
+  const known = MATCHED_BY_LABEL[given.toLowerCase()]
+  if (known) return known
+
+  console.warn(`[inbox-v2] ערך matched_by לא מוכר: ${given}`)
+  return 'שיטה לא מזוהה'
+}
+
 export function deriveEntryReason(row: InboxV2Row, route: InboxRoute): string {
-  const given = normalizeText(row.match_reason)
+  const given = entryReasonLabel(row.match_reason)
   if (given) return given
 
   if (route === 'unclassified') return 'סוג הרשומה לא נקבע'
