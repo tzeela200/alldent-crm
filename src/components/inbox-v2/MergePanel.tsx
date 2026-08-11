@@ -7,9 +7,7 @@ import { AdminPanelField } from '@/components/admin/AdminPanelField'
 import { AdminBadge } from '@/components/admin/AdminBadge'
 import { ActionButton } from '@/components/layout/Shell'
 import { FieldComparisonRow } from '@/components/inbox-v2/FieldComparisonRow'
-import { useInboxV2Row, useInboxV2Mutations } from '@/hooks/useInboxV2'
-import { useContactMutations } from '@/hooks/useContactMutations'
-import { useAccountMutations } from '@/hooks/useAccountMutations'
+import { useInboxV2Row } from '@/hooks/useInboxV2'
 import { useApplicationDicts } from '@/hooks/useApplicationDicts'
 import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
 import { useAuth } from '@/contexts/AuthContext'
@@ -23,9 +21,17 @@ import {
   parseGoogleSource,
   resolveInboxRoute,
   summarizeMerge,
+  unresolvedConflicts,
   type ChoiceId,
   type MergeEntity,
 } from '@/lib/inbox-v2-merge'
+import {
+  suppressDecided,
+  buildDecisionPayload,
+  googleAccountLabel,
+  type DecisionContext,
+} from '@/lib/inbox-v2-decisions'
+import { useInboxFieldDecisions, useApplyInboxMerge } from '@/hooks/useInboxFieldDecisions'
 import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 
@@ -41,18 +47,19 @@ interface Props {
 
 export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
   const { data: row, isLoading: rowLoading } = useInboxV2Row(leadId)
-  const { updateRow, logAction } = useInboxV2Mutations()
-  const { updateContact } = useContactMutations()
-  const { updateAccount } = useAccountMutations()
+  // אין כאן יותר updateContact/updateRow/logAction נפרדים: כל ארבע
+  // הכתיבות עוברות דרך apply_inbox_merge_decision בטרנזקציה אחת.
   const { user } = useAuth()
   const { data: dicts } = useApplicationDicts()
   const { data: cities } = useInboxV2Cities()
 
   const [choices, setChoices] = useState<Record<string, ChoiceId> | null>(null)
+  const [manualValues, setManualValues] = useState<Record<string, unknown>>({})
   const [overwriteOk, setOverwriteOk] = useState<Record<string, boolean>>({})
   const [showSame, setShowSame] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
   const [merging, setMerging] = useState(false)
+  const applyMerge = useApplyInboxMerge()
 
   const routing = row ? resolveInboxRoute(row) : null
 
@@ -101,53 +108,81 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
   const setChoice = (key: string, choice: ChoiceId) =>
     setChoices({ ...activeChoices, [key]: choice })
 
-  // כל השדות מוצגים — גם הזהים (מעומעמים). הסתרתם גרמה לכך שרשומה בלי
-  // הבדלים הציגה מסך שכולו טכני, בלי שום דבר להחליט עליו.
-  const allFields = comparisons.filter((c) => c.status !== 'none')
-  const summary = summarizeMerge(allFields, activeChoices)
   const google = row ? parseGoogleSource(row) : null
+
+  // ── זיכרון החלטות (INC-3123) ────────────────────────────────────────
+  const decisionCtx: DecisionContext | null =
+    entity && targetId != null
+      ? {
+          targetType: entity,
+          targetId,
+          googleAccountKey: google?.accountKey ?? null,
+          googleResourceName: google?.resourceName ?? null,
+        }
+      : null
+
+  const { data: pastDecisions = [] } = useInboxFieldDecisions(
+    entity,
+    targetId,
+    google?.resourceName ?? null,
+  )
+
+  // קונפליקט שכבר הוכרע בדיוק באותם שני ערכים אינו מוצג שוב.
+  const { visible: visibleFields, suppressed } = useMemo(() => {
+    const withValue = comparisons.filter((c) => c.status !== 'none')
+    if (!decisionCtx) return { visible: withValue, suppressed: [] }
+    return suppressDecided(withValue, pastDecisions, decisionCtx)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [comparisons, pastDecisions, entity, targetId, google?.resourceName, google?.accountKey])
+
+  // שדות זהים מוסתרים כברירת מחדל — הם לא דורשים החלטה.
+  const decisionFields = visibleFields.filter((c) => c.status !== 'same')
+  const sameFields = visibleFields.filter((c) => c.status === 'same')
+  const shownFields = showSame ? visibleFields : decisionFields
+
+  const summary = summarizeMerge(visibleFields, activeChoices, manualValues)
+  const blocking = unresolvedConflicts(visibleFields, activeChoices, manualValues)
 
   const handleMerge = async () => {
     if (!row || !entity || targetId == null) return
+    if (blocking.length > 0) {
+      toast.error('יש לבחור ערך בשדות המסומנים.')
+      return
+    }
     setMerging(true)
     try {
-      const { patch, applied } = buildPatch(comparisons, activeChoices, entity, target ?? null)
+      const { patch, applied } = buildPatch(comparisons, activeChoices, entity, target ?? null, manualValues)
       const changed = Object.keys(patch).length > 0
-
-      if (changed) {
-        const { error } =
-          entity === 'account'
-            ? await updateAccount(targetId, patch)
-            : await updateContact(targetId, patch)
-        if (error) throw error
-      }
 
       // אחרי אישור חייבת להישאר בדיוק התאמה אחת: GOOGLE-01 רושם שגיאה ולא יוצר
       // קישור כאשר שתי העמודות מלאות (SSOT §18.5), וההחלטה לא הייתה חוזרת ל-Google.
       // רלוונטי רק למסלול הסתירה — בשאר המסלולים העמודה השנייה כבר null.
-      const rowUpdates: Record<string, unknown> = { merge_status: 6 }
       const resolvedConflict = routing?.route === 'match_conflict'
-      if (resolvedConflict) {
-        if (entity === 'contact') rowUpdates.match_account = null
-        else rowUpdates.match_contact = null
-      }
-      await updateRow.mutateAsync({ leadId, updates: rowUpdates })
 
-      await logAction.mutateAsync({
-        lead_id: leadId,
-        target_type: entity,
-        target_id: targetId,
-        action_type: changed ? INBOX_ACTION.UPDATE_EXISTING : INBOX_ACTION.MERGE,
-        updates_applied: resolvedConflict ? { ...applied, resolved_conflict_as: entity } : applied,
-        approved_by: user?.email ?? null,
+      // ⚠ כתיבה אחת עקבית: עדכון הליבה, שמירת ההחלטות, סטטוס הרשומה
+      // וה-audit — הכול בטרנזקציה אחת. עד היום אלו היו שלוש קריאות
+      // נפרדות, וכשל באמצע השאיר את הרשומה מעודכנת בלי שההחלטה נשמרה,
+      // ואז אותו קונפליקט חזר בסנכרון הבא.
+      await applyMerge.mutateAsync({
+        leadId,
+        targetType: entity,
+        targetId,
+        patch,
+        decisions: buildDecisionPayload(visibleFields, activeChoices, manualValues),
+        actionType: changed ? INBOX_ACTION.UPDATE_EXISTING : INBOX_ACTION.MERGE,
+        approvedBy: user?.email ?? null,
+        googleAccountKey: google?.accountKey ?? null,
+        googleResourceName: google?.resourceName ?? null,
+        clearOtherMatch: resolvedConflict,
       })
 
+      void applied
       toast.success(
         changed
           ? entity === 'account'
             ? 'הרשומה מוזגה והארגון עודכן'
             : 'הרשומה מוזגה ואיש הקשר עודכן'
-          : 'הרשומה סומנה כמוזגת (ללא שינוי שדות)'
+          : 'הרשומה סומנה כמוזגת (ללא שינוי שדות). הבחירות נשמרו ולא יוצגו שוב.'
       )
       onClose()
     } catch (err) {
@@ -159,6 +194,9 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
 
   const entityLabel = entity === 'account' ? 'ארגון' : 'איש קשר'
   const loading = rowLoading || (!!entity && targetLoading)
+  // שם הישות במקום מזהה — §9 אוסר להציג מזהים טכניים
+  const targetName =
+    (entity === 'account' ? (target?.account_name as string | null) : (target?.display_name as string | null)) ?? null
 
   const header = (
     <div className="px-5 py-4">
@@ -171,39 +209,46 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
       </div>
       {row && (
         <p className="mt-1 text-[12px] text-[#9CA3AF]">
-          #{row.lead_id} · {deriveEntryReason(row, routing!.route)}
+          {targetName ? `${targetName} · ` : ''}
+          {deriveEntryReason(row, routing!.route)}
+          {googleAccountLabel(google?.accountKey) ? ` · מקור: ${googleAccountLabel(google?.accountKey)}` : ''}
         </p>
       )}
     </div>
   )
 
   const footer = (
-    <div className="flex items-center justify-between">
+    <div className="flex items-center justify-between gap-3">
       <button
         onClick={onClose}
         className="rounded-xl px-4 py-2 text-sm font-medium text-slate-500 transition hover:bg-slate-50"
       >
         ביטול
       </button>
-      {entity && (
-        <ActionButton
-          variant="primary"
-          icon={GitMerge}
-          onClick={handleMerge}
-          disabled={merging || loading || !target}
-        >
-          {merging
-            ? 'מעדכן...'
-            : hasPendingWrites(comparisons, activeChoices)
-              ? 'אשר ועדכן'
-              : 'סמן כמוזג (ללא שינוי שדות)'}
-        </ActionButton>
-      )}
+      <div className="flex items-center gap-3">
+        {blocking.length > 0 && (
+          <span className="text-[12px] font-semibold text-[#DC2626]">יש לבחור ערך בשדות המסומנים.</span>
+        )}
+        {entity && (
+          <ActionButton
+            variant="primary"
+            icon={GitMerge}
+            onClick={handleMerge}
+            disabled={merging || loading || !target || blocking.length > 0}
+          >
+            {merging
+              ? 'שומר...'
+              : hasPendingWrites(comparisons, activeChoices)
+                ? 'שמור בחירות ועדכן'
+                : 'סמן כמוזג (ללא שינוי שדות)'}
+          </ActionButton>
+        )}
+      </div>
     </div>
   )
 
   return (
-    <SidePanel open onClose={onClose} header={header} footer={footer}>
+    <SidePanel open onClose={onClose} header={header} footer={footer} width="max-w-[900px]">
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-slate-200 border-t-[#008080]" />
@@ -250,19 +295,19 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
                 <AdminBadge label={`${summary.unchanged} ללא שינוי`} variant="neutral" />
               </div>
 
-              {allFields.length === 0 ? (
-                <div className="rounded-[10px] bg-[#F8F9FA] px-4 py-6 text-center text-[13px] text-[#6B6B6B]">
-                  אין שדות להשוואה ברשומה זו.
+              {shownFields.length === 0 ? (
+                <div className="rounded-[10px] bg-[#F0FDF4] px-4 py-6 text-center text-[13px] text-[#166534]">
+                  אין מה להחליט — כל השדות זהים או שכבר הוכרעו בעבר. ניתן לסמן כמוזג.
                 </div>
               ) : (
                 <>
-                  <div className="hidden px-3 text-[12px] font-semibold text-[#6B6B6B] sm:grid sm:grid-cols-[1fr_1fr_1fr_1.4fr] sm:gap-2">
+                  <div className="hidden px-3 text-[12px] font-semibold text-[#6B6B6B] sm:grid sm:grid-cols-[1fr_1fr_1fr_1.5fr] sm:gap-2">
                     <div>שדה</div>
                     <div>יש אצלנו</div>
                     <div>הגיע מגוגל</div>
                     <div>אחרי האישור</div>
                   </div>
-                  {allFields.map((cmp) => (
+                  {shownFields.map((cmp) => (
                     <FieldComparisonRow
                       key={cmp.key}
                       comparison={cmp}
@@ -273,10 +318,35 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
                         setOverwriteOk((o) => ({ ...o, [cmp.key]: confirmed }))
                         if (!confirmed) setChoice(cmp.key, 'skip')
                       }}
+                      manualValue={manualValues[cmp.key]}
+                      onManualValueChange={(v) => setManualValues((m) => ({ ...m, [cmp.key]: v }))}
+                      needsDecision={blocking.some((b) => b.key === cmp.key)}
                     />
                   ))}
                 </>
               )}
+
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                {sameFields.length > 0 ? (
+                  <label className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
+                    <input
+                      type="checkbox"
+                      checked={showSame}
+                      onChange={(e) => setShowSame(e.target.checked)}
+                      className="h-3.5 w-3.5 accent-[#008080]"
+                    />
+                    הצג גם {sameFields.length} שדות זהים
+                  </label>
+                ) : (
+                  <span />
+                )}
+
+                {suppressed.length > 0 && (
+                  <span className="text-[12px] text-[#9CA3AF]">
+                    {suppressed.length} פערים הוכרעו על ידך בעבר ואינם מוצגים שוב
+                  </span>
+                )}
+              </div>
             </div>
           </AdminPanelSection>
 

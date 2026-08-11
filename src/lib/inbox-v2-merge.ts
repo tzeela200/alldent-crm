@@ -162,7 +162,10 @@ export const GENERIC_ROLE_ID = 14
 // ─────────────────────────────────────────────────────
 
 export type MergeEntity = 'contact' | 'account'
-export type FieldKind = 'text' | 'phone' | 'email' | 'role' | 'city' | 'fbid' | 'url'
+// 'account_type' קיים כתשתית בלבד: Google אינו שולח סוג ארגון, ולכן שדה
+// כזה לא מופיע היום ב-ACCOUNT_MERGE_FIELDS ולעולם לא ייווצר בו פער.
+// הסוג קיים כדי ש"ערך אחר" יעבוד מיידית אם המקור יתחיל לספק אותו.
+export type FieldKind = 'text' | 'phone' | 'email' | 'role' | 'city' | 'fbid' | 'url' | 'account_type'
 
 export interface MergeFieldDef {
   key: string
@@ -252,7 +255,8 @@ export function writableKeys(entity: MergeEntity): Set<string> {
 // ─────────────────────────────────────────────────────
 
 export type ComparisonStatus = 'none' | 'same' | 'complete' | 'diff' | 'unresolved'
-export type ChoiceId = 'skip' | 'existing' | 'incoming' | 'secondary' | 'redirect'
+/** 'manual' = "ערך אחר" — ערך שהמשתמשת הזינה או בחרה ממילון (INC-3123). */
+export type ChoiceId = 'skip' | 'existing' | 'incoming' | 'secondary' | 'redirect' | 'manual'
 
 export interface FieldOption {
   id: ChoiceId
@@ -651,7 +655,9 @@ export function buildPatch(
   comparisons: FieldComparison[],
   choices: Record<string, ChoiceId>,
   entity: MergeEntity,
-  target: Record<string, unknown> | null = null
+  target: Record<string, unknown> | null = null,
+  /** ערכי "ערך אחר" לפי מפתח שדה (INC-3123) */
+  manualValues: Record<string, unknown> = {}
 ): PatchResult {
   const allowed = writableKeys(entity)
   const patch: Record<string, unknown> = {}
@@ -664,13 +670,13 @@ export function buildPatch(
     if (cmp.status === 'unresolved' && choice !== 'redirect') continue
 
     let column: string | null = null
-    if (choice === 'incoming') column = cmp.target
+    if (choice === 'incoming' || choice === 'manual') column = cmp.target
     else if (choice === 'secondary') column = cmp.secondaryTarget
     else if (choice === 'redirect') column = cmp.redirectTarget
 
     if (!column || !allowed.has(column)) continue
 
-    const value = cmp.incomingRaw
+    const value = choice === 'manual' ? manualValues[cmp.key] : cmp.incomingRaw
     // אין כתיבת ריק מעל ערך קיים.
     if (value == null || value === '') continue
 
@@ -746,13 +752,22 @@ const EMPTY_LABEL = '(ריק)'
  * חייבת להישאר מיושרת ל-`buildPatch`: דילוג ו"השאר קיים" אינם כותבים,
  * ערך נכנס ריק אינו נכתב, וסטטוס `unresolved` חסום לכל בחירה מלבד הפניה.
  */
-export function describeMergeResult(cmp: FieldComparison, choice: ChoiceId): MergeResultDescription {
+export function describeMergeResult(
+  cmp: FieldComparison,
+  choice: ChoiceId,
+  manualValue?: unknown,
+): MergeResultDescription {
   const existing = cmp.existingLabel ?? EMPTY_LABEL
   const incoming = cmp.incomingLabel
   const unchanged: MergeResultDescription = { value: existing, tone: 'unchanged', note: null }
 
   if (cmp.status === 'same') return { value: existing, tone: 'unchanged', note: 'זהה בשני המקורות' }
   if (choice === 'skip' || choice === 'existing') return unchanged
+
+  if (choice === 'manual') {
+    if (manualValue == null || manualValue === '') return { value: EMPTY_LABEL, tone: 'blocked', note: 'יש להזין ערך' }
+    return { value: String(manualValue), tone: 'replaced', note: 'ערך שהוזן ידנית' }
+  }
 
   // ערך נכנס ריק לא נכתב מעל ערך קיים (buildPatch)
   if (incoming == null || incoming === '') return unchanged
@@ -776,14 +791,36 @@ export function describeMergeResult(cmp: FieldComparison, choice: ChoiceId): Mer
 /** סיכום קצר לראש הפאנל: כמה שדות יתעדכנו וכמה יישארו כמו שהם. */
 export function summarizeMerge(
   comparisons: FieldComparison[],
-  choices: Record<string, ChoiceId>
+  choices: Record<string, ChoiceId>,
+  manualValues: Record<string, unknown> = {}
 ): { willChange: number; unchanged: number } {
   let willChange = 0
   for (const cmp of comparisons) {
-    const tone = describeMergeResult(cmp, choices[cmp.key] ?? 'skip').tone
+    const tone = describeMergeResult(cmp, choices[cmp.key] ?? 'skip', manualValues[cmp.key]).tone
     if (tone === 'new' || tone === 'replaced' || tone === 'elsewhere') willChange++
   }
   return { willChange, unchanged: comparisons.length - willChange }
+}
+
+/**
+ * שדות שדורשים הכרעה ולא נבחר בהם דבר — חוסמים שמירה (§11).
+ * "השלמת מידע חסר" אינה קונפליקט ולכן אינה חוסמת; רק פער אמיתי.
+ */
+export function unresolvedConflicts(
+  comparisons: FieldComparison[],
+  choices: Record<string, ChoiceId>,
+  manualValues: Record<string, unknown> = {}
+): FieldComparison[] {
+  return comparisons.filter((cmp) => {
+    if (cmp.status !== 'diff') return false
+    const choice = choices[cmp.key] ?? 'skip'
+    if (choice === 'skip') return true
+    if (choice === 'manual') {
+      const v = manualValues[cmp.key]
+      return v == null || v === ''
+    }
+    return false
+  })
 }
 
 // ─────────────────────────────────────────────────────

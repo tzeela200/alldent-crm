@@ -1,12 +1,17 @@
 import { AdminBadge, type AdminBadgeVariant } from '@/components/admin/AdminBadge'
+import { CompactValueEditor } from '@/components/inbox-v2/CompactValueEditor'
 import { describeMergeResult, type ChoiceId, type ComparisonStatus, type FieldComparison, type MergeResultTone } from '@/lib/inbox-v2-merge'
 
 /**
  * שורת השוואה אחת בשער האישור:
  * שם השדה · מה יש אצלנו · מה הגיע מגוגל · **מה יישמר אחרי האישור**.
  *
- * העמודה הרביעית היא העיקר: בלעדיה המשתמשת רואה שתי אפשרויות וצריכה
- * לדמיין את התוצאה. היא מתעדכנת חי לפי הבחירה.
+ * העמודה הרביעית היא העיקר: בלעדיה המשתמשת רואה אפשרויות וצריכה לדמיין
+ * את התוצאה. היא מתעדכנת חי לפי הבחירה.
+ *
+ * בקונפליקט אמיתי יש תמיד שלוש אפשרויות (INC-3123):
+ * הערך שלנו · הערך מגוגל · **ערך אחר** — דרך `CompactValueEditor`,
+ * שמשתמש באותם מילונים ובאותה לוגיקה של הרכיבים הקיימים.
  *
  * רכיב תצוגה טהור — כל ההחלטות מגיעות מ-inbox-v2-merge.ts.
  * אינו מייבא דבר מ-MergeRecordsModal (מיזוג כפילויות) — אין מחיקה ואין העברת קשרים.
@@ -16,25 +21,25 @@ const STATUS_META: Record<ComparisonStatus, { label: string; variant: AdminBadge
   none: { label: '', variant: 'neutral' },
   same: { label: 'זהה', variant: 'neutral' },
   complete: { label: 'השלמת מידע חסר', variant: 'teal' },
-  diff: { label: 'פער', variant: 'error' },
-  unresolved: { label: 'מידע לא מזוהה', variant: 'amber' },
+  diff: { label: 'פער — נדרשת בחירה', variant: 'amber' },
+  unresolved: { label: 'מידע לא מזוהה', variant: 'error' },
 }
 
+/** §10 — ירוק: אין פעולה · טורקיז: מידע חדש · כתום: פער · אדום: חסום */
 const ROW_BG: Record<ComparisonStatus, string> = {
   none: 'bg-[#F8F9FA]',
-  same: 'bg-[#F8F9FA]',
+  same: 'bg-[#F0FDF4]',
   complete: 'bg-[#E6F3F3]',
-  diff: 'bg-[#FEF2F2]',
-  unresolved: 'bg-[#FFFBEB]',
+  diff: 'bg-[#FFFBEB]',
+  unresolved: 'bg-[#FEF2F2]',
 }
 
-/** צבע עמודת התוצאה — ירוק כשמשהו נכנס, אפור כשלא, אדום כשחסום. */
 const RESULT_TONE: Record<MergeResultTone, string> = {
   unchanged: 'text-[#9CA3AF]',
   new: 'text-[#008080] font-semibold',
   replaced: 'text-[#008080] font-semibold',
   elsewhere: 'text-[#008080] font-semibold',
-  blocked: 'text-[#B45309] font-semibold',
+  blocked: 'text-[#DC2626] font-semibold',
 }
 
 interface Props {
@@ -43,6 +48,11 @@ interface Props {
   onChoiceChange: (choice: ChoiceId) => void
   overwriteConfirmed: boolean
   onOverwriteConfirmChange: (confirmed: boolean) => void
+  /** "ערך אחר" — הערך שהוקלד/נבחר ידנית, אם יש */
+  manualValue?: unknown
+  onManualValueChange?: (value: unknown) => void
+  /** מסומן כשדורש הכרעה ולא נבחר בו דבר */
+  needsDecision?: boolean
 }
 
 export function FieldComparisonRow({
@@ -51,17 +61,21 @@ export function FieldComparisonRow({
   onChoiceChange,
   overwriteConfirmed,
   onOverwriteConfirmChange,
+  manualValue,
+  onManualValueChange,
+  needsDecision,
 }: Props) {
   const meta = STATUS_META[comparison.status]
   const needsOverwriteConfirm = comparison.options.some((o) => o.requiresOverwriteConfirm)
-  const result = describeMergeResult(comparison, choice)
   const isSame = comparison.status === 'same'
+  const isManual = choice === 'manual'
+  const result = describeMergeResult(comparison, choice, manualValue)
 
   return (
     <div
-      className={`grid grid-cols-1 gap-2 rounded-[10px] px-3 py-2 text-[13px] sm:grid-cols-[1fr_1fr_1fr_1.4fr] sm:items-start ${
+      className={`grid grid-cols-1 gap-2 rounded-[10px] px-3 py-2 text-[13px] sm:grid-cols-[1fr_1fr_1fr_1.5fr] sm:items-start ${
         ROW_BG[comparison.status]
-      } ${isSame ? 'opacity-60' : ''}`}
+      } ${isSame ? 'opacity-60' : ''} ${needsDecision ? 'ring-2 ring-[#DC2626]' : ''}`}
     >
       <div className="space-y-1">
         <div className="font-semibold text-[#2D2D2D]">{comparison.label}</div>
@@ -113,12 +127,28 @@ export function FieldComparisonRow({
                   </label>
                 )
               })}
+
+              {/* אפשרות שלישית קבועה בכל שדה שניתן להכריע בו */}
+              {onManualValueChange && comparison.status !== 'unresolved' && (
+                <label className="flex items-center gap-1 text-[11px] font-medium">
+                  <input
+                    type="radio"
+                    name={`cmp-${comparison.key}`}
+                    checked={isManual}
+                    onChange={() => onChoiceChange('manual')}
+                    className="h-3 w-3 accent-[#008080]"
+                  />
+                  ערך אחר
+                </label>
+              )}
             </div>
 
+            {isManual && onManualValueChange && (
+              <CompactValueEditor kind={comparison.kind} value={manualValue} onChange={onManualValueChange} />
+            )}
+
             {comparison.blockedReason && (
-              <span className="text-[11px] font-medium text-[#B45309]">
-                ⚠️ {comparison.blockedReason}
-              </span>
+              <span className="text-[11px] font-medium text-[#B45309]">⚠️ {comparison.blockedReason}</span>
             )}
 
             {needsOverwriteConfirm && (
