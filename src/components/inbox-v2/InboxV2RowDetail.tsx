@@ -33,6 +33,7 @@ import {
   diffStatusLabel,
 } from '@/lib/inbox-v2-dicts'
 import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
+import { useInboxMatchedNames } from '@/hooks/useInboxMatchedNames'
 import { normalizePhone, formatPhone } from '@/lib/normalizePhone'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
@@ -106,6 +107,7 @@ export function InboxV2RowDetail({
   const { data: dicts } = useApplicationDicts()
   const { data: cities } = useInboxV2Cities()
   const { data: sourceTypes } = useInboxV2SourceTypes()
+  const { data: matchedNames } = useInboxMatchedNames(row ? [row] : [])
   const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [form, setForm] = useState<EditForm | null>(null)
@@ -712,9 +714,14 @@ export function InboxV2RowDetail({
               label="התאמה ל"
               mode="view"
               viewValue={
+                // שם הרשומה, לא מזהה טכני (INC-3125)
                 [
-                  row.match_contact ? `איש קשר #${row.match_contact}` : null,
-                  row.match_account ? `ארגון #${row.match_account}` : null,
+                  row.match_contact
+                    ? `איש קשר: ${matchedNames?.contacts.get(row.match_contact) ?? `#${row.match_contact}`}`
+                    : null,
+                  row.match_account
+                    ? `ארגון: ${matchedNames?.accounts.get(row.match_account) ?? `#${row.match_account}`}`
+                    : null,
                 ]
                   .filter(Boolean)
                   .join(' · ') || null

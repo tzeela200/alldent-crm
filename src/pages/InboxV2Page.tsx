@@ -102,8 +102,8 @@ export default function InboxV2Page() {
 
   return (
     <Shell
-      title="מרכז טריאז' נתונים"
-      subtitle="שער הכניסה של רשומות לפני מיזוג למאגר — אין עדכון ליבה ללא אישור"
+      title="שינוי ויבוא רשומות"
+      subtitle="קליטת מידע חדש והשלמת רשומות קיימות — אין עדכון ליבה ללא אישור"
       icon={DatabaseZap}
       actions={
         <div className="flex items-center gap-2">

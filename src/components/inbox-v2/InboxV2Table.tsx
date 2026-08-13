@@ -10,6 +10,7 @@ import {
   sourceLabel,
 } from '@/lib/inbox-v2-dicts'
 import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
+import { useInboxMatchedNames, matchedLabel } from '@/hooks/useInboxMatchedNames'
 import { entryReasonLabel, matchedByLabel } from '@/lib/inbox-v2-merge'
 import type { InboxV2Row } from '@/types/inbox-v2'
 
@@ -91,6 +92,7 @@ export function InboxV2Table({
   const [sortKey, setSortKey] = useState<string>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const { data: sourceTypes } = useInboxV2SourceTypes()
+  const { data: matchedNames } = useInboxMatchedNames(rows)
 
   const onSort = (key: string) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -178,12 +180,19 @@ export function InboxV2Table({
       match_existing: {
         key: 'match_existing',
         label: 'התאמה לרשומה קיימת',
-        render: (r) =>
-          r.match_contact
-            ? `איש קשר #${r.match_contact}`
-            : r.match_account
-              ? `ארגון #${r.match_account}`
-              : dash(null),
+        // שם הרשומה, לא מזהה טכני (INC-3125).
+        render: (r) => {
+          const label = matchedLabel(r, matchedNames)
+          if (!label) return dash(null)
+          return (
+            <span className="text-[13px] text-[#2D2D2D]">
+              <span className="text-[11px] text-[#9CA3AF]">
+                {r.match_contact != null ? 'איש קשר' : 'ארגון'}{' '}
+              </span>
+              {label}
+            </span>
+          )
+        },
       },
       match_reason: {
         key: 'match_reason',
@@ -318,7 +327,7 @@ export function InboxV2Table({
         ),
       },
     }),
-    [sourceTypes]
+    [sourceTypes, matchedNames]
   )
 
   const columns = useMemo(

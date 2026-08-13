@@ -34,7 +34,7 @@ const navGroups: { title?: string; items: NavItem[] }[] = [
     title: 'מאגר אנשי קשר',
     items: [
       { to: '/admin/inbox', label: 'לידים / פניות', icon: Inbox, badge: 3 },
-      { to: '/admin/inbox-v2', label: 'טריאז\' נתונים', icon: DatabaseZap },
+      { to: '/admin/inbox-v2', label: 'שינוי ויבוא רשומות', icon: DatabaseZap },
       { to: '/admin/employment-intake', label: 'קליטה ומיון תעסוקתי', icon: ScanSearch },
       { to: '/admin/contacts', label: 'ניהול מאגר', icon: Users },
       { to: '/admin/candidates', label: 'מועמדים', icon: UserCheck },
