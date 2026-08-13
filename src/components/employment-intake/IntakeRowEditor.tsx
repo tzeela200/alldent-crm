@@ -101,7 +101,7 @@ export function IntakeRowEditor({ row, onClose }: Props) {
     }
 
     updateRow.mutate(
-      { id: row.id, patch, currentOverride: row.manual_override ?? {} },
+      { row, patch },
       { onSuccess: onClose },
     )
   }
@@ -110,7 +110,7 @@ export function IntakeRowEditor({ row, onClose }: Props) {
     <Dialog open={!!row} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto" dir="rtl">
         <DialogHeader>
-          <DialogTitle>עריכת פרטי ההודעה</DialogTitle>
+          <DialogTitle>עריכת פרטי הרשומה</DialogTitle>
         </DialogHeader>
 
         <div className="rounded-[12px] border border-[#D9D9D9] bg-[#F9FAFB] p-3 text-[13px] text-[#6B6B6B]">

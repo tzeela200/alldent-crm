@@ -21,6 +21,7 @@
  */
 
 import type { ClassificationResult, ConfidenceLevel, ContentType } from '@/types/employment-intake'
+import { detectSourceEvent } from '@/lib/employment-intake/sourceMessage'
 
 // ── רשימות מילים מפורשות ────────────────────────────────────────────
 
@@ -69,7 +70,7 @@ const IRRELEVANT_PHRASE_RE = /(מכיר[ת]? (ציוד|מרפאה)|למכיר[ה
 
 const GROUP_JOIN_RE = /(joined using this group|joined this group|הצטרפ[ה|ו]?\s*לקבוצה|added you|נוספ[הו]?\s*לקבוצה|created group|יצר[ה]?\s*את הקבוצה)/i
 
-const NEEDS_CONTEXT_RE = /^(אשמח לפרטים|טלפון\??|לאיזה ימים\??|מישהו\??|פרטים\??)$/
+const NEEDS_CONTEXT_RE = /^(אשמח לפרטים|טלפון\??|לאיזה ימים\??|מישהו\??|פרטים\??|כן|לא|מחר|היום|בחולון|גם אני|אפשר|יש|איפה|מתי)$/
 
 const DAY_OR_TIME_RE = /(היום|מחר|מחרתיים|שבת|\d{1,2}:\d{2}|\d{1,2}\/\d{1,2})/
 
@@ -223,12 +224,25 @@ export function classifyText(rawText: string): ClassificationResult {
     }
   }
 
-  // 1. הצטרפות לקבוצה — הודעת מערכת, לא מנותחת כתוכן
-  if (GROUP_JOIN_RE.test(text)) {
+  // 1. הודעות מערכת של WhatsApp. אירועי הצטרפות/צירוף נשמרים כאירוע עסקי;
+  // מחיקה/מדיה/עזיבה/הסרה נשמרות במקור בלבד ומסומנות irrelevant.
+  const sourceEvent = detectSourceEvent(text)
+  if (sourceEvent.kind === 'system_noise') {
+    return {
+      contentType: 'irrelevant',
+      isActiveRequest: null,
+      classifyReason: sourceEvent.reason ?? 'הודעת מערכת ללא מידע עסקי',
+      evidence: [text.slice(0, 80)],
+      confidenceLevel: 'high',
+      needsContext: false,
+    }
+  }
+
+  if (sourceEvent.kind === 'join' || sourceEvent.kind === 'add' || GROUP_JOIN_RE.test(text)) {
     return {
       contentType: 'group_join',
       isActiveRequest: null,
-      classifyReason: 'הודעת הצטרפות לקבוצה — אירוע מקור בלבד',
+      classifyReason: sourceEvent.kind === 'add' ? 'אדם צורף לקבוצה — יש לבדוק את האדם שצורף' : 'הודעת הצטרפות לקבוצה — יש לבדוק את המצטרף',
       evidence: [text.slice(0, 60)],
       confidenceLevel: 'high',
       needsContext: false,

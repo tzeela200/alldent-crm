@@ -86,10 +86,10 @@ export function IntakeUploadZone({ onPipelineComplete }: Props) {
       const parts = [`${pipelineResult.rows.length} הודעות נקלטו`]
       if (pipelineResult.duplicatesInFile > 0) parts.push(`${pipelineResult.duplicatesInFile} הודעות זהות בקובץ דולגו`)
       if (pipelineResult.alreadyIngested > 0) parts.push(`${pipelineResult.alreadyIngested} כבר נקלטו בעבר`)
-      toast.success(`המיון הושלם: ${parts.join(' · ')}.`)
+      toast.success(`הניתוח הושלם: ${parts.join(' · ')}.`)
       onPipelineComplete?.(pipelineResult)
     } catch (err) {
-      setErrorMessage(describeError(err, 'המיון נכשל'))
+      setErrorMessage(describeError(err, 'הניתוח נכשל'))
     }
   }
 
@@ -220,7 +220,7 @@ export function IntakeUploadZone({ onPipelineComplete }: Props) {
           </div>
           <div className="flex justify-end">
             <ActionButton variant="success" icon={Sparkles} disabled={pipeline.isPending} onClick={runClassification}>
-              {pipeline.isPending ? 'מריץ מיון…' : 'הפעל מיון'}
+              {pipeline.isPending ? 'מנתח…' : 'הפעל ניתוח'}
             </ActionButton>
           </div>
         </>

@@ -71,6 +71,8 @@ export interface BulkIdentityPlan {
   lastAction: EmploymentIntakeAction | null
   /** ה-patch שיוחל בפועל על contact (נחשב מראש כדי שה-Preview יהיה אמיתי) */
   patch: Record<string, unknown>
+  /** הערכים הקנוניים ב-contact לפני הכתיבה, עבור Audit. */
+  before: Record<string, unknown>
   displayName: string
 }
 
@@ -85,7 +87,7 @@ export interface BulkPreview {
   plans: BulkIdentityPlan[]
 }
 
-const CONTACT_CURRENT_FIELDS = 'contact_id, display_name, role, city_id, source, social_status'
+const CONTACT_CURRENT_FIELDS = 'contact_id, display_name, role, city_id, source, social_status, last_contact_date'
 
 interface ContactCurrent {
   contact_id: number
@@ -94,6 +96,7 @@ interface ContactCurrent {
   city_id: number | null
   source: number | null
   social_status: number | null
+  last_contact_date: string | null
 }
 
 const ACTION_TYPE_BY_FAMILY: Record<BulkFamily, ActionType> = {
@@ -172,6 +175,7 @@ export async function buildBulkPreview(selectedIds: number[], spec: BulkActionSp
         : 'לא נמצא בהופעה אף מזהה (טלפון, מייל או Facebook) ולכן אין לה זהות.',
       lastAction: null,
       patch: {},
+      before: {},
       displayName: row.contact_name ?? row.sender_name ?? `הודעה #${row.id}`,
     })
   }
@@ -209,7 +213,7 @@ export async function buildBulkPreview(selectedIds: number[], spec: BulkActionSp
 
     // (1) חסימות זהות (§4.4) — התאמה לא ודאית מוחרגת מכל פעולה גורפת
     if (identityRows.some((r) => r.match_type === 'ambiguous')) {
-      plans.push({ ...base, status: 'blocked', reason: 'נמצאו כמה התאמות אפשריות — יש להכריע ידנית.', patch: {} })
+      plans.push({ ...base, status: 'blocked', reason: 'נמצאו כמה התאמות אפשריות — יש להכריע ידנית.', patch: {}, before: {} })
       continue
     }
 
@@ -220,6 +224,7 @@ export async function buildBulkPreview(selectedIds: number[], spec: BulkActionSp
         status: 'blocked',
         reason: 'אין איש קשר קיים לזהות זו — יש ליצור איש קשר לפני הפעולה.',
         patch: {},
+        before: {},
       })
       continue
     }
@@ -228,11 +233,11 @@ export async function buildBulkPreview(selectedIds: number[], spec: BulkActionSp
     if (spec.family !== 'update_field') {
       const excluded = identityRows.every((r) => r.content_type === 'unclear' || r.content_type === 'unclassified')
       if (excluded) {
-        plans.push({ ...base, status: 'blocked', reason: 'הסיווג "לא ברור" — אינו נכלל בפעולה גורפת.', patch: {} })
+        plans.push({ ...base, status: 'blocked', reason: 'הסיווג "לא ברור" — אינו נכלל בפעולה גורפת.', patch: {}, before: {} })
         continue
       }
       if (identityRows.every((r) => r.content_type === 'irrelevant')) {
-        plans.push({ ...base, status: 'blocked', reason: 'סומן כלא רלוונטי — אינו נכלל בפעולה גורפת.', patch: {} })
+        plans.push({ ...base, status: 'blocked', reason: 'סומן כלא רלוונטי — אינו נכלל בפעולה גורפת.', patch: {}, before: {} })
         continue
       }
     }
@@ -246,6 +251,7 @@ export async function buildBulkPreview(selectedIds: number[], spec: BulkActionSp
         reason: `כבר טופלה — בוצעה ב-${new Date(repeat.lastAction!.performed_at).toLocaleDateString('he-IL')} על ידי ${repeat.lastAction!.performed_by}.`,
         lastAction: repeat.lastAction,
         patch: {},
+        before: {},
       })
       continue
     }
@@ -253,23 +259,26 @@ export async function buildBulkPreview(selectedIds: number[], spec: BulkActionSp
     // (5) בניית ה-patch בפועל
     const current = contactsCurrent.get(identity.contactId)
     let patch: Record<string, unknown> = {}
+    let before: Record<string, unknown> = {}
 
     if (spec.family === 'lead_status') {
       if (spec.leadStatusId == null) {
-        plans.push({ ...base, status: 'blocked', reason: 'לא נבחר סטטוס ליד.', patch: {} })
+        plans.push({ ...base, status: 'blocked', reason: 'לא נבחר סטטוס ליד.', patch: {}, before: {} })
         continue
       }
       patch = { social_status: spec.leadStatusId }
+      before = { social_status: current?.social_status ?? null }
     } else if (spec.family === 'details_sent') {
       if (!spec.detailsSentType) {
-        plans.push({ ...base, status: 'blocked', reason: 'לא נבחר סוג פרטים שנשלחו.', patch: {} })
+        plans.push({ ...base, status: 'blocked', reason: 'לא נבחר סוג פרטים שנשלחו.', patch: {}, before: {} })
         continue
       }
       patch = { social_status: DETAILS_STATUS_MAP[spec.detailsSentType], last_contact_date: new Date().toISOString() }
+      before = { social_status: current?.social_status ?? null, last_contact_date: current?.last_contact_date ?? null }
     } else {
       const edit = spec.sharedField
       if (!edit || edit.value == null) {
-        plans.push({ ...base, status: 'blocked', reason: 'לא נבחר ערך לעדכון.', patch: {} })
+        plans.push({ ...base, status: 'blocked', reason: 'לא נבחר ערך לעדכון.', patch: {}, before: {} })
         continue
       }
       const currentValue = current ? (current[edit.field] as unknown) : null
@@ -280,17 +289,19 @@ export async function buildBulkPreview(selectedIds: number[], spec: BulkActionSp
           status: 'no_change',
           reason: 'קיים כבר ערך בשדה — לא יידרס (דריסה דורשת סימון מפורש).',
           patch: {},
+          before: {},
         })
         continue
       }
       if (currentValue === edit.value) {
-        plans.push({ ...base, status: 'no_change', reason: 'הערך הקיים כבר זהה לערך המבוקש.', patch: {} })
+        plans.push({ ...base, status: 'no_change', reason: 'הערך הקיים כבר זהה לערך המבוקש.', patch: {}, before: {} })
         continue
       }
       patch = { [edit.field]: edit.value }
+      before = { [edit.field]: currentValue }
     }
 
-    plans.push({ ...base, status: 'will_run', reason: null, patch })
+    plans.push({ ...base, status: 'will_run', reason: null, patch, before })
   }
 
   return {
@@ -385,6 +396,7 @@ export function useRunBulkAction() {
                 source_intake_ids: sourceIntakeIds,
                 occurrence_count: sourceIntakeIds.length,
                 applied_patch: plan.patch,
+                applied_before: plan.before,
                 bulk_run_id: preview.bulkRunId,
               },
               { onConflict: 'idempotency_key', ignoreDuplicates: true },

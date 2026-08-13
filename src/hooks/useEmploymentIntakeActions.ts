@@ -45,6 +45,7 @@ async function insertIntakeAction(args: {
   performedBy: string
   sourceIntakeIds: number[]
   appliedPatch?: Record<string, unknown> | null
+  appliedBefore?: Record<string, unknown> | null
 }): Promise<number> {
   const { data, error } = await supabase
     .from('employment_intake_action')
@@ -60,6 +61,7 @@ async function insertIntakeAction(args: {
       source_intake_ids: args.sourceIntakeIds,
       occurrence_count: args.sourceIntakeIds.length,
       applied_patch: args.appliedPatch ?? null,
+      applied_before: args.appliedBefore ?? null,
       bulk_run_id: crypto.randomUUID(),
     })
     .select('action_id')
@@ -74,6 +76,17 @@ async function linkActionToIntakeRow(rowId: number, actionId: number, extra: Rec
     .update({ last_action_id: actionId, updated_at: new Date().toISOString(), ...extra })
     .eq('id', rowId)
   if (error) throw supabaseError('קישור הפעולה להודעה נכשל', error)
+}
+
+async function fetchContactBefore(contactId: number, fields: string[]): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase
+    .from('contact')
+    .select(fields.join(','))
+    .eq('contact_id', contactId)
+    .single()
+  if (error) throw supabaseError('טעינת מצב איש הקשר לפני העדכון נכשלה', error)
+  const record = data as unknown as Record<string, unknown>
+  return Object.fromEntries(fields.map((field) => [field, record[field] ?? null]))
 }
 
 // ── יצירת Contact חדש (§3.5 פעולה 7) ────────────────────────────────────
@@ -197,6 +210,7 @@ export function useLinkContactToAccount() {
 
   return useMutation({
     mutationFn: async ({ row, contactId, accountId }: { row: RowWithAction; contactId: number; accountId: number }) => {
+      const before = await fetchContactBefore(contactId, ['account_link'])
       const { error } = await updateContact(contactId, { account_link: accountId })
       if (error) throw supabaseError('קישור האדם לארגון נכשל', error)
 
@@ -209,6 +223,7 @@ export function useLinkContactToAccount() {
         performedBy: user?.email ?? 'system',
         sourceIntakeIds: [row.id],
         appliedPatch: { account_link: accountId },
+        appliedBefore: before,
       })
       await linkActionToIntakeRow(row.id, actionId)
     },
@@ -264,6 +279,7 @@ export function useMarkLeadStatus() {
       }
 
       const patch: Record<string, unknown> = { social_status: statusId, ...(includeWorkStatus ? { work_status: 1 } : {}) }
+      const before = await fetchContactBefore(identity.contactId, includeWorkStatus ? ['social_status', 'work_status'] : ['social_status'])
       const { error } = await updateContact(identity.contactId, patch)
       if (error) throw supabaseError('עדכון סטטוס הליד נכשל', error)
 
@@ -275,6 +291,7 @@ export function useMarkLeadStatus() {
         performedBy: user?.email ?? 'system',
         sourceIntakeIds: [row.id],
         appliedPatch: patch,
+        appliedBefore: before,
       })
       await linkActionToIntakeRow(row.id, actionId)
       return { written: true, alreadyDone: false, lastActionAt: null, lastActionBy: null }
@@ -300,6 +317,7 @@ export function useMarkIrrelevant() {
         return { written: false }
       }
 
+      const before = await fetchContactBefore(identity.contactId, ['social_status'])
       const { error } = await updateContact(identity.contactId, { social_status: 12 })
       if (error) throw supabaseError('סימון "לא רלוונטי" נכשל', error)
 
@@ -311,6 +329,7 @@ export function useMarkIrrelevant() {
         performedBy: user?.email ?? 'system',
         sourceIntakeIds: [row.id],
         appliedPatch: { social_status: 12 },
+        appliedBefore: before,
       })
       await linkActionToIntakeRow(row.id, actionId)
       return { written: true }
@@ -357,7 +376,7 @@ export function useMergeContactFields() {
   const { updateContact } = useContactMutations()
 
   return useMutation({
-    mutationFn: async ({ row, contactId, patch }: { row: RowWithAction; contactId: number; patch: Record<string, unknown> }) => {
+    mutationFn: async ({ row, contactId, patch, before }: { row: RowWithAction; contactId: number; patch: Record<string, unknown>; before?: Record<string, unknown> }) => {
       const { error } = await updateContact(contactId, patch)
       if (error) throw supabaseError('מיזוג המידע לאיש הקשר נכשל', error)
 
@@ -370,6 +389,7 @@ export function useMergeContactFields() {
         performedBy: user?.email ?? 'system',
         sourceIntakeIds: [row.id],
         appliedPatch: patch,
+        appliedBefore: before ?? null,
       })
       await linkActionToIntakeRow(row.id, actionId)
     },
@@ -387,7 +407,7 @@ export function useMergeAccountFields() {
   const { updateAccount } = useAccountMutations()
 
   return useMutation({
-    mutationFn: async ({ row, accountId, patch }: { row: RowWithAction; accountId: number; patch: Record<string, unknown> }) => {
+    mutationFn: async ({ row, accountId, patch, before }: { row: RowWithAction; accountId: number; patch: Record<string, unknown>; before?: Record<string, unknown> }) => {
       const { error } = await updateAccount(accountId, patch)
       if (error) throw supabaseError('מיזוג המידע לארגון נכשל', error)
 
@@ -401,6 +421,7 @@ export function useMergeAccountFields() {
         performedBy: user?.email ?? 'system',
         sourceIntakeIds: [row.id],
         appliedPatch: patch,
+        appliedBefore: before ?? null,
       })
       await linkActionToIntakeRow(row.id, actionId)
     },

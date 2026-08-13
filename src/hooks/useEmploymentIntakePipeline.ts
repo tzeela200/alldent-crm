@@ -22,6 +22,7 @@ import { matchRow, type ContactCandidate, type AccountCandidate } from '@/lib/em
 import { proposeAction } from '@/lib/employment-intake/proposals'
 import { normalizeForHash } from '@/lib/employment-intake/hashes'
 import { sourceHashKey, dedupeBySourceHash } from '@/lib/employment-intake/sourceHash'
+import { detectSourceEvent, parseStructuredGoogleContact, targetNameOnly } from '@/lib/employment-intake/sourceMessage'
 import { detectRole, normalizePhonesBatch, resolveCitiesBatch } from '@/hooks/useEmploymentIntakeNormalize'
 import { fetchMatchingPool } from '@/hooks/useEmploymentIntakeMatching'
 import { resolveEmploymentIdentity, fetchImportRows, type ResolveIdentityStats } from '@/hooks/useEmploymentIntakeIdentity'
@@ -69,8 +70,11 @@ function buildInsertRow(params: {
   facebookId: string | null
   match: ReturnType<typeof matchRow>
   proposal: ReturnType<typeof proposeAction>
+  contactName: string | null
+  senderPhoneNorm: string | null
+  extraTags: string[]
 }) {
-  const { draft, importId, input, classification, roleResult, cityCandidate, cityResult, phones, emails, facebookUrls, facebookId, match, proposal } = params
+  const { draft, importId, input, classification, roleResult, cityCandidate, cityResult, phones, emails, facebookUrls, facebookId, match, proposal, contactName, senderPhoneNorm, extraTags } = params
   return {
     import_id: importId,
     source_type: input.sourceTypeId,
@@ -91,9 +95,9 @@ function buildInsertRow(params: {
 
     sender_name: draft.senderName,
     sender_phone: draft.senderPhone,
-    sender_phone_norm: null, // מנורמל בנפרד רק אם נעשה בו שימוש בפועל; אינו זהה בהכרח לטלפון המיוחס
+    sender_phone_norm: senderPhoneNorm,
 
-    contact_name: null, // חילוץ שם מלא מטקסט חופשי אינו אמין דיו לקביעה אוטומטית; נשאר לתיקון ידני (שלב 9)
+    contact_name: contactName,
     org_name: null,
     phone: phones.phone,
     phone_norm: phones.phoneNorm,
@@ -138,7 +142,7 @@ function buildInsertRow(params: {
     last_action_id: null,
 
     notes: null,
-    tags: input.tags,
+    tags: Array.from(new Set([...input.tags, ...extraTags])),
     deleted_at: null,
     engine_version: ENGINE_VERSION,
     rules_version: RULES_VERSION,
@@ -154,14 +158,30 @@ export async function runClassificationPipeline(input: PipelineInput): Promise<P
   // 2. סיווג + חילוץ + מועמדי עיר — פעם אחת לכל יחידה, מוחל על כל חברותיה
   const perUnit = units.map((unit) => {
     const classification = classifyText(unit.combinedText)
-    const primarySenderPhone = unit.members[0].senderPhone
+    const primary = unit.members[0]
+    const sourceEvent = detectSourceEvent(primary.text)
+    const identityLabel = sourceEvent.kind === 'join' || sourceEvent.kind === 'add' ? sourceEvent.targetLabel : primary.senderName
+    const primarySenderPhone = primary.senderPhone
     const identifiers = extractIdentifiers(unit.combinedText, primarySenderPhone)
     const cityCandidates = findCityCandidates(unit.combinedText, input.cityIndex)
-    return { unit, classification, identifiers, cityCandidate: cityCandidates[0] ?? null }
+    const identityCityCandidates = identityLabel ? findCityCandidates(identityLabel, input.cityIndex) : []
+    return {
+      unit,
+      classification,
+      identifiers,
+      cityCandidate: cityCandidates[0] ?? null,
+      sourceEvent,
+      identityLabel,
+      identityCityCandidate: identityCityCandidates[0] ?? null,
+    }
   })
 
-  // 3. נרמול — RPC מקובץ: תפקיד (טקסט מלא לכל יחידה, ייחודי), עיר (מועמדים ייחודיים), טלפון (גולמיים ייחודיים)
-  const uniqueTexts = Array.from(new Set(perUnit.map((u) => u.unit.combinedText)))
+  // 3. נרמול — טקסט ההודעה + תווית השולח/המצטרף נבדקים בנפרד. כך "דרושה סייעת"
+  // אינה הופכת את תפקיד השולח לסייעת; תווית Google שלו מפורקת בפני עצמה.
+  const uniqueTexts = Array.from(new Set([
+    ...perUnit.map((u) => u.unit.combinedText),
+    ...perUnit.map((u) => u.identityLabel).filter((v): v is string => !!v),
+  ]))
   const roleResults = new Map<string, Awaited<ReturnType<typeof detectRole>>>()
   await Promise.all(
     uniqueTexts.map(async (text) => {
@@ -169,27 +189,47 @@ export async function runClassificationPipeline(input: PipelineInput): Promise<P
     }),
   )
 
-  const cityCandidateStrings = perUnit.map((u) => u.cityCandidate).filter((c): c is string => !!c)
+  const cityCandidateStrings = perUnit.flatMap((u) => [u.cityCandidate, u.identityCityCandidate]).filter((c): c is string => !!c)
   const cityResults = await resolveCitiesBatch(cityCandidateStrings)
 
-  const allRawPhones = perUnit.flatMap((u) => u.identifiers.phones.map((p) => p.raw))
+  const allRawPhones = perUnit.flatMap((u) => [
+    ...u.identifiers.phones.map((p) => p.raw),
+    ...(u.unit.members[0].senderPhone ? [u.unit.members[0].senderPhone!] : []),
+  ])
   const phoneNormMap = await normalizePhonesBatch(allRawPhones)
 
   // 4. בניית שורות טיוטה — אחת לכל הודעה מקורית (אפס אובדן)
-  const draftsWithContext = perUnit.flatMap(({ unit, classification, identifiers, cityCandidate }) =>
-    buildDraftRows(unit).map((draft) => ({ draft, classification, identifiers, cityCandidate })),
-  )
+  const draftsWithContext = perUnit.flatMap(({ unit, classification, identifiers, cityCandidate, sourceEvent, identityLabel, identityCityCandidate }) => {
+    const identityRoleResult = identityLabel ? (roleResults.get(identityLabel) ?? null) : null
+    const structured = parseStructuredGoogleContact({
+      label: identityLabel,
+      matchedRoleAlias: identityRoleResult?.matchedAlias ?? null,
+      roleId: identityRoleResult?.roleId ?? null,
+      cityCandidate: identityCityCandidate,
+    })
+    const contactName = structured.contactName ?? targetNameOnly(sourceEvent)
+    return buildDraftRows(unit).map((draft) => ({
+      draft,
+      classification,
+      identifiers,
+      cityCandidate,
+      sourceEvent,
+      contactName,
+      trustedExistingName: structured.isStructured,
+    }))
+  })
 
-  // 5. התאמה — שאילתה מקובצת אחת ל-contact ואחת ל-accounts, לכל האצווה
+  // 5. התאמה — מזהים חזקים + שמות רק מתווית Google המאושרת.
   const pool = await fetchMatchingPool({
     phoneNorms: Array.from(new Set(Array.from(phoneNormMap.values()).filter((v): v is string => !!v))),
     emails: draftsWithContext.flatMap((d) => d.identifiers.emails),
     facebookIds: draftsWithContext.flatMap((d) => (d.identifiers.facebookId ? [d.identifiers.facebookId] : [])),
     facebookUrls: draftsWithContext.flatMap((d) => d.identifiers.facebookUrls),
+    trustedContactNames: draftsWithContext.filter((d) => d.trustedExistingName && d.contactName).map((d) => d.contactName!),
   })
 
   // 6. הרכבת שורות ה-Insert הסופיות
-  const rowsToInsert = draftsWithContext.map(({ draft, classification, identifiers, cityCandidate }) => {
+  const rowsToInsert = draftsWithContext.map(({ draft, classification, identifiers, cityCandidate, sourceEvent, contactName, trustedExistingName }) => {
     const phones = attributePhones(identifiers.phones, phoneNormMap)
     const cityResult = cityCandidate ? (cityResults.get(cityCandidate) ?? null) : null
     const roleResult = roleResults.get(draft.combinedTextForAnalysis) ?? null
@@ -202,10 +242,11 @@ export async function runClassificationPipeline(input: PipelineInput): Promise<P
         secondEmail: identifiers.emails[1] ?? null,
         facebookId: identifiers.facebookId,
         facebookUrl: identifiers.facebookUrls[0] ?? null,
-        contactNameRaw: null,
+        contactNameRaw: contactName,
         orgNameRaw: null,
         roleId: roleResult?.roleId ?? null,
         cityId: cityResult ? cityResult.cityId : null,
+        trustedExistingName,
       },
       { contacts: pool.contacts as ContactCandidate[], accounts: pool.accounts as AccountCandidate[] },
     )
@@ -215,6 +256,13 @@ export async function runClassificationPipeline(input: PipelineInput): Promise<P
       isActiveRequest: classification.isActiveRequest,
       matchContact: match.matchContact,
     })
+
+    const extraTags: string[] = []
+    if (sourceEvent.kind === 'system_noise') extraTags.push('system_noise')
+    if (trustedExistingName) extraTags.push('google_contact_expected_existing')
+    if ((sourceEvent.kind === 'join' || sourceEvent.kind === 'add') && contactName && !trustedExistingName) {
+      extraTags.push('requires_identification')
+    }
 
     return buildInsertRow({
       draft,
@@ -230,6 +278,9 @@ export async function runClassificationPipeline(input: PipelineInput): Promise<P
       facebookId: identifiers.facebookId,
       match,
       proposal,
+      contactName,
+      senderPhoneNorm: draft.senderPhone ? (phoneNormMap.get(draft.senderPhone) ?? null) : null,
+      extraTags,
     })
   })
 
