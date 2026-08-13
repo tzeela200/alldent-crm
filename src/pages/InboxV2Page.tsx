@@ -5,7 +5,6 @@ import { useInboxV2Rows, useInboxV2Batches, useInboxV2Stats, PAGE_SIZE } from '@
 import { useInboxV2Upload } from '@/hooks/useInboxV2Upload'
 import { useInboxV2Matching } from '@/hooks/useInboxV2Matching'
 import { UploadZone } from '@/components/inbox-v2/UploadZone'
-import { PhoneCheckPanel } from '@/components/inbox-v2/PhoneCheckPanel'
 import { InboxV2FiltersBar } from '@/components/inbox-v2/InboxV2Filters'
 import {
   InboxV2Table,
@@ -24,19 +23,6 @@ import type { MergeEntity } from '@/lib/inbox-v2-merge'
 import type { InboxV2Filters } from '@/types/inbox-v2'
 
 const ALL_COLUMN_KEYS = new Set(ALL_COLUMNS.map((c) => c.key))
-
-/**
- * שלושת מצבי העבודה של המסך (INC-3125).
- * הופרדו כי הם עונים על שאלות שונות: מה הגיע ודורש הכרעה · מי כבר קיים
- * אצלנו · קליטת קובץ חדש. קודם הכול היה ערום זה על גבי זה במסך אחד.
- */
-type InboxTab = 'queue' | 'phones' | 'import'
-
-const TABS: { id: InboxTab; label: string }[] = [
-  { id: 'queue', label: 'שינויים שהגיעו' },
-  { id: 'phones', label: 'בדיקת מספרים' },
-  { id: 'import', label: 'ייבוא קובץ' },
-]
 
 function loadStoredVisibleColumns(): string[] {
   try {
@@ -57,7 +43,7 @@ export default function InboxV2Page() {
   // בדיוק כפי שהוגדר — ונשאר נגיש בכיבוי הסינון (INC-3125).
   const [filters, setFilters] = useState<InboxV2Filters>({ open_only: true })
   const [page, setPage] = useState(0)
-  const [tab, setTab] = useState<InboxTab>('queue')
+  const [showUpload, setShowUpload] = useState(true)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [detailLeadId, setDetailLeadId] = useState<number | null>(null)
   const [mergeLeadId, setMergeLeadId] = useState<number | null>(null)
@@ -183,84 +169,63 @@ export default function InboxV2Page() {
         <KPICard label="עודכנו למאגר" value={stats?.merged ?? '—'} />
       </div>
 
-      {/* מצבי עבודה */}
-      <div className="flex flex-wrap items-center gap-1 rounded-2xl bg-white p-1.5 shadow-sm ring-1 ring-slate-200">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            className={`rounded-xl px-4 py-2 text-[13px] font-semibold transition-colors ${
-              tab === t.id
-                ? 'bg-teal-600 text-white'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            {t.label}
-            {t.id === 'queue' && stats?.open ? (
-              <span
-                className={`ms-2 rounded-full px-1.5 py-0.5 text-[11px] ${
-                  tab === t.id ? 'bg-white/20' : 'bg-slate-100 text-slate-600'
-                }`}
-              >
-                {stats.open}
-              </span>
-            ) : null}
-          </button>
-        ))}
+      {/* Upload Zone */}
+      <div>
+        <button
+          onClick={() => setShowUpload(!showUpload)}
+          className="mb-2 flex items-center gap-1 text-sm font-medium text-slate-600 hover:text-teal-600"
+        >
+          {showUpload ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+          {showUpload ? 'הסתר אזור העלאה' : 'הצג אזור העלאה'}
+        </button>
+        {showUpload && (
+          <UploadZone
+            onFileSelected={uploadFile}
+            onPasteSubmit={uploadPaste}
+            isProcessing={isProcessing}
+            progress={progress}
+          />
+        )}
       </div>
 
-      {tab === 'queue' && (
-        <>
-          <InboxV2FiltersBar
-            filters={filters}
-            onChange={(f) => {
-              setFilters(f)
-              setPage(0)
-            }}
-            batches={batches ?? []}
-          />
+      {/* Filters */}
+      <InboxV2FiltersBar
+        filters={filters}
+        onChange={(f) => {
+          setFilters(f)
+          setPage(0)
+        }}
+        batches={batches ?? []}
+      />
 
-          {/* הטבלה מטפלת בעצמה במצבי טעינה/ריק/סינון + bulk + pagination */}
-          <InboxV2Table
-            rows={rows}
-            visibleColumns={visibleColumns}
-            isLoading={isLoading}
-            hasActiveFilter={hasActiveFilters}
+      {/* Table (מטפל בעצמו במצבי טעינה/ריק/סינון + bulk + pagination) */}
+      <InboxV2Table
+        rows={rows}
+        visibleColumns={visibleColumns}
+        isLoading={isLoading}
+        hasActiveFilter={hasActiveFilters}
+        selectedIds={selectedIds}
+        onSelectionChange={setSelectedIds}
+        onRowClick={setDetailLeadId}
+        onOpenMerge={(id) => {
+          setMergeEntity(undefined)
+          setMergeLeadId(id)
+        }}
+        bulkActions={
+          <InboxV2QuickActions
             selectedIds={selectedIds}
-            onSelectionChange={setSelectedIds}
-            onRowClick={setDetailLeadId}
-            onOpenMerge={(id) => {
-              setMergeEntity(undefined)
-              setMergeLeadId(id)
-            }}
-            bulkActions={
-              <InboxV2QuickActions
-                selectedIds={selectedIds}
-                onClearSelection={() => setSelectedIds([])}
-              />
-            }
-            pagination={
-              <AdminTablePagination
-                page={page + 1}
-                pageSize={PAGE_SIZE}
-                total={total}
-                onPageChange={(n) => setPage(n - 1)}
-              />
-            }
+            onClearSelection={() => setSelectedIds([])}
           />
-        </>
-      )}
-
-      {tab === 'phones' && <PhoneCheckPanel />}
-
-      {tab === 'import' && (
-        <UploadZone
-          onFileSelected={uploadFile}
-          onPasteSubmit={uploadPaste}
-          isProcessing={isProcessing}
-          progress={progress}
-        />
-      )}
+        }
+        pagination={
+          <AdminTablePagination
+            page={page + 1}
+            pageSize={PAGE_SIZE}
+            total={total}
+            onPageChange={(n) => setPage(n - 1)}
+          />
+        }
+      />
 
       {/* Slide-over / modals */}
       {detailLeadId != null && (

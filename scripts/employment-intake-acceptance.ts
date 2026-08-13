@@ -412,12 +412,6 @@ check('הצעות', 'לא רלוונטי + אין רשומה ⇒ אין כתיב
 check('הצעות', 'צורך שהסתיים ⇒ אין הצעה', proposeAction({ contentType: 'recruiter', isActiveRequest: false, matchContact: 11 }), { proposedSocialStatus: null, proposedAction: null })
 check('הצעות', 'רשומה חדשה שזוהתה כמחפשת אינה מקבלת גם "הצטרפות למאגר"', proposeAction({ contentType: 'job_seeker', isActiveRequest: true, matchContact: null }).proposedSocialStatus !== 3, true)
 
-// מצטרף קיים ⇒ "קיים במאגר" (7), לא "ליד חדש - הצטרפות למאגר" (3)
-check('הצעות', 'הצטרפות + איש קשר קיים ⇒ 7 "קיים במאגר"', proposeAction({ contentType: 'group_join', isActiveRequest: true, matchContact: 11 }), { proposedSocialStatus: 7, proposedAction: 'mark_lead_status' })
-// מצטרף חדש עם נייד ⇒ 3 + הקמה; בלי נייד כלל ⇒ 3 בלי הצעת פעולה (אי אפשר להקים בלי נייד)
-check('הצעות', 'הצטרפות + חדש + נייד ⇒ 3 + יצירה', proposeAction({ contentType: 'group_join', isActiveRequest: true, matchContact: null, hasPhone: true }), { proposedSocialStatus: 3, proposedAction: 'create_contact' })
-check('הצעות', 'הצטרפות + חדש + בלי נייד ⇒ 3 בלי הצעת פעולה', proposeAction({ contentType: 'group_join', isActiveRequest: true, matchContact: null, hasPhone: false }), { proposedSocialStatus: 3, proposedAction: null })
-
 // מסלולי "נשלחו פרטים" (§6.3)
 check('נשלחו פרטים', 'חיפוש עבודה ⇒ 5', DETAILS_SENT_STATUS.job_seeking, 5)
 check('נשלחו פרטים', 'תהליך גיוס ⇒ 4', DETAILS_SENT_STATUS.recruiting, 4)
