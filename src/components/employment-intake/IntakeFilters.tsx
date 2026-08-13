@@ -1,16 +1,16 @@
-/** Search / Filters של שולחן העבודה. ערכים עסקיים בלבד. */
+/** לשונית "תוצאות" — סרגל מסננים (§3.4, §16.3 בטבלת הצירים). */
 
 import { Toolbar, SearchBar, ActionButton } from '@/components/layout/Shell'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { X } from 'lucide-react'
 import type { ContentType } from '@/types/employment-intake'
-import type { DatabaseState } from '@/lib/employment-intake/labels'
-import { CONTENT_TYPE_LABEL, DATABASE_STATE_LABEL } from '@/lib/employment-intake/labels'
+import type { MatchStatus } from '@/types/employment-intake'
+import { CONTENT_TYPE_LABEL, MATCH_STATUS_LABEL } from '@/lib/employment-intake/labels'
 import { EMPTY_FILTERS, hasActiveFilters, type EmploymentIntakeFilters } from '@/hooks/useEmploymentIntakeRows'
 
-const CONTENT_TYPE_OPTIONS: ContentType[] = ['job_seeker', 'recruiter', 'group_join', 'unclear', 'irrelevant', 'unclassified']
-const DATABASE_STATE_OPTIONS: DatabaseState[] = ['existing', 'not_existing', 'needs_identification', 'google_sync_exception']
+const CONTENT_TYPE_OPTIONS: ContentType[] = ['job_seeker', 'recruiter', 'group_join', 'irrelevant', 'unclear', 'unclassified']
+const MATCH_STATUS_OPTIONS: MatchStatus[] = ['contact_found', 'account_found', 'both_found', 'multiple', 'none', 'already_linked']
 
 interface Props {
   filters: EmploymentIntakeFilters
@@ -28,20 +28,18 @@ export function IntakeFilters({ filters, onChange }: Props) {
   return (
     <Toolbar className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        <SearchBar
-          value={filters.search}
-          onChange={(v) => onChange({ ...filters, search: v })}
-          placeholder="חיפוש בהודעה, שולח, שם, נייד או מייל..."
-        />
+        <SearchBar value={filters.search} onChange={(v) => onChange({ ...filters, search: v })} placeholder="חיפוש בטקסט, שם, טלפון או מייל..." />
 
         <select
-          value={filters.databaseState}
-          onChange={(e) => onChange({ ...filters, databaseState: e.target.value as DatabaseState | '' })}
+          value={filters.matchStatus}
+          onChange={(e) => onChange({ ...filters, matchStatus: e.target.value as MatchStatus | '' })}
           className="h-11 rounded-[14px] border border-[#D9D9D9] bg-white px-3 text-sm outline-none focus:border-[#008080]"
         >
-          <option value="">מצב במאגר — הכול</option>
-          {DATABASE_STATE_OPTIONS.map((state) => (
-            <option key={state} value={state}>{DATABASE_STATE_LABEL[state]}</option>
+          <option value="">מצב התאמה — הכול</option>
+          {MATCH_STATUS_OPTIONS.map((m) => (
+            <option key={m} value={m}>
+              {MATCH_STATUS_LABEL[m]}
+            </option>
           ))}
         </select>
 
@@ -61,20 +59,6 @@ export function IntakeFilters({ filters, onChange }: Props) {
           onRegionChange={() => {}}
         />
 
-        <label className="flex h-11 items-center gap-2 rounded-[14px] border border-[#D9D9D9] bg-white px-3 text-[13px] text-[#2D2D2D]">
-          <input type="checkbox" checked={filters.needsReview} onChange={(e) => onChange({ ...filters, needsReview: e.target.checked })} className="h-4 w-4 accent-[#008080]" />
-          דורש בדיקה
-        </label>
-
-        <label className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
-          מתאריך
-          <input type="date" value={filters.dateFrom} onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })} className="h-10 rounded-[10px] border border-[#D9D9D9] px-2" />
-        </label>
-        <label className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
-          עד תאריך
-          <input type="date" value={filters.dateTo} onChange={(e) => onChange({ ...filters, dateTo: e.target.value })} className="h-10 rounded-[10px] border border-[#D9D9D9] px-2" />
-        </label>
-
         {hasActiveFilters(filters) && (
           <ActionButton variant="ghost" size="sm" icon={X} onClick={() => onChange(EMPTY_FILTERS)}>
             נקה מסננים
@@ -82,7 +66,7 @@ export function IntakeFilters({ filters, onChange }: Props) {
         )}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap gap-2">
         {CONTENT_TYPE_OPTIONS.map((ct) => {
           const active = filters.contentTypes.includes(ct)
           return (
@@ -98,15 +82,6 @@ export function IntakeFilters({ filters, onChange }: Props) {
             </button>
           )
         })}
-        <label className="ms-auto flex items-center gap-2 text-[12px] text-[#6B6B6B]">
-          <input
-            type="checkbox"
-            checked={!filters.hideSystemNoise}
-            onChange={(e) => onChange({ ...filters, hideSystemNoise: !e.target.checked })}
-            className="h-4 w-4 accent-[#008080]"
-          />
-          הצג גם הודעות מערכת לא רלוונטיות
-        </label>
       </div>
     </Toolbar>
   )

@@ -1,5 +1,5 @@
 /**
- * INC-3119 — בדיקות קבלה למסך "איתור מחפשי עבודה ומגייסים" (§14 בתוכנית).
+ * INC-3119 — בדיקות קבלה למסך "קליטה ומיון תעסוקתי" (§14 בתוכנית).
  *
  * הרצה:  npx tsx scripts/employment-intake-acceptance.ts
  *
@@ -28,7 +28,6 @@ import { resolveParserFamily, autoDetectFamily } from '@/lib/employment-intake/p
 import { parseWhatsappCopyText } from '@/lib/employment-intake/parsers/whatsappCopy'
 import { parsePlainText } from '@/lib/employment-intake/parsers/plainText'
 import { DETAILS_SENT_STATUS, ACCOUNT_STATUS_POTENTIAL } from '@/lib/employment-intake/detailsSent'
-import { detectSourceEvent, parseStructuredGoogleContact, targetNameOnly } from '@/lib/employment-intake/sourceMessage'
 import * as L from '@/lib/employment-intake/labels'
 import type { RawParsedMessage, EmploymentIntakeAction } from '@/types/employment-intake'
 
@@ -92,54 +91,6 @@ const unclear = classifyText('אשמח לפרטים')
 checkTrue('סיווג', '"לא ברור" מסומן needs_context', unclear.needsContext)
 checkTrue('סיווג', '"לא ברור" נושא סיבה בעברית', unclear.classifyReason.length > 0 && /[֐-׿]/.test(unclear.classifyReason))
 checkTrue('סיווג', 'סיווג ברור נושא ראיות מהטקסט', classifyText('אני מחפשת עבודה כסייעת').evidence.length > 0)
-
-
-// ═══════════════════════════════════════════════════════════
-// 1ב. אירועי מקור WhatsApp + פורמט Google השמור
-// ═══════════════════════════════════════════════════════════
-const joinedByPhone = detectSourceEvent('\u200f+972 52-805-1911 הצטרף/ה לקבוצה באמצעות קישור.')
-check('אירועי מקור', 'מצטרף במספר מזוהה כ-join', joinedByPhone.kind, 'join')
-check('אירועי מקור', 'מספר המצטרף נשמר כמושא האירוע', joinedByPhone.targetPhone, '+972 52-805-1911')
-
-const osheretJoin = detectSourceEvent('\u200f~\u202fאושרת ביטון מזכירה לוד הצטרפה לקבוצה באמצעות קישור.')
-check('אירועי מקור', 'מצטרפת בשם מזוהה כ-join', osheretJoin.kind, 'join')
-const osheretStructured = parseStructuredGoogleContact({
-  label: osheretJoin.targetLabel,
-  matchedRoleAlias: 'מזכירה',
-  roleId: 13,
-  cityCandidate: 'לוד',
-})
-check('Google Contact', 'שם+תפקיד+עיר מזוהה כאיש קשר שמור', osheretStructured.isStructured, true)
-check('Google Contact', 'שם קנוני מחולץ בלי תפקיד ועיר', osheretStructured.contactName, 'אושרת ביטון')
-
-const irisJoin = detectSourceEvent('איריס אשד הצטרפה לקבוצה באמצעות קישור.')
-check('אירועי מקור', 'שם בלבד נשמר כמושא', targetNameOnly(irisJoin), 'איריס אשד')
-const irisStructured = parseStructuredGoogleContact({ label: irisJoin.targetLabel, matchedRoleAlias: null, roleId: null, cityCandidate: null })
-check('Google Contact', 'שם בלבד אינו נחשב פורמט Google בטוח', irisStructured.isStructured, false)
-
-const added = detectSourceEvent('דנה כהן צירפה את איריס אשד')
-check('אירועי מקור', 'צירוף — Actor נכון', added.actorLabel, 'דנה כהן')
-check('אירועי מקור', 'צירוף — Target נכון', added.targetLabel, 'איריס אשד')
-
-for (const noise of ['ההודעה הזו נמחקה', '<המדיה לא נכללה>', 'דנה יצאה', 'דנה הסירה את איריס']) {
-  check('אירועי מקור', `הודעת מערכת מוסתרת: ${noise}`, detectSourceEvent(noise).kind, 'system_noise')
-  check('סיווג', `הודעת מערכת אינה רשומת עבודה: ${noise}`, classifyText(noise).contentType, 'irrelevant')
-}
-
-for (const fragment of ['מחר', 'גם אני', 'בחולון', 'כן']) {
-  const fragmentResult = classifyText(fragment)
-  check('הקשר', `קטע קצר דורש בדיקה: ${fragment}`, fragmentResult.contentType, 'unclear')
-  check('הקשר', `קטע קצר מסומן needs_context: ${fragment}`, fragmentResult.needsContext, true)
-}
-
-const doctorStructured = parseStructuredGoogleContact({
-  label: 'דר נפתלי חן * חולון',
-  matchedRoleAlias: 'דר',
-  roleId: 1,
-  cityCandidate: 'חולון',
-})
-check('Google Contact', 'רופא + עיר מזוהה כפורמט שמור', doctorStructured.isStructured, true)
-check('Google Contact', 'תואר דר והכוכבית נשמרים בשם הקנוני', doctorStructured.contactName, 'דר נפתלי חן *')
 
 // ═══════════════════════════════════════════════════════════
 // 2. חיבור הודעות המשך (§8.3, §14)
@@ -264,11 +215,6 @@ check('התאמה', 'מייל (case-insensitive) ⇒ התאמה ודאית', [by
 const nameOnly = matchRow({ ...emptyInput, contactNameRaw: 'רונית כהן' }, { contacts, accounts })
 check('התאמה', 'שם בלבד ללא תפקיד/עיר ⇒ אין התאמה אוטומטית', [nameOnly.matchContact, nameOnly.matchType], [null, 'none'])
 
-const trustedName = matchRow({ ...emptyInput, contactNameRaw: 'דנה לוי', trustedExistingName: true }, { contacts, accounts })
-check('התאמה', 'פורמט Google שמור + שם יחיד ⇒ התאמה ודאית', [trustedName.matchContact, trustedName.matchType, trustedName.matchField], [12, 'exact', 'google_contact_label'])
-const trustedAmbiguous = matchRow({ ...emptyInput, contactNameRaw: 'רונית כהן', trustedExistingName: true }, { contacts, accounts })
-check('התאמה', 'פורמט Google שמור עם שני שמות זהים ⇒ ambiguous', trustedAmbiguous.matchType, 'ambiguous')
-
 const nameRole = matchRow({ ...emptyInput, contactNameRaw: 'רונית כהן', roleId: 9 }, { contacts, accounts })
 check('התאמה', 'שם+תפקיד עם שני מועמדים ⇒ נמצאו מספר התאמות', nameRole.matchType, 'ambiguous')
 check('התאמה', 'ambiguous אינו בוחר אוטומטית', [nameRole.matchContact, nameRole.matchAccount], [null, null])
@@ -286,12 +232,6 @@ check('מצב במאגר', 'שניהם', computeMatchStatus({ match_contact: 11,
 check('מצב במאגר', 'מספר התאמות', computeMatchStatus({ match_contact: null, match_account: null, match_type: 'ambiguous', last_action_id: null }), 'multiple')
 check('מצב במאגר', 'לא נמצאה', computeMatchStatus({ match_contact: null, match_account: null, match_type: 'none', last_action_id: null }), 'none')
 check('מצב במאגר', 'כבר קושרה', computeMatchStatus({ match_contact: 11, match_account: null, match_type: 'exact', last_action_id: 5 }), 'already_linked')
-
-check('מצב עסקי', 'התאמה קיימת ⇒ קיים', L.computeDatabaseState({ match_contact: 11, match_account: null, match_type: 'exact' }), 'existing')
-check('מצב עסקי', 'ללא התאמה ⇒ לא קיים', L.computeDatabaseState({ match_contact: null, match_account: null, match_type: 'none' }), 'not_existing')
-check('מצב עסקי', 'שם בלבד/דורש זיהוי', L.computeDatabaseState({ match_contact: null, match_account: null, match_type: 'none', tags: ['requires_identification'] }), 'needs_identification')
-check('מצב עסקי', 'התאמה חלשה אינה מסומנת כלא קיים', L.computeDatabaseState({ match_contact: null, match_account: null, match_type: 'probable' }), 'needs_identification')
-check('מצב עסקי', 'פורמט Google שלא נמצא ב-Supabase ⇒ חריג', L.computeDatabaseState({ match_contact: null, match_account: null, match_type: 'none', tags: ['google_contact_expected_existing'] }), 'google_sync_exception')
 
 // ═══════════════════════════════════════════════════════════
 // 6. זהות מאוחדת (§4)

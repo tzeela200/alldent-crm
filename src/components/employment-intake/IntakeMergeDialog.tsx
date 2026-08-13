@@ -1,14 +1,13 @@
 /**
- * השוואה ועדכון ברמת שדה: הקיים ב-Supabase / הערך מהמקור / ערך אחר.
- * ברירת מחדל: מידע חדש לשדה ריק נבחר; קונפליקט אמיתי נשאר על Supabase
- * עד שהמשתמשת מחליטה במפורש. אין דריסה שקטה.
+ * §3.5 פעולה 10 — מיזוג מידע חדש לרשומה קיימת. בחירה פר-שדה, ברירת מחדל
+ * מסומנת רק לשדות ריקים; דריסת ערך קיים דורשת סימון מפורש (עקבי עם §5.2
+ * כלל 3 שחל גם על עריכת שדה משותף גורפת).
  */
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Merge } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ActionButton } from '@/components/layout/Shell'
-import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import {
   useContactCompareData,
   useAccountCompareData,
@@ -18,8 +17,6 @@ import {
 import { computeContactMergeDiff, computeAccountMergeDiff, type MergeFieldDiff } from '@/lib/employment-intake/mergeCompare'
 import type { RowWithAction } from '@/hooks/useEmploymentIntakeRows'
 
-type Choice = 'supabase' | 'incoming' | 'manual'
-
 interface Props {
   row: RowWithAction | null
   target: 'contact' | 'account' | null
@@ -27,172 +24,96 @@ interface Props {
   onClose: () => void
 }
 
-function isDictionaryField(key: string) {
-  return key === 'role' || key === 'city_id'
-}
-
-function isLtrField(key: string) {
-  return key.includes('phone') || key.includes('email') || key.includes('facebook')
+function formatValue(v: unknown): string {
+  if (v == null || v === '') return '(ריק)'
+  return String(v)
 }
 
 export function IntakeMergeDialog({ row, target, targetId, onClose }: Props) {
-  const { data: appDicts } = useApplicationDicts()
   const contactData = useContactCompareData(target === 'contact' ? targetId : null)
   const accountData = useAccountCompareData(target === 'account' ? targetId : null)
   const mergeContact = useMergeContactFields()
   const mergeAccount = useMergeAccountFields()
 
-  const diffs: MergeFieldDiff[] = useMemo(() => (
+  const diffs: MergeFieldDiff[] =
     row && target === 'contact' && contactData.data
       ? computeContactMergeDiff(row, contactData.data)
       : row && target === 'account' && accountData.data
         ? computeAccountMergeDiff(row, accountData.data)
         : []
-  ), [row, target, contactData.data, accountData.data])
 
-  const [choices, setChoices] = useState<Record<string, Choice>>({})
-  const [manualValues, setManualValues] = useState<Record<string, unknown>>({})
+  const [checked, setChecked] = useState<Set<string>>(new Set())
 
   useEffect(() => {
-    const next: Record<string, Choice> = {}
-    for (const d of diffs) next[d.key] = d.fillsEmpty ? 'incoming' : 'supabase'
-    setChoices(next)
-    setManualValues({})
-  }, [row?.id, target, targetId, diffs])
+    setChecked(new Set(diffs.filter((d) => d.fillsEmpty).map((d) => d.key)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [row?.id, target, targetId, contactData.data, accountData.data])
 
   if (!row || !target || targetId == null) return null
+
+  const confirmedRow = row
+  const confirmedId = targetId
 
   const isLoading = target === 'contact' ? contactData.isLoading : accountData.isLoading
   const isPending = mergeContact.isPending || mergeAccount.isPending
 
-  function displayValue(key: string, value: unknown): string {
-    if (value == null || value === '') return 'ריק'
-    if (key === 'role' && typeof value === 'number') return getDictLabel(appDicts?.roles, value)
-    if (key === 'city_id' && typeof value === 'number') return getDictLabel(appDicts?.cities, value)
-    return String(value)
-  }
-
-  function manualEditor(diff: MergeFieldDiff) {
-    const value = manualValues[diff.key] ?? ''
-    if (diff.key === 'role') {
-      return (
-        <select
-          value={typeof value === 'number' ? value : ''}
-          onChange={(e) => setManualValues((m) => ({ ...m, [diff.key]: e.target.value ? Number(e.target.value) : null }))}
-          className="mt-2 h-9 w-full rounded-[9px] border border-[#D9D9D9] bg-white px-2 text-[13px] outline-none focus:border-[#008080]"
-        >
-          <option value="">בחרי תפקיד…</option>
-          {(appDicts?.roles ?? []).map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-        </select>
-      )
-    }
-    if (diff.key === 'city_id') {
-      return (
-        <select
-          value={typeof value === 'number' ? value : ''}
-          onChange={(e) => setManualValues((m) => ({ ...m, [diff.key]: e.target.value ? Number(e.target.value) : null }))}
-          className="mt-2 h-9 w-full rounded-[9px] border border-[#D9D9D9] bg-white px-2 text-[13px] outline-none focus:border-[#008080]"
-        >
-          <option value="">בחרי עיר…</option>
-          {(appDicts?.cities ?? []).map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-      )
-    }
-    return (
-      <input
-        value={String(value ?? '')}
-        dir={isLtrField(diff.key) ? 'ltr' : 'auto'}
-        onChange={(e) => setManualValues((m) => ({ ...m, [diff.key]: e.target.value }))}
-        placeholder="הקלידי ערך נכון"
-        className="mt-2 h-9 w-full rounded-[9px] border border-[#D9D9D9] bg-white px-2 text-[13px] outline-none focus:border-[#008080]"
-      />
-    )
+  function toggle(key: string) {
+    setChecked((prev) => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
   }
 
   function handleSave() {
-    if (!row || targetId == null) return
     const patch: Record<string, unknown> = {}
-    const before: Record<string, unknown> = {}
-
-    for (const diff of diffs) {
-      const choice = choices[diff.key] ?? 'supabase'
-      if (choice === 'supabase') continue
-      const nextValue = choice === 'incoming' ? diff.incoming : manualValues[diff.key]
-      if (nextValue == null || nextValue === '') continue
-      patch[diff.key] = nextValue
-      before[diff.key] = diff.current
-    }
-
+    for (const d of diffs) if (checked.has(d.key)) patch[d.key] = d.incoming
     if (Object.keys(patch).length === 0) {
       onClose()
       return
     }
-
     if (target === 'contact') {
-      mergeContact.mutate({ row, contactId: targetId, patch, before }, { onSuccess: onClose })
+      mergeContact.mutate({ row: confirmedRow, contactId: confirmedId, patch }, { onSuccess: onClose })
     } else {
-      mergeAccount.mutate({ row, accountId: targetId, patch, before }, { onSuccess: onClose })
+      mergeAccount.mutate({ row: confirmedRow, accountId: confirmedId, patch }, { onSuccess: onClose })
     }
   }
 
   return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto" dir="rtl">
+    <Dialog open={!!row} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] max-w-xl overflow-y-auto" dir="rtl">
         <DialogHeader>
-          <DialogTitle>השוואה ועדכון {target === 'contact' ? 'איש קשר' : 'ארגון'}</DialogTitle>
+          <DialogTitle>מיזוג מידע ל{target === 'contact' ? 'איש הקשר' : 'ארגון'} הקיים</DialogTitle>
         </DialogHeader>
 
-        <div className="rounded-[12px] border border-[#D9D9D9] bg-[#F9FAFB] p-3 text-[13px] text-[#6B6B6B]">
-          בחרי את הערך הנכון לכל שדה. שדה ריק ב-Supabase מקבל כברירת מחדל את המידע החדש; קונפליקט אינו נדרס בלי בחירה מפורשת.
-        </div>
-
         {isLoading ? (
-          <p className="py-4 text-[13px] text-[#6B6B6B]">טוען נתונים…</p>
+          <p className="text-[13px] text-[#6B6B6B]">טוען נתונים…</p>
         ) : diffs.length === 0 ? (
-          <p className="py-4 text-[13px] text-[#6B6B6B]">אין שדות שונים לעדכון.</p>
+          <p className="text-[13px] text-[#6B6B6B]">אין מידע חדש למיזוג — כל השדות שחולצו כבר תואמים לרשומה הקיימת.</p>
         ) : (
-          <div className="overflow-hidden rounded-[14px] border border-[#D9D9D9]">
-            <div className="grid grid-cols-[140px_1fr_1fr_1fr] gap-0 border-b border-[#D9D9D9] bg-[#F3F4F6] text-[12px] font-bold text-[#6B6B6B]">
-              <div className="p-3">שדה</div>
-              <div className="p-3">Supabase</div>
-              <div className="p-3">מהמקור</div>
-              <div className="p-3">הבחירה שלי</div>
-            </div>
-            {diffs.map((diff) => {
-              const choice = choices[diff.key] ?? 'supabase'
-              return (
-                <div key={diff.key} className="grid grid-cols-[140px_1fr_1fr_1fr] border-b border-[#F3F4F6] text-[13px] last:border-b-0">
-                  <div className="p-3 font-semibold text-[#2D2D2D]">{diff.label}</div>
-                  <label className={`cursor-pointer p-3 ${choice === 'supabase' ? 'bg-[#E6F3F3]' : ''}`}>
-                    <div className="flex items-start gap-2">
-                      <input type="radio" name={`choice-${diff.key}`} checked={choice === 'supabase'} onChange={() => setChoices((c) => ({ ...c, [diff.key]: 'supabase' }))} className="mt-0.5 accent-[#008080]" />
-                      <span dir={isLtrField(diff.key) ? 'ltr' : 'auto'}>{displayValue(diff.key, diff.current)}</span>
-                    </div>
-                  </label>
-                  <label className={`cursor-pointer p-3 ${choice === 'incoming' ? 'bg-[#FFF7E8]' : ''}`}>
-                    <div className="flex items-start gap-2">
-                      <input type="radio" name={`choice-${diff.key}`} checked={choice === 'incoming'} onChange={() => setChoices((c) => ({ ...c, [diff.key]: 'incoming' }))} className="mt-0.5 accent-[#D97706]" />
-                      <span dir={isLtrField(diff.key) ? 'ltr' : 'auto'}>{displayValue(diff.key, diff.incoming)}</span>
-                    </div>
-                    {diff.fillsEmpty && <div className="mt-1 text-[11px] text-[#008080]">השלמת מידע חסר</div>}
-                  </label>
-                  <div className={`p-3 ${choice === 'manual' ? 'bg-[#FFFBEB]' : ''}`}>
-                    <label className="flex cursor-pointer items-start gap-2">
-                      <input type="radio" name={`choice-${diff.key}`} checked={choice === 'manual'} onChange={() => setChoices((c) => ({ ...c, [diff.key]: 'manual' }))} className="mt-0.5 accent-[#D97706]" />
-                      <span>ערך אחר</span>
-                    </label>
-                    {choice === 'manual' && manualEditor(diff)}
+          <div className="space-y-2">
+            {diffs.map((d) => (
+              <label key={d.key} className="flex items-start gap-3 rounded-[10px] border border-[#D9D9D9] p-3">
+                <input type="checkbox" checked={checked.has(d.key)} onChange={() => toggle(d.key)} className="mt-1 h-4 w-4 accent-[#008080]" />
+                <div className="text-[13px]">
+                  <div className="font-semibold text-[#2D2D2D]">{d.label}</div>
+                  <div className="text-[#6B6B6B]">
+                    {formatValue(d.current)} ← <span className="font-semibold text-[#008080]">{formatValue(d.incoming)}</span>
                   </div>
+                  {!d.fillsEmpty && <div className="text-[12px] text-[#D97706]">⚠ יחליף ערך קיים</div>}
                 </div>
-              )
-            })}
+              </label>
+            ))}
           </div>
         )}
 
         <DialogFooter>
-          <ActionButton variant="ghost" onClick={onClose}>ביטול</ActionButton>
+          <ActionButton variant="ghost" onClick={onClose}>
+            ביטול
+          </ActionButton>
           <ActionButton variant="primary" icon={Merge} disabled={diffs.length === 0 || isPending} onClick={handleSave}>
-            {isPending ? 'שומר…' : 'שמור בחירות ועדכן'}
+            {isPending ? 'ממזג…' : 'מיזוג השדות שנבחרו'}
           </ActionButton>
         </DialogFooter>
       </DialogContent>

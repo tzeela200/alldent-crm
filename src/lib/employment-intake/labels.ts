@@ -49,8 +49,8 @@ export const MATCH_STATUS_LABEL: Record<MatchStatus, string> = {
   account_found: 'נמצא ארגון',
   both_found: 'נמצאו איש קשר וארגון',
   multiple: 'נמצאו מספר התאמות',
-  none: 'לא קיים',
-  already_linked: 'קיים במאגר',
+  none: 'לא נמצאה התאמה',
+  already_linked: 'הרשומה כבר קושרה בעבר',
 }
 
 /** אוצר מילים זהה ל-MATCH_LABEL הקיים ב-RecruitmentRequestPanel.tsx. */
@@ -80,7 +80,6 @@ export const ACTION_TYPE_LABEL: Record<ActionType, string> = {
   update_field: 'עדכון שדה',
   mark_irrelevant: 'סימון לא רלוונטי',
   merge_identity_group: 'איחוד זהויות',
-  manual_override: 'תיקון ידני',
 }
 
 // ── סוג הפרטים שנשלחו (details_sent_type) ───────────────────────────
@@ -116,7 +115,6 @@ export const FIELD_LABEL: Record<string, string> = {
   performed_by: 'נשלח על ידי',
   last_contact_date: 'מועד יצירת הקשר האחרון',
   display_name: 'שם',
-  google_contact_label: 'שם שמור באנשי הקשר',
   contact_name: 'שם איש קשר',
   org_name: 'שם ארגון',
   account_name: 'שם ארגון',
@@ -148,45 +146,13 @@ export function fieldLabel(key: string): string {
 }
 
 // ── מקטעי המסך ────────────────────────────────────────────────────
-export const SCREEN_TITLE = 'איתור מחפשי עבודה ומגייסים'
-export const SCREEN_SUBTITLE = 'איתור מחפשי עבודה, מגייסים ומצטרפים מתוך WhatsApp ומקורות נוספים, בדיקה מול המאגר וטיפול ברשומות.'
+export const SCREEN_TITLE = 'קליטה ומיון תעסוקתי'
+export const SCREEN_SUBTITLE = 'קליטת טקסטים וקבצים, זיהוי מחפשי עבודה ומגייסים, התאמה למאגר והצעת פעולות.'
 
 export const TAB_LABEL = {
-  intake: 'העלאת מקור',
+  intake: 'קליטה',
   results: 'תוצאות',
 } as const
-
-// ── מצב עסקי במאגר — זהו ה-label שמוצג למשתמשת, לא match_type הטכני ──
-export type DatabaseState = 'existing' | 'not_existing' | 'needs_identification' | 'google_sync_exception'
-
-export const DATABASE_STATE_LABEL: Record<DatabaseState, string> = {
-  existing: 'קיים',
-  not_existing: 'לא קיים',
-  needs_identification: 'נדרש זיהוי',
-  google_sync_exception: 'חריג — איש קשר שמור אך לא נמצא ב-Supabase',
-}
-
-export const DATABASE_STATE_TONE: Record<DatabaseState, 'success' | 'warning' | 'neutral' | 'error' | 'info'> = {
-  existing: 'success',
-  not_existing: 'info',
-  needs_identification: 'warning',
-  google_sync_exception: 'error',
-}
-
-export function computeDatabaseState(row: {
-  match_contact: number | null
-  match_account: number | null
-  match_type: MatchType | null
-  needs_context?: boolean
-  tags?: string[]
-}): DatabaseState {
-  const tags = row.tags ?? []
-  const found = row.match_contact != null || row.match_account != null
-  if (found) return 'existing'
-  if (tags.includes('google_contact_expected_existing')) return 'google_sync_exception'
-  if (row.match_type === 'ambiguous' || row.match_type === 'probable' || row.needs_context || tags.includes('requires_identification')) return 'needs_identification'
-  return 'not_existing'
-}
 
 // ── מצבי טעינה וריק (§12.5) ─────────────────────────────────────────
 export const LOADING_LABEL = {

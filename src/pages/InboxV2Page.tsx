@@ -38,10 +38,7 @@ function loadStoredVisibleColumns(): string[] {
 }
 
 export default function InboxV2Page() {
-  // המסך נפתח כתור עבודה: רק מה שעדיין דורש הכרעה.
-  // "קיים במערכת" (11) אינו ב-OPEN_STATUS_IDS ולכן מוסתר כברירת מחדל,
-  // בדיוק כפי שהוגדר — ונשאר נגיש בכיבוי הסינון (INC-3125).
-  const [filters, setFilters] = useState<InboxV2Filters>({ open_only: true })
+  const [filters, setFilters] = useState<InboxV2Filters>({})
   const [page, setPage] = useState(0)
   const [showUpload, setShowUpload] = useState(true)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
@@ -164,9 +161,9 @@ export default function InboxV2Page() {
       {/* KPI Row — ספירה גלובלית אמיתית */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <KPICard label="סה״כ רשומות" value={stats?.total ?? '—'} />
-        <KPICard label="ממתינות להכרעה" value={stats?.open ?? '—'} />
-        <KPICard label="קיימות במערכת" value={stats?.exists ?? '—'} />
-        <KPICard label="עודכנו למאגר" value={stats?.merged ?? '—'} />
+        <KPICard label="פתוחים בשער" value={stats?.open ?? '—'} />
+        <KPICard label="התאמות" value={stats?.matched ?? '—'} />
+        <KPICard label="מוזגו" value={stats?.merged ?? '—'} />
       </div>
 
       {/* Upload Zone */}
@@ -207,10 +204,6 @@ export default function InboxV2Page() {
         selectedIds={selectedIds}
         onSelectionChange={setSelectedIds}
         onRowClick={setDetailLeadId}
-        onOpenMerge={(id) => {
-          setMergeEntity(undefined)
-          setMergeLeadId(id)
-        }}
         bulkActions={
           <InboxV2QuickActions
             selectedIds={selectedIds}

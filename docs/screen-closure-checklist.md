@@ -223,7 +223,7 @@
 
 ---
 
-## סטטוס: מסך איתור מחפשי עבודה ומגייסים — `EmploymentIntakePage.tsx` (INC-3119, 13.8.2026)
+## סטטוס: מסך קליטה ומיון תעסוקתי — `EmploymentIntakePage.tsx` (INC-3119, 11.8.2026)
 
 מסך חדש. Migration אושר והורץ (2 טבלאות + `resolve_employment_identity`).
 14 שלבי התוכנית בוצעו. `tsc -b` + `vite build` נקיים.

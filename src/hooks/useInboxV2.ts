@@ -79,19 +79,18 @@ export function useInboxV2Stats() {
     queryKey: ['inbox-v2-stats'],
     queryFn: async () => {
       const base = () => supabase.from('inbox_v2').select('*', { count: 'exact', head: true })
-      const [total, open, exists, merged] = await Promise.all([
+      const [total, open, matched, merged] = await Promise.all([
         base(),
         base().in('merge_status', OPEN_STATUS_IDS),
-        // "קיים במערכת" — הותאם בוודאות ואין מה להחליט (INC-3124)
-        base().eq('merge_status', 11),
+        base().in('merge_status', [3, 4]),
         base().eq('merge_status', 6),
       ])
-      const firstError = total.error ?? open.error ?? exists.error ?? merged.error
+      const firstError = total.error ?? open.error ?? matched.error ?? merged.error
       if (firstError) throw firstError
       return {
         total: total.count ?? 0,
         open: open.count ?? 0,
-        exists: exists.count ?? 0,
+        matched: matched.count ?? 0,
         merged: merged.count ?? 0,
       }
     },

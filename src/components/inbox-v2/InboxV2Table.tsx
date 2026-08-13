@@ -11,7 +11,6 @@ import {
 } from '@/lib/inbox-v2-dicts'
 import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import { useInboxMatchedNames, matchedLabel } from '@/hooks/useInboxMatchedNames'
-import { InboxDiffChips } from '@/components/inbox-v2/InboxDiffChips'
 import { entryReasonLabel, matchedByLabel } from '@/lib/inbox-v2-merge'
 import type { InboxV2Row } from '@/types/inbox-v2'
 
@@ -23,7 +22,6 @@ export const ALL_COLUMNS: { key: string; label: string }[] = [
   { key: 'display_name', label: 'שם' },
   { key: 'email', label: 'אימייל' },
   { key: 'match_existing', label: 'התאמה לרשומה קיימת' },
-  { key: 'diffs', label: 'פערים' },
   { key: 'match_reason', label: 'סיבת התאמה' },
   { key: 'match_confidence', label: 'רמת ביטחון' },
   { key: 'has_new_information', label: 'מידע חדש' },
@@ -39,8 +37,8 @@ export const ALL_COLUMNS: { key: string; label: string }[] = [
   { key: 'facebook_url', label: 'Facebook URL' },
   { key: 'linkedin_url', label: 'LinkedIn' },
   { key: 'facebook_group_name', label: 'קבוצת פייסבוק' },
-  { key: 'match_contact', label: 'מזהה איש קשר מותאם' },
-  { key: 'match_account', label: 'מזהה ארגון מותאם' },
+  { key: 'match_contact', label: 'match_contact' },
+  { key: 'match_account', label: 'match_account' },
   { key: 'matched_by', label: 'שיטת התאמה' },
   { key: 'seen_count', label: 'הופעות' },
   { key: 'updated_at', label: 'עודכן' },
@@ -51,18 +49,16 @@ export const DEFAULT_COLUMNS = [
   'match_result',
   'phone',
   'display_name',
-  'match_existing',
-  // "פערים" מחליף את "מידע חדש" בברירת המחדל: בוליאני אמר שיש משהו,
-  // לא מה הוא. בתור טריאז' זה ההבדל בין לפתוח שורה לבין להחליט ממנה.
-  'diffs',
+  'email',
+  'match_reason',
   'match_confidence',
+  'has_new_information',
   'source',
+  'tags',
   'created_at',
 ]
 
-// v2 (INC-3125): עמודת "פערים" נכנסה לברירת המחדל. בלי העלאת הגרסה,
-// מי שכבר בחר עמודות בעבר לא היה רואה אותה לעולם.
-export const INBOX_V2_COLUMNS_STORAGE_KEY = 'alldent.inboxV2.visibleColumns.v2'
+export const INBOX_V2_COLUMNS_STORAGE_KEY = 'alldent.inboxV2.visibleColumns.v1'
 
 const SORTABLE = new Set(['merge_status', 'display_name', 'match_confidence', 'created_at'])
 
@@ -74,8 +70,6 @@ interface Props {
   selectedIds: number[]
   onSelectionChange: (ids: number[]) => void
   onRowClick: (leadId: number) => void
-  /** מעבר ישיר מהתור לפאנל ההכרעה, בלי לעבור דרך פאנל הפרטים */
-  onOpenMerge?: (leadId: number) => void
   bulkActions?: ReactNode
   pagination?: ReactNode
 }
@@ -92,7 +86,6 @@ export function InboxV2Table({
   selectedIds,
   onSelectionChange,
   onRowClick,
-  onOpenMerge,
   bulkActions,
   pagination,
 }: Props) {
@@ -200,11 +193,6 @@ export function InboxV2Table({
             </span>
           )
         },
-      },
-      diffs: {
-        key: 'diffs',
-        label: 'פערים',
-        render: (r) => <InboxDiffChips row={r} />,
       },
       match_reason: {
         key: 'match_reason',
@@ -342,39 +330,13 @@ export function InboxV2Table({
     [sourceTypes, matchedNames]
   )
 
-  const columns = useMemo(() => {
-    const base = ALL_COLUMNS.filter((c) => visibleColumns.includes(c.key))
-      .map((c) => columnDefs[c.key])
-      .filter(Boolean)
-
-    if (!onOpenMerge) return base
-
-    // עמודת פעולה קבועה — אינה חלק מבורר העמודות, כדי שהמעבר להכרעה
-    // לעולם לא ייעלם בטעות מהתור.
-    const actions: AdminColumn<InboxV2Row> = {
-      key: 'row_actions',
-      label: '',
-      nowrap: true,
-      render: (r) => {
-        const hasMatch = r.match_contact != null || r.match_account != null
-        if (!hasMatch) return null
-        const diffCount = Object.keys(r.suggested_updates ?? {}).length
-        return (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onOpenMerge(r.lead_id)
-            }}
-            className="rounded-lg border border-[#99D6D6] bg-white px-2.5 py-1 text-[12px] font-semibold text-[#008080] transition hover:bg-[#E6F3F3]"
-          >
-            {diffCount > 0 ? `הכרע ${diffCount} פערים` : 'פתח השוואה'}
-          </button>
-        )
-      },
-    }
-    return [...base, actions]
-  }, [visibleColumns, columnDefs, onOpenMerge])
+  const columns = useMemo(
+    () =>
+      ALL_COLUMNS.filter((c) => visibleColumns.includes(c.key))
+        .map((c) => columnDefs[c.key])
+        .filter(Boolean),
+    [visibleColumns, columnDefs]
+  )
 
   const selectedStr = selectedIds.map(String)
   const pageIds = rows.map((r) => r.lead_id)
