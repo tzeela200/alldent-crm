@@ -16,20 +16,9 @@ export const INBOX_STATUSES: DictItem[] = [
   { id: 11, name: 'קיים במערכת', slug: 'exists', color: '#06B6D4' },
 ]
 
-export const SOURCE_TYPES: DictItem[] = [
-  { id: 1, name: 'Facebook Group' },
-  { id: 2, name: 'Facebook Page' },
-  { id: 3, name: 'Facebook Profile' },
-  { id: 4, name: 'WhatsApp' },
-  { id: 5, name: 'Google Contacts' },
-  { id: 6, name: 'Excel' },
-  { id: 7, name: 'CSV' },
-  { id: 8, name: 'CRM' },
-  { id: 9, name: 'Email' },
-  { id: 10, name: 'Fillout' },
-  { id: 11, name: 'Manual' },
-  { id: 12, name: 'Other' },
-]
+// מילון המקורות אינו מוגדר כאן. הוא נטען חי מ-`dict_source_types` דרך
+// useInboxV2SourceTypes() — ראו את ההסבר שם. רשימה מוקשחת כאן הייתה
+// "נכונה במקרה" ולא הייתה מתעדכנת בעקבות שינוי במסד (INC-3124).
 
 export const ACTION_TYPES: DictItem[] = [
   { id: 1, name: 'מיזוג' },
@@ -76,6 +65,62 @@ export function getDictName(items: DictItem[], id: number | null | undefined): s
   return items.find((i) => i.id === id)?.name ?? String(id)
 }
 
+/**
+ * שם המקור של הרשומה, לתצוגה (INC-3124).
+ *
+ * עד INC-3124 המסך הניח שכל רשומה הגיעה מ-Google וכתב "הגיע מגוגל" קבוע.
+ * זה היה נכון במקרה — 100% מהנתונים היו Google — אבל ברגע שנכנס Excel
+ * או הדבקה ידנית, המסך שיקר למשתמשת לגבי מקור המידע.
+ *
+ * `short` הוא סוג המקור מהמילון ("Excel", "Google Contacts") ומשמש בתוויות
+ * הכפתורים; `full` מוסיף את שם המקור החופשי אם הוזן, ומשמש בכותרות.
+ */
+export function sourceLabel(
+  row: Pick<InboxV2Row, 'source_type' | 'source_name'>,
+  sourceTypes: DictItem[] | undefined
+): { short: string; full: string } {
+  const dictName =
+    row.source_type != null ? getDictName(sourceTypes ?? [], row.source_type) : null
+  const short = dictName && dictName !== '—' ? dictName : (row.source_name ?? 'מקור לא ידוע')
+  const full = row.source_name && row.source_name !== short ? `${short} · ${row.source_name}` : short
+  return { short, full }
+}
+
+/**
+ * שמות עבריים לשדות שמופיעים ב-suggested_updates.
+ * המפתחות מגיעים מ-inbox_compute_diff ומשקפים שמות עמודות — ערך טכני
+ * באנגלית לעולם אינו מוצג למשתמשת.
+ */
+const FIELD_LABEL: Record<string, string> = {
+  display_name: 'שם תצוגה',
+  account_name: 'שם ארגון',
+  phone: 'נייד ראשי',
+  second_phone: 'נייד נוסף',
+  email: 'מייל ראשי',
+  second_email: 'מייל נוסף',
+  role: 'תפקיד',
+  city_id: 'עיר',
+  facebook_name: 'שם Facebook',
+  facebook_id: 'מזהה Facebook',
+  facebook_url: 'קישור Facebook',
+  role_conflict: 'סתירת תפקיד',
+}
+
+export function fieldLabel(key: string): string {
+  return FIELD_LABEL[key] ?? key
+}
+
+/** תיאור עברי לסטטוס ההשוואה שנשמר ב-suggested_updates. */
+const DIFF_STATUS_LABEL: Record<string, string> = {
+  complete: 'השלמת מידע חסר',
+  diff: 'פער — נדרשת בחירה',
+  unresolved: 'מידע לא מזוהה',
+}
+
+export function diffStatusLabel(status: unknown): string | null {
+  return typeof status === 'string' ? (DIFF_STATUS_LABEL[status] ?? null) : null
+}
+
 // =====================================================
 // הפרדת שלושת צירי הסטטוס (INC-3108 — SSOT)
 // מקור אמת: dict_inbox_statuses / dict_inbox_action_types / dict_check_statuses
@@ -93,8 +138,12 @@ export const MANUAL_INBOX_STATUSES = INBOX_STATUSES.filter((s) =>
 )
 
 /** רשומות "פתוחות בשער" (עדיין דורשות החלטה) מול "סגורות" (טופלו). — מסגור שומר הסף */
-export const OPEN_STATUS_IDS = [1, 2, 3, 4, 5, 11]
-export const CLOSED_STATUS_IDS = [6, 7, 8, 9, 10]
+// INC-3124: 11 ("קיים במערכת") עבר מ"פתוח" ל"סגור".
+// רשומה שהותאמה בוודאות ואין בה שום מידע חדש או שונה אינה דורשת החלטה,
+// ולכן אין לה מה לעשות בתור הטיפול. קודם היא נחשבה "פתוחה" — וזו בדיוק
+// הסיבה שהתור התמלא ברשומות שאין בהן מה לאשר.
+export const OPEN_STATUS_IDS = [1, 2, 3, 4, 5]
+export const CLOSED_STATUS_IDS = [6, 7, 8, 9, 10, 11]
 
 /** קבועי סוג פעולה — מקור אמת dict_inbox_action_types. לא להשתמש בליטרלים חשופים. */
 export const INBOX_ACTION = {

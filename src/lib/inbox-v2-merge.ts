@@ -7,8 +7,17 @@
 //   - השוואת שדות אחרי נרמול
 //   - הרכבת ה-patch לכתיבה, עם whitelist סגורה לכל ישות
 //
-// חוזה הנתונים הנכנס נכתב על ידי n8n (Workflow GOOGLE-01). המסך לא מנתח
-// Google, לא מפצל שמות ולא מנחש תפקיד/עיר/סוג רשומה.
+// המסך לא מנתח את המקור, לא מפצל שמות ולא מנחש תפקיד/עיר/סוג רשומה.
+// עבור Google, חוזה הנתונים הנכנס נכתב על ידי n8n (Workflow GOOGLE-01);
+// עבור Excel/CSV/הדבקה ידנית הוא נכתב על ידי inbox-v2-parser.ts.
+//
+// ⚠ מקור אמת כפול-מראה (INC-3124):
+// CONTACT_MERGE_FIELDS / ACCOUNT_MERGE_FIELDS וכללי ההשוואה כאן הם עותק
+// מדויק של הפונקציה `public.inbox_compute_diff` ב-Supabase, שבה משתמש
+// `match_inbox_row`. הכפילות נחוצה מפני שה-matching רץ בשרת ללא דפדפן
+// (ייבוא אצווה) והפאנל רץ בדפדפן על נתוני היעד הטריים — אך שתי הנקודות
+// **חייבות** להגיע לאותה מסקנה, אחרת רשומה תיסגר כ"קיים במערכת" בזמן
+// שהפאנל היה מציג פער אמיתי. כל שינוי כאן מחייב שינוי זהה שם, ולהפך.
 // =====================================================
 
 import { normalizePhone, phoneDigits } from '@/lib/normalizePhone'
@@ -69,7 +78,7 @@ export function resolveInboxRoute(
       route: 'merge_contact',
       classificationWarning:
         recordType === 'organization'
-          ? 'n8n סיווגה כארגון אך נמצאה התאמה לאדם — בדקי לפני אישור'
+          ? 'המקור סיווג כארגון אך נמצאה התאמה לאדם — בדקי לפני אישור'
           : null,
     }
   }
@@ -79,7 +88,7 @@ export function resolveInboxRoute(
       route: 'merge_account',
       classificationWarning:
         recordType === 'person'
-          ? 'n8n סיווגה כאדם אך נמצאה התאמה לארגון — בדקי לפני אישור'
+          ? 'המקור סיווג כאדם אך נמצאה התאמה לארגון — בדקי לפני אישור'
           : null,
     }
   }
@@ -319,15 +328,21 @@ function formatPhoneLabel(value: unknown): string | null {
   return v
 }
 
+/** ברירת מחדל כשהמקור אינו ידוע — לעולם לא "Google" (INC-3124). */
+export const DEFAULT_SOURCE_LABEL = 'המקור'
+
 /**
  * בונה את שורות ההשוואה לשער האישור.
  * `target` הוא רשומת contact או accounts כפי שנטענה מ-Supabase.
+ * `sourceLabel` הוא שם המקור בפועל ("Excel" / "Google Contacts" / ...),
+ * ומופיע בתוויות הבחירה. אין להניח Google.
  */
 export function buildComparisons(
   row: InboxV2Row,
   target: Record<string, unknown> | null,
   dicts: ComparisonDicts,
-  entity: MergeEntity
+  entity: MergeEntity,
+  sourceLabel: string = DEFAULT_SOURCE_LABEL
 ): FieldComparison[] {
   const defs = fieldsFor(entity)
   const t = target ?? {}
@@ -336,7 +351,9 @@ export function buildComparisons(
   const existingPhoneKeys = [phoneCompareKey(t.phone), phoneCompareKey(t.second_phone)].filter(Boolean)
   const existingEmailKeys = [normalizeEmail(t.email), normalizeEmail(t.second_email)].filter(Boolean)
 
-  return defs.map((def) => buildOne(def, row, t, dicts, entity, existingPhoneKeys, existingEmailKeys))
+  return defs.map((def) =>
+    buildOne(def, row, t, dicts, entity, existingPhoneKeys, existingEmailKeys, sourceLabel)
+  )
 }
 
 function buildOne(
@@ -346,7 +363,8 @@ function buildOne(
   dicts: ComparisonDicts,
   entity: MergeEntity,
   existingPhoneKeys: string[],
-  existingEmailKeys: string[]
+  existingEmailKeys: string[],
+  sourceLabel: string
 ): FieldComparison {
   const base: FieldComparison = {
     key: def.key,
@@ -368,26 +386,31 @@ function buildOne(
 
   switch (def.kind) {
     case 'phone':
-      return buildPhone(def, base, incomingSource, t, entity, existingPhoneKeys)
+      return buildPhone(def, base, incomingSource, t, entity, existingPhoneKeys, sourceLabel)
     case 'email':
-      return buildEmail(def, base, incomingSource, t, existingEmailKeys)
+      return buildEmail(def, base, incomingSource, t, existingEmailKeys, sourceLabel)
     case 'role':
       return buildDict(def, base, incomingSource, t, dicts.roles, row, [
         'role_text_raw',
         'temp_role_name',
         'role_text',
-      ])
+      ], sourceLabel)
     case 'city':
       return buildDict(def, base, incomingSource, t, dicts.cities, row, [
         'city_text_raw',
         'temp_city_name',
         'city_text',
-      ])
+      ], sourceLabel)
     case 'fbid':
-      return buildFacebookId(def, base, incomingSource, t, entity)
+      return buildFacebookId(def, base, incomingSource, t, entity, sourceLabel)
     default:
-      return buildPlainText(def, base, incomingSource, t)
+      return buildPlainText(def, base, incomingSource, t, sourceLabel)
   }
+}
+
+/** תווית "קבל" עם שם המקור בפועל. */
+function acceptLabel(sourceLabel: string): string {
+  return `קבל מ-${sourceLabel}`
 }
 
 function overwriteOptions(existingLabel: string | null, extra: FieldOption[] = []): FieldOption[] {
@@ -404,7 +427,8 @@ function buildPhone(
   incomingSource: unknown,
   t: Record<string, unknown>,
   entity: MergeEntity,
-  existingPhoneKeys: string[]
+  existingPhoneKeys: string[],
+  sourceLabel: string
 ): FieldComparison {
   const incoming = normalizeText(incomingSource)
   if (!incoming) return base
@@ -432,7 +456,7 @@ function buildPhone(
   const extra: FieldOption[] = [
     {
       id: 'incoming',
-      label: 'קבל מ-Google',
+      label: acceptLabel(sourceLabel),
       requiresOverwriteConfirm: base.existingLabel != null,
     },
   ]
@@ -460,7 +484,8 @@ function buildEmail(
   base: FieldComparison,
   incomingSource: unknown,
   t: Record<string, unknown>,
-  existingEmailKeys: string[]
+  existingEmailKeys: string[],
+  sourceLabel: string
 ): FieldComparison {
   const incomingKey = normalizeEmail(incomingSource)
   if (!incomingKey) return base
@@ -475,7 +500,7 @@ function buildEmail(
   }
 
   const extra: FieldOption[] = [
-    { id: 'incoming', label: 'קבל מ-Google', requiresOverwriteConfirm: base.existingLabel != null },
+    { id: 'incoming', label: acceptLabel(sourceLabel), requiresOverwriteConfirm: base.existingLabel != null },
   ]
 
   if (def.secondaryTo) {
@@ -502,12 +527,13 @@ function buildDict(
   t: Record<string, unknown>,
   items: DictLike[] | undefined,
   row: InboxV2Row,
-  hintKeys: string[]
+  hintKeys: string[],
+  sourceLabel: string
 ): FieldComparison {
   base.existingLabel = dictLabel(items, t[def.to])
 
   if (incomingSource == null) {
-    // n8n לא הצליחה לפתור את הערך. אם יש טקסט גולמי — זו "מידע לא מזוהה"
+    // המקור לא הצליח לפתור את הערך. אם יש טקסט גולמי — זו "מידע לא מזוהה"
     // שדורש תשומת לב; אם אין בכלל, פשוט אין מה למזג.
     const hint = rawHint(row, hintKeys)
     if (hint) {
@@ -515,8 +541,8 @@ function buildDict(
       base.incomingLabel = hint
       base.blockedReason =
         def.kind === 'role'
-          ? 'התפקיד לא זוהה על ידי n8n — לא נכתב ערך'
-          : 'העיר לא זוהתה על ידי n8n — לא נכתב ערך'
+          ? 'התפקיד לא זוהה מהמקור — לא נכתב ערך'
+          : 'העיר לא זוהתה מהמקור — לא נכתב ערך'
       base.options = overwriteOptions(base.existingLabel)
     }
     return base
@@ -548,7 +574,7 @@ function buildDict(
 
   base.status = base.existingLabel == null ? 'complete' : 'diff'
   base.options = overwriteOptions(base.existingLabel, [
-    { id: 'incoming', label: 'קבל מ-Google', requiresOverwriteConfirm: base.existingLabel != null },
+    { id: 'incoming', label: acceptLabel(sourceLabel), requiresOverwriteConfirm: base.existingLabel != null },
   ])
   return base
 }
@@ -558,7 +584,8 @@ function buildFacebookId(
   base: FieldComparison,
   incomingSource: unknown,
   t: Record<string, unknown>,
-  _entity: MergeEntity
+  _entity: MergeEntity,
+  sourceLabel: string
 ): FieldComparison {
   const kind = classifyFacebookValue(incomingSource)
   if (kind === 'empty') return base
@@ -602,7 +629,7 @@ function buildFacebookId(
 
   base.status = base.existingLabel == null ? 'complete' : 'diff'
   base.options = overwriteOptions(base.existingLabel, [
-    { id: 'incoming', label: 'קבל מ-Google', requiresOverwriteConfirm: base.existingLabel != null },
+    { id: 'incoming', label: acceptLabel(sourceLabel), requiresOverwriteConfirm: base.existingLabel != null },
   ])
   return base
 }
@@ -611,7 +638,8 @@ function buildPlainText(
   def: MergeFieldDef,
   base: FieldComparison,
   incomingSource: unknown,
-  t: Record<string, unknown>
+  t: Record<string, unknown>,
+  sourceLabel: string
 ): FieldComparison {
   const incoming = normalizeText(incomingSource)
   if (!incoming) return base
@@ -627,7 +655,7 @@ function buildPlainText(
 
   base.status = base.existingLabel == null ? 'complete' : 'diff'
   base.options = overwriteOptions(base.existingLabel, [
-    { id: 'incoming', label: 'קבל מ-Google', requiresOverwriteConfirm: base.existingLabel != null },
+    { id: 'incoming', label: acceptLabel(sourceLabel), requiresOverwriteConfirm: base.existingLabel != null },
   ])
   return base
 }

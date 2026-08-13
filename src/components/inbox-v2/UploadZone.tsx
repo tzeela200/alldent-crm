@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, type DragEvent } from 'react'
 import { Upload, ClipboardPaste, FileSpreadsheet, Loader2 } from 'lucide-react'
 import { Toolbar, SelectFilter, ActionButton } from '@/components/layout/Shell'
-import { SOURCE_TYPES } from '@/lib/inbox-v2-dicts'
+import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import type { UploadMeta } from '@/types/inbox-v2'
 
 interface UploadZoneProps {
@@ -18,6 +18,7 @@ export function UploadZone({ onFileSelected, onPasteSubmit, isProcessing, progre
   const [sourceName, setSourceName] = useState('')
   const [tagsInput, setTagsInput] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { data: sourceTypes } = useInboxV2SourceTypes()
 
   const getMeta = useCallback((): UploadMeta => ({
     source_type: sourceType ? Number(sourceType) : null,
@@ -71,7 +72,7 @@ export function UploadZone({ onFileSelected, onPasteSubmit, isProcessing, progre
           <SelectFilter
             value={sourceType}
             onChange={setSourceType}
-            options={SOURCE_TYPES.map((s) => ({ value: String(s.id), label: s.name }))}
+            options={(sourceTypes ?? []).map((s) => ({ value: String(s.id), label: s.name }))}
             placeholder="בחר מקור..."
           />
         </div>

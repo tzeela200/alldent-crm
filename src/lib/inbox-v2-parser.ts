@@ -123,14 +123,16 @@ export function normalizeRawRow(raw: RawRow): Record<string, unknown> {
     parsed.phone_norm = normalizePhone(phone)
   }
 
-  const name = parsed.display_name as string | undefined
-  if (name && !parsed.first_name) {
-    const parts = name.split(/\s+/)
-    if (parts.length >= 2) {
-      parsed.first_name = parts[0]
-      parsed.last_name = parts.slice(1).join(' ')
-    }
-  }
+  // INC-3124: אין פיצול שם חופשי ל-first_name/last_name.
+  //
+  // עד כאן הפרסר פיצל כל שם עם רווח: המילה הראשונה כשם פרטי, השאר כשם
+  // משפחה. זה ייצר נתונים שגויים בביטחון מלא — "ד״ר יעל כהן" הפך ל-
+  // first_name="ד״ר", ושמות מורכבים ("בן דוד", "אבו חצירא") נחתכו.
+  // הערכים האלה נראים אחר כך כמידע אמין ומוצעים לכתיבה לליבה.
+  //
+  // first_name/last_name נכתבים אך ורק כשהמקור סיפק אותם בעמודות נפרדות
+  // (COLUMN_MAP למעלה מזהה "שם פרטי"/"שם משפחה"). אחרת נשמר display_name
+  // כפי שהגיע. אותו כלל נאכף ב-CreateFromLeadDialog.
 
   return parsed
 }

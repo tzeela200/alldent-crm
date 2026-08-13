@@ -4,7 +4,7 @@ import { describeMergeResult, type ChoiceId, type ComparisonStatus, type FieldCo
 
 /**
  * שורת השוואה אחת בשער האישור:
- * שם השדה · מה יש אצלנו · מה הגיע מגוגל · **מה יישמר אחרי האישור**.
+ * שם השדה · מה יש אצלנו · מה הגיע מהמקור · **מה יישמר אחרי האישור**.
  *
  * העמודה הרביעית היא העיקר: בלעדיה המשתמשת רואה אפשרויות וצריכה לדמיין
  * את התוצאה. היא מתעדכנת חי לפי הבחירה.
@@ -53,6 +53,8 @@ interface Props {
   onManualValueChange?: (value: unknown) => void
   /** מסומן כשדורש הכרעה ולא נבחר בו דבר */
   needsDecision?: boolean
+  /** שם המקור בפועל ("Excel" / "Google Contacts" / ...) — אין להניח Google */
+  sourceLabel?: string
 }
 
 export function FieldComparisonRow({
@@ -64,6 +66,7 @@ export function FieldComparisonRow({
   manualValue,
   onManualValueChange,
   needsDecision,
+  sourceLabel = 'המקור',
 }: Props) {
   const meta = STATUS_META[comparison.status]
   const needsOverwriteConfirm = comparison.options.some((o) => o.requiresOverwriteConfirm)
@@ -90,7 +93,7 @@ export function FieldComparisonRow({
       </div>
 
       <div>
-        <div className="text-[11px] text-[#9CA3AF]">הגיע מגוגל</div>
+        <div className="text-[11px] text-[#9CA3AF]">הגיע מ{sourceLabel}</div>
         <div className="text-[12px] text-[#6B6B6B]" dir="auto">
           {comparison.incomingLabel ?? <span className="text-[#D9D9D9]">(ריק)</span>}
         </div>

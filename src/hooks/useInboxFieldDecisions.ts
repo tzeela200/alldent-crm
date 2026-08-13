@@ -21,18 +21,21 @@ import type { MergeEntity } from '@/lib/inbox-v2-merge'
 export const INBOX_DECISIONS_KEY = 'inbox-field-decisions'
 
 /**
- * ההחלטות שכבר אושרו עבור אותה ישות + אותה רשומת Google.
- * מסונן לפי היעד בלבד; ההצלבה המדויקת (שדה + שני הערכים) נעשית
- * בזיכרון ב-`suppressDecided`, כדי לא לשלוח שאילתה לכל שדה.
+ * ההחלטות שכבר אושרו עבור אותה ישות.
+ *
+ * INC-3124: הסינון הוא לפי היעד בלבד ולא לפי רשומת Google. החלטה על
+ * איש קשר מסוים ושדה מסוים תקפה בכל מקור — אם כבר הוכרע ש"חיפה" מנצחת
+ * את "תל אביב" עבורו, אין סיבה לשאול שוב רק מפני שהפעם המידע הגיע
+ * מ-Excel. ההצלבה המדויקת (שדה + שני הערכים המנורמלים) נעשית בזיכרון
+ * ב-`suppressDecided`, כדי לא לשלוח שאילתה לכל שדה.
  */
 export function useInboxFieldDecisions(
   targetType: MergeEntity | null,
   targetId: number | null,
-  googleResourceName: string | null,
 ) {
   return useQuery({
-    queryKey: [INBOX_DECISIONS_KEY, targetType, targetId, googleResourceName],
-    enabled: !!targetType && targetId != null && !!googleResourceName,
+    queryKey: [INBOX_DECISIONS_KEY, targetType, targetId],
+    enabled: !!targetType && targetId != null,
     staleTime: 30_000,
     queryFn: async (): Promise<InboxFieldDecision[]> => {
       const { data, error } = await supabase
@@ -40,7 +43,6 @@ export function useInboxFieldDecisions(
         .select('*')
         .eq('target_type', targetType!)
         .eq('target_id', targetId!)
-        .eq('google_resource_name', googleResourceName!)
       if (error) throw new Error(`טעינת ההחלטות הקודמות נכשלה: ${error.message}`)
       return (data ?? []) as InboxFieldDecision[]
     },
@@ -57,8 +59,11 @@ export interface ApplyMergeArgs {
   mergeStatus?: number
   actionType: number
   approvedBy: string | null
+  /** provenance — נשמר עם ההחלטה. NULL לגיטימי לכל מקור שאינו Google. */
   googleAccountKey: string | null
   googleResourceName: string | null
+  sourceType: number | null
+  sourceUniqueKey: string | null
   /** מסלול סתירה בלבד — לאפס את ההתאמה שלא נבחרה */
   clearOtherMatch?: boolean
 }
@@ -86,6 +91,8 @@ export function useApplyInboxMerge() {
         p_google_account_key: args.googleAccountKey,
         p_google_resource_name: args.googleResourceName,
         p_clear_other_match: args.clearOtherMatch ?? false,
+        p_source_type: args.sourceType,
+        p_source_unique_key: args.sourceUniqueKey,
       })
       if (error) throw new Error(error.message)
       return data as ApplyMergeResult

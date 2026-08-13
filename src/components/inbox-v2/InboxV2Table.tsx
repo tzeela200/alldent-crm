@@ -4,11 +4,12 @@ import { AdminBadge } from '@/components/admin/AdminBadge'
 import { formatPhone } from '@/lib/normalizePhone'
 import {
   INBOX_STATUSES,
-  SOURCE_TYPES,
   getDictName,
   inboxStatusAdminVariant,
   deriveMatchResult,
+  sourceLabel,
 } from '@/lib/inbox-v2-dicts'
+import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import { entryReasonLabel, matchedByLabel } from '@/lib/inbox-v2-merge'
 import type { InboxV2Row } from '@/types/inbox-v2'
 
@@ -89,6 +90,7 @@ export function InboxV2Table({
 }: Props) {
   const [sortKey, setSortKey] = useState<string>('created_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+  const { data: sourceTypes } = useInboxV2SourceTypes()
 
   const onSort = (key: string) => {
     if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -223,9 +225,7 @@ export function InboxV2Table({
         key: 'source',
         label: 'מקור',
         render: (r) => (
-          <span className="text-[13px] text-[#6B6B6B]">
-            {r.source_name ?? getDictName(SOURCE_TYPES, r.source_type)}
-          </span>
+          <span className="text-[13px] text-[#6B6B6B]">{sourceLabel(r, sourceTypes).full}</span>
         ),
       },
       tags: {
@@ -318,7 +318,7 @@ export function InboxV2Table({
         ),
       },
     }),
-    []
+    [sourceTypes]
   )
 
   const columns = useMemo(

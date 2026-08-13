@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { SearchBar, SelectFilter } from '@/components/layout/Shell'
-import { INBOX_STATUSES, SOURCE_TYPES } from '@/lib/inbox-v2-dicts'
+import { INBOX_STATUSES } from '@/lib/inbox-v2-dicts'
+import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import type { InboxV2Filters } from '@/types/inbox-v2'
 import type { InboxImportBatch } from '@/types/inbox-v2'
 
@@ -13,6 +14,7 @@ interface Props {
 
 export function InboxV2FiltersBar({ filters, onChange, batches }: Props) {
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const { data: sourceTypes } = useInboxV2SourceTypes()
 
   const set = (patch: Partial<InboxV2Filters>) => onChange({ ...filters, ...patch })
 
@@ -52,7 +54,7 @@ export function InboxV2FiltersBar({ filters, onChange, batches }: Props) {
         <SelectFilter
           value={filters.source_type?.length === 1 ? String(filters.source_type[0]) : ''}
           onChange={(v) => set({ source_type: v ? [Number(v)] : undefined })}
-          options={SOURCE_TYPES.map((s) => ({ value: String(s.id), label: s.name }))}
+          options={(sourceTypes ?? []).map((s) => ({ value: String(s.id), label: s.name }))}
           placeholder="סוג מקור"
         />
 

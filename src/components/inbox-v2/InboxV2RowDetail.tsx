@@ -24,12 +24,15 @@ import { useInboxV2Matching } from '@/hooks/useInboxV2Matching'
 import {
   INBOX_STATUSES,
   MANUAL_INBOX_STATUSES,
-  SOURCE_TYPES,
   getDictName,
   inboxStatusAdminVariant,
   deriveMatchResult,
   INBOX_ACTION,
+  sourceLabel,
+  fieldLabel,
+  diffStatusLabel,
 } from '@/lib/inbox-v2-dicts'
+import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import { normalizePhone, formatPhone } from '@/lib/normalizePhone'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
@@ -102,6 +105,7 @@ export function InboxV2RowDetail({
   const { matchRow } = useInboxV2Matching()
   const { data: dicts } = useApplicationDicts()
   const { data: cities } = useInboxV2Cities()
+  const { data: sourceTypes } = useInboxV2SourceTypes()
   const { user } = useAuth()
   const [isEditing, setIsEditing] = useState(false)
   const [form, setForm] = useState<EditForm | null>(null)
@@ -243,8 +247,7 @@ export function InboxV2RowDetail({
             </div>
           </div>
           <p className="mt-1 text-[12px] text-[#9CA3AF]">
-            #{row.lead_id} · {getDictName(SOURCE_TYPES, row.source_type)}
-            {row.source_name ? ` · ${row.source_name}` : ''}
+            #{row.lead_id} · {sourceLabel(row, sourceTypes).full}
           </p>
         </>
       )}
@@ -736,17 +739,29 @@ export function InboxV2RowDetail({
               <div className="sm:col-span-2 space-y-1">
                 {suggestedEntries.map(([key, update]) => {
                   const isConflict = update?.conflict
+                  // שמות השדות מגיעים מ-inbox_compute_diff כשמות עמודות —
+                  // ערך טכני באנגלית לעולם אינו מוצג למשתמשת.
+                  const statusText = diffStatusLabel(
+                    (update as { status?: unknown } | undefined)?.status
+                  )
                   return (
                     <div
                       key={key}
-                      className={`flex items-center justify-between rounded-lg px-3 py-2 text-[12px] ${
+                      className={`flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-[12px] ${
                         isConflict ? 'bg-[#FEF2F2] text-[#DC2626]' : 'bg-[#E6F3F3] text-[#008080]'
                       }`}
                     >
-                      <span className="font-semibold">{key}</span>
-                      <span dir="ltr">
-                        {update?.current != null ? String(update.current) : '(ריק)'} →{' '}
-                        {String(update?.incoming ?? '')}
+                      <span className="font-semibold">
+                        {fieldLabel(key)}
+                        {statusText && (
+                          <span className="me-1 font-normal text-[11px] opacity-70"> · {statusText}</span>
+                        )}
+                      </span>
+                      <span dir="auto">
+                        {update?.current != null && String(update.current) !== ''
+                          ? String(update.current)
+                          : '(ריק)'}{' '}
+                        ← {String(update?.incoming ?? '')}
                         {isConflict && ' ⚠️'}
                       </span>
                     </div>

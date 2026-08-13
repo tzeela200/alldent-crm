@@ -18,31 +18,40 @@
 import { normalizeEmail, normalizeText, phoneCompareKey } from '@/lib/inbox-v2-merge'
 import type { FieldComparison, MergeEntity } from '@/lib/inbox-v2-merge'
 
-export type DecisionSource = 'supabase' | 'google' | 'manual'
+/**
+ * 'supabase' = השארת הערך הקיים · 'incoming' = קבלת הערך הנכנס (מכל מקור)
+ * · 'manual' = ערך שהוזן ידנית.
+ * 'google' נשמר לתאימות לאחור עם רשומות היסטוריות בלבד — קוד חדש אינו כותב אותו.
+ */
+export type DecisionSource = 'supabase' | 'incoming' | 'manual' | 'google'
 
 /** שורה בטבלת inbox_field_decisions. */
 export interface InboxFieldDecision {
   decision_id: number
   target_type: MergeEntity
   target_id: number
-  google_account_key: string
-  google_resource_name: string
   field_name: string
-  supabase_value_norm: string
-  google_value_norm: string
+  current_value_norm: string
+  incoming_value_norm: string
   selected_source: DecisionSource
   selected_value: unknown
   approved_by: string | null
   approved_at: string
   last_used_at: string | null
   reuse_count: number
+  // ── provenance בלבד: מאיפה ההחלטה הגיעה. אינו חלק מזהות ההחלטה ──
+  lead_id: number | null
+  source_type: number | null
+  source_unique_key: string | null
+  google_account_key: string | null
+  google_resource_name: string | null
 }
 
 /** מה שנשלח ל-RPC בעת אישור. */
 export interface DecisionPayload {
   field_name: string
-  supabase_value_norm: string
-  google_value_norm: string
+  current_value_norm: string
+  incoming_value_norm: string
   selected_source: DecisionSource
   selected_value: unknown
 }
@@ -72,24 +81,28 @@ export function normalizeForDecision(value: unknown, kind: string): string {
   }
 }
 
-/** המפתח הלוגי שעליו המסד אוכף ייחודיות. שינוי כאן דורש שינוי ב-DDL. */
+/**
+ * המפתח הלוגי שעליו המסד אוכף ייחודיות. שינוי כאן דורש שינוי ב-DDL
+ * (constraint `inbox_field_decisions_unique`).
+ *
+ * ⚠ INC-3124: המפתח **אינו כולל את מזהי המקור**. "עבור איש קשר #123,
+ * שדה עיר, כשאצלנו 'חיפה' ומגיע 'תל אביב' — בחרתי חיפה" היא אותה החלטה
+ * בין אם המידע הגיע מ-Google, מ-Excel או מהדבקה ידנית, ואין סיבה לשאול
+ * שוב רק מפני שהמקור התחלף. עמודות המקור נשמרות כ-provenance בלבד.
+ */
 export function decisionKey(parts: {
   targetType: string
   targetId: number
-  googleAccountKey: string
-  googleResourceName: string
   fieldName: string
-  supabaseValueNorm: string
-  googleValueNorm: string
+  currentValueNorm: string
+  incomingValueNorm: string
 }): string {
   return [
     parts.targetType,
     parts.targetId,
-    parts.googleAccountKey,
-    parts.googleResourceName,
     parts.fieldName,
-    parts.supabaseValueNorm,
-    parts.googleValueNorm,
+    parts.currentValueNorm,
+    parts.incomingValueNorm,
   ].join('|')
 }
 
@@ -98,32 +111,30 @@ export function keyOfDecision(d: InboxFieldDecision): string {
   return decisionKey({
     targetType: d.target_type,
     targetId: d.target_id,
-    googleAccountKey: d.google_account_key,
-    googleResourceName: d.google_resource_name,
     fieldName: d.field_name,
-    supabaseValueNorm: d.supabase_value_norm,
-    googleValueNorm: d.google_value_norm,
+    currentValueNorm: d.current_value_norm,
+    incomingValueNorm: d.incoming_value_norm,
   })
 }
 
 export interface DecisionContext {
   targetType: MergeEntity
   targetId: number
+  /** provenance בלבד — נשמר עם ההחלטה, אינו משתתף בזיהויה */
   googleAccountKey: string | null
   googleResourceName: string | null
+  sourceType: number | null
+  sourceUniqueKey: string | null
 }
 
-/** מפתח מתוך השוואת שדה נוכחית. null כשאין מזהי Google — אז אין מה לזכור. */
-export function keyOfComparison(cmp: FieldComparison, ctx: DecisionContext): string | null {
-  if (!ctx.googleAccountKey || !ctx.googleResourceName) return null
+/** מפתח מתוך השוואת שדה נוכחית. */
+export function keyOfComparison(cmp: FieldComparison, ctx: DecisionContext): string {
   return decisionKey({
     targetType: ctx.targetType,
     targetId: ctx.targetId,
-    googleAccountKey: ctx.googleAccountKey,
-    googleResourceName: ctx.googleResourceName,
     fieldName: cmp.key,
-    supabaseValueNorm: normalizeForDecision(cmp.existingRaw, cmp.kind),
-    googleValueNorm: normalizeForDecision(cmp.incomingRaw, cmp.kind),
+    currentValueNorm: normalizeForDecision(cmp.existingRaw, cmp.kind),
+    incomingValueNorm: normalizeForDecision(cmp.incomingRaw, cmp.kind),
   })
 }
 
@@ -155,8 +166,7 @@ export function suppressDecided(
       visible.push(cmp)
       continue
     }
-    const key = keyOfComparison(cmp, ctx)
-    const decided = key ? byKey.get(key) : undefined
+    const decided = byKey.get(keyOfComparison(cmp, ctx))
     if (decided) suppressed.push({ comparison: cmp, decision: decided })
     else visible.push(cmp)
   }
@@ -190,7 +200,8 @@ export function buildDecisionPayload(
       source = 'manual'
       value = manualValues[cmp.key]
     } else if (choice === 'incoming' || choice === 'secondary' || choice === 'redirect') {
-      source = 'google'
+      // 'incoming' ולא 'google' — ההחלטה זהה בכל מקור (INC-3124).
+      source = 'incoming'
       value = cmp.incomingRaw
     } else if (choice === 'existing') {
       source = 'supabase'
@@ -202,8 +213,8 @@ export function buildDecisionPayload(
 
     out.push({
       field_name: cmp.key,
-      supabase_value_norm: normalizeForDecision(cmp.existingRaw, cmp.kind),
-      google_value_norm: normalizeForDecision(cmp.incomingRaw, cmp.kind),
+      current_value_norm: normalizeForDecision(cmp.existingRaw, cmp.kind),
+      incoming_value_norm: normalizeForDecision(cmp.incomingRaw, cmp.kind),
       selected_source: source,
       selected_value: value ?? null,
     })

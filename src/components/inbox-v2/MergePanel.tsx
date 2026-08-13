@@ -10,8 +10,9 @@ import { FieldComparisonRow } from '@/components/inbox-v2/FieldComparisonRow'
 import { useInboxV2Row } from '@/hooks/useInboxV2'
 import { useApplicationDicts } from '@/hooks/useApplicationDicts'
 import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
+import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import { useAuth } from '@/contexts/AuthContext'
-import { INBOX_ACTION } from '@/lib/inbox-v2-dicts'
+import { INBOX_ACTION, sourceLabel } from '@/lib/inbox-v2-dicts'
 import {
   buildComparisons,
   buildPatch,
@@ -52,6 +53,7 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
   const { user } = useAuth()
   const { data: dicts } = useApplicationDicts()
   const { data: cities } = useInboxV2Cities()
+  const { data: sourceTypes } = useInboxV2SourceTypes()
 
   const [choices, setChoices] = useState<Record<string, ChoiceId> | null>(null)
   const [manualValues, setManualValues] = useState<Record<string, unknown>>({})
@@ -99,10 +101,13 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
     },
   })
 
+  // מקור הרשומה בפועל — לא הנחה ש-Google (INC-3124).
+  const source = row ? sourceLabel(row, sourceTypes) : null
+
   const comparisons = useMemo(() => {
     if (!row || !entity || !target) return []
-    return buildComparisons(row, target, { roles: dicts?.roles, cities }, entity)
-  }, [row, entity, target, dicts?.roles, cities])
+    return buildComparisons(row, target, { roles: dicts?.roles, cities }, entity, source?.short)
+  }, [row, entity, target, dicts?.roles, cities, source?.short])
 
   const activeChoices = choices ?? initialChoices(comparisons)
   const setChoice = (key: string, choice: ChoiceId) =>
@@ -118,14 +123,12 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
           targetId,
           googleAccountKey: google?.accountKey ?? null,
           googleResourceName: google?.resourceName ?? null,
+          sourceType: row?.source_type ?? null,
+          sourceUniqueKey: row?.source_unique_key ?? null,
         }
       : null
 
-  const { data: pastDecisions = [] } = useInboxFieldDecisions(
-    entity,
-    targetId,
-    google?.resourceName ?? null,
-  )
+  const { data: pastDecisions = [] } = useInboxFieldDecisions(entity, targetId)
 
   // קונפליקט שכבר הוכרע בדיוק באותם שני ערכים אינו מוצג שוב.
   const { visible: visibleFields, suppressed } = useMemo(() => {
@@ -133,7 +136,7 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
     if (!decisionCtx) return { visible: withValue, suppressed: [] }
     return suppressDecided(withValue, pastDecisions, decisionCtx)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [comparisons, pastDecisions, entity, targetId, google?.resourceName, google?.accountKey])
+  }, [comparisons, pastDecisions, entity, targetId])
 
   // שדות זהים מוסתרים כברירת מחדל — הם לא דורשים החלטה.
   const decisionFields = visibleFields.filter((c) => c.status !== 'same')
@@ -173,6 +176,8 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
         approvedBy: user?.email ?? null,
         googleAccountKey: google?.accountKey ?? null,
         googleResourceName: google?.resourceName ?? null,
+        sourceType: row.source_type,
+        sourceUniqueKey: row.source_unique_key,
         clearOtherMatch: resolvedConflict,
       })
 
@@ -211,7 +216,8 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
         <p className="mt-1 text-[12px] text-[#9CA3AF]">
           {targetName ? `${targetName} · ` : ''}
           {deriveEntryReason(row, routing!.route)}
-          {googleAccountLabel(google?.accountKey) ? ` · מקור: ${googleAccountLabel(google?.accountKey)}` : ''}
+          {source ? ` · מקור: ${source.full}` : ''}
+          {googleAccountLabel(google?.accountKey) ? ` (${googleAccountLabel(google?.accountKey)})` : ''}
         </p>
       )}
     </div>
@@ -304,13 +310,14 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
                   <div className="hidden px-3 text-[12px] font-semibold text-[#6B6B6B] sm:grid sm:grid-cols-[1fr_1fr_1fr_1.5fr] sm:gap-2">
                     <div>שדה</div>
                     <div>יש אצלנו</div>
-                    <div>הגיע מגוגל</div>
+                    <div>הגיע מ{source?.short ?? 'המקור'}</div>
                     <div>אחרי האישור</div>
                   </div>
                   {shownFields.map((cmp) => (
                     <FieldComparisonRow
                       key={cmp.key}
                       comparison={cmp}
+                      sourceLabel={source?.short ?? 'המקור'}
                       choice={activeChoices[cmp.key] ?? 'skip'}
                       onChoiceChange={(c) => setChoice(cmp.key, c)}
                       overwriteConfirmed={!!overwriteOk[cmp.key]}
@@ -362,26 +369,36 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
             {showRaw && (
               <div className="mt-3 space-y-3">
                 <div className="grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-                  <AdminPanelField label="חשבון Google" mode="view" viewValue={google?.accountKey ?? row.source_name} />
+                  <AdminPanelField label="מקור הרשומה" mode="view" viewValue={source?.full} />
                   <AdminPanelField label={`מזוהה מול ${entityLabel}`} mode="view" viewValue={`#${targetId}`} />
-                  <AdminPanelField
-                    label="מזהה הרשומה בגוגל"
-                    mode="view"
-                    fullWidth
-                    viewValue={google?.resourceName ? <span className="break-all" dir="ltr">{google.resourceName}</span> : null}
-                  />
-                  <AdminPanelField
-                    label="חתימת המידע"
-                    mode="view"
-                    fullWidth
-                    viewValue={google?.payloadHash ? <span className="break-all" dir="ltr">{google.payloadHash}</span> : null}
-                  />
-                  <AdminPanelField
-                    label="גרסת הרשומה בגוגל"
-                    mode="view"
-                    fullWidth
-                    viewValue={google?.etag ? <span className="break-all" dir="ltr">{google.etag}</span> : null}
-                  />
+                  {/* שדות Google מוצגים רק כשהרשומה אכן הגיעה משם (INC-3124) */}
+                  {google?.accountKey && (
+                    <AdminPanelField label="חשבון Google" mode="view" viewValue={google.accountKey} />
+                  )}
+                  {google?.resourceName && (
+                    <AdminPanelField
+                      label="מזהה הרשומה בגוגל"
+                      mode="view"
+                      fullWidth
+                      viewValue={<span className="break-all" dir="ltr">{google.resourceName}</span>}
+                    />
+                  )}
+                  {google?.payloadHash && (
+                    <AdminPanelField
+                      label="חתימת המידע"
+                      mode="view"
+                      fullWidth
+                      viewValue={<span className="break-all" dir="ltr">{google.payloadHash}</span>}
+                    />
+                  )}
+                  {google?.etag && (
+                    <AdminPanelField
+                      label="גרסת הרשומה בגוגל"
+                      mode="view"
+                      fullWidth
+                      viewValue={<span className="break-all" dir="ltr">{google.etag}</span>}
+                    />
+                  )}
                 </div>
                 <pre
                   className="max-h-64 overflow-auto rounded-lg bg-[#F8F9FA] p-3 text-[10px] leading-relaxed text-[#6B6B6B]"
