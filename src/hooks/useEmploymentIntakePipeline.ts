@@ -255,14 +255,17 @@ export async function runClassificationPipeline(input: PipelineInput): Promise<P
       contentType: classification.contentType,
       isActiveRequest: classification.isActiveRequest,
       matchContact: match.matchContact,
+      hasPhone: phones.phoneNorm != null,
     })
 
+    // הערה: אין כאן תיוג "requires_identification" גורף לכל מצטרף בשם לא-מאומת.
+    // שם שלא נמצא לו שום מועמד (match_type='none') הוא ליד חדש רגיל, לא "נדרש
+    // זיהוי" — מנוע ההתאמה עצמו (weakNameMatchContacts) כבר מסמן ambiguous/
+    // probable כשיש אכן יותר ממועמד אחד או התאמה חלשה, וזה מספיק כדי ש-
+    // computeDatabaseState יציג "נדרש זיהוי" נכון (§8.3 SSOT).
     const extraTags: string[] = []
     if (sourceEvent.kind === 'system_noise') extraTags.push('system_noise')
     if (trustedExistingName) extraTags.push('google_contact_expected_existing')
-    if ((sourceEvent.kind === 'join' || sourceEvent.kind === 'add') && contactName && !trustedExistingName) {
-      extraTags.push('requires_identification')
-    }
 
     return buildInsertRow({
       draft,
