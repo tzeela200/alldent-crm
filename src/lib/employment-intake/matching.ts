@@ -46,6 +46,8 @@ export interface RowMatchInput {
   orgNameRaw: string | null
   roleId: number | null
   cityId: number | null
+  /** שם שחולץ מתווית Google התפעולית (שם+תפקיד+עיר) — signal עסקי חזק. */
+  trustedExistingName?: boolean
 }
 
 export interface MatchResult {
@@ -81,6 +83,18 @@ function matchAccountField(a: AccountCandidate, input: RowMatchInput): { field: 
   if (input.facebookUrl && a.facebook_url && a.facebook_url === input.facebookUrl) return { field: 'facebook_url', strong: true }
   if (input.phoneNorm && normPhoneLoose(a.second_phone) === input.phoneNorm) return { field: 'second_phone', strong: false }
   return null
+}
+
+/**
+ * תווית Google התפעולית של AllDent היא signal קיים חזק: אם לאחר פירוק
+ * שם+תפקיד+עיר נשאר שם זהה בדיוק לרשומה אחת, מותר לקבוע match. אם יש
+ * יותר מאחת — מנגנון המועמדים יחזיר ambiguous ולא יבחר לבד.
+ */
+function trustedNameMatchContacts(pool: ContactCandidate[], input: RowMatchInput): ContactCandidate[] {
+  if (!input.trustedExistingName) return []
+  const name = norm(input.contactNameRaw)
+  if (!name || name.length < 2) return []
+  return pool.filter((c) => norm(c.display_name) === name)
 }
 
 /** התאמה חלשה לפי שם — לעולם אינה 'exact', ולעולם לא ל-Bulk (§9). */
@@ -128,12 +142,14 @@ export function matchRow(
     if (m) (m.strong ? strongAccounts : weakAccounts).push({ a, field: m.field })
   }
 
-  const nameContacts = strongContacts.length === 0 && weakContacts.length === 0 ? weakNameMatchContacts(pool.contacts, input) : []
+  const trustedNameContacts = strongContacts.length === 0 && weakContacts.length === 0 ? trustedNameMatchContacts(pool.contacts, input) : []
+  const nameContacts = strongContacts.length === 0 && weakContacts.length === 0 && trustedNameContacts.length === 0 ? weakNameMatchContacts(pool.contacts, input) : []
   const nameAccounts = strongAccounts.length === 0 && weakAccounts.length === 0 ? weakNameMatchAccounts(pool.accounts, input) : []
 
   const candidates: MatchCandidate[] = [
     ...strongContacts.map(({ c, field }) => ({ type: 'contact' as const, id: c.contact_id, field, label: c.display_name ?? `#${c.contact_id}`, confidence: 'exact' as MatchType })),
     ...weakContacts.map(({ c, field }) => ({ type: 'contact' as const, id: c.contact_id, field, label: c.display_name ?? `#${c.contact_id}`, confidence: 'probable' as MatchType })),
+    ...trustedNameContacts.map((c) => ({ type: 'contact' as const, id: c.contact_id, field: 'google_contact_label', label: c.display_name ?? `#${c.contact_id}`, confidence: 'exact' as MatchType })),
     ...nameContacts.map((c) => ({ type: 'contact' as const, id: c.contact_id, field: 'display_name', label: c.display_name ?? `#${c.contact_id}`, confidence: 'probable' as MatchType })),
     ...strongAccounts.map(({ a, field }) => ({ type: 'account' as const, id: a.account_id, field, label: a.account_name ?? `#${a.account_id}`, confidence: 'exact' as MatchType })),
     ...weakAccounts.map(({ a, field }) => ({ type: 'account' as const, id: a.account_id, field, label: a.account_name ?? `#${a.account_id}`, confidence: 'probable' as MatchType })),
@@ -148,7 +164,7 @@ export function matchRow(
     return { matchContact: null, matchAccount: null, matchField: null, matchType: 'ambiguous', matchCandidates: candidates }
   }
 
-  const bestContact = strongContacts[0] ?? weakContacts[0] ?? (nameContacts[0] ? { c: nameContacts[0], field: 'display_name' } : null)
+  const bestContact = strongContacts[0] ?? weakContacts[0] ?? (trustedNameContacts[0] ? { c: trustedNameContacts[0], field: 'google_contact_label' } : null) ?? (nameContacts[0] ? { c: nameContacts[0], field: 'display_name' } : null)
   const bestAccount = strongAccounts[0] ?? weakAccounts[0] ?? (nameAccounts[0] ? { a: nameAccounts[0], field: 'account_name' } : null)
 
   if (!bestContact && !bestAccount) {
