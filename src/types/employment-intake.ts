@@ -28,7 +28,6 @@ export type ActionType =
   | 'update_field'
   | 'mark_irrelevant'
   | 'merge_identity_group'
-  | 'manual_override'
 
 export type DetailsSentType = 'job_seeking' | 'recruiting' | 'pool_join'
 

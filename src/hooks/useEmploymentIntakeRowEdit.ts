@@ -83,7 +83,9 @@ export function useUpdateEmploymentIntakeRow() {
           identity_group_id: row.identity_group_id,
           contact_id: row.match_contact,
           account_id: row.match_account,
-          action_type: 'manual_override',
+          // action_type חייב להיות אחד מהערכים באילוץ החי employment_intake_action_action_type_check.
+          // 'manual_override' אינו ביניהם (אומת מול Supabase); 'update_field' הוא הערך הקיים שמתאים סמנטית.
+          action_type: 'update_field',
           performed_by: user?.email ?? 'system',
           result: 'done',
           source_intake_ids: [row.id],

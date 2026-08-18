@@ -80,7 +80,6 @@ export const ACTION_TYPE_LABEL: Record<ActionType, string> = {
   update_field: 'עדכון שדה',
   mark_irrelevant: 'סימון לא רלוונטי',
   merge_identity_group: 'איחוד זהויות',
-  manual_override: 'תיקון ידני',
 }
 
 // ── סוג הפרטים שנשלחו (details_sent_type) ───────────────────────────
