@@ -14,6 +14,7 @@ import JobImageUpload from '@/components/admin/JobImageUpload'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { ContactPicker } from '@/components/ui/ContactPicker'
+import { AccountPicker } from '@/components/ui/AccountPicker'
 import RecruitmentRequestPanel from '@/components/admin/RecruitmentRequestPanel'
 
 type DictItem = { id: number; name: string; role_id?: number | null; region_id?: number | null }
@@ -85,13 +86,14 @@ export default function JobDetailsPage() {
     staleTime: 30_000,
   })
 
-  const { data: accounts = [] } = useQuery({
-    queryKey: ['accounts-for-job-detail'],
+  const { data: linkedAccount } = useQuery({
+    queryKey: ['job-detail-account-name', localJob?.account_link],
     queryFn: async () => {
-      const { data, error } = await supabase.from('accounts').select('account_id,account_name').order('account_name')
+      const { data, error } = await supabase.from('accounts').select('account_id,account_name').eq('account_id', localJob.account_link).maybeSingle()
       if (error) throw error
-      return data ?? []
+      return data
     },
+    enabled: !!localJob?.account_link,
     staleTime: 300_000,
   })
   const { data: jobStatuses = [] } = useQuery({ queryKey: ['dict_job_statuses'], queryFn: () => fetchDict('dict_job_statuses'), staleTime: 600_000 })
@@ -384,7 +386,7 @@ export default function JobDetailsPage() {
     return <Shell title="משרה" subtitle="" icon={Briefcase}><div className="rounded-2xl border border-[#D9D9D9] bg-white p-8"><EmptyState icon={Briefcase} title="משרה לא נמצאה" description="הרשומה לא קיימת" /></div></Shell>
   }
 
-  const accountName = (accounts as any[]).find((a) => Number(a.account_id) === Number(localJob.account_link))?.account_name ?? '—'
+  const accountName = linkedAccount?.account_name ?? '—'
   const regionName = labelById(regions, localJob.region_id)
   const cityName = labelById(cities, localJob.city_id)
   const roleName = labelById(roles, localJob.job_role)
@@ -431,7 +433,7 @@ export default function JobDetailsPage() {
                 <TextField label="כותרת משרה" value={draft.job_title} onChange={(value) => setField('job_title', value)} labelSuffix={<JobAIWriter mode="admin" field="job_title" currentValue={draft.job_title} jobContext={{ role: draft.job_role }} onApply={(v) => setField('job_title', v)} />} />
                 <SelectField label="סטטוס פעילות" value={draft.job_status} onChange={(value) => setField('job_status', value)} options={jobStatuses.map(toOption)} />
                 <SelectField label="סטטוס פרסום" value={draft.public_status} onChange={(value) => setField('public_status', value)} options={publicStatuses.map(toOption)} />
-                <SelectField label="ארגון" value={draft.account_link} onChange={(value) => setField('account_link', value)} options={(accounts as any[]).map((a) => ({ value: String(a.account_id), label: a.account_name ?? '' }))} />
+                <AccountPicker label="ארגון" value={draft.account_link || null} onChange={(id) => setField('account_link', id ?? '')} />
                 <ContactPicker label="מעסיק / איש קשר" value={draft.rel_employer_contact ? Number(draft.rel_employer_contact) : null} onChange={(id) => setField('rel_employer_contact', id ? String(id) : '')} />
                 <ContactPicker label="מגייס" value={draft.rel_recruiter_contact ? Number(draft.rel_recruiter_contact) : null} onChange={(id) => setField('rel_recruiter_contact', id ? String(id) : '')} />
                 <RoleSubRolePicker
