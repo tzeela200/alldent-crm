@@ -1,11 +1,10 @@
 import { useState } from 'react'
-import { Search, ShieldCheck, UserPlus, X, Loader2 } from 'lucide-react'
+import { Search, ShieldCheck, UserPlus, Loader2 } from 'lucide-react'
 import { Toolbar, ActionButton } from '@/components/layout/Shell'
 import { AdminBadge, type AdminBadgeVariant } from '@/components/admin/AdminBadge'
 import { useInboxPhoneCheck, summarize, type PhoneCheckResult, type PhoneCheckStatus } from '@/hooks/useInboxPhoneCheck'
-import { useContactMutations } from '@/hooks/useContactMutations'
 import { formatPhone } from '@/lib/normalizePhone'
-import { toast } from 'sonner'
+import { CreateFromLeadDialog } from '@/components/inbox-v2/CreateFromLeadDialog'
 
 /**
  * בדיקת מספרים (INC-3125).
@@ -162,9 +161,11 @@ export function PhoneCheckPanel() {
         </>
       )}
 
+      {/* אותו טופס יצירת איש קשר של המערכת, עם הנייד כערך פתיחה —
+          ולא טופס מקוצר משלנו (INC-3125). */}
       {addingFor && (
-        <QuickCreateContactDialog
-          phone={addingFor.normalized!}
+        <CreateFromLeadDialog
+          prefill={{ phone: addingFor.normalized }}
           onClose={() => setAddingFor(null)}
           onCreated={() => {
             // הרשומה נוצרה — הבדיקה מורצת מחדש כדי שהשורה תשקף את המצב האמיתי
@@ -199,99 +200,5 @@ function SummaryCard({
       <div className="text-[12px] text-[#9CA3AF]">{label}</div>
       <div className={`mt-1 text-[22px] font-bold ${color}`}>{value}</div>
     </div>
-  )
-}
-
-/**
- * הוספה מהירה של איש קשר ממספר שלא נמצא.
- * מינימום שדות במכוון — שם ונייד. שאר הפרופיל מושלם בכרטיס המועמד.
- * `phone_norm` והאזור נגזרים בטריגרים של הטבלה ואינם נשלחים מכאן.
- */
-function QuickCreateContactDialog({
-  phone,
-  onClose,
-  onCreated,
-}: {
-  phone: string
-  onClose: () => void
-  onCreated: () => void
-}) {
-  const { insertContact } = useContactMutations()
-  const [name, setName] = useState('')
-  const [saving, setSaving] = useState(false)
-
-  const handleCreate = async () => {
-    const displayName = name.trim()
-    if (!displayName) {
-      toast.error('שם הוא שדה חובה')
-      return
-    }
-    setSaving(true)
-    try {
-      const { data, error } = await insertContact({ display_name: displayName, phone })
-      if (error) throw new Error(error.message)
-      toast.success(`נוצר איש קשר חדש (#${data?.contact_id})`)
-      onCreated()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'שגיאה ביצירת איש קשר')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <>
-      <div className="fixed inset-0 z-50 bg-slate-900/30" onClick={onClose} />
-      <div className="fixed inset-x-0 bottom-0 top-0 z-50 mx-auto flex max-w-md items-center justify-center p-4">
-        <div className="w-full rounded-2xl bg-white shadow-2xl" dir="rtl">
-          <div className="flex items-center justify-between border-b border-[#E5E7EB] px-6 py-4">
-            <div className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5 text-[#008080]" />
-              <h2 className="text-base font-bold text-[#2D2D2D]">הוספת איש קשר חדש</h2>
-            </div>
-            <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100">
-              <X className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="space-y-4 p-6">
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-semibold text-[#6B6B6B]">נייד</label>
-              <div
-                className="h-10 rounded-[10px] border border-[#E5E7EB] bg-[#F8F9FA] px-3 text-sm leading-10 text-[#6B6B6B]"
-                dir="ltr"
-              >
-                {formatPhone(phone)}
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1">
-              <label className="text-[12px] font-semibold text-[#6B6B6B]">שם מלא *</label>
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                autoFocus
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                className="h-10 rounded-[10px] border border-[#D9D9D9] bg-white px-3 text-sm outline-none focus:border-[#008080]"
-              />
-            </div>
-
-            <p className="rounded-[10px] bg-[#F8F9FA] px-3 py-2 text-[12px] text-[#6B6B6B]">
-              השם נשמר כפי שהוזן ואינו מפוצל לשם פרטי ומשפחה. שאר הפרטים מושלמים
-              בכרטיס איש הקשר.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between border-t border-[#E5E7EB] px-6 py-4">
-            <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-slate-500 hover:bg-slate-50">
-              ביטול
-            </button>
-            <ActionButton variant="primary" icon={UserPlus} onClick={handleCreate} disabled={saving || !name.trim()}>
-              {saving ? 'שומר...' : 'צור איש קשר'}
-            </ActionButton>
-          </div>
-        </div>
-      </div>
-    </>
   )
 }
