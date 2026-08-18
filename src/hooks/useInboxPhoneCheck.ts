@@ -65,6 +65,70 @@ export function splitPhoneInput(text: string): string[] {
     .filter(Boolean)
 }
 
+/**
+ * חיפוש set-based של מספרים מנורמלים מול contact ו-accounts — **קריאה בלבד**.
+ *
+ * מיוצא כדי שאשף הייבוא ישתמש באותה לוגיקה בדיוק: אם ה-Preview של הייבוא
+ * היה מחשב "קיים/חדש" אחרת מבדיקת המספרים, אותו מספר היה מקבל שתי
+ * תשובות שונות בשני מסכים.
+ */
+export async function lookupPhonesByNorm(norms: string[]): Promise<Map<string, PhoneMatch[]>> {
+  const byNorm = new Map<string, PhoneMatch[]>()
+  const unique = [...new Set(norms.filter(Boolean))]
+  if (!unique.length) return byNorm
+
+  const add = (norm: string, m: PhoneMatch) => {
+    const list = byNorm.get(norm) ?? []
+    if (!list.some((x) => x.kind === m.kind && x.id === m.id)) list.push(m)
+    byNorm.set(norm, list)
+  }
+
+  for (const chunk of chunked(unique, CHUNK)) {
+    const locals = chunk.map(toLocal)
+
+    const [contactPrimary, contactSecondary, accountPrimary, accountSecondary] = await Promise.all([
+      supabase.from('contact').select('contact_id, display_name, full_name, phone_norm')
+        .in('phone_norm', chunk),
+      supabase.from('contact').select('contact_id, display_name, full_name, second_phone')
+        .in('second_phone', [...chunk, ...locals]),
+      supabase.from('accounts').select('account_id, account_name, phone_norm')
+        .in('phone_norm', chunk),
+      supabase.from('accounts').select('account_id, account_name, second_phone')
+        .in('second_phone', [...chunk, ...locals]),
+    ])
+
+    const firstErr =
+      contactPrimary.error ?? contactSecondary.error ?? accountPrimary.error ?? accountSecondary.error
+    if (firstErr) throw new Error(firstErr.message)
+
+    const contactName = (c: Record<string, unknown>) =>
+      (c.display_name as string) || (c.full_name as string) || `איש קשר #${c.contact_id}`
+
+    for (const c of (contactPrimary.data ?? []) as Record<string, unknown>[]) {
+      add(c.phone_norm as string, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'primary' })
+    }
+    for (const c of (contactSecondary.data ?? []) as Record<string, unknown>[]) {
+      const norm = normalizeIlMobile(c.second_phone as string)
+      if (norm) add(norm, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'secondary' })
+    }
+    for (const a of (accountPrimary.data ?? []) as Record<string, unknown>[]) {
+      add(a.phone_norm as string, {
+        kind: 'account', id: a.account_id as number,
+        name: (a.account_name as string) || `ארגון #${a.account_id}`, field: 'primary',
+      })
+    }
+    for (const a of (accountSecondary.data ?? []) as Record<string, unknown>[]) {
+      const norm = normalizeIlMobile(a.second_phone as string)
+      if (norm) add(norm, {
+        kind: 'account', id: a.account_id as number,
+        name: (a.account_name as string) || `ארגון #${a.account_id}`, field: 'secondary',
+      })
+    }
+  }
+
+  return byNorm
+}
+
 export function useInboxPhoneCheck() {
   const [results, setResults] = useState<PhoneCheckResult[] | null>(null)
   const [isChecking, setIsChecking] = useState(false)
@@ -98,83 +162,13 @@ export function useInboxPhoneCheck() {
         }
       })
 
-      const norms = [...new Set(rows.filter((r) => r.normalized).map((r) => r.normalized!))]
-      const byNorm = new Map<string, PhoneMatch[]>()
-
-      const add = (norm: string, m: PhoneMatch) => {
-        const list = byNorm.get(norm) ?? []
-        list.push(m)
-        byNorm.set(norm, list)
-      }
-
-      for (const chunk of chunked(norms, CHUNK)) {
-        const locals = chunk.map(toLocal)
-
-        const [contactPrimary, contactSecondary, accountPrimary, accountSecondary] =
-          await Promise.all([
-            supabase.from('contact').select('contact_id, display_name, full_name, phone_norm')
-              .in('phone_norm', chunk),
-            supabase.from('contact').select('contact_id, display_name, full_name, second_phone')
-              .in('second_phone', [...chunk, ...locals]),
-            supabase.from('accounts').select('account_id, account_name, phone_norm')
-              .in('phone_norm', chunk),
-            supabase.from('accounts').select('account_id, account_name, second_phone')
-              .in('second_phone', [...chunk, ...locals]),
-          ])
-
-        const firstErr =
-          contactPrimary.error ?? contactSecondary.error ?? accountPrimary.error ?? accountSecondary.error
-        if (firstErr) throw new Error(firstErr.message)
-
-        for (const c of (contactPrimary.data ?? []) as Record<string, unknown>[]) {
-          add(c.phone_norm as string, {
-            kind: 'contact',
-            id: c.contact_id as number,
-            name: (c.display_name as string) || (c.full_name as string) || `איש קשר #${c.contact_id}`,
-            field: 'primary',
-          })
-        }
-        for (const c of (contactSecondary.data ?? []) as Record<string, unknown>[]) {
-          const norm = normalizeIlMobile(c.second_phone as string)
-          if (!norm) continue
-          add(norm, {
-            kind: 'contact',
-            id: c.contact_id as number,
-            name: (c.display_name as string) || (c.full_name as string) || `איש קשר #${c.contact_id}`,
-            field: 'secondary',
-          })
-        }
-        for (const a of (accountPrimary.data ?? []) as Record<string, unknown>[]) {
-          add(a.phone_norm as string, {
-            kind: 'account',
-            id: a.account_id as number,
-            name: (a.account_name as string) || `ארגון #${a.account_id}`,
-            field: 'primary',
-          })
-        }
-        for (const a of (accountSecondary.data ?? []) as Record<string, unknown>[]) {
-          const norm = normalizeIlMobile(a.second_phone as string)
-          if (!norm) continue
-          add(norm, {
-            kind: 'account',
-            id: a.account_id as number,
-            name: (a.account_name as string) || `ארגון #${a.account_id}`,
-            field: 'secondary',
-          })
-        }
-      }
+      const byNorm = await lookupPhonesByNorm(
+        rows.filter((r) => r.normalized).map((r) => r.normalized!)
+      )
 
       for (const row of rows) {
         if (!row.normalized) continue
-        const found = byNorm.get(row.normalized) ?? []
-        // דדופ׳: אותה רשומה יכולה להופיע גם בראשי וגם במשני
-        const seen = new Set<string>()
-        row.matches = found.filter((m) => {
-          const key = `${m.kind}:${m.id}`
-          if (seen.has(key)) return false
-          seen.add(key)
-          return true
-        })
+        row.matches = byNorm.get(row.normalized) ?? []
         row.status = row.matches.length ? 'found' : 'new'
       }
 

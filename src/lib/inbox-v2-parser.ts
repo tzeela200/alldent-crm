@@ -49,6 +49,58 @@ const COLUMN_MAP: Record<string, string> = {
   'מזהה קבוצה': 'facebook_group_id',
 }
 
+/**
+ * שדות היעד שניתן למפות אליהם בייבוא, עם תוויות בעברית (INC-3125).
+ * זהו מקור האמת של מסך המיפוי — אין להציג למשתמשת שמות עמודות טכניים.
+ */
+export const IMPORT_TARGET_FIELDS: { key: string; label: string }[] = [
+  { key: 'display_name', label: 'שם מלא' },
+  { key: 'phone', label: 'נייד' },
+  { key: 'email', label: 'אימייל' },
+  { key: 'first_name', label: 'שם פרטי' },
+  { key: 'last_name', label: 'שם משפחה' },
+  { key: 'temp_role_name', label: 'תפקיד (טקסט)' },
+  { key: 'temp_city_name', label: 'עיר (טקסט)' },
+  { key: 'facebook_name', label: 'שם Facebook' },
+  { key: 'facebook_id', label: 'מזהה Facebook' },
+  { key: 'facebook_url', label: 'קישור Facebook' },
+  { key: 'linkedin_url', label: 'LinkedIn' },
+  { key: 'facebook_group_name', label: 'קבוצת Facebook' },
+  { key: 'notes', label: 'הערות' },
+]
+
+/**
+ * זיהוי אוטומטי של מיפוי לפי כותרות הקובץ.
+ * המשתמשת יכולה לשנות כל שיוך — הזיהוי הוא הצעה, לא הכרעה.
+ */
+export function detectMapping(headers: string[]): Record<string, string> {
+  const mapping: Record<string, string> = {}
+  for (const header of headers) {
+    const mapped = COLUMN_MAP[header.toLowerCase().trim()]
+    if (mapped) mapping[header] = mapped
+  }
+  return mapping
+}
+
+/**
+ * ממיר שורה גולמית לשדות היעד לפי מיפוי מפורש.
+ * בניגוד ל-normalizeRawRow, כאן המיפוי מגיע מהמשתמשת ולא מטבלה קבועה —
+ * וכך קובץ עם כותרות לא מוכרות עדיין ניתן לייבוא.
+ */
+export function applyMapping(raw: RawRow, mapping: Record<string, string>): Record<string, unknown> {
+  const parsed: Record<string, unknown> = {}
+  for (const [header, target] of Object.entries(mapping)) {
+    if (!target) continue
+    const val = raw[header]
+    if (val == null || !String(val).trim()) continue
+    parsed[target] = String(val).trim()
+  }
+  const phone = parsed.phone as string | undefined
+  if (phone) parsed.phone_norm = normalizePhone(phone)
+  // אין פיצול שם אוטומטי — ראו ההערה ב-normalizeRawRow.
+  return parsed
+}
+
 export async function parseExcelFile(file: File): Promise<RawRow[]> {
   const buffer = await file.arrayBuffer()
   const wb = XLSX.read(buffer, { type: 'array' })

@@ -1,11 +1,10 @@
-import { useState, useCallback } from 'react'
-import { ChevronDown, ChevronUp, Columns3, DatabaseZap, RefreshCw, Sparkles } from 'lucide-react'
+import { useState } from 'react'
+import { Columns3, DatabaseZap, RefreshCw, Sparkles } from 'lucide-react'
 import { Shell, KPICard, ActionButton } from '@/components/layout/Shell'
 import { useInboxV2Rows, useInboxV2Batches, useInboxV2Stats, PAGE_SIZE } from '@/hooks/useInboxV2'
-import { useInboxV2Upload } from '@/hooks/useInboxV2Upload'
 import { useInboxV2Matching } from '@/hooks/useInboxV2Matching'
-import { UploadZone } from '@/components/inbox-v2/UploadZone'
 import { PhoneCheckPanel } from '@/components/inbox-v2/PhoneCheckPanel'
+import { ImportWizard } from '@/components/inbox-v2/ImportWizard'
 import { InboxV2FiltersBar } from '@/components/inbox-v2/InboxV2Filters'
 import {
   InboxV2Table,
@@ -73,16 +72,8 @@ export default function InboxV2Page() {
   const { data: stats } = useInboxV2Stats()
   const { matchBatch } = useInboxV2Matching()
 
-  const handleBatchReady = useCallback(
-    (batchId: number) => {
-      matchBatch.mutate(batchId)
-    },
-    [matchBatch]
-  )
-
-  const { uploadFile, uploadPaste, isProcessing, progress, lastBatchId } =
-    useInboxV2Upload(handleBatchReady)
-
+  // הייבוא עבר ל-ImportWizard, שמריץ את ההתאמה בעצמו אחרי האישור.
+  // useInboxV2Upload (כתיבה מיידית ללא שער) אינו בשימוש יותר מהמסך הזה.
   const rows = data?.rows ?? []
   const total = data?.total ?? 0
 
@@ -99,7 +90,7 @@ export default function InboxV2Page() {
     filters.date_to
   )
 
-  const rematchBatchId = filters.batch_id ?? lastBatchId
+  const rematchBatchId = filters.batch_id ?? null
 
   const persistColumns = (next: string[]) => {
     setVisibleColumns(next)
@@ -253,14 +244,7 @@ export default function InboxV2Page() {
 
       {tab === 'phones' && <PhoneCheckPanel />}
 
-      {tab === 'import' && (
-        <UploadZone
-          onFileSelected={uploadFile}
-          onPasteSubmit={uploadPaste}
-          isProcessing={isProcessing}
-          progress={progress}
-        />
-      )}
+      {tab === 'import' && <ImportWizard />}
 
       {/* Slide-over / modals */}
       {detailLeadId != null && (
