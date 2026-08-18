@@ -67,7 +67,7 @@ export default function InboxV2Page() {
   const [showAiChat, setShowAiChat] = useState(false)
   const [visibleColumns, setVisibleColumns] = useState<string[]>(loadStoredVisibleColumns)
 
-  const { data, isLoading } = useInboxV2Rows(filters, page)
+  const { data, isLoading, error } = useInboxV2Rows(filters, page)
   const { data: batches } = useInboxV2Batches()
   const { data: stats } = useInboxV2Stats()
   const { matchBatch } = useInboxV2Matching()
@@ -77,6 +77,9 @@ export default function InboxV2Page() {
   const rows = data?.rows ?? []
   const total = data?.total ?? 0
 
+  // `open_only` הוא ברירת המחדל של המסך ולא סינון שהמשתמשת בחרה — אילו נחשב
+  // כאן, תור ריק באמת היה מציג "לא נמצאו תוצאות התואמות את הסינון" במקום
+  // "אין רשומות", כלומר הודעה שגויה על מצב תקין (INC-3125).
   const hasActiveFilters = !!(
     filters.search ||
     filters.status?.length ||
@@ -85,7 +88,6 @@ export default function InboxV2Page() {
     filters.role ||
     filters.confidence_min != null ||
     filters.has_new_info ||
-    filters.open_only ||
     filters.date_from ||
     filters.date_to
   )
@@ -216,6 +218,7 @@ export default function InboxV2Page() {
             rows={rows}
             visibleColumns={visibleColumns}
             isLoading={isLoading}
+            error={error ? `טעינת הרשומות נכשלה: ${error.message}` : undefined}
             hasActiveFilter={hasActiveFilters}
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}

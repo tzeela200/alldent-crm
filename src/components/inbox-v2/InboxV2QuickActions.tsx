@@ -42,18 +42,32 @@ export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
     )
   }
 
+  // כישלון פעולת אצווה חייב להיראות. עד INC-3125 שתי הפעולות האלה לא היו
+  // עטופות כלל, ולכן עדכון שנכשל לא הציג דבר — המשתמשת הניחה שהוא עבר.
   const setStatus = async (status: number, label: string, actionType: number | null) => {
-    await bulkUpdateStatus.mutateAsync({ leadIds: selectedIds, status })
-    await logBulk(actionType, { merge_status: status })
-    toast.success(`${count} רשומות עודכנו ל-${label}`)
-    onClearSelection()
+    try {
+      await bulkUpdateStatus.mutateAsync({ leadIds: selectedIds, status })
+      await logBulk(actionType, { merge_status: status })
+      toast.success(`${count} רשומות עודכנו ל-${label}`)
+      onClearSelection()
+    } catch (err) {
+      toast.error(
+        `עדכון ${count} הרשומות ל-${label} נכשל: ${err instanceof Error ? err.message : 'שגיאה לא ידועה'}`
+      )
+    }
   }
 
   const flagForReview = async () => {
     // פעולה בלבד — לא משנה סטטוס (כך המילון מגדיר "סימון לבדיקה").
-    await logBulk(INBOX_ACTION.FLAG_REVIEW, { flagged_for_review: true })
-    toast.success(`${count} רשומות סומנו לבדיקה (ללא שינוי סטטוס)`)
-    onClearSelection()
+    try {
+      await logBulk(INBOX_ACTION.FLAG_REVIEW, { flagged_for_review: true })
+      toast.success(`${count} רשומות סומנו לבדיקה (ללא שינוי סטטוס)`)
+      onClearSelection()
+    } catch (err) {
+      toast.error(
+        `סימון ${count} הרשומות לבדיקה נכשל: ${err instanceof Error ? err.message : 'שגיאה לא ידועה'}`
+      )
+    }
   }
 
   const doAddTag = async () => {

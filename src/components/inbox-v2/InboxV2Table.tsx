@@ -70,6 +70,8 @@ interface Props {
   rows: InboxV2Row[]
   visibleColumns: string[]
   isLoading?: boolean
+  /** שגיאת טעינה — חייבת להיראות כשגיאה ולא כ"אין נתונים" (INC-3125) */
+  error?: string
   hasActiveFilter?: boolean
   selectedIds: number[]
   onSelectionChange: (ids: number[]) => void
@@ -88,6 +90,7 @@ export function InboxV2Table({
   rows,
   visibleColumns,
   isLoading,
+  error,
   hasActiveFilter,
   selectedIds,
   onSelectionChange,
@@ -408,6 +411,7 @@ export function InboxV2Table({
       sortDir={sortDir}
       onSort={onSort}
       isLoading={isLoading}
+      error={error}
       hasActiveFilter={hasActiveFilter}
       emptyMessage="אין רשומות — העלו קובץ או הדביקו נתונים כדי להתחיל"
       noResultsMessage="לא נמצאו רשומות התואמות את הסינון"
