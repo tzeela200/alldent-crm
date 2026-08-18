@@ -1,4 +1,4 @@
-import { fieldLabel } from '@/lib/inbox-v2-dicts'
+import { fieldLabel, isDecidableField } from '@/lib/inbox-v2-dicts'
 import type { InboxV2Row } from '@/types/inbox-v2'
 
 /**
@@ -29,6 +29,8 @@ interface Props {
 
 export function InboxDiffChips({ row, max = 3 }: Props) {
   const entries = Object.entries(row.suggested_updates ?? {})
+    // מטא-דאטה של n8n (direction/reasons) אינה פער ואינה מוצגת
+    .filter(([key]) => isDecidableField(key))
     .map(([key, v]) => ({
       key,
       status: String((v as { status?: unknown } | undefined)?.status ?? 'diff'),

@@ -7,7 +7,9 @@ export const INBOX_STATUSES: DictItem[] = [
   { id: 2, name: 'נותח', slug: 'analyzed', color: '#8B5CF6' },
   { id: 3, name: 'התאמה חזקה', slug: 'strong-match', color: '#10B981' },
   { id: 4, name: 'התאמה חלקית', slug: 'partial-match', color: '#F59E0B' },
-  { id: 5, name: 'ממתין לאישור', slug: 'pending', color: '#EAB308' },
+  // §5: "ממתין לאישור" לא אמר למשתמשת מה היא אמורה לאשר ולמה הרשומה
+  // מחכה לה. השם המוצג הוא מה שנדרש ממנה בפועל. הערך במסד (5) לא השתנה.
+  { id: 5, name: 'דורש החלטה', slug: 'pending', color: '#EAB308' },
   { id: 6, name: 'מוזג', slug: 'merged', color: '#008080' },
   { id: 7, name: 'נדחה', slug: 'rejected', color: '#EF4444' },
   { id: 8, name: 'התעלמות', slug: 'ignored', color: '#6B7280' },
@@ -75,14 +77,27 @@ export function getDictName(items: DictItem[], id: number | null | undefined): s
  * `short` הוא סוג המקור מהמילון ("Excel", "Google Contacts") ומשמש בתוויות
  * הכפתורים; `full` מוסיף את שם המקור החופשי אם הוזן, ומשמש בכותרות.
  */
+/**
+ * שמות חשבונות Google הם מזהים טכניים. הם לעולם לא מוצגים כמו שהם —
+ * `google_workers` אינו שם שאומר משהו למשתמשת (INC-3125).
+ */
+const SOURCE_NAME_LABEL: Record<string, string> = {
+  google_doctors: 'רופאים',
+  google_workers: 'עובדים',
+  google_dental_managers_orgs: 'מנהלים וארגונים',
+}
+
 export function sourceLabel(
   row: Pick<InboxV2Row, 'source_type' | 'source_name'>,
   sourceTypes: DictItem[] | undefined
 ): { short: string; full: string } {
   const dictName =
     row.source_type != null ? getDictName(sourceTypes ?? [], row.source_type) : null
-  const short = dictName && dictName !== '—' ? dictName : (row.source_name ?? 'מקור לא ידוע')
-  const full = row.source_name && row.source_name !== short ? `${short} · ${row.source_name}` : short
+  const rawName = row.source_name?.trim() || null
+  const niceName = rawName ? (SOURCE_NAME_LABEL[rawName.toLowerCase()] ?? rawName) : null
+
+  const short = dictName && dictName !== '—' ? dictName : (niceName ?? 'מקור לא ידוע')
+  const full = niceName && niceName !== short ? `${short} — ${niceName}` : short
   return { short, full }
 }
 
@@ -108,6 +123,20 @@ const FIELD_LABEL: Record<string, string> = {
 
 export function fieldLabel(key: string): string {
   return FIELD_LABEL[key] ?? key
+}
+
+/**
+ * האם המפתח הוא שדה אמיתי שניתן להכריע בו (INC-3125).
+ *
+ * `suggested_updates` אינו מכיל רק פערי שדות: n8n כותבת לתוכו גם מטא-דאטה
+ * משלה (`direction`, `reasons`) עם ערכים ריקים. עד שסוננו, הן הוצגו
+ * למשתמשת כ"פערים" — באנגלית, ועל רשומות שאין בהן שום פער בפועל.
+ *
+ * הסינון הוא whitelist ולא blacklist: מפתח שאינו שדה מוכר לא יוצג,
+ * כך שגם מטא-דאטה עתידית לא תדלוף למסך.
+ */
+export function isDecidableField(key: string): boolean {
+  return key in FIELD_LABEL
 }
 
 /** תיאור עברי לסטטוס ההשוואה שנשמר ב-suggested_updates. */

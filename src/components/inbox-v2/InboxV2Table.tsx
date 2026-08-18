@@ -8,6 +8,7 @@ import {
   inboxStatusAdminVariant,
   deriveMatchResult,
   sourceLabel,
+  isDecidableField,
 } from '@/lib/inbox-v2-dicts'
 import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import { useInboxMatchedNames, matchedLabel } from '@/hooks/useInboxMatchedNames'
@@ -46,23 +47,26 @@ export const ALL_COLUMNS: { key: string; label: string }[] = [
   { key: 'updated_at', label: 'עודכן' },
 ]
 
+/**
+ * ברירת המחדל עונה על שבע שאלות בלבד (INC-3125):
+ * סטטוס · מי זה · נייד · מה נמצא במערכת · מה השתנה · מקור · מתי נכנס.
+ *
+ * מה שהוסר במכוון: "תוצאת התאמה" ו"רמת ביטחון" סיפרו את אותו סיפור של
+ * "התאמה לרשומה קיימת" בשלוש דרכים שונות, והכריחו להרכיב חמישה נתונים
+ * כדי להבין מה לעשות. שניהם נשארים זמינים בבורר העמודות.
+ */
 export const DEFAULT_COLUMNS = [
   'merge_status',
-  'match_result',
-  'phone',
   'display_name',
+  'phone',
   'match_existing',
-  // "פערים" מחליף את "מידע חדש" בברירת המחדל: בוליאני אמר שיש משהו,
-  // לא מה הוא. בתור טריאז' זה ההבדל בין לפתוח שורה לבין להחליט ממנה.
-  'diffs',
-  'match_confidence',
   'source',
   'created_at',
 ]
 
 // v2 (INC-3125): עמודת "פערים" נכנסה לברירת המחדל. בלי העלאת הגרסה,
 // מי שכבר בחר עמודות בעבר לא היה רואה אותה לעולם.
-export const INBOX_V2_COLUMNS_STORAGE_KEY = 'alldent.inboxV2.visibleColumns.v2'
+export const INBOX_V2_COLUMNS_STORAGE_KEY = 'alldent.inboxV2.visibleColumns.v3'
 
 const SORTABLE = new Set(['merge_status', 'display_name', 'match_confidence', 'created_at'])
 
@@ -191,15 +195,15 @@ export function InboxV2Table({
         key: 'match_existing',
         label: 'התאמה לרשומה קיימת',
         // שם הרשומה, לא מזהה טכני (INC-3125).
+        // שם הרשומה + תג "קיים" קטן. מי שרוצה לדעת *איך* נמצאה ההתאמה
+        // מוצא זאת בפאנל, לא בעמודה צרה בטבלה (INC-3125).
         render: (r) => {
           const label = matchedLabel(r, matchedNames)
-          if (!label) return dash(null)
+          if (!label) return <span className="text-[13px] text-[#9CA3AF]">לא נמצא במערכת</span>
           return (
-            <span className="text-[13px] text-[#2D2D2D]">
-              <span className="text-[11px] text-[#9CA3AF]">
-                {r.match_contact != null ? 'איש קשר' : 'ארגון'}{' '}
-              </span>
-              {label}
+            <span className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[13px] text-[#2D2D2D]">{label}</span>
+              <AdminBadge label="קיים" variant="success" />
             </span>
           )
         },
@@ -360,18 +364,30 @@ export function InboxV2Table({
       nowrap: true,
       render: (r) => {
         const hasMatch = r.match_contact != null || r.match_account != null
-        if (!hasMatch) return null
-        const diffCount = Object.keys(r.suggested_updates ?? {}).length
+        // ⚠ נספרים רק שדות אמיתיים. ספירה על כל מפתחות suggested_updates
+        // הציגה "הכרע 2 פערים" על מטא-דאטה של n8n (direction/reasons),
+        // בעוד הפאנל — שמשתמש במנוע האמיתי — אמר "אין מה להחליט".
+        const diffCount = Object.keys(r.suggested_updates ?? {}).filter(isDecidableField).length
+        const label = !hasMatch
+          ? 'טפל ברשומה'
+          : diffCount > 0
+            ? `הכרע ${diffCount} ${diffCount === 1 ? 'פער' : 'פערים'}`
+            : 'פתח השוואה'
         return (
           <button
             type="button"
             onClick={(e) => {
               e.stopPropagation()
-              onOpenMerge(r.lead_id)
+              if (hasMatch) onOpenMerge(r.lead_id)
+              else onRowClick(r.lead_id)
             }}
-            className="rounded-lg border border-[#99D6D6] bg-white px-2.5 py-1 text-[12px] font-semibold text-[#008080] transition hover:bg-[#E6F3F3]"
+            className={`rounded-lg border px-2.5 py-1 text-[12px] font-semibold transition ${
+              diffCount > 0
+                ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E] hover:bg-[#FEF3C7]'
+                : 'border-[#99D6D6] bg-white text-[#008080] hover:bg-[#E6F3F3]'
+            }`}
           >
-            {diffCount > 0 ? `הכרע ${diffCount} פערים` : 'פתח השוואה'}
+            {label}
           </button>
         )
       },

@@ -185,13 +185,13 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
       toast.success(
         changed
           ? entity === 'account'
-            ? 'הרשומה מוזגה והארגון עודכן'
-            : 'הרשומה מוזגה ואיש הקשר עודכן'
-          : 'הרשומה סומנה כמוזגת (ללא שינוי שדות). הבחירות נשמרו ולא יוצגו שוב.'
+            ? 'הארגון עודכן'
+            : 'איש הקשר עודכן'
+          : 'סומן כקיים במערכת. הבחירות נשמרו ולא יוצגו שוב.'
       )
       onClose()
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'שגיאה במיזוג')
+      toast.error(err instanceof Error ? err.message : 'שגיאה בעדכון הרשומה')
     } finally {
       setMerging(false)
     }
@@ -208,7 +208,7 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
       <div className="flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 text-[16px] font-bold text-[#2D2D2D]">
           <GitMerge className="h-5 w-5 text-[#008080]" />
-          {entity ? `הצג ואשר מיזוג ל${entityLabel}` : 'אישור רשומת Inbox'}
+          {entity ? `השוואה ועדכון — ${entityLabel} קיים` : 'אישור רשומת Inbox'}
         </h2>
         {routing && <AdminBadge label={entity === 'account' ? 'ארגון' : entity === 'contact' ? 'אדם' : 'לא סווג'} variant="neutral" />}
       </div>
@@ -246,7 +246,7 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
               ? 'שומר...'
               : hasPendingWrites(comparisons, activeChoices)
                 ? 'שמור בחירות ועדכן'
-                : 'סמן כמוזג (ללא שינוי שדות)'}
+                : 'סמן כקיים במערכת'}
           </ActionButton>
         )}
       </div>
@@ -265,8 +265,8 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
         <AdminPanelSection title="לא ניתן למזג">
           <div className="sm:col-span-2 rounded-[10px] bg-[#FFFBEB] px-4 py-3 text-[13px] text-[#92400E]">
             {routing?.route === 'match_conflict'
-              ? 'נמצאה התאמה גם לאדם וגם לארגון — נדרשת הכרעה מפורשת לפני מיזוג.'
-              : 'לרשומה זו אין התאמה קיימת למיזוג. השתמשי במסלול היצירה המתאים.'}
+              ? 'נמצאה התאמה גם לאדם וגם לארגון — נדרשת הכרעה מפורשת לפני העדכון.'
+              : 'לרשומה זו אין רשומה קיימת לעדכן. השתמשי במסלול היצירה המתאים.'}
           </div>
         </AdminPanelSection>
       ) : targetError ? (
@@ -303,7 +303,7 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
 
               {shownFields.length === 0 ? (
                 <div className="rounded-[10px] bg-[#F0FDF4] px-4 py-6 text-center text-[13px] text-[#166534]">
-                  אין מה להחליט — כל השדות זהים או שכבר הוכרעו בעבר. ניתן לסמן כמוזג.
+                  אין מה להחליט — כל השדות זהים או שכבר הוכרעו בעבר. ניתן לסמן כקיים במערכת.
                 </div>
               ) : (
                 <>

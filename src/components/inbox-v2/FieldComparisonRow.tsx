@@ -23,6 +23,7 @@ const STATUS_META: Record<ComparisonStatus, { label: string; variant: AdminBadge
   complete: { label: 'השלמת מידע חסר', variant: 'teal' },
   diff: { label: 'פער — נדרשת בחירה', variant: 'amber' },
   unresolved: { label: 'מידע לא מזוהה', variant: 'error' },
+  auto: { label: 'הוכרע אוטומטית', variant: 'teal' },
 }
 
 /** §10 — ירוק: אין פעולה · טורקיז: מידע חדש · כתום: פער · אדום: חסום */
@@ -32,6 +33,7 @@ const ROW_BG: Record<ComparisonStatus, string> = {
   complete: 'bg-[#E6F3F3]',
   diff: 'bg-[#FFFBEB]',
   unresolved: 'bg-[#FEF2F2]',
+  auto: 'bg-[#E6F3F3]',
 }
 
 const RESULT_TONE: Record<MergeResultTone, string> = {
@@ -71,6 +73,8 @@ export function FieldComparisonRow({
   const meta = STATUS_META[comparison.status]
   const needsOverwriteConfirm = comparison.options.some((o) => o.requiresOverwriteConfirm)
   const isSame = comparison.status === 'same'
+  // 'auto' הוכרע לפי חוק עסקי — מוצג, אך אין בו מה לבחור (§14–§15, §17).
+  const isAuto = comparison.status === 'auto'
   const isManual = choice === 'manual'
   const result = describeMergeResult(comparison, choice, manualValue)
 
@@ -86,14 +90,14 @@ export function FieldComparisonRow({
       </div>
 
       <div>
-        <div className="text-[11px] text-[#9CA3AF]">יש אצלנו</div>
+        <div className="text-[11px] text-[#9CA3AF] sm:hidden">יש אצלנו</div>
         <div className="text-[12px] text-[#6B6B6B]" dir="auto">
           {comparison.existingLabel ?? <span className="text-[#D9D9D9]">(ריק)</span>}
         </div>
       </div>
 
       <div>
-        <div className="text-[11px] text-[#9CA3AF]">הגיע מ{sourceLabel}</div>
+        <div className="text-[11px] text-[#9CA3AF] sm:hidden">הגיע מ{sourceLabel}</div>
         <div className="text-[12px] text-[#6B6B6B]" dir="auto">
           {comparison.incomingLabel ?? <span className="text-[#D9D9D9]">(ריק)</span>}
         </div>
@@ -101,14 +105,14 @@ export function FieldComparisonRow({
 
       <div className="flex flex-col gap-1.5">
         <div>
-          <div className="text-[11px] text-[#9CA3AF]">אחרי האישור</div>
+          <div className="text-[11px] text-[#9CA3AF] sm:hidden">אחרי האישור</div>
           <div className={`text-[12px] ${RESULT_TONE[result.tone]}`} dir="auto">
             {result.tone === 'unchanged' && !isSame ? 'ללא שינוי' : result.value}
           </div>
           {result.note && <div className="text-[11px] text-[#9CA3AF]">{result.note}</div>}
         </div>
 
-        {!isSame && (
+        {!isSame && !isAuto && (
           <>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
               {comparison.options.map((option) => {

@@ -166,6 +166,20 @@ export function isNumericId(value: unknown): boolean {
  */
 export const GENERIC_ROLE_ID = 14
 
+/**
+ * `dict_cities.id = 1173` — "כללי". אומת חי: זו העיר הגנרית היחידה במילון.
+ * עיר אמיתית גוברת עליה תמיד, לשני הכיוונים (INC-3125 §14).
+ */
+export const GENERIC_CITY_ID = 1173
+
+/** האם הערך הנכנס/הקיים הוא הערך הגנרי של אותו מילון. */
+function isGenericDictValue(kind: FieldKind, id: number | null): boolean {
+  if (id == null) return false
+  if (kind === 'role') return id === GENERIC_ROLE_ID
+  if (kind === 'city') return id === GENERIC_CITY_ID
+  return false
+}
+
 // ─────────────────────────────────────────────────────
 // מפות השדות
 // ─────────────────────────────────────────────────────
@@ -263,7 +277,12 @@ export function writableKeys(entity: MergeEntity): Set<string> {
 // השוואה
 // ─────────────────────────────────────────────────────
 
-export type ComparisonStatus = 'none' | 'same' | 'complete' | 'diff' | 'unresolved'
+/**
+ * 'auto' = הוכרע אוטומטית לפי חוק עסקי, בלי לשאול את המשתמשת
+ * (ערך ספציפי גובר על ערך כללי). אינו חוסם שמירה, אך כן מופיע
+ * בתוצאה הסופית — המערכת חוסכת החלטה, לא מסתירה מה ייכתב (§17).
+ */
+export type ComparisonStatus = 'none' | 'same' | 'complete' | 'diff' | 'unresolved' | 'auto'
 /** 'manual' = "ערך אחר" — ערך שהמשתמשת הזינה או בחרה ממילון (INC-3123). */
 export type ChoiceId = 'skip' | 'existing' | 'incoming' | 'secondary' | 'redirect' | 'manual'
 
@@ -557,18 +576,32 @@ function buildDict(
     return base
   }
 
-  // כלל "שמירת תפקיד מדויק" (SSOT §7): Google מחזירה את הערך הכללי 14 בעוד
-  // Supabase מחזיקה תפקיד מקצועי מדויק יותר ⇒ אין הורדה ואין פער בכלל.
-  // הכיוון ההפוך (Google מדויק מול 14 ב-Supabase) הוא פער אמיתי וממשיך רגיל.
+  // ── חוק: מידע ספציפי גובר על מידע כללי, לשני הכיוונים (§14–§15) ──
+  //
+  // "כללי" (עיר 1173) ו"עובד/ת דנטלי" (תפקיד 14, שאליו ממופים גם
+  // "מועמדת" ו"דנטל") הם ערכי בררת-מחדל, לא מידע. הם לעולם לא גוברים על
+  // ערך מקצועי/עירוני אמיתי, ואין סיבה לשאול את המשתמשת על כך.
   const existingId = t[def.to] != null ? Number(t[def.to]) : null
-  if (
-    def.kind === 'role' &&
-    incomingId === GENERIC_ROLE_ID &&
-    existingId != null &&
-    existingId !== GENERIC_ROLE_ID
-  ) {
+  const incomingGeneric = isGenericDictValue(def.kind, incomingId)
+  const existingGeneric = isGenericDictValue(def.kind, existingId)
+
+  // הקיים ספציפי, הנכנס כללי ⇒ אין הורדת איכות, אין פער.
+  if (incomingGeneric && existingId != null && !existingGeneric) {
     base.status = 'same'
-    base.blockedReason = 'Supabase מחזיקה תפקיד מדויק יותר — אין הורדה לערך הכללי'
+    base.blockedReason =
+      def.kind === 'role'
+        ? 'במאגר יש תפקיד מדויק יותר — אין הורדה לערך הכללי'
+        : 'במאגר יש עיר מדויקת — אין הורדה ל"כללי"'
+    return base
+  }
+
+  // הקיים כללי, הנכנס ספציפי ⇒ שדרוג ודאי. מוכרע אוטומטית.
+  if (existingGeneric && !incomingGeneric) {
+    base.status = 'auto'
+    base.blockedReason =
+      def.kind === 'role'
+        ? 'תפקיד מקצועי גובר על הערך הכללי — הוכרע אוטומטית'
+        : 'עיר אמיתית גוברת על "כללי" — הוכרע אוטומטית'
     return base
   }
 
@@ -691,7 +724,8 @@ export function buildPatch(
   const patch: Record<string, unknown> = {}
 
   for (const cmp of comparisons) {
-    const choice = choices[cmp.key] ?? 'skip'
+    // 'auto' הוכרע לפי חוק עסקי ואינו תלוי בבחירה — הוא תמיד נכתב (§14–§15).
+    const choice = cmp.status === 'auto' ? 'incoming' : (choices[cmp.key] ?? 'skip')
     if (choice === 'skip' || choice === 'existing') continue
 
     // חסום = חסום. גם אם ה-UI איכשהו שלח בחירה.
@@ -742,6 +776,7 @@ export function hasPendingWrites(
   choices: Record<string, ChoiceId>
 ): boolean {
   return comparisons.some((c) => {
+    if (c.status === 'auto') return true
     const choice = choices[c.key]
     return choice === 'incoming' || choice === 'secondary' || choice === 'redirect'
   })
@@ -750,7 +785,8 @@ export function hasPendingWrites(
 /** ברירת מחדל: הכל "דלג". אין דריסה שקטה בלחיצה אחת. */
 export function initialChoices(comparisons: FieldComparison[]): Record<string, ChoiceId> {
   const out: Record<string, ChoiceId> = {}
-  for (const c of comparisons) out[c.key] = 'skip'
+  // 'auto' נקבע מראש: החוק העסקי כבר הכריע, ואין מה לדלג עליו.
+  for (const c of comparisons) out[c.key] = c.status === 'auto' ? 'incoming' : 'skip'
   return out
 }
 
@@ -790,6 +826,13 @@ export function describeMergeResult(
   const unchanged: MergeResultDescription = { value: existing, tone: 'unchanged', note: null }
 
   if (cmp.status === 'same') return { value: existing, tone: 'unchanged', note: 'זהה בשני המקורות' }
+  if (cmp.status === 'auto') {
+    return {
+      value: incoming ?? existing,
+      tone: 'replaced',
+      note: cmp.blockedReason ?? 'הוכרע אוטומטית לפי חוק עסקי',
+    }
+  }
   if (choice === 'skip' || choice === 'existing') return unchanged
 
   if (choice === 'manual') {

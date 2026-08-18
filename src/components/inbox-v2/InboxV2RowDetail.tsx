@@ -31,6 +31,7 @@ import {
   sourceLabel,
   fieldLabel,
   diffStatusLabel,
+  isDecidableField,
 } from '@/lib/inbox-v2-dicts'
 import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import { useInboxMatchedNames } from '@/hooks/useInboxMatchedNames'
@@ -224,7 +225,11 @@ export function InboxV2RowDetail({
 
   const mode = isEditing ? 'edit' : 'view'
   const match = row ? deriveMatchResult(row) : null
-  const suggestedEntries = row?.suggested_updates ? Object.entries(row.suggested_updates) : []
+  // רק שדות אמיתיים. n8n כותבת ל-suggested_updates גם מטא-דאטה משלה
+  // (direction/reasons) עם ערכים ריקים — היא אינה פער ואינה מוצגת.
+  const suggestedEntries = row?.suggested_updates
+    ? Object.entries(row.suggested_updates).filter(([key]) => isDecidableField(key))
+    : []
   const routing = row ? resolveInboxRoute(row) : null
   const recordType = row ? getRecordType(row) : null
   const google = row ? parseGoogleSource(row) : null
@@ -607,7 +612,7 @@ export function InboxV2RowDetail({
                   {routing.route === 'merge_contact' && (
                     <GateButton
                       icon={<GitMerge className="h-4 w-4" />}
-                      label="הצג ואשר מיזוג לאיש קשר"
+                      label="השוואה ועדכון איש הקשר"
                       onClick={() => onOpenMerge(leadId)}
                       primary
                     />
@@ -616,7 +621,7 @@ export function InboxV2RowDetail({
                   {routing.route === 'merge_account' && (
                     <GateButton
                       icon={<Building2 className="h-4 w-4" />}
-                      label="הצג ואשר מיזוג לארגון"
+                      label="השוואה ועדכון הארגון"
                       onClick={() => onOpenMerge(leadId)}
                       primary
                     />
