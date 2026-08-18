@@ -29,6 +29,7 @@ import { parseWhatsappCopyText } from '@/lib/employment-intake/parsers/whatsappC
 import { parsePlainText } from '@/lib/employment-intake/parsers/plainText'
 import { DETAILS_SENT_STATUS, ACCOUNT_STATUS_POTENTIAL } from '@/lib/employment-intake/detailsSent'
 import { detectSourceEvent, parseStructuredGoogleContact, targetNameOnly } from '@/lib/employment-intake/sourceMessage'
+import { resolveEffectiveFields } from '@/lib/employment-intake/effectiveFields'
 import * as L from '@/lib/employment-intake/labels'
 import type { RawParsedMessage, EmploymentIntakeAction } from '@/types/employment-intake'
 
@@ -594,6 +595,64 @@ check('דילוג', 'נשמר מופע ראשון בלבד', deduped.unique.map(
 check('דילוג', 'ספירת הכפילויות מדויקת', deduped.duplicateCount, 2)
 check('דילוג', 'אין כפילויות ⇒ הכול עובר', dedupeBySourceHash([{ k: 'x' }, { k: 'y' }], (r) => r.k).duplicateCount, 0)
 check('דילוג', 'רשימה ריקה', dedupeBySourceHash([], (r: { k: string }) => r.k), { unique: [], duplicateCount: 0 })
+
+// ═══════════════════════════════════════════════════════════
+// 15. עברית עסקית אחידה לקטגוריות (§14 בסבב התיקונים)
+// ═══════════════════════════════════════════════════════════
+check('קטגוריה', 'job_seeker ⇒ "מחפש עבודה" (לא "מחפש/ת")', L.CONTENT_TYPE_LABEL.job_seeker, 'מחפש עבודה')
+check('קטגוריה', 'recruiter ⇒ "מגייס" (לא "מגייס/ת עובדים")', L.CONTENT_TYPE_LABEL.recruiter, 'מגייס')
+check('קטגוריה', 'group_join ⇒ "הצטרף/צורף לקבוצה"', L.CONTENT_TYPE_LABEL.group_join, 'הצטרף/צורף לקבוצה')
+check('קטגוריה', 'unclear ⇒ "דורש בדיקה" (לא "לא ברור")', L.CONTENT_TYPE_LABEL.unclear, 'דורש בדיקה')
+check('קטגוריה', 'irrelevant ⇒ "לא רלוונטי"', L.CONTENT_TYPE_LABEL.irrelevant, 'לא רלוונטי')
+check('קטגוריה', 'unclassified ⇒ "טרם סווג"', L.CONTENT_TYPE_LABEL.unclassified, 'טרם סווג')
+
+// ═══════════════════════════════════════════════════════════
+// 16. ערך אפקטיבי — Enrichment מ-Supabase ו"לא ליפול ל'ללא שם'" (§1, §4)
+// ═══════════════════════════════════════════════════════════
+type EffRow = Parameters<typeof resolveEffectiveFields>[0]
+
+const baseEffRow: EffRow = {
+  contact_name: null, org_name: null, sender_name: null,
+  phone: null, second_phone: null, email: null, second_email: null,
+  role_id: null, city_id: null, region_id: null,
+  facebook_id: null, facebook_url: null, facebook_name: null,
+  matched_contact: null, matched_account: null,
+}
+
+// #1 — Sender קיים במקור, אין contact_name מפורש ⇒ אסור להגיע ל"ללא שם"
+const senderOnlyRow: EffRow = { ...baseEffRow, sender_name: 'דר נפתלי חן * חולון' }
+check('ערך אפקטיבי', 'Sender קיים ⇒ משמש כשם המוצג (לא נופל ל-null)', resolveEffectiveFields(senderOnlyRow).displayName, 'דר נפתלי חן * חולון')
+checkTrue('ערך אפקטיבי', 'Sender קיים ⇒ displayName אינו null (בפאנל זה מונע "ללא שם")', resolveEffectiveFields(senderOnlyRow).displayName !== null)
+
+// #4 — נייד/מייל/תפקיד/עיר נופלים ל-Contact שהותאם כשה-Parser לא חילץ אותם
+const matchedContactRow: EffRow = {
+  ...baseEffRow,
+  sender_name: 'יוסי כהן',
+  matched_contact: {
+    contact_id: 501, display_name: 'יוסי כהן', phone: '0501234567', second_phone: null,
+    email: 'yossi@example.com', role: 9, city_id: 388, region_id: 13, social_status: 7,
+  },
+}
+const enrichedFromContact = resolveEffectiveFields(matchedContactRow)
+check('ערך אפקטיבי', 'נייד נופל ל-Contact כש-Parser לא חילץ', enrichedFromContact.phone, '0501234567')
+checkTrue('ערך אפקטיבי', 'נייד מסומן כמגיע מהתאמה', enrichedFromContact.phoneFromMatch)
+check('ערך אפקטיבי', 'מייל נופל ל-Contact כש-Parser לא חילץ', enrichedFromContact.email, 'yossi@example.com')
+check('ערך אפקטיבי', 'תפקיד נופל ל-Contact כש-Parser לא חילץ', enrichedFromContact.roleId, 9)
+check('ערך אפקטיבי', 'עיר נופלת ל-Contact כש-Parser לא חילץ', enrichedFromContact.cityId, 388)
+check('ערך אפקטיבי', 'אזור נופל ל-Contact כש-Parser לא חילץ', enrichedFromContact.regionId, 13)
+check('ערך אפקטיבי', 'שם מוצג הוא display_name של ה-Contact (עדיף על Sender)', enrichedFromContact.displayName, 'יוסי כהן')
+
+// עדיפות: ערך שכבר על השורה (מה-Parser או מעריכה ידנית — אותה עמודה) גובר על ההתאמה
+const ownValueWins: EffRow = {
+  ...baseEffRow,
+  phone: '0529998888',
+  role_id: 3,
+  matched_contact: { contact_id: 502, display_name: 'אחר', phone: '0501111111', second_phone: null, email: null, role: 9, city_id: null, region_id: null, social_status: null },
+}
+const ownWins = resolveEffectiveFields(ownValueWins)
+check('ערך אפקטיבי', 'נייד על השורה עצמה גובר על ה-Contact', ownWins.phone, '0529998888')
+checkTrue('ערך אפקטיבי', 'נייד על השורה עצמה לא מסומן כמגיע מהתאמה', !ownWins.phoneFromMatch)
+check('ערך אפקטיבי', 'תפקיד על השורה עצמה גובר על ה-Contact', ownWins.roleId, 3)
 
 // ═══════════════════════════════════════════════════════════
 console.log('')

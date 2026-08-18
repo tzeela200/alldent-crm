@@ -3,15 +3,16 @@
  * ולכן דורשת אישור מפורש (checkbox) והצגת הטקסט המקורי לפני האישור.
  */
 
-import { useState } from 'react'
-import { UserPlus } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { AlertTriangle, UserPlus } from 'lucide-react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import { ActionButton } from '@/components/layout/Shell'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { isValidIlMobile } from '@/lib/normalizePhone'
 import { useEmploymentIntakeDicts } from '@/hooks/useEmploymentIntake'
-import { useCreateContactFromIntake, type CreateContactInput } from '@/hooks/useEmploymentIntakeActions'
+import { normalizePhoneRpc } from '@/hooks/useEmploymentIntakeNormalize'
+import { useCreateContactFromIntake, useCheckPhoneDuplicate, type CreateContactInput } from '@/hooks/useEmploymentIntakeActions'
 import { errorInvalidPhone } from '@/lib/employment-intake/labels'
 import type { RowWithAction } from '@/hooks/useEmploymentIntakeRows'
 import { toast } from 'sonner'
@@ -43,6 +44,24 @@ export function IntakeCreateContactDialog({ row, onClose }: Props) {
   const [regionId, setRegionId] = useState<number | null>(row?.region_id ?? null)
   const [includeWorkStatus, setIncludeWorkStatus] = useState(false)
   const [confirmed, setConfirmed] = useState(false)
+  const [phoneNorm, setPhoneNorm] = useState<string | null>(null)
+
+  // בדיקת כפילות יזומה (§9.4, §13): לא מסתמכים רק על אילוץ UNIQUE ב-DB —
+  // מנרמלים את הנייד שהוזן ובודקים חי מול contact.phone_norm, עם דיבאונס קצר.
+  useEffect(() => {
+    if (!phone || !isValidIlMobile(phone)) {
+      setPhoneNorm(null)
+      return
+    }
+    let cancelled = false
+    const timer = setTimeout(() => {
+      normalizePhoneRpc(phone).then((norm) => { if (!cancelled) setPhoneNorm(norm) }).catch(() => { if (!cancelled) setPhoneNorm(null) })
+    }, 400)
+    return () => { cancelled = true; clearTimeout(timer) }
+  }, [phone])
+
+  const duplicateCheck = useCheckPhoneDuplicate(phoneNorm)
+  const duplicate = duplicateCheck.data ?? null
 
   if (!row) return null
 
@@ -65,6 +84,10 @@ export function IntakeCreateContactDialog({ row, onClose }: Props) {
     }
     if (!phone && !email && !facebookId && !facebookUrl) {
       toast.error('נדרש לפחות אחד מהשדות: נייד, מייל, מזהה Facebook או קישור Facebook.')
+      return
+    }
+    if (duplicate) {
+      toast.error(`לא ניתן ליצור: כבר קיים איש קשר עם הנייד הזה (${duplicate.displayName ?? `#${duplicate.contactId}`}). יש לקשר לרשומה הקיימת במקום ליצור כפילות.`)
       return
     }
 
@@ -110,6 +133,16 @@ export function IntakeCreateContactDialog({ row, onClose }: Props) {
         <RoleSubRolePicker variant="edit" roleId={roleId} subRoleIds={subRoleIds} onRoleChange={setRoleId} onSubRoleChange={setSubRoleIds} />
         <CityRegionPicker variant="edit" cityId={cityId} regionId={regionId} onCityChange={setCityId} onRegionChange={setRegionId} />
 
+        {duplicate && (
+          <div className="flex items-start gap-2 rounded-[12px] border border-[#FECACA] bg-[#FEF2F2] p-3 text-[13px] text-[#991B1B]">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              כבר קיים איש קשר עם הנייד הזה: <span className="font-semibold">{duplicate.displayName ?? `#${duplicate.contactId}`}</span>.
+              לא ניתן ליצור רשומה כפולה — יש לסגור ולבחור "זיהוי / שיוך רשומה" כדי לקשר לרשומה הקיימת.
+            </div>
+          </div>
+        )}
+
         {showWorkStatusOption && (
           <label className="flex items-center gap-2 text-[13px] font-semibold text-[#2D2D2D]">
             <input type="checkbox" checked={includeWorkStatus} onChange={(e) => setIncludeWorkStatus(e.target.checked)} className="h-4 w-4 accent-[#008080]" />
@@ -126,7 +159,7 @@ export function IntakeCreateContactDialog({ row, onClose }: Props) {
           <ActionButton variant="ghost" onClick={onClose}>
             ביטול
           </ActionButton>
-          <ActionButton variant="primary" icon={UserPlus} disabled={!confirmed || createContact.isPending} onClick={handleCreate}>
+          <ActionButton variant="primary" icon={UserPlus} disabled={!confirmed || createContact.isPending || !!duplicate} onClick={handleCreate}>
             {createContact.isPending ? 'יוצר…' : 'יצירת איש קשר'}
           </ActionButton>
         </DialogFooter>

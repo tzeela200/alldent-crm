@@ -19,6 +19,8 @@ interface Props {
   row: RowWithAction | null
   kind: ConfirmActionKind | null
   onClose: () => void
+  /** נבחר ידנית (למשל מ-select ישיר בטבלה) — עוקף את proposed_social_status של השורה. */
+  overrideStatusId?: number | null
 }
 
 function formatDateTime(iso: string | null): string {
@@ -26,7 +28,7 @@ function formatDateTime(iso: string | null): string {
   return new Date(iso).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' })
 }
 
-export function IntakeConfirmActionDialog({ row, kind, onClose }: Props) {
+export function IntakeConfirmActionDialog({ row, kind, onClose, overrideStatusId }: Props) {
   const { data: dicts } = useEmploymentIntakeDicts()
   const markLeadStatus = useMarkLeadStatus()
   const markIrrelevant = useMarkIrrelevant()
@@ -38,16 +40,17 @@ export function IntakeConfirmActionDialog({ row, kind, onClose }: Props) {
 
   if (!row || !kind) return null
 
-  const statusLabel = dicts?.socialStatuses.find((s) => s.id === row.proposed_social_status)?.name ?? 'הסטטוס המוצע'
+  const targetStatusId = overrideStatusId ?? row.proposed_social_status
+  const statusLabel = dicts?.socialStatuses.find((s) => s.id === targetStatusId)?.name ?? 'הסטטוס המוצע'
   const showWorkStatusOption = kind === 'lead_status' && row.content_type === 'job_seeker' && row.is_active_request !== false
   const isPending = markLeadStatus.isPending || markIrrelevant.isPending || linkAccount.isPending
 
   function handleConfirm(force = false) {
     if (!row || !kind) return
     if (kind === 'lead_status') {
-      if (row.proposed_social_status == null) return
+      if (targetStatusId == null) return
       markLeadStatus.mutate(
-        { row, statusId: row.proposed_social_status, statusLabel, includeWorkStatus, force },
+        { row, statusId: targetStatusId, statusLabel, includeWorkStatus, force },
         {
           onSuccess: (result) => {
             if (result.alreadyDone) setAlreadyDoneWarning({ at: result.lastActionAt, by: result.lastActionBy })

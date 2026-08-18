@@ -28,6 +28,32 @@ import type { ContactCompareData, AccountCompareData } from '@/lib/employment-in
 import type { RowWithAction } from '@/hooks/useEmploymentIntakeRows'
 import { supabaseError, describeError } from '@/lib/employment-intake/errors'
 
+// ── בדיקת כפילות יזומה לפני "הקמת איש קשר" (§9.4, §13) ──────────────────
+// אילוץ UNIQUE על contact.phone_norm ימנע כפילות בכל מקרה ברמת ה-DB, אבל
+// זו אינה חוויית משתמש מספקת: כשל האילוץ מגיע רק אחרי לחיצה על "יצירה",
+// כשגיאה גנרית. הבדיקה כאן רצה יזום לפני האישור ומראה שם קיים בפירוש.
+export interface PhoneDuplicateCheck {
+  contactId: number
+  displayName: string | null
+}
+
+export function useCheckPhoneDuplicate(phoneNorm: string | null) {
+  return useQuery({
+    queryKey: ['employment-intake-phone-duplicate', phoneNorm],
+    enabled: !!phoneNorm,
+    staleTime: 10_000,
+    queryFn: async (): Promise<PhoneDuplicateCheck | null> => {
+      const { data, error } = await supabase
+        .from('contact')
+        .select('contact_id, display_name')
+        .eq('phone_norm', phoneNorm!)
+        .maybeSingle()
+      if (error) throw supabaseError('בדיקת כפילות נייד נכשלה', error)
+      return data ? { contactId: data.contact_id as number, displayName: data.display_name as string | null } : null
+    },
+  })
+}
+
 function invalidateIntake(qc: ReturnType<typeof useQueryClient>) {
   qc.invalidateQueries({ queryKey: ['employment-intake-rows'] })
   qc.invalidateQueries({ queryKey: ['employment-intake-summary'] })

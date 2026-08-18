@@ -17,6 +17,7 @@ import { AccountPicker, type AccountPickerResult } from '@/components/ui/Account
 import { useEmploymentIntakeDicts } from '@/hooks/useEmploymentIntake'
 import { normalizePhoneRpc } from '@/hooks/useEmploymentIntakeNormalize'
 import { useUpdateEmploymentIntakeRow, type EmploymentIntakeRowPatch } from '@/hooks/useEmploymentIntakeRowEdit'
+import { resolveEffectiveFields } from '@/lib/employment-intake/effectiveFields'
 import { CONTENT_TYPE_LABEL } from '@/lib/employment-intake/labels'
 import type { ContentType } from '@/types/employment-intake'
 import type { RowWithAction } from '@/hooks/useEmploymentIntakeRows'
@@ -36,51 +37,57 @@ export function IntakeRowEditor({ row, onClose }: Props) {
   const { data: dicts } = useEmploymentIntakeDicts()
   const updateRow = useUpdateEmploymentIntakeRow()
 
-  const [contactName, setContactName] = useState(row?.contact_name ?? '')
-  const [orgName, setOrgName] = useState(row?.org_name ?? '')
-  const [phone, setPhone] = useState(row?.phone ?? '')
-  const [secondPhone, setSecondPhone] = useState(row?.second_phone ?? '')
-  const [email, setEmail] = useState(row?.email ?? '')
-  const [secondEmail, setSecondEmail] = useState(row?.second_email ?? '')
-  const [facebookId, setFacebookId] = useState(row?.facebook_id ?? '')
-  const [facebookUrl, setFacebookUrl] = useState(row?.facebook_url ?? '')
-  const [facebookName, setFacebookName] = useState(row?.facebook_name ?? '')
-  const [roleId, setRoleId] = useState<number | null>(row?.role_id ?? null)
+  // ערך פתיחה: מה שהפרסר/עריכה קודמת כבר קבעו על השורה, ואם חסר — נופל
+  // לרשומה הקנונית שהותאמה ב-Supabase. הטופס לא נפתח ריק כשהמידע כבר ידוע.
+  const effective = row ? resolveEffectiveFields(row) : null
+
+  const [contactName, setContactName] = useState(effective?.displayName ?? '')
+  const [orgName, setOrgName] = useState(effective?.orgName ?? '')
+  const [phone, setPhone] = useState(effective?.phone ?? '')
+  const [secondPhone, setSecondPhone] = useState(effective?.secondPhone ?? '')
+  const [email, setEmail] = useState(effective?.email ?? '')
+  const [secondEmail, setSecondEmail] = useState(effective?.secondEmail ?? '')
+  const [facebookId, setFacebookId] = useState(effective?.facebookId ?? '')
+  const [facebookUrl, setFacebookUrl] = useState(effective?.facebookUrl ?? '')
+  const [facebookName, setFacebookName] = useState(effective?.facebookName ?? '')
+  const [roleId, setRoleId] = useState<number | null>(effective?.roleId ?? null)
   const [subRoleIds, setSubRoleIds] = useState<number[]>(row?.sub_role_ids ?? [])
-  const [cityId, setCityId] = useState<number | null>(row?.city_id ?? null)
-  const [regionId, setRegionId] = useState<number | null>(row?.region_id ?? null)
+  const [cityId, setCityId] = useState<number | null>(effective?.cityId ?? null)
+  const [regionId, setRegionId] = useState<number | null>(effective?.regionId ?? null)
   const [contentType, setContentType] = useState<ContentType>(row?.content_type ?? 'unclassified')
   const [socialStatus, setSocialStatus] = useState<number | null>(row?.proposed_social_status ?? null)
   const [matchContact, setMatchContact] = useState<number | null>(row?.match_contact ?? null)
   const [matchAccount, setMatchAccount] = useState<number | null>(row?.match_account ?? null)
 
-  if (!row) return null
+  if (!row || !effective) return null
 
   async function handleSave() {
-    if (!row) return
+    if (!row || !effective) return
     const patch: EmploymentIntakeRowPatch = {}
 
-    if (contactName !== (row.contact_name ?? '')) patch.contact_name = contactName || null
-    if (orgName !== (row.org_name ?? '')) patch.org_name = orgName || null
-    if (email !== (row.email ?? '')) patch.email = email || null
-    if (secondEmail !== (row.second_email ?? '')) patch.second_email = secondEmail || null
-    if (facebookId !== (row.facebook_id ?? '')) patch.facebook_id = facebookId || null
-    if (facebookUrl !== (row.facebook_url ?? '')) patch.facebook_url = facebookUrl || null
-    if (facebookName !== (row.facebook_name ?? '')) patch.facebook_name = facebookName || null
+    // ההשוואה היא מול ערך הפתיחה (effective), לא מול row הגולמי: אם המשתמשת
+    // לא נגעה בשדה שהוצג ממותאם ב-Supabase, אין לכתוב אותו בחזרה ל-employment_intake.
+    if (contactName !== (effective.displayName ?? '')) patch.contact_name = contactName || null
+    if (orgName !== (effective.orgName ?? '')) patch.org_name = orgName || null
+    if (email !== (effective.email ?? '')) patch.email = email || null
+    if (secondEmail !== (effective.secondEmail ?? '')) patch.second_email = secondEmail || null
+    if (facebookId !== (effective.facebookId ?? '')) patch.facebook_id = facebookId || null
+    if (facebookUrl !== (effective.facebookUrl ?? '')) patch.facebook_url = facebookUrl || null
+    if (facebookName !== (effective.facebookName ?? '')) patch.facebook_name = facebookName || null
 
-    if (phone !== (row.phone ?? '')) {
+    if (phone !== (effective.phone ?? '')) {
       patch.phone = phone || null
       patch.phone_norm = phone ? await normalizePhoneRpc(phone) : null
     }
-    if (secondPhone !== (row.second_phone ?? '')) {
+    if (secondPhone !== (effective.secondPhone ?? '')) {
       patch.second_phone = secondPhone || null
       patch.second_phone_norm = secondPhone ? await normalizePhoneRpc(secondPhone) : null
     }
 
-    if (roleId !== row.role_id) patch.role_id = roleId
+    if (roleId !== effective.roleId) patch.role_id = roleId
     if (JSON.stringify(subRoleIds) !== JSON.stringify(row.sub_role_ids)) patch.sub_role_ids = subRoleIds
-    if (cityId !== row.city_id) patch.city_id = cityId
-    if (regionId !== row.region_id) patch.region_id = regionId
+    if (cityId !== effective.cityId) patch.city_id = cityId
+    if (regionId !== effective.regionId) patch.region_id = regionId
     if (contentType !== row.content_type) patch.content_type = contentType
     if (socialStatus !== row.proposed_social_status) patch.proposed_social_status = socialStatus
 

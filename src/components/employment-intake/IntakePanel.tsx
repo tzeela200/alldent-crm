@@ -11,6 +11,7 @@ import { ActionButton } from '@/components/layout/Shell'
 import { formatPhone } from '@/lib/normalizePhone'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { useEmploymentIntakeDicts } from '@/hooks/useEmploymentIntake'
+import { resolveEffectiveFields } from '@/lib/employment-intake/effectiveFields'
 import { useIntakeActionHistory, useIntakeIdentityOccurrences } from '@/hooks/useEmploymentIntakePanel'
 import {
   ACTION_RESULT_LABEL,
@@ -60,8 +61,9 @@ export function IntakePanel({ row, onClose, onEdit, onMarkDetailsSent }: Props) 
   const state = computeDatabaseState(row)
   const existingContact = row.matched_contact
   const existingAccount = row.matched_account
-  const identifiedName = existingContact?.display_name ?? existingAccount?.account_name ?? row.contact_name ?? row.org_name ?? row.sender_name ?? 'ללא שם'
-  const mobile = row.phone ?? existingContact?.phone ?? existingAccount?.phone ?? null
+  const effective = resolveEffectiveFields(row)
+  const identifiedName = effective.displayName ?? 'ללא שם'
+  const mobile = effective.phone
   const isException = state === 'google_sync_exception'
   const needsIdentification = state === 'needs_identification'
   const canCreateContact = state === 'not_existing' && !isException && !needsIdentification && !!(row.phone || row.contact_name || row.sender_name)
@@ -129,10 +131,10 @@ export function IntakePanel({ row, onClose, onEdit, onMarkDetailsSent }: Props) 
           <AdminPanelField label="האדם / הארגון" mode="view" viewValue={identifiedName} />
           <AdminPanelField label="נייד" mode="view" viewValue={mobile ? ltr(formatPhone(mobile)) : null} />
           <AdminPanelField label="נייד נוסף" mode="view" viewValue={row.second_phone ? ltr(formatPhone(row.second_phone)) : null} />
-          <AdminPanelField label="מייל" mode="view" viewValue={ltr(row.email ?? existingContact?.email ?? existingAccount?.email)} />
-          <AdminPanelField label="תפקיד" mode="view" viewValue={row.role_id != null ? getDictLabel(appDicts?.roles, row.role_id) : row.role_raw} />
-          <AdminPanelField label="עיר" mode="view" viewValue={row.city_id != null ? getDictLabel(appDicts?.cities, row.city_id) : row.city_raw} />
-          <AdminPanelField label="אזור" mode="view" viewValue={row.region_id != null ? getDictLabel(appDicts?.regions, row.region_id) : null} />
+          <AdminPanelField label="מייל" mode="view" viewValue={ltr(effective.email)} />
+          <AdminPanelField label="תפקיד" mode="view" viewValue={effective.roleId != null ? getDictLabel(appDicts?.roles, effective.roleId) : row.role_raw} />
+          <AdminPanelField label="עיר" mode="view" viewValue={effective.cityId != null ? getDictLabel(appDicts?.cities, effective.cityId) : row.city_raw} />
+          <AdminPanelField label="אזור" mode="view" viewValue={effective.regionId != null ? getDictLabel(appDicts?.regions, effective.regionId) : null} />
           <AdminPanelField label="מצב הבקשה" mode="view" viewValue={activeRequestLabel(row.is_active_request)} />
           <AdminPanelField label="סטטוס טיפול" mode="view" viewValue={statusLabel} />
         </AdminPanelSection>

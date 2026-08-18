@@ -18,11 +18,11 @@ import type {
 
 // ── סוג התוכן (§3.2 ציר 1) ──────────────────────────────────────────
 export const CONTENT_TYPE_LABEL: Record<ContentType, string> = {
-  job_seeker: 'מחפש/ת עבודה',
-  recruiter: 'מגייס/ת עובדים',
-  group_join: 'הצטרפות לקבוצה',
+  job_seeker: 'מחפש עבודה',
+  recruiter: 'מגייס',
+  group_join: 'הצטרף/צורף לקבוצה',
   irrelevant: 'לא רלוונטי',
-  unclear: 'לא ברור',
+  unclear: 'דורש בדיקה',
   unclassified: 'טרם סווג',
 }
 

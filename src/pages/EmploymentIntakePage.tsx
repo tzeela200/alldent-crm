@@ -20,6 +20,7 @@ import {
 import { IntakeSourceContext } from '@/components/employment-intake/IntakeSourceContext'
 import { IntakeRowEditor } from '@/components/employment-intake/IntakeRowEditor'
 import { IntakePanel } from '@/components/employment-intake/IntakePanel'
+import { IntakeConfirmActionDialog } from '@/components/employment-intake/IntakeConfirmActionDialog'
 import { BulkActionBar } from '@/components/employment-intake/BulkActionBar'
 import { BulkPreviewDialog } from '@/components/employment-intake/BulkPreviewDialog'
 import { BulkResultReport } from '@/components/employment-intake/BulkResultReport'
@@ -64,6 +65,7 @@ export default function EmploymentIntakePage() {
   const [bulkFamily, setBulkFamily] = useState<BulkFamily | null>(null)
   const [bulkReport, setBulkReport] = useState<BulkRunReport | null>(null)
   const [singleRowScope, setSingleRowScope] = useState<number[] | null>(null)
+  const [statusChangeRequest, setStatusChangeRequest] = useState<{ row: RowWithAction; statusId: number } | null>(null)
 
   const { data, isLoading, isError } = useEmploymentIntakeRows(filters, page, sortKey, sortDir)
   const rows = data?.rows ?? []
@@ -188,9 +190,10 @@ export default function EmploymentIntakePage() {
             selectedIds={selectedIds}
             onSelectId={toggleSelectId}
             onSelectAll={toggleSelectAll}
-            onRowClick={(row) => { setSourceRow(row); setMobileSourceOpen(true) }}
+            onRowClick={(row) => { setSourceRow(row); setMobileSourceOpen(true); setDetailRow(row) }}
             onOpenDetails={setDetailRow}
             onEditRow={setEditingRow}
+            onRequestStatusChange={(row, statusId) => setStatusChangeRequest({ row, statusId })}
             bulkActions={<BulkActionBar onOpen={setBulkFamily} />}
           />
           {isError && <div className="mt-2 text-[12px] text-[#DC2626]">אירעה שגיאה בטעינת הנתונים. נסי לרענן את המסך.</div>}
@@ -223,6 +226,12 @@ export default function EmploymentIntakePage() {
         </SidePanel>
       </div>
 
+      <IntakeConfirmActionDialog
+        row={statusChangeRequest?.row ?? null}
+        kind={statusChangeRequest ? 'lead_status' : null}
+        overrideStatusId={statusChangeRequest?.statusId}
+        onClose={() => setStatusChangeRequest(null)}
+      />
       <IntakeRowEditor row={editingRow} onClose={() => setEditingRow(null)} />
       <IntakePanel
         row={detailRow}

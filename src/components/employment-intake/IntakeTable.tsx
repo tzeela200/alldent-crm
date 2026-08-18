@@ -9,6 +9,8 @@ import { AdminCountPreview } from '@/components/admin/AdminCountPreview'
 import { formatPhone } from '@/lib/normalizePhone'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { useEmploymentIntakeDicts } from '@/hooks/useEmploymentIntake'
+import { useUpdateEmploymentIntakeRow } from '@/hooks/useEmploymentIntakeRowEdit'
+import { resolveEffectiveFields } from '@/lib/employment-intake/effectiveFields'
 import {
   CONTENT_TYPE_LABEL,
   CONTENT_TYPE_TONE,
@@ -16,9 +18,12 @@ import {
   DATABASE_STATE_TONE,
   computeDatabaseState,
 } from '@/lib/employment-intake/labels'
+import type { ContentType } from '@/types/employment-intake'
 import type { EmploymentIntakeSortKey, RowWithAction } from '@/hooks/useEmploymentIntakeRows'
 
 export const EMPLOYMENT_INTAKE_COLUMNS_STORAGE_KEY = 'alldent:employment-intake:visible-columns:v2'
+
+const CONTENT_TYPE_OPTIONS: ContentType[] = ['job_seeker', 'recruiter', 'group_join', 'unclear', 'irrelevant', 'unclassified']
 
 export const ALL_COLUMNS = [
   { key: 'source_published_at', label: 'זמן הפרסום המקורי' },
@@ -70,12 +75,8 @@ function ltrValue(value: string | null | undefined) {
   return value ? <span dir="ltr" className="inline-block unicode-bidi-isolate">{value}</span> : '—'
 }
 
-function identifiedName(row: RowWithAction): string {
-  return row.matched_contact?.display_name ?? row.matched_account?.account_name ?? row.contact_name ?? row.org_name ?? '—'
-}
-
-function displayedPhone(row: RowWithAction): string | null {
-  return row.phone ?? row.matched_contact?.phone ?? row.matched_account?.phone ?? null
+function selectClass() {
+  return 'h-8 max-w-full rounded-[8px] border border-[#D9D9D9] bg-white px-2 text-[13px] outline-none focus:border-[#008080]'
 }
 
 interface Props {
@@ -96,6 +97,8 @@ interface Props {
   onRowClick?: (row: RowWithAction) => void
   onOpenDetails: (row: RowWithAction) => void
   onEditRow: (row: RowWithAction) => void
+  /** שינוי סטטוס טיפול על רשומה עם Contact מותאם הוא כתיבה לליבה — עובר דרך אישור מפורש בדיאלוג, לא נכתב ישירות מהטבלה. */
+  onRequestStatusChange: (row: RowWithAction, statusId: number, statusLabel: string) => void
   bulkActions?: React.ReactNode
 }
 
@@ -117,14 +120,34 @@ export function IntakeTable({
   onRowClick,
   onOpenDetails,
   onEditRow,
+  onRequestStatusChange,
   bulkActions,
 }: Props) {
   const { data: appDicts } = useApplicationDicts()
   const { data: intakeDicts } = useEmploymentIntakeDicts()
+  const updateRow = useUpdateEmploymentIntakeRow()
   const allSelected = rows.length > 0 && rows.every((r) => selectedIds.includes(String(r.id)))
   const someSelected = rows.some((r) => selectedIds.includes(String(r.id)))
 
-  const socialStatus = new Map((intakeDicts?.socialStatuses ?? []).map((s) => [s.id, s.name]))
+  const socialStatuses = intakeDicts?.socialStatuses ?? []
+
+  function handleCategoryChange(row: RowWithAction, next: ContentType) {
+    if (next === row.content_type) return
+    updateRow.mutate({ row, patch: { content_type: next } })
+  }
+
+  function handleStatusChange(row: RowWithAction, nextId: number | null) {
+    if (nextId == null) return
+    const label = socialStatuses.find((s) => s.id === nextId)?.name ?? String(nextId)
+    if (row.match_contact != null) {
+      // כתיבה לליבה (contact.social_status) — עוברת דרך דיאלוג אישור מפורש, לא כתיבה שקטה.
+      onRequestStatusChange(row, nextId, label)
+      return
+    }
+    // אין עדיין Contact מותאם — זו רק הצעת סטטוס על שורת ה-staging, לא כתיבה לליבה.
+    if (nextId === row.proposed_social_status) return
+    updateRow.mutate({ row, patch: { proposed_social_status: nextId } })
+  }
 
   const columnsByKey: Record<IntakeColumnKey, AdminColumn<RowWithAction>> = {
     source_published_at: {
@@ -137,12 +160,12 @@ export function IntakeTable({
     },
     identified_entity: {
       key: 'identified_entity', label: 'האדם / הארגון שזוהה', minWidth: '170px',
-      render: (row) => <span className="font-semibold">{identifiedName(row)}</span>,
+      render: (row) => <span className="font-semibold">{resolveEffectiveFields(row).displayName ?? '—'}</span>,
     },
     phone: {
       key: 'phone', label: 'נייד', sortable: true, nowrap: true,
       render: (row) => {
-        const phone = displayedPhone(row)
+        const phone = resolveEffectiveFields(row).phone
         return phone ? <span dir="ltr" className="inline-block unicode-bidi-isolate">{formatPhone(phone)}</span> : '—'
       },
     },
@@ -151,16 +174,35 @@ export function IntakeTable({
       render: (row) => <span className="line-clamp-2 text-[13px]" dir="auto">{row.original_text}</span>,
     },
     content_type: {
-      key: 'content_type', label: 'קטגוריה', sortable: true,
-      render: (row) => <AdminBadge label={CONTENT_TYPE_LABEL[row.content_type]} variant={CONTENT_TYPE_TONE[row.content_type]} />,
+      key: 'content_type', label: 'קטגוריה', sortable: true, minWidth: '150px',
+      render: (row) => (
+        <div onClick={(e) => e.stopPropagation()}>
+          <select
+            className={selectClass()}
+            value={row.content_type}
+            onChange={(e) => handleCategoryChange(row, e.target.value as ContentType)}
+            disabled={updateRow.isPending}
+          >
+            {CONTENT_TYPE_OPTIONS.map((ct) => (
+              <option key={ct} value={ct}>{CONTENT_TYPE_LABEL[ct]}</option>
+            ))}
+          </select>
+        </div>
+      ),
     },
     role_id: {
       key: 'role_id', label: 'תפקיד', sortable: true,
-      render: (row) => row.role_id != null ? getDictLabel(appDicts?.roles, row.role_id) : (row.role_raw ?? '—'),
+      render: (row) => {
+        const { roleId } = resolveEffectiveFields(row)
+        return roleId != null ? getDictLabel(appDicts?.roles, roleId) : (row.role_raw ?? '—')
+      },
     },
     city_id: {
       key: 'city_id', label: 'עיר', sortable: true,
-      render: (row) => row.city_id != null ? getDictLabel(appDicts?.cities, row.city_id) : (row.city_raw ?? '—'),
+      render: (row) => {
+        const { cityId } = resolveEffectiveFields(row)
+        return cityId != null ? getDictLabel(appDicts?.cities, cityId) : (row.city_raw ?? '—')
+      },
     },
     database_state: {
       key: 'database_state', label: 'מצב במאגר', minWidth: '120px',
@@ -170,10 +212,24 @@ export function IntakeTable({
       },
     },
     treatment_status: {
-      key: 'treatment_status', label: 'סטטוס טיפול', minWidth: '150px',
+      key: 'treatment_status', label: 'סטטוס טיפול', minWidth: '170px',
       render: (row) => {
         const statusId = row.matched_contact?.social_status ?? row.proposed_social_status
-        return statusId != null ? (socialStatus.get(statusId) ?? '—') : '—'
+        return (
+          <div onClick={(e) => e.stopPropagation()}>
+            <select
+              className={selectClass()}
+              value={statusId ?? ''}
+              onChange={(e) => handleStatusChange(row, e.target.value ? Number(e.target.value) : null)}
+              disabled={updateRow.isPending}
+            >
+              <option value="">— ללא —</option>
+              {socialStatuses.map((s) => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+        )
       },
     },
     row_actions: {
@@ -194,10 +250,16 @@ export function IntakeTable({
       key: 'second_phone', label: 'נייד נוסף', nowrap: true,
       render: (row) => row.second_phone ? <span dir="ltr" className="inline-block unicode-bidi-isolate">{formatPhone(row.second_phone)}</span> : '—',
     },
-    email: { key: 'email', label: 'מייל', render: (row) => ltrValue(row.email ?? row.matched_contact?.email ?? row.matched_account?.email) },
+    email: { key: 'email', label: 'מייל', render: (row) => ltrValue(resolveEffectiveFields(row).email) },
     second_email: { key: 'second_email', label: 'מייל נוסף', render: (row) => ltrValue(row.second_email) },
-    org_name: { key: 'org_name', label: 'ארגון', render: (row) => row.matched_account?.account_name ?? row.org_name ?? '—' },
-    region_id: { key: 'region_id', label: 'אזור', render: (row) => row.region_id != null ? getDictLabel(appDicts?.regions, row.region_id) : '—' },
+    org_name: { key: 'org_name', label: 'ארגון', render: (row) => resolveEffectiveFields(row).orgName ?? '—' },
+    region_id: {
+      key: 'region_id', label: 'אזור',
+      render: (row) => {
+        const { regionId } = resolveEffectiveFields(row)
+        return regionId != null ? getDictLabel(appDicts?.regions, regionId) : '—'
+      },
+    },
     source_name: { key: 'source_name', label: 'מקור הקלט', sortable: true, render: (row) => row.source_name ?? row.file_name ?? '—' },
     facebook_name: { key: 'facebook_name', label: 'שם פייסבוק', render: (row) => row.facebook_name ?? '—' },
     facebook_id: { key: 'facebook_id', label: 'Facebook ID', render: (row) => ltrValue(row.facebook_id) },
