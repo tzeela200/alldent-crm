@@ -363,21 +363,24 @@ export function InboxV2RowDetail({
               }
             />
             <AdminPanelField label="מייל נוסף" mode="view" viewValue={row.second_email} />
+            {/* התפקיד והעיר אינם מוקלדים כאן — הם מה שהמקור שלח, אחרי
+                שזוהו מול המילונים החיים. התווית אומרת מאיפה, כדי שלא
+                יישאר ניחוש מה מקורו של הערך. */}
             <AdminPanelField
-              label="תפקיד (הוצע)"
+              label={`תפקיד — לפי ${sourceLabel(row, sourceTypes).short}`}
               mode="view"
               viewValue={row.temp_role != null ? getDictLabel(dicts?.roles, row.temp_role) : null}
-              emptyLabel="לא זוהה"
+              emptyLabel="לא זוהה מהמקור"
             />
             <AdminPanelField
-              label="עיר (הוצעה)"
+              label={`עיר — לפי ${sourceLabel(row, sourceTypes).short}`}
               mode="view"
               viewValue={
                 row.temp_city_id != null
                   ? (cities?.find((c) => c.id === row.temp_city_id)?.name ?? String(row.temp_city_id))
                   : null
               }
-              emptyLabel="לא זוהתה"
+              emptyLabel="לא זוהתה מהמקור"
             />
             <AdminPanelField
               label="שם פייסבוק"

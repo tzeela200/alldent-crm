@@ -180,6 +180,47 @@ function isGenericDictValue(kind: FieldKind, id: number | null): boolean {
   return false
 }
 
+/**
+ * `dict_genders` — 1 = נקבה · 2 = זכר. אומת חי.
+ */
+export const GENDER_FEMALE_ID = 1
+export const GENDER_MALE_ID = 2
+
+/**
+ * מגדר נגזר מכינוי התפקיד שהגיע מ-Google (INC-3125).
+ *
+ * ב-Google Contacts התפקיד נכתב בתוך שם המשפחה, למשל
+ * `familyName: "מועמדת כללי"`. שני הכינויים האלה ממופים שניהם לתפקיד
+ * הכללי 14 ("עובד/ת דנטלי") ולכן התפקיד עצמו אינו מבחין ביניהם —
+ * אבל הכינוי כן: "מועמדת" הוא נקבה, "דנטל" הוא זכר.
+ *
+ * ההשוואה היא על **מילים שלמות** ולא על הכלה. `` אינו עובד על עברית,
+ * ובלי פיצול לטוקנים השם "אולדנט" היה נספר כ"דנטל".
+ */
+export function deriveGenderFromSource(row: Pick<InboxV2Row, 'display_name' | 'parsed_payload' | 'raw_payload'>): number | null {
+  const parsed = (row.parsed_payload ?? {}) as Record<string, unknown>
+  const raw = (row.raw_payload ?? {}) as Record<string, unknown>
+  const names = Array.isArray(raw.names) ? (raw.names as Record<string, unknown>[]) : []
+
+  const texts = [
+    row.display_name,
+    parsed.role_text_raw,
+    parsed.temp_role_name,
+    parsed.role_text,
+    ...names.flatMap((n) => [n.familyName, n.displayName, n.unstructuredName]),
+  ]
+
+  const tokens = texts
+    .map((t) => normalizeText(t))
+    .filter(Boolean)
+    .flatMap((t) => t.split(/[\s,.\-–—()[\]/|]+/))
+    .filter(Boolean)
+
+  if (tokens.some((t) => t === 'מועמדת')) return GENDER_FEMALE_ID
+  if (tokens.some((t) => t === 'דנטל')) return GENDER_MALE_ID
+  return null
+}
+
 // ─────────────────────────────────────────────────────
 // מפות השדות
 // ─────────────────────────────────────────────────────

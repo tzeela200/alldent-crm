@@ -5,6 +5,7 @@ import { ActionButton } from '@/components/layout/Shell'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { useInboxV2Row, useInboxV2Mutations } from '@/hooks/useInboxV2'
+import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
 import { useContactMutations } from '@/hooks/useContactMutations'
 import { lookupPhonesByNorm } from '@/hooks/useInboxPhoneCheck'
 import { useAuth } from '@/contexts/AuthContext'
@@ -12,11 +13,13 @@ import { INBOX_ACTION } from '@/lib/inbox-v2-dicts'
 import { normalizeIlMobile } from '@/lib/normalizePhone'
 import {
   classifyFacebookValue,
+  deriveGenderFromSource,
   isValidILMobile,
   normalizeEmail,
   normalizeText,
   phoneCompareKey,
 } from '@/lib/inbox-v2-merge'
+import { useGenders } from '@/hooks/useGenders'
 import { toast } from 'sonner'
 
 /** ערכי פתיחה כשאין שורת Inbox (למשל ממסך בדיקת המספרים). */
@@ -61,6 +64,8 @@ export function CreateFromLeadDialog({ leadId, prefill, onClose, onCreated }: Pr
   const { data: row } = useInboxV2Row(leadId ?? null)
   const { updateRow, logAction } = useInboxV2Mutations()
   const { insertContact } = useContactMutations()
+  const { data: cities } = useInboxV2Cities()
+  const { data: genders } = useGenders()
   const { user } = useAuth()
 
   const [saving, setSaving] = useState(false)
@@ -70,6 +75,7 @@ export function CreateFromLeadDialog({ leadId, prefill, onClose, onCreated }: Pr
   const [subRoleIds, setSubRoleIds] = useState<number[]>([])
   const [cityId, setCityId] = useState<number | null>(prefill?.city_id ?? null)
   const [regionId, setRegionId] = useState<number | null>(null)
+  const [genderId, setGenderId] = useState<number | null>(null)
   const [form, setForm] = useState({
     display_name: prefill?.display_name ?? '',
     first_name: prefill?.first_name ?? '',
@@ -84,7 +90,7 @@ export function CreateFromLeadDialog({ leadId, prefill, onClose, onCreated }: Pr
   })
 
   // מילוי מראש מתוך שורת ה-Inbox, פעם אחת.
-  if (row && !initialized) {
+  if (row && !initialized && cities) {
     setForm({
       display_name: row.display_name ?? '',
       // אין פיצול שם אוטומטי: נכתבים רק כשהמקור סיפק אותם בנפרד.
@@ -100,6 +106,15 @@ export function CreateFromLeadDialog({ leadId, prefill, onClose, onCreated }: Pr
     })
     setRoleId(row.temp_role ?? null)
     setCityId(row.temp_city_id ?? null)
+    // האזור נגזר מהעיר גם כשהעיר הגיעה כערך פתיחה. `CityRegionPicker`
+    // גוזר אותו רק כשהמשתמשת בוחרת בעצמה, ולכן prefill השאיר אותו ריק.
+    if (row.temp_city_id != null) {
+      const city = cities?.find((c) => c.id === row.temp_city_id)
+      if (city?.region_id != null) setRegionId(city.region_id)
+    }
+    // "מועמדת" ⇒ נקבה · "דנטל" ⇒ זכר. שני הכינויים ממופים לתפקיד הכללי
+    // ולכן התפקיד לבדו אינו מבחין ביניהם — הכינוי כן.
+    setGenderId(deriveGenderFromSource(row))
     setInitialized(true)
   }
 
@@ -171,6 +186,7 @@ export function CreateFromLeadDialog({ leadId, prefill, onClose, onCreated }: Pr
         second_email: sameEmail ? null : secondEmail || null,
         role: roleId,
         city_id: cityId,
+        gender: genderId,
         facebook_name: facebookName || null,
         facebook_id: facebookId || null,
         facebook_url: facebookUrl || null,
@@ -248,10 +264,32 @@ export function CreateFromLeadDialog({ leadId, prefill, onClose, onCreated }: Pr
           <CityRegionPicker
             cityId={cityId}
             regionId={regionId}
-            onCityChange={setCityId}
+            onCityChange={(id) => {
+              setCityId(id)
+              const city = id != null ? cities?.find((c) => c.id === id) : null
+              if (city?.region_id != null) setRegionId(city.region_id)
+            }}
             onRegionChange={setRegionId}
             variant="edit"
           />
+
+          {/* מגדר — מילון חי. נקבע מראש מכינוי התפקיד שהגיע מהמקור
+              ("מועמדת" ⇒ נקבה · "דנטל" ⇒ זכר), וניתן לשינוי. */}
+          <div className="flex flex-col gap-1">
+            <label className="text-[12px] font-semibold text-[#6B6B6B]">מגדר</label>
+            <select
+              value={genderId != null ? String(genderId) : ''}
+              onChange={(e) => setGenderId(e.target.value ? Number(e.target.value) : null)}
+              className="h-10 rounded-[10px] border border-[#D9D9D9] bg-white px-3 text-sm outline-none focus:border-[#008080]"
+            >
+              <option value="">— לא נקבע —</option>
+              {(genders ?? []).map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
           <FormField label="שם Facebook" value={form.facebook_name} onChange={(v) => set('facebook_name', v)} />
           <FormField label="מזהה Facebook (ספרות בלבד)" value={form.facebook_id} onChange={(v) => set('facebook_id', v)} dir="ltr" />
