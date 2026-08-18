@@ -284,7 +284,19 @@ export function writableKeys(entity: MergeEntity): Set<string> {
  */
 export type ComparisonStatus = 'none' | 'same' | 'complete' | 'diff' | 'unresolved' | 'auto'
 /** 'manual' = "ערך אחר" — ערך שהמשתמשת הזינה או בחרה ממילון (INC-3123). */
-export type ChoiceId = 'skip' | 'existing' | 'incoming' | 'secondary' | 'redirect' | 'manual'
+/**
+ * 'existing_secondary' = "השתמש בערך המשני שכבר קיים אצלנו" (§10).
+ * לדוגמה: הנייד הנוסף שכבר במאגר יהפוך לנייד הראשי. בלי זה, ערך שכבר
+ * קיים ב-Supabase היה צריך להיות מוקלד מחדש ידנית.
+ */
+export type ChoiceId =
+  | 'skip'
+  | 'existing'
+  | 'incoming'
+  | 'secondary'
+  | 'redirect'
+  | 'manual'
+  | 'existing_secondary'
 
 export interface FieldOption {
   id: ChoiceId
@@ -309,6 +321,9 @@ export interface FieldComparison {
   blockedReason: string | null
   /** עמודת יעד ל"שמור כנוסף" */
   secondaryTarget: string | null
+  /** הערך המשני שכבר קיים אצלנו, כשניתן לקדם אותו לראשי (§10) */
+  existingSecondaryValue: unknown
+  existingSecondaryLabel: string | null
   /** עמודת יעד להפניית ערך Facebook שמוקם בעמודה הלא נכונה */
   redirectTarget: string | null
   /** עמודת היעד הראשית */
@@ -397,6 +412,8 @@ function buildOne(
     options: [],
     blockedReason: null,
     secondaryTarget: null,
+    existingSecondaryValue: null,
+    existingSecondaryLabel: null,
     redirectTarget: null,
     target: def.to,
   }
@@ -491,6 +508,17 @@ function buildPhone(
         requiresOverwriteConfirm: !!secondaryKey,
       })
     }
+    // §10 — הנייד הנוסף שכבר קיים אצלנו הוא בחירה לגיטימית לראשי,
+    // ואין סיבה להקליד אותו מחדש.
+    if (secondaryKey && secondaryKey !== phoneCompareKey(t[def.to])) {
+      base.existingSecondaryValue = t[def.secondaryTo]
+      base.existingSecondaryLabel = formatPhoneLabel(t[def.secondaryTo])
+      extra.push({
+        id: 'existing_secondary',
+        label: 'קדם את הנייד הנוסף הקיים',
+        requiresOverwriteConfirm: base.existingLabel != null,
+      })
+    }
   }
 
   base.status = base.existingLabel == null ? 'complete' : 'diff'
@@ -530,6 +558,16 @@ function buildEmail(
         id: 'secondary',
         label: 'שמור כמייל נוסף',
         requiresOverwriteConfirm: !!secondaryKey,
+      })
+    }
+    // §10 — המייל הנוסף שכבר קיים אצלנו זמין לבחירה כראשי.
+    if (secondaryKey && secondaryKey !== normalizeEmail(t[def.to])) {
+      base.existingSecondaryValue = t[def.secondaryTo]
+      base.existingSecondaryLabel = secondaryKey
+      extra.push({
+        id: 'existing_secondary',
+        label: 'קדם את המייל הנוסף הקיים',
+        requiresOverwriteConfirm: base.existingLabel != null,
       })
     }
   }
@@ -732,13 +770,18 @@ export function buildPatch(
     if (cmp.status === 'unresolved' && choice !== 'redirect') continue
 
     let column: string | null = null
-    if (choice === 'incoming' || choice === 'manual') column = cmp.target
+    if (choice === 'incoming' || choice === 'manual' || choice === 'existing_secondary') column = cmp.target
     else if (choice === 'secondary') column = cmp.secondaryTarget
     else if (choice === 'redirect') column = cmp.redirectTarget
 
     if (!column || !allowed.has(column)) continue
 
-    const value = choice === 'manual' ? manualValues[cmp.key] : cmp.incomingRaw
+    const value =
+      choice === 'manual'
+        ? manualValues[cmp.key]
+        : choice === 'existing_secondary'
+          ? cmp.existingSecondaryValue
+          : cmp.incomingRaw
     // אין כתיבת ריק מעל ערך קיים.
     if (value == null || value === '') continue
 
@@ -770,6 +813,55 @@ function dedupeSecondary(
   }
 }
 
+// ─────────────────────────────────────────────────────
+// "כך תיראה הרשומה אחרי השמירה" (§12)
+// ─────────────────────────────────────────────────────
+
+export interface FinalFieldView {
+  key: string
+  label: string
+  /** הערך שיוצג אחרי השמירה, מתורגם למילון/פורמט מקומי */
+  value: string
+  /** האם השדה ישתנה בפעולה הזו */
+  changed: boolean
+}
+
+/**
+ * תמונת הרשומה כפי שתיראה אחרי הכתיבה.
+ *
+ * לא מספיק לבחור בין שני ערכים שדה-שדה: המשתמשת צריכה לראות את
+ * **הרשומה עצמה** לפני שהיא מאשרת, כולל שדות שלא נגעו בהם וכולל
+ * הכרעות אוטומטיות שהמערכת עשתה בשבילה (§17).
+ *
+ * מחושב מ-`patch` בפועל, כדי שלא תיווצר סתירה בין מה שמוצג לבין
+ * מה שנכתב.
+ */
+export function buildFinalRecord(
+  entity: MergeEntity,
+  target: Record<string, unknown> | null,
+  patch: Record<string, unknown>,
+  dicts: ComparisonDicts
+): FinalFieldView[] {
+  const t = target ?? {}
+  return fieldsFor(entity).map((def) => {
+    const changed = Object.prototype.hasOwnProperty.call(patch, def.to)
+    const raw = changed ? patch[def.to] : t[def.to]
+
+    let value: string
+    if (raw == null || raw === '') {
+      value = '—'
+    } else if (def.kind === 'role') {
+      value = dictLabel(dicts.roles, raw) ?? String(raw)
+    } else if (def.kind === 'city') {
+      value = dictLabel(dicts.cities, raw) ?? String(raw)
+    } else {
+      value = normalizeText(raw)
+    }
+
+    return { key: def.key, label: def.label, value, changed }
+  })
+}
+
 /** האם קיימת לפחות בחירה אחת שתגרום לכתיבה. */
 export function hasPendingWrites(
   comparisons: FieldComparison[],
@@ -778,7 +870,12 @@ export function hasPendingWrites(
   return comparisons.some((c) => {
     if (c.status === 'auto') return true
     const choice = choices[c.key]
-    return choice === 'incoming' || choice === 'secondary' || choice === 'redirect'
+    return (
+      choice === 'incoming' ||
+      choice === 'secondary' ||
+      choice === 'redirect' ||
+      choice === 'existing_secondary'
+    )
   })
 }
 

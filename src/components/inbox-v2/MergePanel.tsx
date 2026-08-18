@@ -13,8 +13,10 @@ import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
 import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import { useAuth } from '@/contexts/AuthContext'
 import { INBOX_ACTION, sourceLabel } from '@/lib/inbox-v2-dicts'
+import { formatPhone } from '@/lib/normalizePhone'
 import {
   buildComparisons,
+  buildFinalRecord,
   buildPatch,
   deriveEntryReason,
   hasPendingWrites,
@@ -146,6 +148,15 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
   const summary = summarizeMerge(visibleFields, activeChoices, manualValues)
   const blocking = unresolvedConflicts(visibleFields, activeChoices, manualValues)
 
+  // §12 — הרשומה כפי שתיראה אחרי השמירה, מחושבת מאותו patch שייכתב.
+  const finalRecord = useMemo(() => {
+    if (!entity || !target) return []
+    const { patch } = buildPatch(comparisons, activeChoices, entity, target, manualValues)
+    return buildFinalRecord(entity, target, patch, { roles: dicts?.roles, cities })
+  }, [comparisons, activeChoices, entity, target, manualValues, dicts?.roles, cities])
+
+  const autoDecided = visibleFields.filter((c) => c.status === 'auto')
+
   const handleMerge = async () => {
     if (!row || !entity || targetId == null) return
     if (blocking.length > 0) {
@@ -212,13 +223,29 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
         </h2>
         {routing && <AdminBadge label={entity === 'account' ? 'ארגון' : entity === 'contact' ? 'אדם' : 'לא סווג'} variant="neutral" />}
       </div>
+      {/* §7 — זהות קודם: מי זה, איזה נייד, מה מצבו במערכת, מאיפה הגיע */}
       {row && (
-        <p className="mt-1 text-[12px] text-[#9CA3AF]">
-          {targetName ? `${targetName} · ` : ''}
-          {deriveEntryReason(row, routing!.route)}
-          {source ? ` · מקור: ${source.full}` : ''}
-          {googleAccountLabel(google?.accountKey) ? ` (${googleAccountLabel(google?.accountKey)})` : ''}
-        </p>
+        <div className="mt-1 space-y-0.5">
+          <p className="text-[13px] font-semibold text-[#2D2D2D]" dir="auto">
+            {targetName ?? row.display_name ?? 'ללא שם'}
+            {targetName && <span className="ms-2 text-[12px] font-normal text-[#008080]">קיים במערכת</span>}
+          </p>
+          <p className="text-[12px] text-[#9CA3AF]">
+            {row.phone && (
+              <span dir="ltr" className="me-2">
+                {formatPhone(row.phone)}
+              </span>
+            )}
+            {source ? `מקור: ${source.full}` : ''}
+          </p>
+          <p className="text-[12px] text-[#9CA3AF]">
+            {blocking.length > 0
+              ? `${blocking.length} ${blocking.length === 1 ? 'שינוי דורש' : 'שינויים דורשים'} את החלטתך`
+              : summary.willChange > 0
+                ? `${summary.willChange} שדות יתעדכנו`
+                : 'אין שינוי — ניתן לסמן כקיים במערכת'}
+          </p>
+        </div>
       )}
     </div>
   )
@@ -245,7 +272,7 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
             {merging
               ? 'שומר...'
               : hasPendingWrites(comparisons, activeChoices)
-                ? 'שמור בחירות ועדכן'
+                ? 'אשר ושמור'
                 : 'סמן כקיים במערכת'}
           </ActionButton>
         )}
@@ -333,6 +360,15 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
                 </>
               )}
 
+              {/* §17 — הכרעות אוטומטיות אינן נשאלות, אבל גם אינן מוסתרות */}
+              {autoDecided.length > 0 && (
+                <div className="rounded-[10px] border border-[#99D6D6] bg-[#E6F3F3] px-4 py-2 text-[12px] text-[#00696B]">
+                  {autoDecided.length === 1 ? 'שדה אחד הוכרע' : `${autoDecided.length} שדות הוכרעו`} אוטומטית
+                  לפי חוק עסקי — מידע ספציפי גובר על ערך כללי:{' '}
+                  {autoDecided.map((c) => c.label).join(' · ')}
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                 {sameFields.length > 0 ? (
                   <label className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
@@ -354,6 +390,29 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
                   </span>
                 )}
               </div>
+            </div>
+          </AdminPanelSection>
+
+          {/* §12 — הרשומה עצמה לפני האישור, לא רק בחירה בין שני ערכים */}
+          <AdminPanelSection title={`כך תיראה ה${entityLabel} אחרי השמירה`}>
+            <div className="sm:col-span-2 divide-y divide-[#F0F0F0] rounded-[10px] border border-[#E5E7EB]">
+              {finalRecord.map((f) => (
+                <div
+                  key={f.key}
+                  className={`flex items-center justify-between gap-3 px-3 py-2 text-[13px] ${
+                    f.changed ? 'bg-[#E6F3F3]' : ''
+                  }`}
+                >
+                  <span className="text-[#6B6B6B]">{f.label}</span>
+                  <span
+                    className={`text-left ${f.changed ? 'font-semibold text-[#00696B]' : 'text-[#2D2D2D]'}`}
+                    dir="auto"
+                  >
+                    {f.value}
+                    {f.changed && <span className="ms-2 text-[11px] font-normal text-[#00696B]">ישתנה</span>}
+                  </span>
+                </div>
+              ))}
             </div>
           </AdminPanelSection>
 

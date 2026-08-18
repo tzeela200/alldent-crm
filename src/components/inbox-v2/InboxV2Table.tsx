@@ -80,8 +80,8 @@ interface Props {
   selectedIds: number[]
   onSelectionChange: (ids: number[]) => void
   onRowClick: (leadId: number) => void
-  /** מעבר ישיר מהתור לפאנל ההכרעה, בלי לעבור דרך פאנל הפרטים */
-  onOpenMerge?: (leadId: number) => void
+  /** פתיחת פאנל הפרטים המלא — פעולה משנית, לצד לחיצת השורה */
+  onOpenDetail?: (leadId: number) => void
   bulkActions?: ReactNode
   pagination?: ReactNode
 }
@@ -99,7 +99,7 @@ export function InboxV2Table({
   selectedIds,
   onSelectionChange,
   onRowClick,
-  onOpenMerge,
+  onOpenDetail,
   bulkActions,
   pagination,
 }: Props) {
@@ -354,46 +354,29 @@ export function InboxV2Table({
       .map((c) => columnDefs[c.key])
       .filter(Boolean)
 
-    if (!onOpenMerge) return base
+    if (!onOpenDetail) return base
 
-    // עמודת פעולה קבועה — אינה חלק מבורר העמודות, כדי שהמעבר להכרעה
-    // לעולם לא ייעלם בטעות מהתור.
+    // §4/§31 — הפעולה הראשית היא לחיצה על השורה עצמה. כאן נשארת רק
+    // דרך משנית לפרטים המלאים, לנגישות ולמקרים שאינם החלטה.
     const actions: AdminColumn<InboxV2Row> = {
       key: 'row_actions',
       label: '',
       nowrap: true,
-      render: (r) => {
-        const hasMatch = r.match_contact != null || r.match_account != null
-        // ⚠ נספרים רק שדות אמיתיים. ספירה על כל מפתחות suggested_updates
-        // הציגה "הכרע 2 פערים" על מטא-דאטה של n8n (direction/reasons),
-        // בעוד הפאנל — שמשתמש במנוע האמיתי — אמר "אין מה להחליט".
-        const diffCount = Object.keys(r.suggested_updates ?? {}).filter(isDecidableField).length
-        const label = !hasMatch
-          ? 'טפל ברשומה'
-          : diffCount > 0
-            ? `הכרע ${diffCount} ${diffCount === 1 ? 'פער' : 'פערים'}`
-            : 'פתח השוואה'
-        return (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              if (hasMatch) onOpenMerge(r.lead_id)
-              else onRowClick(r.lead_id)
-            }}
-            className={`rounded-lg border px-2.5 py-1 text-[12px] font-semibold transition ${
-              diffCount > 0
-                ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E] hover:bg-[#FEF3C7]'
-                : 'border-[#99D6D6] bg-white text-[#008080] hover:bg-[#E6F3F3]'
-            }`}
-          >
-            {label}
-          </button>
-        )
-      },
+      render: (r) => (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onOpenDetail(r.lead_id)
+          }}
+          className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-medium text-slate-500 transition hover:bg-slate-50"
+        >
+          פרטים
+        </button>
+      ),
     }
     return [...base, actions]
-  }, [visibleColumns, columnDefs, onOpenMerge])
+  }, [visibleColumns, columnDefs, onOpenDetail])
 
   const selectedStr = selectedIds.map(String)
   const pageIds = rows.map((r) => r.lead_id)

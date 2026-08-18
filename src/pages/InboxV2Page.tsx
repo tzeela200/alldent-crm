@@ -222,11 +222,19 @@ export default function InboxV2Page() {
             hasActiveFilter={hasActiveFilters}
             selectedIds={selectedIds}
             onSelectionChange={setSelectedIds}
-            onRowClick={setDetailLeadId}
-            onOpenMerge={(id) => {
-              setMergeEntity(undefined)
-              setMergeLeadId(id)
+            // §31 — לחיצה על השורה היא הפעולה הראשית ומובילה ישר למסך
+            // ההחלטה. רשומה שהותאמה נפתחת בהשוואה; רשומה שלא נמצאה
+            // נפתחת בפאנל הפרטים, שם נמצאים מסלולי היצירה.
+            onRowClick={(id) => {
+              const row = rows.find((r) => r.lead_id === id)
+              if (row && (row.match_contact != null || row.match_account != null)) {
+                setMergeEntity(undefined)
+                setMergeLeadId(id)
+              } else {
+                setDetailLeadId(id)
+              }
             }}
+            onOpenDetail={setDetailLeadId}
             bulkActions={
               <InboxV2QuickActions
                 selectedIds={selectedIds}
