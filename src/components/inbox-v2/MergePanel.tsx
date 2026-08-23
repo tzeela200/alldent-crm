@@ -16,7 +16,6 @@ import { INBOX_ACTION, sourceLabel } from '@/lib/inbox-v2-dicts'
 import { formatPhone } from '@/lib/normalizePhone'
 import {
   buildComparisons,
-  buildFinalRecord,
   buildPatch,
   deriveEntryReason,
   hasPendingWrites,
@@ -59,7 +58,6 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
 
   const [choices, setChoices] = useState<Record<string, ChoiceId> | null>(null)
   const [manualValues, setManualValues] = useState<Record<string, unknown>>({})
-  const [overwriteOk, setOverwriteOk] = useState<Record<string, boolean>>({})
   const [showSame, setShowSame] = useState(false)
   const [showRaw, setShowRaw] = useState(false)
   const [merging, setMerging] = useState(false)
@@ -147,13 +145,6 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
 
   const summary = summarizeMerge(visibleFields, activeChoices, manualValues)
   const blocking = unresolvedConflicts(visibleFields, activeChoices, manualValues)
-
-  // §12 — הרשומה כפי שתיראה אחרי השמירה, מחושבת מאותו patch שייכתב.
-  const finalRecord = useMemo(() => {
-    if (!entity || !target) return []
-    const { patch } = buildPatch(comparisons, activeChoices, entity, target, manualValues)
-    return buildFinalRecord(entity, target, patch, { roles: dicts?.roles, cities })
-  }, [comparisons, activeChoices, entity, target, manualValues, dicts?.roles, cities])
 
   const autoDecided = visibleFields.filter((c) => c.status === 'auto')
 
@@ -309,69 +300,64 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
             </div>
           )}
 
-          <div className="mb-4 flex items-start gap-2 rounded-[10px] border border-[#FDE68A] bg-[#FFFBEB] px-4 py-3 text-[12px] text-[#92400E]">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>
-              ברירת המחדל היא "דלג" — לא מתעדכן דבר עד שתבחרי מפורשות. דריסת ערך קיים דורשת אישור נוסף.
-            </span>
-          </div>
-
-          {/* הטבלה תמיד מוצגת, כולל שדות זהים. רשומה בלי הבדלים הציגה קודם
-              רק את המקטע הטכני, ולא היה על סמך מה לאשר. */}
-          <AdminPanelSection title={`השוואה מול ה${entityLabel} הקיים`}>
-            <div className="sm:col-span-2 space-y-2">
-              <div className="flex flex-wrap items-center gap-2 text-[12px]">
-                <AdminBadge
-                  label={summary.willChange > 0 ? `${summary.willChange} שדות יתעדכנו` : 'שום שדה לא יתעדכן'}
-                  variant={summary.willChange > 0 ? 'teal' : 'neutral'}
-                />
-                <AdminBadge label={`${summary.unchanged} ללא שינוי`} variant="neutral" />
-              </div>
-
-              {shownFields.length === 0 ? (
-                <div className="rounded-[10px] bg-[#F0FDF4] px-4 py-6 text-center text-[13px] text-[#166534]">
-                  אין מה להחליט — כל השדות זהים או שכבר הוכרעו בעבר. ניתן לסמן כקיים במערכת.
+          {/* אין מה להחליט — מצב מינימלי. אין טעם להציג טבלה של שדות
+              זהים ורשימת שדות ריקים כשאין שום פעולה נדרשת (INC-3125). */}
+          {shownFields.length === 0 ? (
+            <div className="rounded-[16px] border border-[#BBF7D0] bg-[#F0FDF4] px-4 py-6 text-center text-[13px] text-[#166534]">
+              אין שינוי מול ה{entityLabel} הקיים — אין מה להחליט.
+              {suppressed.length > 0 && (
+                <div className="mt-1 text-[12px] text-[#4D7C5F]">
+                  {suppressed.length} פערים הוכרעו על ידך בעבר ואינם מוצגים שוב.
                 </div>
-              ) : (
-                <>
-                  <div className="hidden px-3 text-[12px] font-semibold text-[#6B6B6B] sm:grid sm:grid-cols-[1fr_1fr_1fr_1.5fr] sm:gap-2">
-                    <div>שדה</div>
-                    <div>יש אצלנו</div>
-                    <div>הגיע מ{source?.short ?? 'המקור'}</div>
-                    <div>אחרי האישור</div>
-                  </div>
-                  {shownFields.map((cmp) => (
-                    <FieldComparisonRow
-                      key={cmp.key}
-                      comparison={cmp}
-                      sourceLabel={source?.short ?? 'המקור'}
-                      choice={activeChoices[cmp.key] ?? 'skip'}
-                      onChoiceChange={(c) => setChoice(cmp.key, c)}
-                      overwriteConfirmed={!!overwriteOk[cmp.key]}
-                      onOverwriteConfirmChange={(confirmed) => {
-                        setOverwriteOk((o) => ({ ...o, [cmp.key]: confirmed }))
-                        if (!confirmed) setChoice(cmp.key, 'skip')
-                      }}
-                      manualValue={manualValues[cmp.key]}
-                      onManualValueChange={(v) => setManualValues((m) => ({ ...m, [cmp.key]: v }))}
-                      needsDecision={blocking.some((b) => b.key === cmp.key)}
-                    />
-                  ))}
-                </>
               )}
+            </div>
+          ) : (
+            <>
+              {/* אותה טבלה בדיוק של מסך מיזוג הרשומות: שדה · קיים · הגיע ·
+                  תוצאה סופית, ובחירה בלחיצה על הערך עצמו. */}
+              <div className="overflow-hidden rounded-2xl border border-slate-200">
+                <table className="w-full border-collapse text-right text-[13px]">
+                  <thead className="bg-[#F9FAFB]">
+                    <tr className="border-b border-slate-200">
+                      <th className="w-[130px] px-4 py-3 text-[12px] font-semibold text-slate-500">שדה</th>
+                      <th className="px-4 py-3 text-[12px] font-semibold text-slate-500">קיים במערכת</th>
+                      <th className="px-4 py-3 text-[12px] font-semibold text-slate-500">
+                        הגיע מ{source?.short ?? 'המקור'}
+                      </th>
+                      <th className="bg-slate-50 px-4 py-3 text-[12px] font-semibold text-slate-700">
+                        תוצאה סופית
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {shownFields.map((cmp) => (
+                      <FieldComparisonRow
+                        key={cmp.key}
+                        comparison={cmp}
+                        sourceLabel={source?.short ?? 'המקור'}
+                        choice={activeChoices[cmp.key] ?? 'skip'}
+                        onChoiceChange={(c) => setChoice(cmp.key, c)}
+                        manualValue={manualValues[cmp.key]}
+                        onManualValueChange={(v) => setManualValues((m) => ({ ...m, [cmp.key]: v }))}
+                        needsDecision={blocking.some((b) => b.key === cmp.key)}
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
               {/* §17 — הכרעות אוטומטיות אינן נשאלות, אבל גם אינן מוסתרות */}
               {autoDecided.length > 0 && (
-                <div className="rounded-[10px] border border-[#99D6D6] bg-[#E6F3F3] px-4 py-2 text-[12px] text-[#00696B]">
+                <div className="mt-3 rounded-[10px] border border-[#99D6D6] bg-[#E6F3F3] px-4 py-2 text-[12px] text-[#00696B]">
                   {autoDecided.length === 1 ? 'שדה אחד הוכרע' : `${autoDecided.length} שדות הוכרעו`} אוטומטית
                   לפי חוק עסקי — מידע ספציפי גובר על ערך כללי:{' '}
                   {autoDecided.map((c) => c.label).join(' · ')}
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+              <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                 {sameFields.length > 0 ? (
-                  <label className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
+                  <label className="flex items-center gap-2 text-[12px] text-slate-400">
                     <input
                       type="checkbox"
                       checked={showSame}
@@ -383,38 +369,14 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
                 ) : (
                   <span />
                 )}
-
                 {suppressed.length > 0 && (
-                  <span className="text-[12px] text-[#9CA3AF]">
-                    {suppressed.length} פערים הוכרעו על ידך בעבר ואינם מוצגים שוב
+                  <span className="text-[12px] text-slate-400">
+                    {suppressed.length} פערים הוכרעו על ידך בעבר
                   </span>
                 )}
               </div>
-            </div>
-          </AdminPanelSection>
-
-          {/* §12 — הרשומה עצמה לפני האישור, לא רק בחירה בין שני ערכים */}
-          <AdminPanelSection title={`כך תיראה ה${entityLabel} אחרי השמירה`}>
-            <div className="sm:col-span-2 divide-y divide-[#F0F0F0] rounded-[10px] border border-[#E5E7EB]">
-              {finalRecord.map((f) => (
-                <div
-                  key={f.key}
-                  className={`flex items-center justify-between gap-3 px-3 py-2 text-[13px] ${
-                    f.changed ? 'bg-[#E6F3F3]' : ''
-                  }`}
-                >
-                  <span className="text-[#6B6B6B]">{f.label}</span>
-                  <span
-                    className={`text-left ${f.changed ? 'font-semibold text-[#00696B]' : 'text-[#2D2D2D]'}`}
-                    dir="auto"
-                  >
-                    {f.value}
-                    {f.changed && <span className="ms-2 text-[11px] font-normal text-[#00696B]">ישתנה</span>}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </AdminPanelSection>
+            </>
+          )}
 
           {/* כל מה שאינו נדרש להחלטה יורד לכאן, סגור כברירת מחדל. */}
           <div className="rounded-[16px] border border-[#E5E7EB] bg-white p-4">
