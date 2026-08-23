@@ -4,7 +4,7 @@
  */
 
 import { useState } from 'react'
-import { ChevronDown, ChevronUp, Columns3, MessageSquareText, ScanSearch, Upload, X } from 'lucide-react'
+import { ChevronDown, ChevronUp, Columns3, MessageSquareText, RefreshCw, ScanSearch, Upload, X } from 'lucide-react'
 
 import { Shell, ActionButton } from '@/components/layout/Shell'
 import SidePanel from '@/components/ui/SidePanel'
@@ -24,7 +24,10 @@ import { IntakeConfirmActionDialog } from '@/components/employment-intake/Intake
 import { BulkActionBar } from '@/components/employment-intake/BulkActionBar'
 import { BulkPreviewDialog } from '@/components/employment-intake/BulkPreviewDialog'
 import { BulkResultReport } from '@/components/employment-intake/BulkResultReport'
+import { ReclassifyPreviewDialog } from '@/components/employment-intake/ReclassifyPreviewDialog'
+import { ReclassifyResultReport } from '@/components/employment-intake/ReclassifyResultReport'
 import type { BulkFamily, BulkRunReport } from '@/hooks/useEmploymentIntakeBulk'
+import { useReclassifyEligibleCount, type ReclassifyScope, type ReclassifyRunReport } from '@/hooks/useEmploymentIntakeReclassify'
 import { SCREEN_TITLE, SCREEN_SUBTITLE } from '@/lib/employment-intake/labels'
 import {
   useEmploymentIntakeRows,
@@ -66,7 +69,10 @@ export default function EmploymentIntakePage() {
   const [bulkReport, setBulkReport] = useState<BulkRunReport | null>(null)
   const [singleRowScope, setSingleRowScope] = useState<number[] | null>(null)
   const [statusChangeRequest, setStatusChangeRequest] = useState<{ row: RowWithAction; statusId: number } | null>(null)
+  const [reclassifyScope, setReclassifyScope] = useState<ReclassifyScope | null>(null)
+  const [reclassifyReport, setReclassifyReport] = useState<ReclassifyRunReport | null>(null)
 
+  const { data: reclassifyEligibleCount } = useReclassifyEligibleCount()
   const { data, isLoading, isError } = useEmploymentIntakeRows(filters, page, sortKey, sortDir)
   const rows = data?.rows ?? []
   const total = data?.total ?? 0
@@ -170,6 +176,17 @@ export default function EmploymentIntakePage() {
         </button>
       )}
 
+      {!!reclassifyEligibleCount && reclassifyEligibleCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-[14px] border border-[#F6D5A8] bg-[#FDF3E7] px-4 py-3">
+          <span className="text-[13px] font-semibold text-[#8A5A1F]">
+            {reclassifyEligibleCount} רשומות עדיין מסווגות לפי גרסה ישנה של הכללים.
+          </span>
+          <ActionButton size="sm" icon={RefreshCw} onClick={() => setReclassifyScope({ mode: 'all_eligible' })}>
+            סווג מחדש את כולן
+          </ActionButton>
+        </div>
+      )}
+
       <IntakeSummary />
       <IntakeFilters filters={filters} onChange={handleFiltersChange} />
 
@@ -194,7 +211,12 @@ export default function EmploymentIntakePage() {
             onOpenDetails={setDetailRow}
             onEditRow={setEditingRow}
             onRequestStatusChange={(row, statusId) => setStatusChangeRequest({ row, statusId })}
-            bulkActions={<BulkActionBar onOpen={setBulkFamily} />}
+            bulkActions={
+              <BulkActionBar
+                onOpen={setBulkFamily}
+                onReclassify={selectedIds.length > 0 ? () => setReclassifyScope({ mode: 'selected', ids: selectedIds.map(Number) }) : undefined}
+              />
+            }
           />
           {isError && <div className="mt-2 text-[12px] text-[#DC2626]">אירעה שגיאה בטעינת הנתונים. נסי לרענן את המסך.</div>}
         </div>
@@ -258,6 +280,15 @@ export default function EmploymentIntakePage() {
         }}
       />
       <BulkResultReport report={bulkReport} onClose={() => setBulkReport(null)} />
+      <ReclassifyPreviewDialog
+        scope={reclassifyScope}
+        onClose={() => setReclassifyScope(null)}
+        onDone={(report) => {
+          setReclassifyReport(report)
+          if (reclassifyScope?.mode === 'selected') setSelectedIds([])
+        }}
+      />
+      <ReclassifyResultReport report={reclassifyReport} onClose={() => setReclassifyReport(null)} />
     </Shell>
   )
 }

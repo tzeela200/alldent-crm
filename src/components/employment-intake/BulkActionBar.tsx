@@ -4,16 +4,17 @@
  * אישור מפורש לפני כתיבה כלשהי.
  */
 
-import { CheckCircle2, Send, PencilLine } from 'lucide-react'
+import { CheckCircle2, Send, PencilLine, RefreshCw } from 'lucide-react'
 import { ActionButton } from '@/components/layout/Shell'
 import type { BulkFamily } from '@/hooks/useEmploymentIntakeBulk'
 
 interface Props {
   onOpen: (family: BulkFamily) => void
+  onReclassify?: () => void
   disabled?: boolean
 }
 
-export function BulkActionBar({ onOpen, disabled }: Props) {
+export function BulkActionBar({ onOpen, onReclassify, disabled }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <ActionButton size="sm" icon={CheckCircle2} disabled={disabled} onClick={() => onOpen('lead_status')}>
@@ -25,6 +26,11 @@ export function BulkActionBar({ onOpen, disabled }: Props) {
       <ActionButton size="sm" icon={PencilLine} disabled={disabled} onClick={() => onOpen('update_field')}>
         עריכת שדה משותף
       </ActionButton>
+      {onReclassify && (
+        <ActionButton size="sm" variant="secondary" icon={RefreshCw} disabled={disabled} onClick={onReclassify}>
+          סווג מחדש
+        </ActionButton>
+      )}
     </div>
   )
 }

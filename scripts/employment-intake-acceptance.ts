@@ -30,6 +30,12 @@ import { parsePlainText } from '@/lib/employment-intake/parsers/plainText'
 import { DETAILS_SENT_STATUS, ACCOUNT_STATUS_POTENTIAL } from '@/lib/employment-intake/detailsSent'
 import { detectSourceEvent, parseStructuredGoogleContact, targetNameOnly } from '@/lib/employment-intake/sourceMessage'
 import { resolveEffectiveFields } from '@/lib/employment-intake/effectiveFields'
+import {
+  isEligibleForReclassify,
+  buildRowPatch,
+  classifyRowDiff,
+  PIPELINE_OWNED_FIELDS,
+} from '@/lib/employment-intake/reclassifyDiff'
 import * as L from '@/lib/employment-intake/labels'
 import type { RawParsedMessage, EmploymentIntakeAction } from '@/types/employment-intake'
 
@@ -653,6 +659,69 @@ const ownWins = resolveEffectiveFields(ownValueWins)
 check('ערך אפקטיבי', 'נייד על השורה עצמה גובר על ה-Contact', ownWins.phone, '0529998888')
 checkTrue('ערך אפקטיבי', 'נייד על השורה עצמה לא מסומן כמגיע מהתאמה', !ownWins.phoneFromMatch)
 check('ערך אפקטיבי', 'תפקיד על השורה עצמה גובר על ה-Contact', ownWins.roleId, 3)
+
+// ═══════════════════════════════════════════════════════════
+// 17. סיווג מחדש — זכאות, שמירה על עריכה ידנית, קיבוץ שינויים
+// ═══════════════════════════════════════════════════════════
+const CURRENT_RULES = 'v2'
+
+checkTrue('סיווג מחדש', 'נמחקה ⇒ לא זכאית', !isEligibleForReclassify({ deleted_at: '2026-01-01', last_action_id: null, rules_version: 'v1' }, CURRENT_RULES))
+checkTrue('סיווג מחדש', 'כבר קושרה לפעולה ⇒ לא זכאית', !isEligibleForReclassify({ deleted_at: null, last_action_id: 5, rules_version: 'v1' }, CURRENT_RULES))
+checkTrue('סיווג מחדש', 'כבר בגרסה נוכחית ⇒ לא זכאית', !isEligibleForReclassify({ deleted_at: null, last_action_id: null, rules_version: CURRENT_RULES }, CURRENT_RULES))
+checkTrue('סיווג מחדש', 'גרסה ישנה ⇒ זכאית', isEligibleForReclassify({ deleted_at: null, last_action_id: null, rules_version: 'v1' }, CURRENT_RULES))
+checkTrue('סיווג מחדש', 'ללא rules_version (null) ⇒ זכאית', isEligibleForReclassify({ deleted_at: null, last_action_id: null, rules_version: null }, CURRENT_RULES))
+
+const freshValues: Record<string, unknown> = {
+  content_type: 'group_join', is_active_request: true, classify_reason: 'r', evidence: [], confidence_level: 'high', needs_context: false,
+  role_raw: 'סייעת', role_id: 9, city_raw: 'חולון', city_id: 375, region_id: 13,
+  contact_name: 'יוסי כהן', phone: '0501234567', phone_norm: '972501234567', second_phone: null, second_phone_norm: null,
+  email: null, email_norm: null, second_email: null, second_email_norm: null,
+  facebook_id: null, facebook_url: null, facebook_url_norm: null, unassigned_phones: [],
+  match_contact: 501, match_account: null, match_field: 'phone_norm', match_type: 'exact', match_candidates: [],
+  proposed_social_status: 7, proposed_action: 'mark_lead_status',
+  tags: [],
+}
+
+// שדה ללא עריכה ידנית ⇒ מקבל את הערך הטרי
+const noManualRow = { id: 1, content_type: 'unclear', role_id: null, manual_override: {}, tags: [] }
+const noManualPatch = buildRowPatch(noManualRow, freshValues)
+check('סיווג מחדש', 'שדה ללא עריכה ידנית ⇒ ערך טרי', noManualPatch.patch.content_type, 'group_join')
+checkTrue('סיווג מחדש', 'שדה ללא עריכה ידנית ⇒ ברשימת touchedFields', noManualPatch.touchedFields.includes('content_type'))
+
+// שדה שנערך ידנית ⇒ הערך הנוכחי נכתב בחזרה, לא נדרס
+const manualRow = { id: 2, content_type: 'irrelevant', role_id: 3, manual_override: { fields: { content_type: '2026-08-01T00:00:00Z' } }, tags: [] }
+const manualPatch = buildRowPatch(manualRow, freshValues)
+check('סיווג מחדש', 'שדה שנערך ידנית ⇒ לא נדרס (הערך הנוכחי נשמר)', manualPatch.patch.content_type, 'irrelevant')
+checkTrue('סיווג מחדש', 'שדה שנערך ידנית ⇒ ברשימת skippedFields', manualPatch.skippedFields.includes('content_type'))
+check('סיווג מחדש', 'שדה אחר (לא נערך ידנית) באותה שורה ⇒ עדיין מתעדכן', manualPatch.patch.role_id, 9)
+
+// ה-patch תמיד כולל את כל השדות (למניעת מלכודת upsert עם מפתחות שונים בין שורות)
+checkTrue('סיווג מחדש', 'patch כולל את כל PIPELINE_OWNED_FIELDS גם כשחלקם דולגו', PIPELINE_OWNED_FIELDS.every((f) => f in manualPatch.patch))
+
+// sub_role_ids/notes אינם בבעלות המנוע — לעולם לא ב-patch
+checkTrue('סיווג מחדש', 'sub_role_ids לעולם לא ב-patch', !('sub_role_ids' in noManualPatch.patch))
+checkTrue('סיווג מחדש', 'notes לעולם לא ב-patch', !('notes' in noManualPatch.patch))
+checkTrue('סיווג מחדש', 'manual_override עצמו לעולם לא ב-patch', !('manual_override' in noManualPatch.patch))
+
+// tags: מיזוג, לא דריסה — תגית מנועית ישנה שלא רלוונטית יותר יורדת; תגית לא-מנועית נשמרת
+const staleTagRow = { id: 3, content_type: 'unclear', manual_override: {}, tags: ['requires_identification', 'custom_manual_tag'] }
+const staleTagPatch = buildRowPatch(staleTagRow, freshValues)
+check('סיווג מחדש', 'תגית מנועית ישנה שלא רלוונטית יותר יורדת', (staleTagPatch.patch.tags as string[]).includes('requires_identification'), false)
+checkTrue('סיווג מחדש', 'תגית לא-מנועית נשמרת', (staleTagPatch.patch.tags as string[]).includes('custom_manual_tag'))
+
+// classifyRowDiff — קיבוץ לתצוגה המקדימה
+const baseDiff = { match_contact: null, match_account: null, content_type: 'unclear', proposed_social_status: null, proposed_action: null, tags: [] as string[] }
+check('סיווג מחדש', 'null → match_contact ⇒ now_matched', classifyRowDiff(baseDiff, { ...baseDiff, match_contact: 501 }, ['match_contact']), 'now_matched')
+check('סיווג מחדש', 'תגית system_noise חדשה ⇒ now_hidden_system_noise', classifyRowDiff(baseDiff, { ...baseDiff, tags: ['system_noise'] }, ['tags']), 'now_hidden_system_noise')
+check(
+  'סיווג מחדש',
+  'group_join + סטטוס מוצע חדש ⇒ group_join_status_fixed',
+  classifyRowDiff({ ...baseDiff, content_type: 'group_join' }, { ...baseDiff, content_type: 'group_join', proposed_social_status: 3 }, ['proposed_social_status']),
+  'group_join_status_fixed',
+)
+check('סיווג מחדש', 'קטגוריה משתנה (לא group_join) ⇒ category_changed', classifyRowDiff(baseDiff, { ...baseDiff, content_type: 'job_seeker' }, ['content_type']), 'category_changed')
+check('סיווג מחדש', 'שדה משתנה בלי קטגוריה/התאמה ⇒ field_updated', classifyRowDiff(baseDiff, baseDiff, ['role_id']), 'field_updated')
+check('סיווג מחדש', 'שום שדה לא השתנה ⇒ no_change', classifyRowDiff(baseDiff, baseDiff, []), 'no_change')
 
 // ═══════════════════════════════════════════════════════════
 console.log('')

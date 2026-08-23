@@ -1,0 +1,264 @@
+/**
+ * "סווג מחדש" — תצוגה מקדימה עם checkbox לכל שורה (לא הכול-או-כלום):
+ * מסומן מראש על כל השינויים המוצעים, אפשר לבטל סימון על שורות ספציפיות
+ * לפני האישור. אותו דפוס Preview→אישור מפורש→כתיבה כמו BulkPreviewDialog.
+ */
+
+import { useState } from 'react'
+import { ChevronDown, ChevronLeft, PlayCircle } from 'lucide-react'
+import { toast } from 'sonner'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import { ActionButton } from '@/components/layout/Shell'
+import { AdminBadge } from '@/components/admin/AdminBadge'
+import { useCityIndex } from '@/hooks/useEmploymentIntakeNormalize'
+import {
+  buildReclassifyPreview,
+  useRunReclassify,
+  type ReclassifyScope,
+  type ReclassifyPreview,
+  type ReclassifyRowPlan,
+  type ReclassifyRunReport,
+} from '@/hooks/useEmploymentIntakeReclassify'
+import { CONTENT_TYPE_LABEL, fieldLabel } from '@/lib/employment-intake/labels'
+import { describeError } from '@/lib/employment-intake/errors'
+import type { ReclassifyBucket } from '@/lib/employment-intake/reclassifyDiff'
+
+const BUCKET_LABEL: Record<ReclassifyBucket, string> = {
+  now_matched: 'נמצאה התאמה חדשה',
+  now_hidden_system_noise: 'יוסתר כרעש מערכת',
+  group_join_status_fixed: 'הצטרפות תוקנה',
+  category_changed: 'קטגוריה השתנתה',
+  field_updated: 'שדה עודכן',
+  no_change: 'ללא שינוי',
+}
+
+const BUCKET_TONE: Record<ReclassifyBucket, 'success' | 'warning' | 'neutral' | 'info'> = {
+  now_matched: 'success',
+  now_hidden_system_noise: 'info',
+  group_join_status_fixed: 'success',
+  category_changed: 'info',
+  field_updated: 'neutral',
+  no_change: 'neutral',
+}
+
+const CONFIRM_TYPED_THRESHOLD = 200
+
+function formatValue(field: string, value: unknown): string {
+  if (value == null || value === '') return '(ריק)'
+  if (field === 'content_type' && typeof value === 'string' && value in CONTENT_TYPE_LABEL) {
+    return CONTENT_TYPE_LABEL[value as keyof typeof CONTENT_TYPE_LABEL]
+  }
+  if (Array.isArray(value)) return value.length ? value.join(', ') : '(ריק)'
+  return String(value)
+}
+
+interface Props {
+  scope: ReclassifyScope | null
+  onClose: () => void
+  onDone: (report: ReclassifyRunReport) => void
+}
+
+export function ReclassifyPreviewDialog({ scope, onClose, onDone }: Props) {
+  const { data: cityIndex } = useCityIndex()
+  const runReclassify = useRunReclassify()
+
+  const [preview, setPreview] = useState<ReclassifyPreview | null>(null)
+  const [building, setBuilding] = useState(false)
+  const [includedIds, setIncludedIds] = useState<Set<number>>(new Set())
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const [confirmed, setConfirmed] = useState(false)
+  const [typedCount, setTypedCount] = useState('')
+
+  if (!scope) return null
+
+  async function handleBuildPreview() {
+    if (!cityIndex) return
+    setBuilding(true)
+    try {
+      const result = await buildReclassifyPreview(scope!, cityIndex)
+      setPreview(result)
+      setIncludedIds(new Set(result.plans.map((p) => p.rowId)))
+      setConfirmed(false)
+      setTypedCount('')
+    } catch (err) {
+      toast.error(describeError(err, 'בניית התצוגה המקדימה נכשלה'))
+    } finally {
+      setBuilding(false)
+    }
+  }
+
+  function toggleRow(id: number) {
+    setIncludedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleExpand(id: number) {
+    setExpanded((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function selectAll() {
+    if (!preview) return
+    setIncludedIds(new Set(preview.plans.map((p) => p.rowId)))
+  }
+  function selectNone() {
+    setIncludedIds(new Set())
+  }
+
+  function handleRun() {
+    if (!preview) return
+    runReclassify.mutate(
+      { plans: preview.plans, includedIds },
+      {
+        onSuccess: (report) => {
+          onDone(report)
+          onClose()
+        },
+      },
+    )
+  }
+
+  const includedCount = includedIds.size
+  const needsTypedConfirm = includedCount > CONFIRM_TYPED_THRESHOLD
+  const typedConfirmOk = !needsTypedConfirm || typedCount.trim() === String(includedCount)
+  const canRun = !!preview && confirmed && includedCount > 0 && typedConfirmOk && !runReclassify.isPending
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto" dir="rtl">
+        <DialogHeader>
+          <DialogTitle>סווג מחדש לפי הכללים העדכניים</DialogTitle>
+        </DialogHeader>
+
+        <div className="rounded-[12px] border border-[#D9D9D9] bg-[#F9FAFB] p-3 text-[13px] text-[#6B6B6B]">
+          מריץ את הסיווג, החילוץ וההתאמה העדכניים על רשומות קיימות — כאילו נטענו היום מחדש. שום דבר לא נכתב לפני שתאשרי. שדה שנערך ידנית לא יידרס.
+        </div>
+
+        {!preview ? (
+          <ActionButton variant="secondary" disabled={building || !cityIndex} onClick={handleBuildPreview}>
+            {building ? 'סורק ומחשב…' : 'הצגת תצוגה מקדימה'}
+          </ActionButton>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2 text-center text-[12px] sm:grid-cols-5">
+              <div className="rounded-[10px] border border-[#D9D9D9] bg-white p-2">
+                <div className="text-[18px] font-bold text-[#2D2D2D]">{preview.scanned}</div>
+                נסרקו
+              </div>
+              <div className="rounded-[10px] border border-[#D9D9D9] bg-white p-2">
+                <div className="text-[18px] font-bold text-[#2D2D2D]">{preview.eligible}</div>
+                זכאיות
+              </div>
+              <div className="rounded-[10px] border border-[#99D6D6] bg-[#E6F3F3] p-2">
+                <div className="text-[18px] font-bold text-[#008080]">{preview.plans.length}</div>
+                ישתנו
+              </div>
+              <div className="rounded-[10px] border border-[#BFDBFE] bg-[#EFF6FF] p-2">
+                <div className="text-[18px] font-bold text-[#3B82F6]">{preview.buckets.now_matched}</div>
+                נמצאה התאמה
+              </div>
+              <div className="rounded-[10px] border border-[#D9D9D9] bg-white p-2">
+                <div className="text-[18px] font-bold text-[#2D2D2D]">{preview.buckets.no_change}</div>
+                ללא שינוי
+              </div>
+            </div>
+
+            {preview.plans.length === 0 ? (
+              <p className="text-[13px] text-[#6B6B6B]">אין שינויים להציע — כל הרשומות הזכאיות כבר תואמות את הכללים העדכניים.</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="text-[13px] font-semibold text-[#2D2D2D]">{includedCount} מתוך {preview.plans.length} מסומנות לביצוע</span>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={selectAll} className="text-[12px] font-semibold text-[#008080] hover:underline">סמני הכול</button>
+                    <button type="button" onClick={selectNone} className="text-[12px] font-semibold text-[#6B6B6B] hover:underline">בטלי הכול</button>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  {preview.plans.map((plan: ReclassifyRowPlan) => {
+                    const isOpen = expanded.has(plan.rowId)
+                    const isIncluded = includedIds.has(plan.rowId)
+                    return (
+                      <div key={plan.rowId} className={`rounded-[10px] border ${isIncluded ? 'border-[#D9D9D9]' : 'border-[#F3F4F6] opacity-60'}`}>
+                        <div className="flex items-center gap-2 px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={isIncluded}
+                            onChange={() => toggleRow(plan.rowId)}
+                            className="h-4 w-4 shrink-0 accent-[#008080]"
+                            aria-label={`כלול רשומה #${plan.rowId} בסיווג מחדש`}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => toggleExpand(plan.rowId)}
+                            className="flex flex-1 items-center justify-between gap-3 text-right text-[13px]"
+                          >
+                            <div className="flex items-center gap-2 overflow-hidden">
+                              {isOpen ? <ChevronDown className="h-4 w-4 shrink-0 text-[#9CA3AF]" /> : <ChevronLeft className="h-4 w-4 shrink-0 text-[#9CA3AF]" />}
+                              <span className="truncate text-[#2D2D2D]">{plan.originalText}</span>
+                            </div>
+                            <AdminBadge label={BUCKET_LABEL[plan.bucket]} variant={BUCKET_TONE[plan.bucket]} />
+                          </button>
+                        </div>
+                        {isOpen && (
+                          <ul className="space-y-1 border-t border-[#F3F4F6] bg-[#F9FAFB] px-3 py-2 text-[12px]">
+                            {plan.touchedFields.filter((f) => f !== 'tags').map((field) => (
+                              <li key={field} className="flex items-center justify-between gap-2">
+                                <span className="text-[#6B6B6B]">{fieldLabel(field)}</span>
+                                <span className="text-[#2D2D2D]">
+                                  {formatValue(field, plan.before[field])} ← <span className="font-semibold text-[#008080]">{formatValue(field, plan.after[field])}</span>
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                <label className="flex items-center gap-2 text-[13px] font-semibold text-[#2D2D2D]">
+                  <input type="checkbox" checked={confirmed} onChange={(e) => setConfirmed(e.target.checked)} className="h-4 w-4 accent-[#008080]" />
+                  אני מאשרת ביצוע סיווג מחדש עבור {includedCount} רשומות
+                </label>
+
+                {needsTypedConfirm && (
+                  <div className="rounded-[10px] border border-[#F6D5A8] bg-[#FDF3E7] p-3 text-[13px] text-[#8A5A1F]">
+                    <label className="flex flex-col gap-1.5">
+                      זו פעולה על {includedCount} רשומות — הקלידי את המספר לאישור נוסף:
+                      <input
+                        value={typedCount}
+                        onChange={(e) => setTypedCount(e.target.value)}
+                        placeholder={String(includedCount)}
+                        className="h-9 w-32 rounded-[8px] border border-[#D9D9D9] bg-white px-2 text-[13px]"
+                        dir="ltr"
+                      />
+                    </label>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+
+        <DialogFooter>
+          <ActionButton variant="ghost" onClick={onClose}>
+            ביטול
+          </ActionButton>
+          <ActionButton variant="primary" icon={PlayCircle} disabled={!canRun} onClick={handleRun}>
+            {runReclassify.isPending ? 'מבצע…' : 'ביצוע סיווג מחדש'}
+          </ActionButton>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
