@@ -102,7 +102,10 @@ export function parseStructuredGoogleContact(input: StructuredGoogleContactInput
 
   const isDoctor = /^(?:דר(?:[.\s]|$)|ד['״]?ר(?:[.\s]|$))/u.test(label)
   const hasCity = !!input.cityCandidate
-  const hasRole = input.roleId != null && (!!input.matchedRoleAlias || isDoctor)
+  // רופאים הם החריג המוצהר למעלה: "דר" עצמו מספיק כסימן תפקיד, בלי תלות
+  // בזיהוי roleId נפרד. בעבר hasRole דרש roleId != null גם לרופא — מנע את
+  // החריג הזה בפועל בכל מקרה שבו "דר" לא נתפס כ-alias נפרד של תפקיד.
+  const hasRole = isDoctor || (input.roleId != null && !!input.matchedRoleAlias)
   if (!hasCity || !hasRole) return { isStructured: false, contactName: null, rawLabel: label }
 
   let name = label

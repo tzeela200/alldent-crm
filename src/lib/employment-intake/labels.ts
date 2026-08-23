@@ -180,9 +180,14 @@ export function computeDatabaseState(row: {
   tags?: string[]
 }): DatabaseState {
   const tags = row.tags ?? []
+  // פורמט Google (שם+תפקיד+עיר) על מי שצורף/הצטרף הוא כשלעצמו ההוכחה
+  // שהאדם כבר שמור — כי כך אנשי הקשר נשמרים אצל המשתמשת, ואנשי הקשר
+  // מסונכרנים ל-Supabase. אין לבדוק את זה מול תוצאת ההתאמה בכלל: גם
+  // כשה-lookup לא מצא (טעות הקלדה/עדיין לא הסתנכרן), עדיין 'existing',
+  // לא תווית "חריג" נפרדת — ההחלטה העסקית היא של הפורמט, לא של Supabase.
+  if (tags.includes('google_contact_expected_existing')) return 'existing'
   const found = row.match_contact != null || row.match_account != null
   if (found) return 'existing'
-  if (tags.includes('google_contact_expected_existing')) return 'google_sync_exception'
   if (row.match_type === 'ambiguous' || row.match_type === 'probable' || row.needs_context || tags.includes('requires_identification')) return 'needs_identification'
   return 'not_existing'
 }

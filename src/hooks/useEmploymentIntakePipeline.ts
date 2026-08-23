@@ -160,7 +160,7 @@ export async function computeUnitAnalyses(units: UnitAnalysisInput[], cityIndex:
       cityCandidate: u.identityCityCandidate,
     })
     const contactName = structured.contactName ?? targetNameOnly(u.sourceEvent)
-    return { ...u, contactName, trustedExistingName: structured.isStructured }
+    return { ...u, contactName, trustedExistingName: structured.isStructured, identityRoleResult }
   })
 
   // 5. התאמה — מזהים חזקים + שמות רק מתווית Google המאושרת. שאילתה
@@ -176,8 +176,18 @@ export async function computeUnitAnalyses(units: UnitAnalysisInput[], cityIndex:
   const perUnit = new Map<string, UnitAnalysisResult>()
   for (const u of withIdentity) {
     const phones = attributePhones(u.identifiers.phones, phoneNormMap)
-    const cityResult = u.cityCandidate ? (cityResults.get(u.cityCandidate) ?? null) : null
-    const roleResult = roleResults.get(u.unit.combinedText) ?? null
+
+    // בהודעת "X צירף/ה את Y" או "Y הצטרף/ה" — תפקיד/עיר חייבים להיבדק
+    // אצל Y (היעד) בלבד, לא על כל המשפט. בלי זה, "שרה סייעת אור-עקיבא
+    // צירפה את דר X ירושלים" תופס את "סייעת"/"אור-עקיבא" של שרה (מי
+    // שמצרפת) כי היא מופיעה קודם במשפט — לא את התפקיד/עיר של X (מי
+    // שצורף, האדם שצריך לזהות). identityCityCandidate/identityRoleResult
+    // כבר מחושבים מבודדים ל-identityLabel (רק Y) — כאן משתמשים בהם
+    // לשורה עצמה, לא רק לבדיקת פורמט Google הפנימית.
+    const isJoinerEvent = u.sourceEvent.kind === 'join' || u.sourceEvent.kind === 'add'
+    const cityCandidateForRow = isJoinerEvent ? u.identityCityCandidate : u.cityCandidate
+    const cityResult = cityCandidateForRow ? (cityResults.get(cityCandidateForRow) ?? null) : null
+    const roleResult = isJoinerEvent ? u.identityRoleResult : (roleResults.get(u.unit.combinedText) ?? null)
 
     const match = matchRow(
       {
@@ -218,7 +228,7 @@ export async function computeUnitAnalyses(units: UnitAnalysisInput[], cityIndex:
       contactName: u.contactName,
       trustedExistingName: u.trustedExistingName,
       roleResult,
-      cityCandidate: u.cityCandidate,
+      cityCandidate: cityCandidateForRow,
       cityResult: cityResult ? { cityId: cityResult.cityId, regionId: cityResult.regionId } : null,
       phones,
       emails: u.identifiers.emails,

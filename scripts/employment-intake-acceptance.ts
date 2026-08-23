@@ -148,6 +148,28 @@ const doctorStructured = parseStructuredGoogleContact({
 check('Google Contact', 'רופא + עיר מזוהה כפורמט שמור', doctorStructured.isStructured, true)
 check('Google Contact', 'תואר דר והכוכבית נשמרים בשם הקנוני', doctorStructured.contactName, 'דר נפתלי חן *')
 
+// "דר" בלבד, בלי roleId/matchedRoleAlias שזוהו בנפרד — החריג המוצהר
+// (§7.1 SSOT) חייב לעבוד גם כש-detectRole לא מזהה "דר" כ-alias של תפקיד.
+const doctorAloneStructured = parseStructuredGoogleContact({
+  label: 'דר יעקב טוביה גלסמן * ירושלים',
+  matchedRoleAlias: null,
+  roleId: null,
+  cityCandidate: 'ירושלים',
+})
+check('Google Contact', '"דר" מספיק לבד גם בלי roleId שזוהה בנפרד', doctorAloneStructured.isStructured, true)
+
+// צירוף שבו לשולחת (Actor) יש תווית "שם תפקיד עיר" משלה — אסור שהתפקיד/
+// עיר של השולחת "ידלפו" לרשומה של מי שצורף (Target).
+const addedWithActorLabel = detectSourceEvent('שרה דהרי סייעת אור-עקיבא צירף/ה את דר יעקב טוביה גלסמן * ירושלים')
+check('אירועי מקור', 'צירוף עם תווית לשולחת — Target נכון (לא כולל את תווית השולחת)', addedWithActorLabel.targetLabel, 'דר יעקב טוביה גלסמן * ירושלים')
+const addedWithActorLabelStructured = parseStructuredGoogleContact({
+  label: addedWithActorLabel.targetLabel,
+  matchedRoleAlias: null,
+  roleId: null,
+  cityCandidate: 'ירושלים',
+})
+check('Google Contact', 'צירוף עם תווית לשולחת — היעד עצמו מזוהה כפורמט Google (לא תפקיד/עיר השולחת)', addedWithActorLabelStructured.isStructured, true)
+
 // ═══════════════════════════════════════════════════════════
 // 2. חיבור הודעות המשך (§8.3, §14)
 // ═══════════════════════════════════════════════════════════
@@ -298,7 +320,7 @@ check('מצב עסקי', 'התאמה קיימת ⇒ קיים', L.computeDatabase
 check('מצב עסקי', 'ללא התאמה ⇒ לא קיים', L.computeDatabaseState({ match_contact: null, match_account: null, match_type: 'none' }), 'not_existing')
 check('מצב עסקי', 'שם בלבד/דורש זיהוי', L.computeDatabaseState({ match_contact: null, match_account: null, match_type: 'none', tags: ['requires_identification'] }), 'needs_identification')
 check('מצב עסקי', 'התאמה חלשה אינה מסומנת כלא קיים', L.computeDatabaseState({ match_contact: null, match_account: null, match_type: 'probable' }), 'needs_identification')
-check('מצב עסקי', 'פורמט Google שלא נמצא ב-Supabase ⇒ חריג', L.computeDatabaseState({ match_contact: null, match_account: null, match_type: 'none', tags: ['google_contact_expected_existing'] }), 'google_sync_exception')
+check('מצב עסקי', 'פורמט Google שלא נמצא ב-Supabase ⇒ עדיין קיים (הפורמט הוא ההוכחה, לא ה-lookup)', L.computeDatabaseState({ match_contact: null, match_account: null, match_type: 'none', tags: ['google_contact_expected_existing'] }), 'existing')
 
 // ═══════════════════════════════════════════════════════════
 // 6. זהות מאוחדת (§4)
