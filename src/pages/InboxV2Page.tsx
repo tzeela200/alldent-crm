@@ -4,6 +4,7 @@ import { Shell, KPICard, ActionButton } from '@/components/layout/Shell'
 import { useInboxV2Rows, useInboxV2Batches, useInboxV2Stats, PAGE_SIZE } from '@/hooks/useInboxV2'
 import { useInboxV2Matching } from '@/hooks/useInboxV2Matching'
 import { PhoneCheckPanel } from '@/components/inbox-v2/PhoneCheckPanel'
+import { GoogleSyncStatusCard } from '@/components/inbox-v2/GoogleSyncStatusCard'
 import { ImportWizard } from '@/components/inbox-v2/ImportWizard'
 import { InboxV2FiltersBar } from '@/components/inbox-v2/InboxV2Filters'
 import {
@@ -204,6 +205,8 @@ export default function InboxV2Page() {
 
       {tab === 'queue' && (
         <>
+          <GoogleSyncStatusCard />
+
           {/* מצב עבודה מפורש. הרוב המוחלט של הרשומות כאן כבר טופלו
               (מוזג / קיים במערכת / התעלמות) ואין בהן שום פעולה נדרשת —
               ולכן ברירת המחדל היא "לטיפול", והמעבר להיסטוריה הוא בחירה
