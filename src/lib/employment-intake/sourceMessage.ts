@@ -34,6 +34,12 @@ function trimPunctuation(value: string): string {
 export function detectSourceEvent(text: string): SourceEvent {
   const clean = cleanWhatsappLabel(text)
 
+  // הודעה ללא שום תוכן טקסטואלי (למשל מדיה/כרטיס איש-קשר משותף בלי כיתוב)
+  // — אין בה מה לסווג, ואין טעם להציג אותה כ"דורש בדיקה": אין מה לבדוק.
+  if (!clean) {
+    return { kind: 'system_noise', actorLabel: null, targetLabel: null, targetPhone: null, reason: 'הודעה ללא תוכן טקסטואלי לניתוח' }
+  }
+
   if (/^(?:ההודעה (?:הזו|זאת) נמחקה|<\s*(?:המדיה לא נכללה|Media omitted)\s*>|image omitted|video omitted|sticker omitted)$/i.test(clean)) {
     return { kind: 'system_noise', actorLabel: null, targetLabel: null, targetPhone: null, reason: 'הודעת מערכת ללא מידע עסקי' }
   }

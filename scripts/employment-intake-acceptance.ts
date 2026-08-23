@@ -724,6 +724,17 @@ check('סיווג מחדש', 'שדה משתנה בלי קטגוריה/התאמה
 check('סיווג מחדש', 'שום שדה לא השתנה ⇒ no_change', classifyRowDiff(baseDiff, baseDiff, []), 'no_change')
 
 // ═══════════════════════════════════════════════════════════
+// 18. הודעה ריקה — אין מה לבדוק, לא "דורש בדיקה" (שאלת המשתמשת מ-23.08.2026)
+// ═══════════════════════════════════════════════════════════
+check('הודעה ריקה', 'detectSourceEvent על מחרוזת ריקה ⇒ system_noise', detectSourceEvent('').kind, 'system_noise')
+check('הודעה ריקה', 'detectSourceEvent על רווחים בלבד ⇒ system_noise', detectSourceEvent('   \n  ').kind, 'system_noise')
+check('הודעה ריקה', 'classifyText על טקסט ריק ⇒ irrelevant, לא unclear', classifyText('').contentType, 'irrelevant')
+checkTrue('הודעה ריקה', 'classifyText על טקסט ריק ⇒ needsContext=false (אין מה לבדוק)', classifyText('').needsContext === false)
+check('הודעה ריקה', 'classifyText על רווחים/שורות בלבד ⇒ irrelevant', classifyText('   \n\n  ').contentType, 'irrelevant')
+// ודאות: "ההודעה הזו נמחקה" עדיין נתפס נכון אחרי הזזת הבדיקה (§ שאלת המשתמשת השנייה)
+check('הודעה ריקה', '"ההודעה הזו נמחקה" עדיין irrelevant אחרי הסידור מחדש', classifyText('ההודעה הזו נמחקה').contentType, 'irrelevant')
+
+// ═══════════════════════════════════════════════════════════
 console.log('')
 console.log('═'.repeat(70))
 if (failures.length) {

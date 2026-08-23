@@ -213,6 +213,23 @@ function confidenceFor(contentType: ContentType, evidenceCount: number): Confide
 export function classifyText(rawText: string): ClassificationResult {
   const text = rawText.replace(/\s+/g, ' ').trim()
 
+  // 1. הודעות מערכת של WhatsApp, כולל הודעה ריקה לגמרי (למשל מדיה/כרטיס
+  // איש-קשר בלי כיתוב — detectSourceEvent מזהה טקסט ריק כ-system_noise
+  // בעצמו). אירועי הצטרפות/צירוף נשמרים כאירוע עסקי; מחיקה/מדיה/עזיבה/
+  // הסרה/ריק נשמרות במקור בלבד ומסומנות irrelevant, לא "דורש בדיקה" —
+  // אין מה לבדוק בהודעה שאין בה שום תוכן.
+  const sourceEvent = detectSourceEvent(text)
+  if (sourceEvent.kind === 'system_noise') {
+    return {
+      contentType: 'irrelevant',
+      isActiveRequest: null,
+      classifyReason: sourceEvent.reason ?? 'הודעת מערכת ללא מידע עסקי',
+      evidence: text ? [text.slice(0, 80)] : [],
+      confidenceLevel: 'high',
+      needsContext: false,
+    }
+  }
+
   if (!text) {
     return {
       contentType: 'unclear',
@@ -221,20 +238,6 @@ export function classifyText(rawText: string): ClassificationResult {
       evidence: [],
       confidenceLevel: 'low',
       needsContext: true,
-    }
-  }
-
-  // 1. הודעות מערכת של WhatsApp. אירועי הצטרפות/צירוף נשמרים כאירוע עסקי;
-  // מחיקה/מדיה/עזיבה/הסרה נשמרות במקור בלבד ומסומנות irrelevant.
-  const sourceEvent = detectSourceEvent(text)
-  if (sourceEvent.kind === 'system_noise') {
-    return {
-      contentType: 'irrelevant',
-      isActiveRequest: null,
-      classifyReason: sourceEvent.reason ?? 'הודעת מערכת ללא מידע עסקי',
-      evidence: [text.slice(0, 80)],
-      confidenceLevel: 'high',
-      needsContext: false,
     }
   }
 
