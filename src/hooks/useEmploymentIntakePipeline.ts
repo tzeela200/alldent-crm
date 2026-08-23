@@ -37,7 +37,7 @@ import { supabaseError } from '@/lib/employment-intake/errors'
  * דרך הכלל החדש" מ"רשומה ישנה שנשארה מאחור" — זה בדיוק מה ש"סיווג מחדש"
  * (useEmploymentIntakeReclassify.ts) משתמש בו כדי לדעת מי זכאי. */
 export const ENGINE_VERSION = 'v1'
-export const RULES_VERSION = 'v2'
+export const RULES_VERSION = 'v3'
 
 export interface PipelineInput {
   messages: RawParsedMessage[]
