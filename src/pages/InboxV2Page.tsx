@@ -118,6 +118,8 @@ export default function InboxV2Page() {
       icon={DatabaseZap}
       actions={
         <div className="flex items-center gap-2">
+          <GoogleSyncStatusCard />
+
           <details className="relative">
             <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50">
               <Columns3 className="h-4 w-4" />
@@ -205,8 +207,6 @@ export default function InboxV2Page() {
 
       {tab === 'queue' && (
         <>
-          <GoogleSyncStatusCard />
-
           {/* מצב עבודה מפורש. הרוב המוחלט של הרשומות כאן כבר טופלו
               (מוזג / קיים במערכת / התעלמות) ואין בהן שום פעולה נדרשת —
               ולכן ברירת המחדל היא "לטיפול", והמעבר להיסטוריה הוא בחירה

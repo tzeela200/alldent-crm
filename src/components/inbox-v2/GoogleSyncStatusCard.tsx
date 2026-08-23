@@ -1,5 +1,4 @@
 import { RefreshCw } from 'lucide-react'
-import { AdminBadge } from '@/components/admin/AdminBadge'
 import { googleAccountLabel } from '@/lib/inbox-v2-decisions'
 import {
   useGoogleSyncStatus,
@@ -8,81 +7,96 @@ import {
 } from '@/hooks/useGoogleSyncStatus'
 
 /**
- * חלון מצב הסנכרון מ-Google Contacts (INC-3125).
+ * מחוון מצב הסנכרון מ-Google Contacts (INC-3125).
  *
- * עונה על שאלה אחת: מתי הסנכרון רץ ומה נכנס מכל חשבון. בלי זה, תור ריק
- * יכול להיות "אין שינויים" או "הסנכרון לא הביא כלום" — ואי אפשר להבדיל.
+ * יושב בכותרת המסך, ליד בורר העמודות, ובאותה תבנית `details/summary` —
+ * צ'יפ קטן שנפתח לפירוט. עונה על שאלה אחת: תור ריק הוא "אין שינויים"
+ * או "הסנכרון לא הביא כלום"?
  *
  * הכיוון הנכנס בלבד (Google → Supabase). כל הזמנים בשעון ישראל.
- * שמות החשבונות מגיעים מ-`googleAccountLabel` הקיים — אין כאן מיפוי משלנו.
+ * שמות החשבונות מ-`googleAccountLabel` הקיים — אין כאן מיפוי משלנו.
  */
+
+const DOT: Record<string, string> = {
+  success: 'bg-[#10B981]',
+  partial: 'bg-[#F59E0B]',
+  failed: 'bg-[#EF4444]',
+}
+
+const STATUS_TEXT: Record<string, string> = {
+  success: 'תקין',
+  partial: 'חלקי',
+  failed: 'נכשל',
+}
+
 export function GoogleSyncStatusCard() {
   const { data, isLoading, error } = useGoogleSyncStatus()
 
-  if (isLoading) {
-    return (
-      <div className="rounded-2xl bg-white p-4 text-[12px] text-slate-400 shadow-sm ring-1 ring-slate-200">
-        טוען מצב סנכרון…
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-2xl bg-[#FEF2F2] p-4 text-[12px] font-medium text-[#B42318] ring-1 ring-[#FECDCA]">
-        {error instanceof Error ? error.message : 'טעינת מצב הסנכרון נכשלה'}
-      </div>
-    )
-  }
-
-  if (!data?.lastRunAt) {
-    return (
-      <div className="rounded-2xl bg-white p-4 text-[12px] text-slate-400 shadow-sm ring-1 ring-slate-200">
-        אין עדיין נתוני סנכרון מ-Google.
-      </div>
-    )
-  }
+  const dot = error
+    ? 'bg-[#EF4444]'
+    : isLoading || !data?.status
+      ? 'bg-slate-300'
+      : (DOT[data.status] ?? 'bg-slate-300')
 
   return (
-    <div className="rounded-2xl bg-white shadow-sm ring-1 ring-slate-200" dir="rtl">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <RefreshCw className="h-4 w-4 text-[#008080]" />
-          <span className="text-[13px] font-bold text-[#2D2D2D]">סנכרון Google</span>
+    <details className="relative">
+      <summary
+        className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50"
+        title="מצב הסנכרון מ-Google Contacts"
+      >
+        <RefreshCw className="h-4 w-4" />
+        <span className={`h-2 w-2 rounded-full ${dot}`} />
+        {isLoading ? 'סנכרון…' : data?.lastRunAt ? `סנכרון ${israelTime(data.lastRunAt)}` : 'סנכרון'}
+      </summary>
+
+      <div
+        className="absolute left-0 top-full z-30 mt-2 w-80 rounded-2xl border border-slate-200 bg-white p-3 shadow-md"
+        dir="rtl"
+      >
+        <div className="mb-1 flex items-center justify-between">
+          <span className="text-[13px] font-bold text-slate-900">סנכרון Google</span>
           <span className="text-[11px] text-[#9CA3AF]">נכנס בלבד</span>
         </div>
-        <div className="flex items-center gap-2 text-[12px] text-[#6B6B6B]">
-          <span>
-            הרצה אחרונה <strong className="text-[#2D2D2D]">{israelTime(data.lastRunAt)}</strong>
-          </span>
-          {data.nextRunLabel && <span className="text-[#9CA3AF]">· הבאה {data.nextRunLabel}</span>}
-          {data.status && (
-            <AdminBadge
-              label={data.status === 'success' ? 'תקין' : data.status === 'partial' ? 'חלקי' : 'נכשל'}
-              variant={data.status === 'success' ? 'success' : data.status === 'partial' ? 'amber' : 'error'}
-            />
-          )}
-        </div>
-      </div>
 
-      <div className="divide-y divide-slate-100">
-        {data.accounts.map((a) => (
-          <div
-            key={a.key}
-            className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 text-[12px]"
-          >
-            <span className="font-medium text-[#2D2D2D]">
-              {googleAccountLabel(a.key) ?? a.key}
-            </span>
-            <span className="text-[#6B6B6B]">
-              <span className="text-[#9CA3AF]">מידע אחרון שנכנס: </span>
-              {a.lastRowAt
-                ? `${israelDate(a.lastRowAt)} ${israelTime(a.lastRowAt)}`
-                : 'טרם נכנס מידע'}
-            </span>
-          </div>
-        ))}
+        {error ? (
+          <p className="py-2 text-[12px] font-medium text-[#B42318]">
+            {error instanceof Error ? error.message : 'טעינת מצב הסנכרון נכשלה'}
+          </p>
+        ) : isLoading ? (
+          <p className="py-2 text-[12px] text-slate-400">טוען…</p>
+        ) : !data?.lastRunAt ? (
+          <p className="py-2 text-[12px] text-slate-400">אין עדיין נתוני סנכרון.</p>
+        ) : (
+          <>
+            <p className="mb-2 text-[12px] text-[#6B6B6B]">
+              הרצה אחרונה <strong className="text-[#2D2D2D]">{israelTime(data.lastRunAt)}</strong>
+              {data.status && <> · {STATUS_TEXT[data.status] ?? data.status}</>}
+              {data.nextRunLabel && (
+                <span className="text-[#9CA3AF]"> · הבאה {data.nextRunLabel}</span>
+              )}
+            </p>
+
+            <div className="divide-y divide-slate-100 rounded-xl border border-slate-100">
+              {data.accounts.map((a) => (
+                <div key={a.key} className="flex items-center justify-between gap-2 px-3 py-2">
+                  <span className="text-[12px] font-medium text-[#2D2D2D]">
+                    {googleAccountLabel(a.key) ?? a.key}
+                  </span>
+                  <span className="text-[11px] text-[#6B6B6B]">
+                    {a.lastRowAt
+                      ? `${israelDate(a.lastRowAt)} ${israelTime(a.lastRowAt)}`
+                      : 'טרם נכנס מידע'}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <p className="mt-2 text-[11px] text-[#9CA3AF]">
+              התאריך שליד כל חשבון הוא מתי נכנס ממנו מידע לאחרונה.
+            </p>
+          </>
+        )}
       </div>
-    </div>
+    </details>
   )
 }
