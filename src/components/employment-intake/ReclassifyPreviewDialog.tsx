@@ -286,16 +286,22 @@ export function ReclassifyPreviewDialog({ scope, onClose, onDone }: Props) {
                                     </button>
                                   </div>
                                   {isRowOpen && (
-                                    <ul className="space-y-1 border-t border-[#F3F4F6] bg-[#F9FAFB] px-3 py-2 text-[12px]">
-                                      {plan.touchedFields.filter((f) => f !== 'tags').map((field) => (
-                                        <li key={field} className="flex items-center justify-between gap-2">
-                                          <span className="text-[#6B6B6B]">{fieldLabel(field)}</span>
-                                          <span className="text-[#2D2D2D]">
-                                            {formatValue(field, plan.before[field])} ← <span className="font-semibold text-[#008080]">{formatValue(field, plan.after[field])}</span>
-                                          </span>
-                                        </li>
-                                      ))}
-                                    </ul>
+                                    <div className="grid grid-cols-1 gap-0 border-t border-[#F3F4F6] bg-[#F9FAFB] md:grid-cols-2">
+                                      <div className="border-b border-[#F3F4F6] p-3 text-[12px] md:border-b-0 md:border-l">
+                                        <div className="mb-1 font-semibold text-[#6B6B6B]">ההודעה המקורית</div>
+                                        <p className="whitespace-pre-wrap text-[#2D2D2D]">{plan.originalText}</p>
+                                      </div>
+                                      <ul className="space-y-1 p-3 text-[12px]">
+                                        {plan.touchedFields.filter((f) => f !== 'tags').map((field) => (
+                                          <li key={field} className="flex items-center justify-between gap-2">
+                                            <span className="text-[#6B6B6B]">{fieldLabel(field)}</span>
+                                            <span className="text-[#2D2D2D]">
+                                              {formatValue(field, plan.before[field])} ← <span className="font-semibold text-[#008080]">{formatValue(field, plan.after[field])}</span>
+                                            </span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
                                   )}
                                 </div>
                               )

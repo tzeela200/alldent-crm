@@ -44,6 +44,8 @@ const FETCH_PAGE = 1000
 
 export interface ReclassifyRowPlan {
   rowId: number
+  importId: string
+  normalizedText: string
   originalText: string
   sourceName: string | null
   bucket: ReclassifyBucket
@@ -283,6 +285,8 @@ export async function buildReclassifyPreview(scope: ReclassifyScope, cityIndex: 
         if (bucket !== 'no_change') {
           plans.push({
             rowId: row.id,
+            importId: row.import_id,
+            normalizedText: row.normalized_text,
             originalText: row.original_text,
             sourceName: row.source_name,
             bucket,
@@ -323,10 +327,21 @@ export function useRunReclassify() {
       // upsert מוקבץ, לא update בודד לכל שורה: כל ה-patches חולקים בדיוק
       // אותה קבוצת מפתחות (buildRowPatch מבטיח את זה — ראו reclassifyDiff.ts)
       // ולכן בטוח לאחד אותם לבקשה אחת לכל 400 שורות במקום ~2,000 סיבובים.
+      //
+      // upsert() מייצר אצל Postgres INSERT ... ON CONFLICT DO UPDATE — גם
+      // כשכל השורות כבר קיימות, ה-INSERT המוצע עדיין נבדק תחילה מול כל
+      // אילוצי NOT NULL של הטבלה. import_id/normalized_text/original_text
+      // הן NOT NULL בלי ברירת מחדל ואינן חלק מ-PIPELINE_OWNED_FIELDS (בכוונה
+      // — הסיווג מחדש לא אמור לגעת בהן), ולכן חייבות להישלח עם הערך הקיים
+      // שלהן בכל שורה, אחרת ה-upsert כולו נכשל על "null value violates
+      // not-null constraint" (זה בדיוק מה שגרם ל"עדכון סיווג נכשל").
       for (let from = 0; from < toWrite.length; from += WRITE_CHUNK_SIZE) {
         const chunk = toWrite.slice(from, from + WRITE_CHUNK_SIZE)
         const rows = chunk.map((plan) => ({
           id: plan.rowId,
+          import_id: plan.importId,
+          normalized_text: plan.normalizedText,
+          original_text: plan.originalText,
           ...plan.patch,
           engine_version: ENGINE_VERSION,
           rules_version: RULES_VERSION,
