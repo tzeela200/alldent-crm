@@ -50,7 +50,6 @@ const BUCKET_ORDER: ReclassifyBucket[] = ['group_join_status_fixed', 'now_matche
 
 /** קבוצה גדולה מזה לא מציגה checkbox לכל שורה — רק דוגמה + החלטה על הקבוצה כולה. */
 const ROW_LIST_LIMIT = 300
-const AUTO_EXPAND_LIMIT = 50
 const CONFIRM_TYPED_THRESHOLD = 200
 
 function formatValue(field: string, value: unknown): string {
@@ -181,14 +180,14 @@ export function ReclassifyPreviewDialog({ scope, onClose, onDone }: Props) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto" dir="rtl">
+      <DialogContent className="max-h-[92vh] max-w-4xl overflow-y-auto" dir="rtl">
         <DialogHeader>
           <DialogTitle>סווג מחדש לפי הכללים העדכניים</DialogTitle>
         </DialogHeader>
 
-        <div className="rounded-[12px] border border-[#D9D9D9] bg-[#F9FAFB] p-3 text-[13px] text-[#6B6B6B]">
-          מריץ את הסיווג, החילוץ וההתאמה העדכניים על רשומות קיימות — כאילו נטענו היום מחדש. שום דבר לא נכתב לפני שתאשרי. שדה שנערך ידנית לא יידרס.
-        </div>
+        {!preview && (
+          <p className="text-[13px] text-[#6B6B6B]">בודק רשומות קיימות מול הכללים העדכניים. שום דבר לא נכתב לפני שתאשרי, ושדה שנערך ידנית לא יידרס.</p>
+        )}
 
         {!preview ? (
           <ActionButton variant="secondary" disabled={building || !cityIndex} onClick={handleBuildPreview}>
@@ -196,27 +195,11 @@ export function ReclassifyPreviewDialog({ scope, onClose, onDone }: Props) {
           </ActionButton>
         ) : (
           <>
-            <div className="grid grid-cols-3 gap-2 text-center text-[12px] sm:grid-cols-5">
-              <div className="rounded-[10px] border border-[#D9D9D9] bg-white p-2">
-                <div className="text-[18px] font-bold text-[#2D2D2D]">{preview.scanned}</div>
-                נסרקו
-              </div>
-              <div className="rounded-[10px] border border-[#D9D9D9] bg-white p-2">
-                <div className="text-[18px] font-bold text-[#2D2D2D]">{preview.eligible}</div>
-                זכאיות
-              </div>
-              <div className="rounded-[10px] border border-[#99D6D6] bg-[#E6F3F3] p-2">
-                <div className="text-[18px] font-bold text-[#008080]">{preview.plans.length}</div>
-                ישתנו
-              </div>
-              <div className="rounded-[10px] border border-[#BFDBFE] bg-[#EFF6FF] p-2">
-                <div className="text-[18px] font-bold text-[#3B82F6]">{preview.buckets.now_matched}</div>
-                נמצאה התאמה
-              </div>
-              <div className="rounded-[10px] border border-[#D9D9D9] bg-white p-2">
-                <div className="text-[18px] font-bold text-[#2D2D2D]">{preview.buckets.no_change}</div>
-                ללא שינוי
-              </div>
+            <div className="flex flex-wrap items-center gap-2 text-[12px]">
+              <span className="rounded-full border border-[#D9D9D9] bg-white px-3 py-1"><b>{preview.scanned}</b> נסרקו</span>
+              <span className="rounded-full border border-[#D9D9D9] bg-white px-3 py-1"><b>{preview.eligible}</b> זכאיות</span>
+              <span className="rounded-full border border-[#99D6D6] bg-[#E6F3F3] px-3 py-1 text-[#008080]"><b>{preview.plans.length}</b> ישתנו</span>
+              <span className="rounded-full border border-[#D9D9D9] bg-white px-3 py-1"><b>{preview.buckets.no_change}</b> ללא שינוי</span>
             </div>
 
             {preview.plans.length === 0 ? (
@@ -225,15 +208,18 @@ export function ReclassifyPreviewDialog({ scope, onClose, onDone }: Props) {
               <>
                 <div className="flex items-center justify-between">
                   <span className="text-[13px] font-semibold text-[#2D2D2D]">{includedCount} מתוך {preview.plans.length} מסומנות לביצוע</span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
                     <button type="button" onClick={selectAll} className="text-[12px] font-semibold text-[#008080] hover:underline">סמני הכול</button>
                     <button type="button" onClick={selectNone} className="text-[12px] font-semibold text-[#6B6B6B] hover:underline">בטלי הכול</button>
+                    <span className="text-[#D9D9D9]">|</span>
+                    <button type="button" onClick={() => setExpandedBuckets(new Set(groups.map((g) => g.bucket)))} className="text-[12px] font-semibold text-[#008080] hover:underline">פתחי את כל הקבוצות</button>
+                    <button type="button" onClick={() => setExpandedBuckets(new Set())} className="text-[12px] font-semibold text-[#6B6B6B] hover:underline">סגרי את כל הקבוצות</button>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   {groups.map((group) => {
-                    const isOpen = expandedBuckets.has(group.bucket) || group.plans.length <= AUTO_EXPAND_LIMIT
+                    const isOpen = expandedBuckets.has(group.bucket)
                     const includedInGroup = group.plans.filter((p) => includedIds.has(p.rowId)).length
                     const allIncluded = includedInGroup === group.plans.length
                     const someIncluded = includedInGroup > 0 && !allIncluded
