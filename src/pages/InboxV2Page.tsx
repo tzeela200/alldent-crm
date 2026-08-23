@@ -204,6 +204,43 @@ export default function InboxV2Page() {
 
       {tab === 'queue' && (
         <>
+          {/* מצב עבודה מפורש. הרוב המוחלט של הרשומות כאן כבר טופלו
+              (מוזג / קיים במערכת / התעלמות) ואין בהן שום פעולה נדרשת —
+              ולכן ברירת המחדל היא "לטיפול", והמעבר להיסטוריה הוא בחירה
+              מודעת ולא תוצאה של סינון שנוקה בטעות. */}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="inline-flex rounded-xl bg-slate-100 p-1">
+              <button
+                onClick={() => {
+                  setFilters({ ...filters, open_only: true })
+                  setPage(0)
+                }}
+                className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+                  filters.open_only ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                לטיפול{stats?.open ? ` (${stats.open})` : ''}
+              </button>
+              <button
+                onClick={() => {
+                  setFilters({ ...filters, open_only: undefined })
+                  setPage(0)
+                }}
+                className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition-colors ${
+                  !filters.open_only ? 'bg-white text-teal-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                הכול{stats?.total ? ` (${stats.total})` : ''}
+              </button>
+            </div>
+
+            {!filters.open_only && (
+              <span className="text-[12px] text-[#9CA3AF]">
+                מוצגות גם רשומות שכבר טופלו — מוזגו, קיימות במערכת או שהוסתרו. אין בהן פעולה נדרשת.
+              </span>
+            )}
+          </div>
+
           <InboxV2FiltersBar
             filters={filters}
             onChange={(f) => {

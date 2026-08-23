@@ -88,7 +88,7 @@ const SOURCE_NAME_LABEL: Record<string, string> = {
 }
 
 export function sourceLabel(
-  row: Pick<InboxV2Row, 'source_type' | 'source_name'>,
+  row: Pick<InboxV2Row, 'source_type' | 'source_name' | 'source_unique_key'>,
   sourceTypes: DictItem[] | undefined
 ): { short: string; full: string } {
   const dictName =
@@ -96,7 +96,12 @@ export function sourceLabel(
   const rawName = row.source_name?.trim() || null
   const niceName = rawName ? (SOURCE_NAME_LABEL[rawName.toLowerCase()] ?? rawName) : null
 
-  const short = dictName && dictName !== '—' ? dictName : (niceName ?? 'מקור לא ידוע')
+  // רשומות שנקלטו לפני שנוסף מעקב המקור אינן נושאות source_type, אבל
+  // ה-source_unique_key שלהן עדיין מעיד מאיפה הן הגיעו. עדיף להסיק ממנו
+  // מאשר להציג "מקור לא ידוע" על עשרות שורות שמקורן ידוע היטב.
+  const inferred = row.source_unique_key?.startsWith('google:') ? 'Google Contacts' : null
+
+  const short = dictName && dictName !== '—' ? dictName : (inferred ?? niceName ?? 'לא תועד')
   const full = niceName && niceName !== short ? `${short} — ${niceName}` : short
   return { short, full }
 }
