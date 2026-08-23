@@ -39,13 +39,12 @@ export type ReclassifyScope = { mode: 'selected'; ids: number[] } | { mode: 'all
 /** מס' יחידות (לא שורות) שמעובדות במקביל בכל סבב RPC — לא כל האצווה
  * בבת אחת, כדי לא להציף את Supabase בקריאות מקבילות על ~2,000 רשומות. */
 const ANALYSIS_CHUNK_SIZE = 300
-const WRITE_CHUNK_SIZE = 400
+/** מס' בקשות UPDATE מקבילות בכל סבב כתיבה — לא upsert מוקבץ (ראו useRunReclassify). */
+const UPDATE_CONCURRENCY = 20
 const FETCH_PAGE = 1000
 
 export interface ReclassifyRowPlan {
   rowId: number
-  importId: string
-  normalizedText: string
   originalText: string
   sourceName: string | null
   bucket: ReclassifyBucket
@@ -285,8 +284,6 @@ export async function buildReclassifyPreview(scope: ReclassifyScope, cityIndex: 
         if (bucket !== 'no_change') {
           plans.push({
             rowId: row.id,
-            importId: row.import_id,
-            normalizedText: row.normalized_text,
             originalText: row.original_text,
             sourceName: row.source_name,
             bucket,
@@ -324,31 +321,27 @@ export function useRunReclassify() {
       let updated = 0
       const now = new Date().toISOString()
 
-      // upsert מוקבץ, לא update בודד לכל שורה: כל ה-patches חולקים בדיוק
-      // אותה קבוצת מפתחות (buildRowPatch מבטיח את זה — ראו reclassifyDiff.ts)
-      // ולכן בטוח לאחד אותם לבקשה אחת לכל 400 שורות במקום ~2,000 סיבובים.
-      //
-      // upsert() מייצר אצל Postgres INSERT ... ON CONFLICT DO UPDATE — גם
-      // כשכל השורות כבר קיימות, ה-INSERT המוצע עדיין נבדק תחילה מול כל
-      // אילוצי NOT NULL של הטבלה. import_id/normalized_text/original_text
-      // הן NOT NULL בלי ברירת מחדל ואינן חלק מ-PIPELINE_OWNED_FIELDS (בכוונה
-      // — הסיווג מחדש לא אמור לגעת בהן), ולכן חייבות להישלח עם הערך הקיים
-      // שלהן בכל שורה, אחרת ה-upsert כולו נכשל על "null value violates
-      // not-null constraint" (זה בדיוק מה שגרם ל"עדכון סיווג נכשל").
-      for (let from = 0; from < toWrite.length; from += WRITE_CHUNK_SIZE) {
-        const chunk = toWrite.slice(from, from + WRITE_CHUNK_SIZE)
-        const rows = chunk.map((plan) => ({
-          id: plan.rowId,
-          import_id: plan.importId,
-          normalized_text: plan.normalizedText,
-          original_text: plan.originalText,
-          ...plan.patch,
-          engine_version: ENGINE_VERSION,
-          rules_version: RULES_VERSION,
-          updated_at: now,
-        }))
-        const { error } = await supabase.from('employment_intake').upsert(rows, { onConflict: 'id' })
-        if (error) throw supabaseError('עדכון סיווג מחדש נכשל', error)
+      // לא upsert: id ב-employment_intake הוא GENERATED ALWAYS AS IDENTITY,
+      // ו-upsert() מייצר אצל PostgREST תמיד INSERT ... ON CONFLICT DO UPDATE
+      // עם ה-id בתוך ה-INSERT המוצע — Postgres דוחה את זה על הסף (קוד 428C9,
+      // "cannot insert a non-DEFAULT value into column id") גם כשכל השורות
+      // כבר קיימות ובפועל היה קורה רק UPDATE. אומת ישירות מול Supabase
+      // (INSERT...ON CONFLICT זהה על שורה קיימת החזיר בדיוק את השגיאה הזו).
+      // אין דרך ב-PostgREST לעקוף את זה (אין OVERRIDING SYSTEM VALUE ב-REST),
+      // ולכן זו חייבת להיות UPDATE אמיתי, לא upsert — מוגבל למספר קריאות
+      // מקבילות בכל סבב כדי לא להציף את Supabase, לא ~2,000 ברצף אחד-אחד.
+      for (let from = 0; from < toWrite.length; from += UPDATE_CONCURRENCY) {
+        const chunk = toWrite.slice(from, from + UPDATE_CONCURRENCY)
+        const results = await Promise.all(
+          chunk.map((plan) =>
+            supabase
+              .from('employment_intake')
+              .update({ ...plan.patch, engine_version: ENGINE_VERSION, rules_version: RULES_VERSION, updated_at: now })
+              .eq('id', plan.rowId),
+          ),
+        )
+        const failed = results.find((r) => r.error)
+        if (failed?.error) throw supabaseError('עדכון סיווג מחדש נכשל', failed.error)
         updated += chunk.length
       }
 
