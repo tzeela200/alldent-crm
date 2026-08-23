@@ -323,7 +323,20 @@ export function writableKeys(entity: MergeEntity): Set<string> {
  * (ערך ספציפי גובר על ערך כללי). אינו חוסם שמירה, אך כן מופיע
  * בתוצאה הסופית — המערכת חוסכת החלטה, לא מסתירה מה ייכתב (§17).
  */
-export type ComparisonStatus = 'none' | 'same' | 'complete' | 'diff' | 'unresolved' | 'auto'
+export type ComparisonStatus =
+  | 'none'
+  | 'same'
+  | 'complete'
+  | 'diff'
+  | 'unresolved'
+  | 'auto'
+  /**
+   * 'removed' = יש לנו ערך, והמקור הגיע בלי ערך — כלומר הוא נמחק שם.
+   * זו **החלטה של המשתמשת ולעולם לא פעולה אוטומטית**: ברירת המחדל היא
+   * לשמור את הקיים, והמחיקה מתבצעת רק בבחירה מפורשת.
+   * בלי הסטטוס הזה מחיקה במקור פשוט נעלמה — המסך אמר "אין שינוי".
+   */
+  | 'removed'
 /** 'manual' = "ערך אחר" — ערך שהמשתמשת הזינה או בחרה ממילון (INC-3123). */
 /**
  * 'existing_secondary' = "השתמש בערך המשני שכבר קיים אצלנו" (§10).
@@ -490,6 +503,22 @@ function acceptLabel(sourceLabel: string): string {
   return `קבל מ-${sourceLabel}`
 }
 
+/**
+ * המקור הגיע בלי ערך בשדה שיש בו ערך אצלנו.
+ * מוצג כשורת החלטה; ברירת המחדל נשארת "שמור קיים".
+ */
+function buildRemoved(base: FieldComparison, existingLabel: string | null): FieldComparison {
+  base.status = 'removed'
+  base.existingLabel = existingLabel
+  base.incomingRaw = null
+  base.incomingLabel = null
+  base.options = [
+    { id: 'existing', label: 'שמור קיים' },
+    { id: 'incoming', label: 'מחק גם אצלנו' },
+  ]
+  return base
+}
+
 function overwriteOptions(existingLabel: string | null, extra: FieldOption[] = []): FieldOption[] {
   const opts: FieldOption[] = []
   if (existingLabel != null) opts.push({ id: 'existing', label: 'שמור קיים' })
@@ -508,7 +537,10 @@ function buildPhone(
   sourceLabel: string
 ): FieldComparison {
   const incoming = normalizeText(incomingSource)
-  if (!incoming) return base
+  if (!incoming) {
+    const existingLabel = formatPhoneLabel(t[def.to])
+    return existingLabel ? buildRemoved(base, existingLabel) : base
+  }
 
   const incomingKey = phoneCompareKey(incoming)
   base.incomingRaw = incoming
@@ -576,7 +608,10 @@ function buildEmail(
   sourceLabel: string
 ): FieldComparison {
   const incomingKey = normalizeEmail(incomingSource)
-  if (!incomingKey) return base
+  if (!incomingKey) {
+    const existingLabel = normalizeEmail(t[def.to]) || null
+    return existingLabel ? buildRemoved(base, existingLabel) : base
+  }
 
   base.incomingRaw = incomingKey // נשמר מנורמל — lowercase, בלי רווחים
   base.incomingLabel = incomingKey
@@ -700,7 +735,10 @@ function buildFacebookId(
   sourceLabel: string
 ): FieldComparison {
   const kind = classifyFacebookValue(incomingSource)
-  if (kind === 'empty') return base
+  if (kind === 'empty') {
+    const existingLabel = t[def.to] != null ? String(t[def.to]) : null
+    return existingLabel ? buildRemoved(base, existingLabel) : base
+  }
 
   const incoming = normalizeText(incomingSource)
   base.incomingLabel = incoming
@@ -754,7 +792,10 @@ function buildPlainText(
   sourceLabel: string
 ): FieldComparison {
   const incoming = normalizeText(incomingSource)
-  if (!incoming) return base
+  if (!incoming) {
+    const existingLabel = normalizeText(t[def.to]) || null
+    return existingLabel ? buildRemoved(base, existingLabel) : base
+  }
 
   base.incomingRaw = incoming
   base.incomingLabel = incoming
@@ -816,6 +857,13 @@ export function buildPatch(
     else if (choice === 'redirect') column = cmp.redirectTarget
 
     if (!column || !allowed.has(column)) continue
+
+    // מחיקה מפורשת: המקור הגיע בלי ערך, והמשתמשת בחרה למחוק גם אצלנו.
+    // זו **הדרך היחידה** שבה נכתב null — כל שאר המסלולים חסומים.
+    if (cmp.status === 'removed') {
+      if (choice === 'incoming') patch[column] = null
+      continue
+    }
 
     const value =
       choice === 'manual'
@@ -910,6 +958,7 @@ export function hasPendingWrites(
 ): boolean {
   return comparisons.some((c) => {
     if (c.status === 'auto') return true
+    if (c.status === 'removed') return choices[c.key] === 'incoming'
     const choice = choices[c.key]
     return (
       choice === 'incoming' ||
@@ -963,6 +1012,11 @@ export function describeMergeResult(
   const incoming = cmp.incomingLabel
   const unchanged: MergeResultDescription = { value: existing, tone: 'unchanged', note: null }
 
+  if (cmp.status === 'removed') {
+    return choice === 'incoming'
+      ? { value: EMPTY_LABEL, tone: 'replaced', note: 'יימחק אצלנו' }
+      : { value: existing, tone: 'unchanged', note: 'נמחק במקור — נשמר אצלנו' }
+  }
   if (cmp.status === 'same') return { value: existing, tone: 'unchanged', note: 'זהה בשני המקורות' }
   if (cmp.status === 'auto') {
     return {

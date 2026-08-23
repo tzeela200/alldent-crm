@@ -41,6 +41,8 @@ export function FieldComparisonRow({
   needsDecision,
 }: Props) {
   const isAuto = comparison.status === 'auto'
+  // נמחק במקור: אין ערך נכנס להציג, אבל כן יש החלטה — לשמור או למחוק.
+  const isRemoved = comparison.status === 'removed'
   const isBlocked = comparison.status === 'unresolved'
   const isManual = choice === 'manual'
   const result = describeMergeResult(comparison, choice, manualValue)
@@ -82,6 +84,9 @@ export function FieldComparisonRow({
         {isAuto && (
           <div className="mt-0.5 text-[11px] font-normal text-[#00696B]">הוכרע אוטומטית</div>
         )}
+        {isRemoved && (
+          <div className="mt-0.5 text-[11px] font-normal text-[#B45309]">נמחק במקור</div>
+        )}
         {needsDecision && (
           <div className="mt-0.5 text-[11px] font-normal text-[#B45309]">נדרשת בחירה</div>
         )}
@@ -99,14 +104,17 @@ export function FieldComparisonRow({
 
       {/* הגיע מהמקור */}
       <td className="px-4 py-3 align-top" dir="auto">
-        {cell(
-          !isAuto && choice === 'incoming',
-          comparison.incomingLabel ?? EMPTY,
-          isAuto || isBlocked || comparison.incomingLabel == null
-            ? null
-            : () => onChoiceChange('incoming'),
-          isAuto
-        )}
+        {isRemoved
+          ? cell(choice === 'incoming', <span className="text-[#B45309]">מחק גם אצלנו</span>,
+                 () => onChoiceChange('incoming'))
+          : cell(
+              !isAuto && choice === 'incoming',
+              comparison.incomingLabel ?? EMPTY,
+              isAuto || isBlocked || comparison.incomingLabel == null
+                ? null
+                : () => onChoiceChange('incoming'),
+              isAuto
+            )}
 
         {isBlocked && comparison.blockedReason && (
           <div className="mt-1 px-3 text-[11px] text-[#B45309]">{comparison.blockedReason}</div>

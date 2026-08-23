@@ -149,6 +149,8 @@ const DIFF_STATUS_LABEL: Record<string, string> = {
   complete: 'השלמת מידע חסר',
   diff: 'פער — נדרשת בחירה',
   unresolved: 'מידע לא מזוהה',
+  auto: 'הוכרע אוטומטית',
+  removed: 'נמחק במקור — נדרשת החלטה',
 }
 
 export function diffStatusLabel(status: unknown): string | null {
