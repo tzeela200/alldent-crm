@@ -232,86 +232,79 @@ function CandidateNotesCell({ value }: { value: string | null }) {
 
 /**
  * applications.internal_notes — the AllDent team's own note about this one
- * application. Editable in place. Writes only to applications.internal_notes:
- * never candidate_notes, never contact.notes.
+ * application. Edited from the row actions menu, not from a table cell: an
+ * in-cell editor widened the column and made the whole table jump. Writes only
+ * to applications.internal_notes: never candidate_notes, never contact.notes.
  */
-function EditableApplicationNotes({
-  value,
-  applicationId,
+function ApplicationNotesDialog({
+  target,
+  onClose,
   onSave,
 }: {
-  value: string | null;
-  applicationId: number;
-  onSave: (notes: string | null) => Promise<void>;
+  target: { applicationId: number; jobCode: string | null; notes: string | null } | null;
+  onClose: () => void;
+  onSave: (applicationId: number, notes: string | null) => Promise<void>;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(value ?? "");
+  const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (!editing) setDraft(value ?? "");
-  }, [editing, value]);
-
-  const text = (value ?? "").trim();
-
-  if (!editing) {
-    return (
-      <div className="flex max-w-[260px] items-start gap-1.5">
-        <div className="min-w-0 flex-1">
-          {text ? <ClampedText text={text} /> : <span className="text-[13px] text-slate-300">—</span>}
-        </div>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="mt-0.5 shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-teal-50 hover:text-[#008080] focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-200"
-          aria-label={text ? `עריכת הערת אדמין להגשה ${applicationId}` : `הוספת הערת אדמין להגשה ${applicationId}`}
-          title={text ? "עריכת הערת אדמין" : "הוספת הערת אדמין"}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-        </button>
-      </div>
-    );
-  }
+    setDraft(target?.notes ?? "");
+  }, [target]);
 
   return (
-    <div className="w-[280px] space-y-2">
-      <Textarea
-        value={draft}
-        onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setDraft(event.target.value)}
-        placeholder="הערה פנימית של הצוות להגשה זו..."
-        className="min-h-[88px] rounded-xl border-slate-200 text-[13px] leading-6"
-        dir="rtl"
-        aria-label={`הערת אדמין להגשה ${applicationId}`}
-      />
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          disabled={saving}
-          onClick={async () => {
-            setSaving(true);
-            try {
-              await onSave(draft.trim() ? draft : null);
-              setEditing(false);
-            } finally {
-              setSaving(false);
-            }
-          }}
-          className="inline-flex items-center gap-1 rounded-lg bg-[#008080] px-2.5 py-1.5 text-[13px] font-medium text-white hover:bg-[#006666] disabled:opacity-50"
-        >
-          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-          שמור
-        </button>
-        <button
-          type="button"
-          disabled={saving}
-          onClick={() => setEditing(false)}
-          className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[13px] text-slate-500 hover:bg-slate-50"
-        >
-          <X className="h-3.5 w-3.5" />
-          ביטול
-        </button>
-      </div>
-    </div>
+    <Dialog open={!!target} onOpenChange={(open) => { if (!open && !saving) onClose(); }}>
+      <DialogContent className="max-w-lg rounded-2xl" dir="rtl">
+        <DialogHeader>
+          <DialogTitle className="text-right text-lg font-bold">
+            הערת אדמין להגשה {target?.applicationId}
+          </DialogTitle>
+          <DialogDescription className="text-right text-xs text-slate-400">
+            {target?.jobCode ? `משרה ${target.jobCode} — ` : ""}
+            הערה פנימית של הצוות להגשה זו בלבד. אינה מוצגת למועמד/ת ואינה משפיעה על ההערות הכלליות.
+          </DialogDescription>
+        </DialogHeader>
+        <Textarea
+          value={draft}
+          onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setDraft(event.target.value)}
+          placeholder="הערה פנימית של הצוות להגשה זו..."
+          className="min-h-[180px] rounded-xl border-slate-200 text-sm leading-7"
+          dir="rtl"
+          aria-label={`הערת אדמין להגשה ${target?.applicationId ?? ""}`}
+        />
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            disabled={saving}
+            onClick={onClose}
+            className="h-10 rounded-xl border-slate-200"
+          >
+            <X className="me-1.5 h-3.5 w-3.5" />
+            ביטול
+          </Button>
+          <Button
+            disabled={saving || !target}
+            onClick={async () => {
+              if (!target) return;
+              setSaving(true);
+              try {
+                await onSave(target.applicationId, draft.trim() ? draft : null);
+                onClose();
+              } catch {
+                /* the caller already surfaced the error as a toast */
+              } finally {
+                setSaving(false);
+              }
+            }}
+            className="h-10 rounded-xl text-white"
+            style={{ backgroundColor: "#008080" }}
+          >
+            {saving ? <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="me-1.5 h-3.5 w-3.5" />}
+            שמירה
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -354,30 +347,32 @@ function AdminGeneralNoteCard({
     <Card className="rounded-2xl border border-[#E5E7EB] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]">
       <CardContent className="p-6">
         <h2 className="mb-3 text-lg font-bold text-slate-900">הערות פנימיות על המועמד/ת</h2>
-        <div className="mb-3 max-h-40 overflow-y-auto rounded-xl border border-slate-100 bg-[#F8FAFC] p-3">
+        <div className="mb-4 min-h-[220px] max-h-[420px] overflow-y-auto rounded-xl border border-slate-100 bg-[#F8FAFC] p-4">
           {notes?.trim() ? (
-            <div className="whitespace-pre-wrap text-[13px] leading-6 text-slate-700">{notes}</div>
+            <div className="whitespace-pre-wrap text-sm leading-7 text-slate-700">{notes}</div>
           ) : (
-            <span className="text-[13px] text-slate-400">אין הערות עדיין</span>
+            <span className="text-sm text-slate-400">אין הערות עדיין</span>
           )}
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row">
+        <div className="space-y-2">
           <Textarea
             value={draft}
             onChange={(event: React.ChangeEvent<HTMLTextAreaElement>) => setDraft(event.target.value)}
             placeholder="הוספת הערה חדשה על המועמד/ת..."
-            className="min-h-[60px] flex-1 rounded-xl border-slate-200 text-[13px] leading-6"
+            className="min-h-[140px] w-full rounded-xl border-slate-200 text-sm leading-7"
             dir="rtl"
           />
-          <Button
-            disabled={saving || !draft.trim()}
-            onClick={addEntry}
-            className="h-10 shrink-0 rounded-xl text-white sm:self-end"
-            style={{ backgroundColor: "#008080" }}
-          >
-            {saving ? <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" /> : null}
-            הוספת הערה
-          </Button>
+          <div className="flex justify-end">
+            <Button
+              disabled={saving || !draft.trim()}
+              onClick={addEntry}
+              className="h-10 shrink-0 rounded-xl text-white"
+              style={{ backgroundColor: "#008080" }}
+            >
+              {saving ? <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" /> : null}
+              הוספת הערה
+            </Button>
+          </div>
         </div>
       </CardContent>
     </Card>
@@ -403,14 +398,14 @@ function EditableApplicationStatus({
 
   if (!editing) {
     return (
-      <div className="flex items-center gap-1.5">
-        <Badge className={`h-[30px] rounded-full border px-3 text-sm font-medium shadow-none ${applicationStatusClass(application.application_status)}`}>
+      <div className="flex w-full items-center gap-1 py-1">
+        <Badge className={`min-w-0 flex-1 justify-center whitespace-normal rounded-xl border px-2 py-1 text-center text-[13px] font-medium leading-5 shadow-none ${applicationStatusClass(application.application_status)}`}>
           {dictName(statuses, application.application_status)}
         </Badge>
         <button
           type="button"
           onClick={() => setEditing(true)}
-          className="rounded-lg p-1.5 text-slate-400 hover:bg-teal-50 hover:text-[#008080]"
+          className="shrink-0 rounded-lg p-1 text-slate-400 hover:bg-teal-50 hover:text-[#008080]"
           aria-label="עריכת סטטוס הגשה"
           title="עריכת סטטוס הגשה"
         >
@@ -420,42 +415,48 @@ function EditableApplicationStatus({
     );
   }
 
+  // The editor must never be wider than the read-only badge, or opening it
+  // widens the column and the whole table jumps. Hence w-full + stacked buttons:
+  // only the row height changes, never the column width.
   return (
-    <div className="flex min-w-[220px] items-center gap-2">
+    <div className="w-full space-y-1.5 py-1">
       <select
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
-        className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-2 text-sm outline-none focus:border-[#008080]"
+        className="h-9 w-full rounded-xl border border-slate-200 bg-white px-2 text-[13px] outline-none focus:border-[#008080]"
+        aria-label="בחירת סטטוס הגשה"
       >
         <option value="">— ללא סטטוס —</option>
         {statuses.map((status) => <option key={status.id} value={status.id}>{status.name}</option>)}
       </select>
-      <button
-        type="button"
-        disabled={saving}
-        onClick={async () => {
-          setSaving(true);
-          try {
-            await onSave(draft ? Number(draft) : null);
-            setEditing(false);
-          } finally {
-            setSaving(false);
-          }
-        }}
-        className="rounded-lg bg-[#008080] p-2 text-white hover:bg-[#006666] disabled:opacity-50"
-        aria-label="שמירת סטטוס הגשה"
-      >
-        {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
-      </button>
-      <button
-        type="button"
-        disabled={saving}
-        onClick={() => setEditing(false)}
-        className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-50"
-        aria-label="ביטול עריכת סטטוס הגשה"
-      >
-        <X className="h-4 w-4" />
-      </button>
+      <div className="flex gap-1.5">
+        <button
+          type="button"
+          disabled={saving}
+          onClick={async () => {
+            setSaving(true);
+            try {
+              await onSave(draft ? Number(draft) : null);
+              setEditing(false);
+            } finally {
+              setSaving(false);
+            }
+          }}
+          className="rounded-lg bg-[#008080] p-1.5 text-white hover:bg-[#006666] disabled:opacity-50"
+          aria-label="שמירת סטטוס הגשה"
+        >
+          {saving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+        </button>
+        <button
+          type="button"
+          disabled={saving}
+          onClick={() => setEditing(false)}
+          className="rounded-lg border border-slate-200 bg-white p-1.5 text-slate-500 hover:bg-slate-50"
+          aria-label="ביטול עריכת סטטוס הגשה"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      </div>
     </div>
   );
 }
@@ -552,6 +553,10 @@ export default function Candidate360Page() {
   const [activeTab, setActiveTab] = useState<Contact360TabId>("person");
   const [previewJobCode, setPreviewJobCode] = useState<string | null>(null);
   const [messagePreview, setMessagePreview] = useState<{ title: string; text: string } | null>(null);
+  const [notesTarget, setNotesTarget] = useState<{ applicationId: number; jobCode: string | null; notes: string | null } | null>(null);
+  const [selectedAppIds, setSelectedAppIds] = useState<string[]>([]);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [bulkSaving, setBulkSaving] = useState(false);
 
   // Same query key as ContactMessagesPanel — React Query dedupes it, so the
   // CRM badge costs no extra request. No counter is invented for a badge.
@@ -691,8 +696,10 @@ export default function Candidate360Page() {
   const applicationColumns = useMemo<AdminColumn<ApplicationRow>[]>(() => [
     {
       key: "application_id",
-      label: "מספר הגשה",
+      label: "הגשה",
+      width: "78px",
       nowrap: true,
+      cellClassName: "align-top",
       render: (application) => (
         <Link
           to={`/admin/applications?application=${application.application_id}`}
@@ -705,7 +712,9 @@ export default function Candidate360Page() {
     {
       key: "job_code",
       label: "קוד משרה",
+      width: "112px",
       nowrap: true,
+      cellClassName: "align-top",
       render: (application) => application.job_code ? (
         <div className="flex items-center gap-1">
           <button
@@ -732,7 +741,8 @@ export default function Candidate360Page() {
     {
       key: "job_role",
       label: "תפקיד",
-      minWidth: "130px",
+      minWidth: "110px",
+      cellClassName: "align-top",
       render: (application) => (
         <span className="text-sm font-medium text-slate-900">{application.job_role || "—"}</span>
       ),
@@ -740,14 +750,15 @@ export default function Candidate360Page() {
     {
       key: "account_name",
       label: "מעסיק",
-      minWidth: "150px",
+      minWidth: "130px",
+      cellClassName: "align-top",
       render: (application) => application.account_name || "—",
     },
     {
       key: "job_status_live",
       label: "סטטוס משרה",
-      minWidth: "120px",
-      nowrap: true,
+      width: "116px",
+      cellClassName: "align-top",
       render: (application) => {
         if (application.job_status_live == null) {
           return <span className="text-[13px] text-slate-400">—</span>;
@@ -757,7 +768,7 @@ export default function Candidate360Page() {
         const label = dictName(dicts?.jobStatuses ?? [], statusId);
         return (
           <span
-            className={`inline-flex items-center whitespace-nowrap rounded-full px-2.5 py-1 text-[13px] font-medium ${
+            className={`inline-flex items-center whitespace-normal rounded-xl px-2 py-1 text-center text-[13px] font-medium leading-5 ${
               tone ? `${tone.bg} ${tone.text}` : "bg-slate-100 text-slate-600"
             }`}
           >
@@ -769,7 +780,8 @@ export default function Candidate360Page() {
     {
       key: "application_status",
       label: "סטטוס הגשה",
-      minWidth: "150px",
+      width: "200px",
+      cellClassName: "align-top",
       render: (application) => (
         <EditableApplicationStatus
           application={application}
@@ -795,69 +807,33 @@ export default function Candidate360Page() {
     },
     {
       key: "candidate_notes",
-      label: "הערות המועמד/ת בזמן ההגשה",
-      minWidth: "260px",
+      label: "הערות המועמד/ת",
+      minWidth: "180px",
+      cellClassName: "align-top",
       render: (application) => <CandidateNotesCell value={application.candidate_notes} />,
-    },
-    {
-      key: "internal_notes",
-      label: "הערות אדמין להגשה",
-      minWidth: "280px",
-      render: (application) => (
-        <EditableApplicationNotes
-          value={application.internal_notes}
-          applicationId={application.application_id}
-          onSave={async (notes) => {
-            const { error: updateError } = await supabase
-              .from("applications")
-              .update({ internal_notes: notes, updated_timestamp: new Date().toISOString() })
-              .eq("application_id", application.application_id);
-            if (updateError) {
-              showToast("error", `שמירת הערת האדמין נכשלה: ${updateError.message}`);
-              throw updateError;
-            }
-            await Promise.all([
-              queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] }),
-              queryClient.invalidateQueries({ queryKey: ["applications"] }),
-              queryClient.invalidateQueries({ queryKey: ["applications-kpis"] }),
-            ]);
-            showToast("success", "הערת האדמין נשמרה");
-          }}
-        />
-      ),
     },
     {
       key: "submission_date",
       label: "תאריך הגשה",
+      width: "108px",
       nowrap: true,
+      cellClassName: "align-top",
       render: (application) => <span className="text-slate-500">{formatDate(application.submission_date)}</span>,
     },
     {
       key: "updated_timestamp",
       label: "עדכון אחרון",
+      width: "108px",
       nowrap: true,
+      cellClassName: "align-top",
       render: (application) => <span className="text-slate-500">{formatDate(application.updated_timestamp)}</span>,
-    },
-    {
-      key: "cv",
-      label: 'קו"ח',
-      nowrap: true,
-      render: (application) => applicationHasCv(application) ? (
-        <button
-          type="button"
-          onClick={() => void openApplicationCv(application)}
-          className="text-blue-600 hover:underline"
-        >
-          צפייה
-        </button>
-      ) : (
-        <span className="text-slate-300">—</span>
-      ),
     },
     {
       key: "actions",
       label: "פעולות",
+      width: "60px",
       nowrap: true,
+      cellClassName: "align-top",
       render: (application) => (
         <AdminActionsMenu
           ariaLabel={`פעולות להגשה ${application.application_id}`}
@@ -883,9 +859,21 @@ export default function Candidate360Page() {
               onClick: () => void openApplicationCv(application),
             },
             {
+              key: "internal-notes",
+              icon: <Pencil className="h-4 w-4" />,
+              label: application.internal_notes?.trim() ? "עריכת הערת אדמין להגשה" : "הוספת הערת אדמין להגשה",
+              separatorBefore: true,
+              onClick: () => setNotesTarget({
+                applicationId: application.application_id,
+                jobCode: application.job_code ?? null,
+                notes: application.internal_notes,
+              }),
+            },
+            {
               key: "copy-handoff",
               icon: <MessageCircle className="h-4 w-4" />,
               label: "העברת פרטים (וואטסאפ)",
+              separatorBefore: true,
               disabled: !application.job_code,
               onClick: () => setMessagePreview({
                 title: `תצוגה מקדימה — העברת פרטים למשרה ${application.job_code}`,
@@ -905,6 +893,94 @@ export default function Candidate360Page() {
     ),
   ), [dicts?.candidateTags, tags]);
 
+  // Tag chips for the header: the dictionary name wins over the denormalised
+  // contact_tags.tag string, exactly as the CRM tab resolves it — otherwise a
+  // tag renamed in the dictionary would read differently in the two places.
+  const quickTagChips = useMemo(() => tags.map((tag) => ({
+    id: tag.id,
+    label: (tag.tag_id
+      ? dicts?.candidateTags.find((candidateTag) => candidateTag.id === Number(tag.tag_id))?.name
+      : null) ?? tag.tag,
+  })), [dicts?.candidateTags, tags]);
+
+  // ── applications: bulk selection ──
+  const applicationIds = useMemo(() => applications.map((application) => String(application.application_id)), [applications]);
+
+  // Drop selections whose row no longer exists, so a bulk update can never
+  // target an application that was removed or filtered out meanwhile.
+  useEffect(() => {
+    setSelectedAppIds((current) => {
+      const next = current.filter((id) => applicationIds.includes(id));
+      return next.length === current.length ? current : next;
+    });
+  }, [applicationIds]);
+
+  const allApplicationsSelected = applicationIds.length > 0 && selectedAppIds.length === applicationIds.length;
+  const someApplicationsSelected = selectedAppIds.length > 0 && !allApplicationsSelected;
+
+  function toggleApplicationId(id: string) {
+    setSelectedAppIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
+  }
+
+  function toggleAllApplications() {
+    setSelectedAppIds((current) => current.length === applicationIds.length ? [] : [...applicationIds]);
+  }
+
+  async function invalidateApplicationQueries() {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["contact360", resolvedId] }),
+      queryClient.invalidateQueries({ queryKey: ["applications"] }),
+      queryClient.invalidateQueries({ queryKey: ["applications-kpis"] }),
+    ]);
+  }
+
+  /**
+   * Bulk status update. Deliberately per-row rather than a single .in() call:
+   * one failing row must not hide the rows that did succeed, and the admin has
+   * to be told exactly how many of the selected applications were updated.
+   */
+  async function applyBulkStatus() {
+    if (!bulkStatus || selectedAppIds.length === 0) return;
+    const statusId = bulkStatus === "none" ? null : Number(bulkStatus);
+    const ids = selectedAppIds.map(Number).filter(Number.isFinite);
+    setBulkSaving(true);
+    let updated = 0;
+    const failures: string[] = [];
+    try {
+      for (const applicationId of ids) {
+        const { error: updateError } = await supabase
+          .from("applications")
+          .update({ application_status: statusId, updated_timestamp: new Date().toISOString() })
+          .eq("application_id", applicationId);
+        if (updateError) failures.push(`${applicationId}: ${updateError.message}`);
+        else updated += 1;
+      }
+      await invalidateApplicationQueries();
+      if (failures.length === 0) {
+        setSelectedAppIds([]);
+        setBulkStatus("");
+        showToast("success", `סטטוס ההגשה עודכן ל-${updated} הגשות`);
+      } else {
+        showToast("error", `עודכנו ${updated} מתוך ${ids.length} הגשות. נכשלו: ${failures.slice(0, 2).join(" | ")}`);
+      }
+    } finally {
+      setBulkSaving(false);
+    }
+  }
+
+  async function saveApplicationInternalNotes(applicationId: number, notes: string | null) {
+    const { error: updateError } = await supabase
+      .from("applications")
+      .update({ internal_notes: notes, updated_timestamp: new Date().toISOString() })
+      .eq("application_id", applicationId);
+    if (updateError) {
+      showToast("error", `שמירת הערת האדמין נכשלה: ${updateError.message}`);
+      throw updateError;
+    }
+    await invalidateApplicationQueries();
+    showToast("success", "הערת האדמין נשמרה");
+  }
+
   // ── actions ──
   async function saveContactPatch(patch: Record<string, unknown>) {
     if (!contact) return;
@@ -919,9 +995,9 @@ export default function Candidate360Page() {
     showToast("success", "הנתון עודכן");
   }
 
-  async function addTag() {
-    if (!contact || !dicts || !selectedTagId) return;
-    const selectedTag = dicts.candidateTags.find((tag) => tag.id === Number(selectedTagId));
+  async function addTag(tagId: number) {
+    if (!contact || !dicts || !Number.isFinite(tagId)) return;
+    const selectedTag = dicts.candidateTags.find((tag) => tag.id === Number(tagId));
     if (!selectedTag) {
       showToast("error", "התגית שנבחרה אינה קיימת במילון");
       return;
@@ -1160,6 +1236,10 @@ export default function Candidate360Page() {
         dicts={dicts}
         profileTypeIds={profileTypeIds}
         completion={completion}
+        tags={quickTagChips}
+        availableTags={availableCandidateTags}
+        onAddTag={addTag}
+        onRemoveTag={removeTag}
         recommendedJobsCount={allRecommendedJobs.length}
         applicationsCount={applications.length}
         activeApplicationsCount={activeApplications.length}
@@ -1194,19 +1274,19 @@ export default function Candidate360Page() {
 
       {/* ═══════════ טאב 1 — פרטי האדם ═══════════ */}
       <Contact360TabPanel tabId="person" active={activeTab}>
-        {/* ===== פרטים אישיים + מדיה חברתית ===== */}
+        {/* ===== פרטים אישיים + תנאים והעדפות ===== */}
         {dicts && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <BlockIdentity contact={contact} dicts={dicts} onUpdate={saveContactPatch} />
-            <BlockSocial contact={contact} dicts={dicts} onUpdate={saveContactPatch} />
+            <BlockConditions contact={contact} dicts={dicts} onUpdate={saveContactPatch} />
           </div>
         )}
 
-        {/* ===== מקצועיות + תנאים ===== */}
+        {/* ===== מקצועיות + מדיה חברתית ===== */}
         {dicts && (
           <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
             <BlockProfessional contact={contact} dicts={dicts} onUpdate={saveContactPatch} />
-            <BlockConditions contact={contact} dicts={dicts} onUpdate={saveContactPatch} />
+            <BlockSocial contact={contact} dicts={dicts} onUpdate={saveContactPatch} />
           </div>
         )}
       </Contact360TabPanel>
@@ -1260,10 +1340,55 @@ export default function Candidate360Page() {
               data={applications}
               keyField="application_id"
               emptyMessage="אין הגשות לאיש קשר זה"
-              minWidth="900px"
+              selectedIds={selectedAppIds}
+              onSelectId={toggleApplicationId}
+              allSelected={allApplicationsSelected}
+              someSelected={someApplicationsSelected}
+              onSelectAll={toggleAllApplications}
+              bulkActions={
+                <div className="flex flex-wrap items-center gap-2">
+                  <select
+                    value={bulkStatus}
+                    onChange={(event) => setBulkStatus(event.target.value)}
+                    className="h-9 rounded-xl border border-slate-200 bg-white px-2 text-[13px] outline-none focus:border-[#008080]"
+                    aria-label="סטטוס הגשה לעדכון מרוכז"
+                  >
+                    <option value="">— בחירת סטטוס לעדכון —</option>
+                    <option value="none">ללא סטטוס</option>
+                    {(dicts?.applicationStatuses ?? []).map((status) => (
+                      <option key={status.id} value={status.id}>{status.name}</option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    disabled={!bulkStatus || bulkSaving}
+                    onClick={() => void applyBulkStatus()}
+                    className="h-9 rounded-xl text-white"
+                    style={{ backgroundColor: BRAND.primary }}
+                  >
+                    {bulkSaving ? <Loader2 className="me-1.5 h-3.5 w-3.5 animate-spin" /> : <Check className="me-1.5 h-3.5 w-3.5" />}
+                    עדכון סטטוס ל-{selectedAppIds.length} הגשות
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={bulkSaving}
+                    onClick={() => { setSelectedAppIds([]); setBulkStatus(""); }}
+                    className="h-9 rounded-xl border-slate-200 bg-white"
+                  >
+                    ניקוי בחירה
+                  </Button>
+                </div>
+              }
             />
           </CardContent>
         </Card>
+
+        <ApplicationNotesDialog
+          target={notesTarget}
+          onClose={() => setNotesTarget(null)}
+          onSave={saveApplicationInternalNotes}
+        />
 
         <JobPreviewPanel
           jobCode={previewJobCode}
@@ -1395,7 +1520,7 @@ export default function Candidate360Page() {
             <Button
               variant="outline"
               className="h-10 rounded-xl border-slate-200"
-              onClick={addTag}
+              onClick={() => void addTag(Number(selectedTagId))}
               disabled={!selectedTagId}
             >
               הוסף

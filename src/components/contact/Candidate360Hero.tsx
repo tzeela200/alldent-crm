@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { ContactRow, Contact360Dicts } from "@/hooks/useContact360";
 import { Badge } from "@/components/ui/badge";
 import { RoleBadge } from "@/components/admin/RoleBadge";
@@ -23,6 +24,7 @@ import {
   Phone,
   Plus,
   Sparkles,
+  Tag,
   User2,
   X,
 } from "lucide-react";
@@ -81,11 +83,182 @@ function KpiCard({ value, label, icon, accentColor }: { value: ReactNode; label:
   );
 }
 
+/** תגית מועמד לתצוגה בכותרת — id של שורת contact_tags + השם לאחר פענוח מהמילון. */
+export interface QuickTagChip {
+  id: number;
+  label: string;
+}
+
+const QUICK_TAG_PANEL_WIDTH = 256;
+
+/**
+ * תגיות מהירות בכותרת — הצגה והוספה של תגיות מועמד בלי לעבור ללשונית CRM.
+ * הבורר אינו DropdownMenu של Radix כי הרשימה דורשת שדה חיפוש, ו-typeahead של
+ * Radix חוטף את הקלדות המקלדת מתוך תפריט. הפאנל נפתח דרך Portal ל-document.body
+ * ולא כ-absolute מקומי, כי כרטיס הכותרת הוא overflow-hidden והיה חותך אותו.
+ */
+function QuickTags({
+  tags,
+  availableTags,
+  onAddTag,
+  onRemoveTag,
+}: {
+  tags: QuickTagChip[];
+  availableTags: { id: number; name: string }[];
+  onAddTag: (tagId: number) => Promise<void>;
+  onRemoveTag: (rowId: number) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const [pendingId, setPendingId] = useState<number | null>(null);
+  const [coords, setCoords] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (!open) return;
+    const reposition = () => {
+      const button = buttonRef.current;
+      if (!button) return;
+      const rect = button.getBoundingClientRect();
+      // RTL: יישור לקצה השמאלי של הכפתור, עם הצמדה לקצה החלון אם חורג.
+      let left = rect.right - QUICK_TAG_PANEL_WIDTH;
+      if (left + QUICK_TAG_PANEL_WIDTH > window.innerWidth - 8) left = window.innerWidth - QUICK_TAG_PANEL_WIDTH - 8;
+      if (left < 8) left = 8;
+      setCoords({ top: rect.bottom + 8, left });
+    };
+    reposition();
+    const onDocClick = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (buttonRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    // Capture-phase scroll fires for the panel's own list too — closing on that
+    // would make the tag list impossible to scroll.
+    const onScroll = (event: Event) => {
+      if (panelRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+    };
+    const onResize = () => setOpen(false);
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, true);
+    window.addEventListener("resize", onResize);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll, true);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) setSearch("");
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    const term = search.trim();
+    if (!term) return availableTags;
+    return availableTags.filter((tag) => tag.name.includes(term));
+  }, [availableTags, search]);
+
+  return (
+    <div className="flex flex-wrap items-center gap-2" dir="rtl">
+      <Tag className="h-4 w-4 shrink-0" style={{ color: BRAND_PRIMARY }} />
+      {tags.length === 0 && <span className="text-[13px] text-slate-400">אין תגיות</span>}
+      {tags.map((tag) => (
+        <span
+          key={tag.id}
+          className="inline-flex min-h-[28px] items-center gap-1.5 rounded-full border border-[#E5E7EB] bg-white px-2.5 text-[13px] font-semibold text-slate-900"
+        >
+          {tag.label}
+          <button
+            type="button"
+            onClick={() => onRemoveTag(tag.id)}
+            className="text-slate-400 hover:text-red-600"
+            aria-label={`הסרת התגית ${tag.label}`}
+            title="הסרת תגית"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </span>
+      ))}
+
+      <div>
+        <button
+          ref={buttonRef}
+          type="button"
+          onClick={() => setOpen((current) => !current)}
+          disabled={availableTags.length === 0}
+          className="inline-flex min-h-[28px] items-center gap-1 rounded-full border border-dashed border-[#008080] bg-white px-2.5 text-[13px] font-semibold text-[#008080] hover:bg-teal-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300"
+          aria-haspopup="true"
+          aria-expanded={open}
+          title={availableTags.length === 0 ? "כל תגיות המילון כבר משויכות" : "הוספת תגית מהירה"}
+        >
+          <Plus className="h-3.5 w-3.5" />
+          תגית
+        </button>
+
+        {open && createPortal(
+          <div
+            ref={panelRef}
+            dir="rtl"
+            style={{ position: "fixed", top: coords.top, left: coords.left, width: QUICK_TAG_PANEL_WIDTH }}
+            className="z-[9999] rounded-2xl border border-[#D9D9D9] bg-white p-2 shadow-xl"
+          >
+            <Input
+              autoFocus
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="חיפוש תגית..."
+              className="mb-2 h-9 rounded-xl border-slate-200 text-[13px]"
+            />
+            <div className="max-h-56 space-y-0.5 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <div className="px-2 py-3 text-center text-[13px] text-slate-400">לא נמצאה תגית</div>
+              ) : (
+                filtered.map((tag) => (
+                  <button
+                    key={tag.id}
+                    type="button"
+                    disabled={pendingId !== null}
+                    onClick={async () => {
+                      setPendingId(tag.id);
+                      try {
+                        await onAddTag(tag.id);
+                        setOpen(false);
+                      } finally {
+                        setPendingId(null);
+                      }
+                    }}
+                    className="flex w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-right text-[13px] text-slate-700 hover:bg-slate-100 hover:text-[#008080] disabled:opacity-50"
+                  >
+                    {tag.name}
+                    {pendingId === tag.id && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  </button>
+                ))
+              )}
+            </div>
+          </div>,
+          document.body,
+        )}
+      </div>
+    </div>
+  );
+}
+
 interface Props {
   contact: ContactRow;
   dicts: Contact360Dicts | undefined;
   profileTypeIds: number[];
   completion: number;
+  tags: QuickTagChip[];
+  availableTags: { id: number; name: string }[];
+  onAddTag: (tagId: number) => Promise<void>;
+  onRemoveTag: (rowId: number) => void;
   recommendedJobsCount: number;
   applicationsCount: number;
   activeApplicationsCount: number;
@@ -100,6 +273,10 @@ export function Candidate360Hero({
   dicts,
   profileTypeIds,
   completion,
+  tags,
+  availableTags,
+  onAddTag,
+  onRemoveTag,
   recommendedJobsCount,
   applicationsCount,
   activeApplicationsCount,
@@ -334,13 +511,23 @@ export function Candidate360Hero({
             </div>
           </div>
 
-          <div className="mt-5 rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-4">
-            <div className="mb-2 flex items-center justify-between gap-4 text-sm font-semibold text-slate-900">
-              <span>{completion}% שלמות פרופיל</span>
-              <Sparkles className="h-4 w-4" style={{ color: BRAND_PRIMARY }} />
+          <div className="mt-5 grid gap-4 rounded-2xl border border-[#E5E7EB] bg-[#F9FAFB] p-4 lg:grid-cols-[minmax(220px,320px)_1fr]">
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-4 text-sm font-semibold text-slate-900">
+                <span>{completion}% שלמות פרופיל</span>
+                <Sparkles className="h-4 w-4" style={{ color: BRAND_PRIMARY }} />
+              </div>
+              <div className="h-2 overflow-hidden rounded-full bg-[#E5E7EB]">
+                <div className="h-full rounded-full" style={{ width: `${completion}%`, backgroundColor: BRAND_PRIMARY }} />
+              </div>
             </div>
-            <div className="h-2 overflow-hidden rounded-full bg-[#E5E7EB]">
-              <div className="h-full rounded-full" style={{ width: `${completion}%`, backgroundColor: BRAND_PRIMARY }} />
+            <div className="border-t border-[#E5E7EB] pt-3 lg:border-s lg:border-t-0 lg:pe-4 lg:pt-0">
+              <QuickTags
+                tags={tags}
+                availableTags={availableTags}
+                onAddTag={onAddTag}
+                onRemoveTag={onRemoveTag}
+              />
             </div>
           </div>
         </CardContent>
