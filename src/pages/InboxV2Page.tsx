@@ -71,7 +71,7 @@ export default function InboxV2Page() {
   const { data, isLoading, error } = useInboxV2Rows(filters, page)
   const { data: batches } = useInboxV2Batches()
   const { data: stats } = useInboxV2Stats()
-  const { matchBatch } = useInboxV2Matching()
+  const { matchBatch, rematchOpenQueue } = useInboxV2Matching()
 
   // הייבוא עבר ל-ImportWizard, שמריץ את ההתאמה בעצמו אחרי האישור.
   // useInboxV2Upload (כתיבה מיידית ללא שער) אינו בשימוש יותר מהמסך הזה.
@@ -119,6 +119,17 @@ export default function InboxV2Page() {
       actions={
         <div className="flex items-center gap-2">
           <GoogleSyncStatusCard />
+
+          {/* n8n כותבת שורות עם סיווג משלה בלי להריץ את מנוע ההשוואה.
+              הכפתור מסווג מחדש את התור לפי המנוע האמיתי (INC-3125). */}
+          <ActionButton
+            variant="secondary"
+            icon={RefreshCw}
+            onClick={() => rematchOpenQueue.mutate()}
+            disabled={rematchOpenQueue.isPending}
+          >
+            {rematchOpenQueue.isPending ? 'מנתח...' : 'נתח מחדש את התור'}
+          </ActionButton>
 
           <details className="relative">
             <summary className="inline-flex cursor-pointer list-none items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50">
