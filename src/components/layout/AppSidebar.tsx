@@ -2,6 +2,7 @@ import React from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
+  Home,
   Inbox,
   Users,
   UserCheck,
@@ -46,6 +47,13 @@ const navGroups: { title?: string; items: NavItem[] }[] = [
     items: [
       { to: '/admin/accounts', label: 'כל הארגונים', icon: Building2 },
       { to: '/admin/employers', label: 'מעסיקים', icon: Building2 },
+    ],
+  },
+  {
+    // INC-3130 — HOME DENT
+    title: 'נכסים דנטליים',
+    items: [
+      { to: '/admin/dental-assets', label: 'ניהול נכסים', icon: Home },
     ],
   },
   {

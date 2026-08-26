@@ -18,6 +18,11 @@
 -- jsonb; ורישום שדות הפרסום נדחה ל-A2 יחד עם הצרכן שלו.
 -- מה לא כלול:   עורך הבלוקים עצמו (חבילה C). הסכמה מוכנה לו.
 --
+-- ⚠️ תיקון 26.08.2026 אחרי ההרצה (מיגרציה 07): RETURNS TABLE יוצר משתני
+-- OUT בשמות status/asset_code/asset_id, והם התנגשו עם עמודות הטבלה
+-- ב-RETURNING. כל הגשה מהטופס הייתה נכשלת ב-42702. נוסף
+-- #variable_conflict use_column לשני ה-RPC הציבוריים.
+--
 -- אין בקובץ הזה: customer_visibility · payment_status · חוזים · חישוב עמלה.
 -- הם נמחקו מהאפיון במפורש (§77) ואין להחזירם.
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -464,6 +469,7 @@ create or replace function public.submit_public_dental_asset(
 ) returns table (status text, asset_code text, asset_id uuid)
 language plpgsql security definer
 set search_path = '' as $$
+#variable_conflict use_column
 declare
   v_id uuid; v_code text; v_phone text; v_o jsonb; v_i jsonb; v_n int;
 begin
@@ -582,7 +588,7 @@ begin
       'service', jsonb_build_object('package_days',p_package_days,'screening',p_screening,
                  'terms_version',p_terms_version)
     )
-  ) returning id, asset_code into v_id, v_code;
+  ) returning dental_assets.id, dental_assets.asset_code into v_id, v_code;
 
   -- מסלולי עסקה
   for v_o in select * from jsonb_array_elements(p_offers) loop
@@ -644,6 +650,7 @@ create or replace function public.submit_dental_asset_inquiry(
 ) returns table (status text, inquiry_id uuid)
 language plpgsql security definer
 set search_path = '' as $$
+#variable_conflict use_column
 declare
   v_asset uuid; v_pub uuid; v_code text; v_phone text; v_label text; v_id uuid;
 begin
@@ -695,7 +702,7 @@ begin
      lower(nullif(btrim(coalesce(p_email,'')),'')),
      nullif(btrim(coalesce(p_message,'')),''),
      nullif(btrim(coalesce(p_source_url,'')),''), true)
-  returning id into v_id;
+  returning dental_asset_inquiries.id into v_id;
 
   return query select 'success'::text, v_id;
 end $$;
