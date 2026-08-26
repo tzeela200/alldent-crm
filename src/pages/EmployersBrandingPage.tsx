@@ -235,7 +235,7 @@ const FAQ_ITEMS = [
 ]
 
 const WHATSAPP_CLASS =
-  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#D97706] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#B45309]'
+  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#B45309] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#92400E]'
 
 const PRIMARY_CTA_CLASS =
   'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#008080] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(0,128,128,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#006D6D]'
@@ -690,7 +690,7 @@ export default function EmployersBrandingPage() {
                 key={item.title}
                 className={`rounded-[24px] border p-5 shadow-[0_12px_34px_rgba(15,23,32,0.045)] text-start ${
                   index === 2
-                    ? 'border-[#D97706]/12 bg-[#FFFAF4]'
+                    ? 'border-[#B45309]/12 bg-[#FFFAF4]'
                     : 'bg-white'
                 }`}
                 style={
@@ -769,8 +769,8 @@ export default function EmployersBrandingPage() {
             </div>
           </div>
 
-          <div className="rounded-[28px] border border-[#D97706]/20 bg-[#2B2B2B] p-7 text-white shadow-[0_18px_50px_rgba(15,23,32,0.12)] md:p-9 text-start">
-            <span className="inline-flex rounded-full border border-[#D97706]/22 bg-[#D97706]/12 px-4 py-1.5 text-[13px] font-bold text-[#FFD7A6]">
+          <div className="rounded-[28px] border border-[#B45309]/20 bg-[#2B2B2B] p-7 text-white shadow-[0_18px_50px_rgba(15,23,32,0.12)] md:p-9 text-start">
+            <span className="inline-flex rounded-full border border-[#B45309]/22 bg-[#D97706]/12 px-4 py-1.5 text-[13px] font-bold text-[#FFD7A6]">
               מחיר ותנאים
             </span>
             <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">

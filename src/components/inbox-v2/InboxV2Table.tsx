@@ -229,7 +229,7 @@ export function InboxV2Table({
                 r.match_confidence >= 80
                   ? 'text-[#008080]'
                   : r.match_confidence >= 40
-                    ? 'text-[#D97706]'
+                    ? 'text-[#B45309]'
                     : 'text-[#9CA3AF]'
               }`}
             >

@@ -172,7 +172,7 @@ function LeadForm({
 
   const input =
     'w-full rounded-none border-0 border-b border-white/15 bg-transparent px-0.5 py-3 ' +
-    'text-[16px] text-white placeholder:text-white/50 focus:border-[#D97706] focus:outline-none'
+    'text-[16px] text-white placeholder:text-white/50 focus:border-[#B45309] focus:outline-none'
 
   if (state === 'done') {
     return (
@@ -207,7 +207,7 @@ function LeadForm({
         value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} />
       {error && <p role="alert" className="text-[13.5px] text-[#FCA5A5] sm:col-span-2">{error}</p>}
       <button type="button" disabled={state === 'saving'} onClick={send}
-        className="rounded-sm bg-[#D97706] px-8 py-4 text-[14.5px] font-semibold text-white transition-colors duration-500 hover:bg-[#B45309] disabled:opacity-40 sm:col-span-2">
+        className="rounded-sm bg-[#B45309] px-8 py-4 text-[14.5px] font-semibold text-white transition-colors duration-500 hover:bg-[#92400E] disabled:opacity-40 sm:col-span-2">
         {state === 'saving' ? 'שולח…' : 'שליחת פרטים'}
       </button>
     </div>
@@ -254,7 +254,7 @@ export function DentalAssetPageBody({
           <div className="mx-auto max-w-[1280px]">
             <BackLink to="/dental-assets">חזרה ללוח הנכסים</BackLink>
             <div className="mt-5 flex flex-wrap gap-2">
-              <span className="rounded-sm border border-[#D97706]/70 bg-[#D97706]/[0.18] px-3 py-1.5 font-mono text-[10.5px] tracking-[0.18em] text-[#F0A03C]">
+              <span className="rounded-sm border border-[#B45309]/70 bg-[#D97706]/[0.18] px-3 py-1.5 font-mono text-[10.5px] tracking-[0.18em] text-[#F0A03C]">
                 {page.asset_code}
               </span>
               {page.asset_type && (
@@ -386,7 +386,7 @@ export function DentalAssetPageBody({
                     className={`inline-flex items-center gap-2 rounded-sm px-7 py-3.5 text-[14.5px] font-semibold transition-colors duration-500 ${
                       c.style === 'secondary'
                         ? 'border border-white/15 text-white hover:bg-white hover:text-[#1E1E1E]'
-                        : 'bg-[#D97706] text-white hover:bg-[#B45309]'
+                        : 'bg-[#B45309] text-white hover:bg-[#92400E]'
                     }`}>
                     {c.label}
                   </a>
@@ -420,7 +420,7 @@ export function DentalAssetPageBody({
                 className={`flex-1 rounded-sm px-2 py-3.5 text-center text-[13px] font-semibold ${
                   c.style === 'secondary'
                     ? 'border border-white/15 text-white'
-                    : 'bg-[#D97706] text-white'
+                    : 'bg-[#B45309] text-white'
                 }`}>
                 {c.label}
               </a>

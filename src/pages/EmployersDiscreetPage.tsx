@@ -239,7 +239,7 @@ const FAQ_ITEMS = [
 ]
 
 const WHATSAPP_CLASS =
-  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#D97706] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#B45309]'
+  'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#B45309] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.24)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#92400E]'
 
 const PRIMARY_CTA_CLASS =
   'inline-flex min-h-[46px] items-center justify-center gap-2 rounded-[18px] bg-[#008080] px-6 py-3 text-[14px] font-bold text-white shadow-[0_10px_24px_rgba(0,128,128,0.20)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#006D6D]'
@@ -639,7 +639,7 @@ export default function EmployersDiscreetPage() {
                 key={item.title}
                 className={`rounded-[24px] border p-5 text-start shadow-[0_12px_34px_rgba(15,23,32,0.045)] ${
                   index === 2
-                    ? 'border-[#D97706]/12 bg-[#FFFAF4]'
+                    ? 'border-[#B45309]/12 bg-[#FFFAF4]'
                     : 'border-[#D9A928]/18 bg-white'
                 }`}
               >

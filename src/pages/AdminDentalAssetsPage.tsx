@@ -211,7 +211,7 @@ export default function AdminDentalAssetsPage() {
         ) : (
           <span
             className={`font-mono text-[12px] font-semibold ${
-              r.days_remaining <= 30 ? 'text-[#D97706]' : 'text-[#2D2D2D]'
+              r.days_remaining <= 30 ? 'text-[#B45309]' : 'text-[#2D2D2D]'
             }`}
           >
             {r.days_remaining}
@@ -229,7 +229,7 @@ export default function AdminDentalAssetsPage() {
           <span>
             {r.total_inquiries}
             {r.new_inquiries > 0 && (
-              <span className="ms-1.5 text-[11px] font-bold text-[#D97706]">
+              <span className="ms-1.5 text-[11px] font-bold text-[#B45309]">
                 {r.new_inquiries} חדשות
               </span>
             )}

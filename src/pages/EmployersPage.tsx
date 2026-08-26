@@ -142,7 +142,7 @@ export default function EmployersPage() {
                 href="https://wa.me/972533951003"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] bg-[#D97706] px-7 py-3 text-[15px] font-bold text-white shadow-[0_12px_28px_rgba(217,119,6,0.22)] transition-all hover:-translate-y-0.5 hover:bg-[#B45309]"
+                className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-[18px] bg-[#B45309] px-7 py-3 text-[15px] font-bold text-white shadow-[0_12px_28px_rgba(217,119,6,0.22)] transition-all hover:-translate-y-0.5 hover:bg-[#92400E]"
               >
                 <WhatsAppIcon className="h-4 w-4" />
                 דברו איתנו ב־WhatsApp

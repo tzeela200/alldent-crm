@@ -1258,7 +1258,7 @@ function UnifiedJobPanel({
         <button
           type="button"
           onClick={() => navigate(`/admin/jobs/${job.job_code}`)}
-          className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]"
+          className="rounded-[10px] bg-[#B45309] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#92400E]"
         >
           עריכה מלאה ←
         </button>
@@ -1333,7 +1333,7 @@ function UnifiedJobPanel({
 }
 
 function KpiCard({ label, value, hint, tone = 'default', onClick }: { label: string; value: number | string; hint: string; tone?: 'default' | 'warning' | 'success'; onClick?: () => void }) {
-  const cls = tone === 'success' ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#16A34A]' : tone === 'warning' ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#D97706]' : 'border-[#D9D9D9] bg-white text-[#008080]'
+  const cls = tone === 'success' ? 'border-[#BBF7D0] bg-[#F0FDF4] text-[#16A34A]' : tone === 'warning' ? 'border-[#FDE68A] bg-[#FFFBEB] text-[#B45309]' : 'border-[#D9D9D9] bg-white text-[#008080]'
   return (
     <button type="button" onClick={onClick} className={`rounded-[18px] border p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${cls}`}>
       <div className="text-[13px] font-semibold text-[#6B6B6B]">{label}</div>
@@ -1373,7 +1373,7 @@ function ListKpiCard({ title, items, empty, onItemClick, colorFor }: { title: st
 }
 
 function InfoPill({ label, tone = 'default' }: { label: string; tone?: 'default' | 'warning' | 'success' }) {
-  const cls = tone === 'success' ? 'bg-[#F0FDF4] text-[#16A34A]' : tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'
+  const cls = tone === 'success' ? 'bg-[#F0FDF4] text-[#16A34A]' : tone === 'warning' ? 'bg-[#FFFBEB] text-[#B45309]' : 'bg-[#F3F4F6] text-[#6B6B6B]'
   return <span className={`rounded-[6px] px-3 py-1 text-[12px] font-semibold ${cls}`}>{label}</span>
 }
 

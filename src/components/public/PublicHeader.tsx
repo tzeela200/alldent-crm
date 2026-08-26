@@ -256,7 +256,7 @@ export function SiteHeader() {
               href="https://whatsapp.com/channel/0029VbAzFBc5Ejxz7zArAv0X"
               target="_blank"
               rel="noreferrer"
-              className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-[#D97706] text-white text-[13.5px] font-bold rounded-[16px] shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#B45309] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200"
+              className="hidden md:inline-flex items-center gap-2 px-4 py-2 bg-[#B45309] text-white text-[13.5px] font-bold rounded-[16px] shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#92400E] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200"
             >
               <Briefcase className="h-3.5 w-3.5" aria-hidden="true" />
               הצטרפות לערוץ ALLDENT
@@ -296,7 +296,7 @@ export function SiteHeader() {
               target="_blank"
               rel="noreferrer"
               onClick={() => setMobileOpen(false)}
-              className="flex items-center justify-center gap-2 w-full py-4 bg-[#D97706] text-white text-[15px] font-bold rounded-[20px] shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#B45309] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200 min-h-[44px]"
+              className="flex items-center justify-center gap-2 w-full py-4 bg-[#B45309] text-white text-[15px] font-bold rounded-[20px] shadow-[6px_6px_12px_rgba(0,0,0,0.12)] hover:bg-[#92400E] hover:shadow-[4px_4px_8px_rgba(0,0,0,0.16)] transition-all duration-200 min-h-[44px]"
             >
               <Briefcase className="h-4 w-4" aria-hidden="true" />
               הצטרפות לערוץ ALLDENT

@@ -283,7 +283,7 @@ export default function AdminDentalAssetDetailPage() {
                 isPublished ? publishUpdate(asset.id) : publish(asset.id),
               )
             }
-            className="inline-flex items-center gap-1.5 rounded-xl bg-[#D97706] px-4 py-2 text-[13px] font-bold text-white transition hover:bg-[#B45309] disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-[#B45309] px-4 py-2 text-[13px] font-bold text-white transition hover:bg-[#92400E] disabled:opacity-40"
           >
             <Send className="h-3.5 w-3.5" />
             {isPublished ? 'עדכון הפרסום' : 'פרסום'}

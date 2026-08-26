@@ -604,7 +604,7 @@ export default function SmartMatchPage() {
               type="button"
               onClick={() => setViewMode('grid')}
               className={`flex h-10 w-10 items-center justify-center ${
-                viewMode === 'grid' ? 'bg-[#FFF7ED] text-[#D97706]' : 'text-slate-500'
+                viewMode === 'grid' ? 'bg-[#FFF7ED] text-[#B45309]' : 'text-slate-500'
               }`}
               title="תצוגת גריד"
               aria-label="תצוגת גריד"
@@ -1124,7 +1124,7 @@ export default function SmartMatchPage() {
                                     יש
                                   </span>
                                 ) : (
-                                  <span className="rounded-full bg-[#FFFBEB] px-2.5 py-1 text-[12px] font-semibold text-[#D97706]">
+                                  <span className="rounded-full bg-[#FFFBEB] px-2.5 py-1 text-[12px] font-semibold text-[#B45309]">
                                     חסר
                                   </span>
                                 )}
@@ -1673,7 +1673,7 @@ function CandidateSheet({
           <button
             type="button"
             onClick={() => window.alert(`תיאום ראיון מול ${candidate.full_name ?? candidate.display_name ?? 'המועמד'}`)}
-            className="inline-flex h-10 items-center justify-center rounded-xl border border-[#D97706]/20 bg-[#FFF7ED] px-3 text-[13px] font-semibold text-[#D97706] transition hover:bg-[#FFEDD5]"
+            className="inline-flex h-10 items-center justify-center rounded-xl border border-[#B45309]/20 bg-[#FFF7ED] px-3 text-[13px] font-semibold text-[#B45309] transition hover:bg-[#FFEDD5]"
           >
             Schedule Interview
           </button>
@@ -1761,7 +1761,7 @@ function LogicPill({
       <div className="text-[12px] font-semibold text-slate-500">{label}</div>
       <div
         className={`mt-1 text-[13px] font-semibold ${
-          tone === 'accent' ? 'text-[#D97706]' : 'text-[#0F172A]'
+          tone === 'accent' ? 'text-[#B45309]' : 'text-[#0F172A]'
         }`}
       >
         {value}
@@ -1786,7 +1786,7 @@ function FilterChip({
       onClick={onClick}
       className={`rounded-full px-3 py-1.5 text-[12px] font-semibold transition ${
         active
-          ? 'bg-[#FFF7ED] text-[#D97706]'
+          ? 'bg-[#FFF7ED] text-[#B45309]'
           : 'bg-[#F8FAFC] text-slate-600 hover:bg-slate-100'
       }`}
     >
@@ -1808,7 +1808,7 @@ function ScoreBadge({ score }: { score: number }) {
       : score >= 70
         ? 'bg-[#EFF6FF] text-[#1D4ED8]'
         : score >= 55
-          ? 'bg-[#FFF7ED] text-[#D97706]'
+          ? 'bg-[#FFF7ED] text-[#B45309]'
           : 'bg-[#F8FAFC] text-slate-600'
 
 
@@ -1964,7 +1964,7 @@ function InlineSignal({
 }) {
   const style =
     tone === 'warning'
-      ? 'bg-[#FFFBEB] text-[#D97706]'
+      ? 'bg-[#FFFBEB] text-[#B45309]'
       : tone === 'danger'
         ? 'bg-[#FEF2F2] text-[#DC2626]'
         : tone === 'success'

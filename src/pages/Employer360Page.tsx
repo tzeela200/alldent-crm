@@ -1036,7 +1036,7 @@ function HeroSection({
                   פרופיל להדפסה
                 </Link>
               </Button>
-              <Button asChild className="rounded-xl bg-[#D97706] text-white hover:bg-[#B95F04]">
+              <Button asChild className="rounded-xl bg-[#B45309] text-white hover:bg-[#B95F04]">
                 <Link to={`/admin/jobs/new?account_id=${account.account_id}`}>
                   <Plus className="h-4 w-4" />
                   יצירת משרה

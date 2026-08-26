@@ -210,7 +210,7 @@ function JobDetailsPanel({
       <div className="hidden px-5 pb-5 pt-4 md:block">
         <button
           onClick={onApply}
-          className="w-full rounded-full bg-[#D97706] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#B45309] focus:outline-none focus:ring-4 focus:ring-[#D97706]/25 active:scale-[0.98]"
+          className="w-full rounded-full bg-[#B45309] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#92400E] focus:outline-none focus:ring-4 focus:ring-[#B45309]/25 active:scale-[0.98]"
         >
           הגשת מועמדות
         </button>
@@ -327,7 +327,7 @@ function JobMobileApplyBar({
       </div>
       <button
         onClick={onApply}
-        className="shrink-0 rounded-full bg-[#D97706] px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#B45309] active:scale-[0.98]"
+        className="shrink-0 rounded-full bg-[#B45309] px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#92400E] active:scale-[0.98]"
       >
         הגשה
       </button>

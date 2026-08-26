@@ -10,7 +10,7 @@
  *
  * המלל כולו ב-src/content/homeDentTerms.ts.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { BackLink } from '@/components/public/BackLink'
 import {
@@ -86,8 +86,13 @@ function Option({
       role="radio"
       aria-checked={checked}
       onClick={onSelect}
-      className={`relative flex flex-col gap-3 bg-paper p-7 text-right transition-colors duration-500 ease-out-expo md:p-11 ${
-        checked ? 'bg-ink text-paper' : 'hover:bg-[rgba(15,15,16,0.03)]'
+      /* ⚠️ הרקע חייב להיות בענף אחד בלבד. קודם היה כאן `bg-paper` בבסיס
+         ו-`bg-ink` בענף הנבחר — שתי מחלקות רקע על אותו אלמנט, ו-Tailwind
+         מכריע ביניהן לפי הסדר בגיליון הסגנונות ולא לפי סדר המחרוזת.
+         התוצאה: הכרטיס הנבחר קיבל רקע בהיר יחד עם `text-paper` הבהיר,
+         והטקסט נעלם. */
+      className={`relative flex flex-col gap-3 p-7 text-right transition-colors duration-500 ease-out-expo md:p-11 ${
+        checked ? 'bg-ink text-paper' : 'bg-paper text-ink hover:bg-[rgba(15,15,16,0.03)]'
       }`}
     >
       <span className="flex items-center justify-between gap-4">
@@ -103,7 +108,7 @@ function Option({
         <span
           className={`h-2.5 w-2.5 shrink-0 rounded-full border transition-all duration-500 ${
             checked
-              ? 'border-[#D97706] bg-[#D97706] shadow-[0_0_0_5px_rgba(217,119,6,0.22)]'
+              ? 'border-[#B45309] bg-[#B45309] shadow-[0_0_0_5px_rgba(217,119,6,0.22)]'
               : 'border-ink/25'
           }`}
         />
@@ -148,6 +153,29 @@ export default function DentalAssetTermsPage() {
   const [consent, setConsent] = useState(false)
   const [error, setError] = useState(false)
   const [openFaq, setOpenFaq] = useState<number | null>(null)
+
+  /* הסרגל נעלם ברגע שכפתור "המשך לטופס" על המסך — אחרת נראים שני
+     כפתורי המשך זה ליד זה.
+     ⚠️ בכוונה בדיקת מיקום ב-scroll ולא IntersectionObserver: קריאות של
+     IO נמסרות רק כשהדפדפן מבצע rendering steps, ובלשונית שאינה מצוירת
+     (או ממוזערת) הן לא נמסרות והסרגל היה נתקע במצב אחד. */
+  const gateRef = useRef<HTMLButtonElement | null>(null)
+  const [gateVisible, setGateVisible] = useState(false)
+  useEffect(() => {
+    const check = () => {
+      const el = gateRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      setGateVisible(r.top < window.innerHeight && r.bottom > 0)
+    }
+    check()
+    window.addEventListener('scroll', check, { passive: true })
+    window.addEventListener('resize', check)
+    return () => {
+      window.removeEventListener('scroll', check)
+      window.removeEventListener('resize', check)
+    }
+  }, [])
 
   const price = useMemo(
     () => HD_PACKAGES.find((p) => p.days === days)?.price ?? null,
@@ -214,7 +242,7 @@ export default function DentalAssetTermsPage() {
           <div className="mt-2 flex flex-wrap justify-center gap-3">
             <a
               href="#choose"
-              className="rounded-sm bg-[#D97706] px-8 py-4 text-[14.5px] font-semibold text-white transition-colors duration-500 hover:bg-[#B45309]"
+              className="rounded-sm bg-[#B45309] px-8 py-4 text-[14.5px] font-semibold text-white transition-colors duration-500 hover:bg-[#92400E]"
             >
               בחירת מסלול
             </a>
@@ -386,7 +414,7 @@ export default function DentalAssetTermsPage() {
                     }`}
                   >
                     <div className="overflow-hidden">
-                      <p className="max-w-[56ch] pb-[clamp(22px,2.4vw,34px)] text-[15.5px] leading-[1.85] text-ink/72 text-pretty">
+                      <p className="max-w-[62ch] pb-[clamp(22px,2.4vw,34px)] text-[15.5px] leading-[1.85] text-ink/72 text-balance">
                         {item.a}
                       </p>
                     </div>
@@ -399,7 +427,7 @@ export default function DentalAssetTermsPage() {
       </section>
 
       {/* ═══ שער ההסכמה ═══ */}
-      <section className="pb-[clamp(56px,7vw,96px)]">
+      <section id="gate" className="pb-[clamp(56px,7vw,96px)]">
         <div className="mx-auto max-w-[1280px] px-[clamp(24px,5vw,72px)]">
           <div className="relative overflow-hidden rounded-[22px] bg-[#1E1E1E] text-white">
             <div
@@ -446,7 +474,7 @@ export default function DentalAssetTermsPage() {
                       setConsent(e.target.checked)
                       if (e.target.checked) setError(false)
                     }}
-                    className="mt-1 h-4 w-4 shrink-0 accent-[#D97706]"
+                    className="mt-1 h-4 w-4 shrink-0 accent-[#B45309]"
                   />
                   <span className="text-[13.5px] leading-[1.7] text-white/75">
                     {HD_CONSENT_LABEL}
@@ -462,10 +490,11 @@ export default function DentalAssetTermsPage() {
                 )}
 
                 <button
+                  ref={gateRef}
                   type="button"
                   onClick={handleContinue}
                   disabled={!canContinue}
-                  className="mt-5 w-full rounded-sm bg-[#D97706] px-8 py-4 text-[14.5px] font-semibold text-white transition-colors duration-500 hover:bg-[#B45309] disabled:cursor-not-allowed disabled:opacity-30"
+                  className="mt-5 w-full rounded-sm bg-[#B45309] px-8 py-4 text-[14.5px] font-semibold text-white transition-colors duration-500 hover:bg-[#92400E] disabled:cursor-not-allowed disabled:opacity-30"
                 >
                   המשך לטופס
                 </button>
@@ -481,8 +510,13 @@ export default function DentalAssetTermsPage() {
 
       {/* ═══ סרגל סיכום — עולה אחרי הבחירה הראשונה ═══ */}
       <div
-        className={`sticky bottom-0 z-30 border-t border-white/10 bg-[rgba(30,30,30,0.94)] text-white backdrop-blur-xl transition-transform duration-700 ease-out-expo ${
-          days !== null || screening !== null ? 'translate-y-0' : 'translate-y-full'
+        /* ⚠️ translate-y-full לבדו לא מספיק: בסוף המסמך הסרגל כבר אינו
+           "תקוע" לתחתית החלון, וההזזה בגובה עצמו משאירה אותו חלקית במסך.
+           opacity-0 + pointer-events-none מבטיחים היעלמות בכל מצב גלילה. */
+        className={`sticky bottom-0 z-30 border-t border-white/10 bg-[rgba(30,30,30,0.94)] text-white backdrop-blur-xl transition-[transform,opacity] duration-700 ease-out-expo ${
+          (days !== null || screening !== null) && !gateVisible
+            ? 'translate-y-0 opacity-100'
+            : 'pointer-events-none translate-y-full opacity-0'
         }`}
       >
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-x-[clamp(20px,3vw,44px)] gap-y-3 px-[clamp(24px,5vw,72px)] py-4">
@@ -506,16 +540,19 @@ export default function DentalAssetTermsPage() {
               </span>
             </div>
           </div>
+          {/* כפתור אחד בלבד: כשהשער כבר על המסך הסרגל נעלם, אחרת היו
+              נראים שני כפתורי "המשך" זה ליד זה שעושים דברים שונים. */}
           <button
             type="button"
-            onClick={() =>
+            onClick={() => {
+              if (canContinue) return handleContinue()
               document
-                .querySelector(ready ? '#choose ~ section, section:last-of-type' : '#choose')
+                .querySelector(ready ? '#gate' : '#choose')
                 ?.scrollIntoView({ behavior: 'smooth', block: ready ? 'center' : 'start' })
-            }
-            className="rounded-sm border border-white/15 px-6 py-3 text-[13.5px] font-semibold transition-colors duration-500 hover:bg-white hover:text-ink"
+            }}
+            className="rounded-sm bg-[#B45309] px-6 py-3 text-[13.5px] font-semibold text-white transition-colors duration-500 hover:bg-[#92400E]"
           >
-            {ready ? 'להמשך' : 'בחירת מסלול'}
+            {canContinue ? 'המשך לטופס' : ready ? 'לאישור התנאים' : 'בחירת מסלול'}
           </button>
         </div>
       </div>

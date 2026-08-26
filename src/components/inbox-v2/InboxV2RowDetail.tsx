@@ -478,7 +478,7 @@ export function InboxV2RowDetail({
                         row.match_confidence >= 80
                           ? 'text-[#008080]'
                           : row.match_confidence >= 40
-                            ? 'text-[#D97706]'
+                            ? 'text-[#B45309]'
                             : 'text-[#9CA3AF]'
                       }`}
                     >
@@ -491,7 +491,7 @@ export function InboxV2RowDetail({
                         row.match_confidence >= 80
                           ? 'bg-[#008080]'
                           : row.match_confidence >= 40
-                            ? 'bg-[#D97706]'
+                            ? 'bg-[#B45309]'
                             : 'bg-[#D9D9D9]'
                       }`}
                       style={{ width: `${row.match_confidence}%` }}

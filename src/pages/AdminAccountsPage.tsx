@@ -489,7 +489,7 @@ export default function AdminAccountsPage() {
             </select>
             <button onClick={applyBulkUpdate} className="rounded-lg bg-[#008080] px-3 py-1 text-[13px] font-bold text-white hover:bg-[#006D6D]">בצע שינוי גורף</button>
             {selectedRows.length >= 2 && (
-              <button onClick={() => setMergeOpen(true)} className="rounded-lg border border-[#D97706] px-3 py-1 text-[13px] font-bold text-[#D97706] hover:bg-[#FFFBEB]">🔀 מיזוג רשומות</button>
+              <button onClick={() => setMergeOpen(true)} className="rounded-lg border border-[#B45309] px-3 py-1 text-[13px] font-bold text-[#B45309] hover:bg-[#FFFBEB]">🔀 מיזוג רשומות</button>
             )}
             <button onClick={() => setSelectedRows([])} className="rounded-lg border border-[#D9D9D9] px-3 py-1 text-[13px] font-semibold text-[#6B6B6B] hover:bg-[#F3F4F6]">נקה בחירה</button>
           </div>

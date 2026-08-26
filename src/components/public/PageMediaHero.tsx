@@ -42,7 +42,7 @@ export function PageMediaHero({
               </span>
             )}
             {status === 'coming-soon' && (
-              <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold tracking-wide bg-[#D97706]/10 text-[#D97706]">
+              <span className="inline-flex items-center px-3 py-1 rounded-full text-[12px] font-bold tracking-wide bg-[#D97706]/10 text-[#B45309]">
                 בקרוב
               </span>
             )}

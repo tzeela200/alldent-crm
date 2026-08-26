@@ -1187,9 +1187,9 @@ export default function AdminEmployersPage({
 
           {selectedRows.length > 0 && (
             <Toolbar>
-              <div className="rounded-[18px] border border-[#D97706]/20 bg-[#FFFBEB] p-4 shadow-sm">
+              <div className="rounded-[18px] border border-[#B45309]/20 bg-[#FFFBEB] p-4 shadow-sm">
                 <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                  <span className="rounded-full bg-white px-3 py-1 text-[13px] font-bold text-[#D97706] shadow-sm">נבחרו {selectedRows.length} רשומות</span>
+                  <span className="rounded-full bg-white px-3 py-1 text-[13px] font-bold text-[#B45309] shadow-sm">נבחרו {selectedRows.length} רשומות</span>
                   <ActionButton variant="ghost" onClick={() => setSelectedRows([])}>נקה בחירה</ActionButton>
                 </div>
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
@@ -1368,7 +1368,7 @@ export default function AdminEmployersPage({
                     <button
                       type="button"
                       onClick={() => navigate(`/admin/employers/${sheet.accountId}`)}
-                      className="rounded-[10px] bg-[#D97706] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#B45309]"
+                      className="rounded-[10px] bg-[#B45309] px-5 py-2 text-[13px] font-semibold text-white hover:bg-[#92400E]"
                     >
                       360 מלא ←
                     </button>
@@ -1554,7 +1554,7 @@ export default function AdminEmployersPage({
 
 function KpiCard({ label, value, hint, tone = 'default', onClick }: { label: string; value: number; hint?: string; tone?: 'default' | 'success' | 'warning'; onClick?: () => void }) {
   const toneClasses = tone === 'success' ? 'border-[#BBF7D0] bg-[#F0FDF4]' : tone === 'warning' ? 'border-[#FDE68A] bg-[#FFFBEB]' : 'border-[#D9D9D9] bg-white'
-  const valueClasses = tone === 'success' ? 'text-[#16A34A]' : tone === 'warning' ? 'text-[#D97706]' : 'text-[#008080]'
+  const valueClasses = tone === 'success' ? 'text-[#16A34A]' : tone === 'warning' ? 'text-[#B45309]' : 'text-[#008080]'
   return <button type="button" onClick={onClick} className={`rounded-[18px] border p-5 text-right shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${toneClasses}`}><div className="text-[13px] font-semibold text-[#6B6B6B]">{label}</div><div className={`mt-2 text-[24px] font-bold ${valueClasses}`}>{value}</div>{hint && <div className="mt-1 text-[12px] font-medium text-[#6B6B6B]">{hint}</div>}</button>
 }
 
@@ -1563,7 +1563,7 @@ function InfoPill({ label, tone = 'default' }: { label: string; tone?: 'default'
 }
 
 function MiniSignal({ children, tone = 'muted' }: { children: React.ReactNode; tone?: 'muted' | 'warning' }) {
-  return <span className={`rounded-[6px] px-2 py-0.5 text-[11px] font-bold ${tone === 'warning' ? 'bg-[#FFFBEB] text-[#D97706]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>{children}</span>
+  return <span className={`rounded-[6px] px-2 py-0.5 text-[11px] font-bold ${tone === 'warning' ? 'bg-[#FFFBEB] text-[#B45309]' : 'bg-[#F3F4F6] text-[#6B6B6B]'}`}>{children}</span>
 }
 
 function SortableTh({ label, sortKey, sortBy, sortDir, onSort, width, onResize }: { label: string; sortKey: string; sortBy: string | null; sortDir: 'asc' | 'desc'; onSort: (key: string) => void; width?: number; onResize?: (delta: number) => void }) {

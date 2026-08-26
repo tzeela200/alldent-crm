@@ -244,7 +244,7 @@ interface ActionButtonProps {
 }
 
 const buttonVariants = {
-  primary:   'bg-[#D97706] text-white hover:bg-[#B45309] shadow-sm',
+  primary:   'bg-[#B45309] text-white hover:bg-[#92400E] shadow-sm',
   secondary: 'border border-[#D9D9D9] bg-white text-[#2D2D2D] hover:bg-[#F3F4F6]',
   ghost:     'text-[#6B6B6B] hover:bg-[#F3F4F6]',
   danger:    'bg-[#DC2626] text-white hover:bg-[#B91C1C]',

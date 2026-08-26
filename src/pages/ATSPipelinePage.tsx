@@ -611,7 +611,7 @@ export default function ATSPipelinePage() {
                 onClick={() => setFilters((prev) => ({ ...prev, active_only: !prev.active_only }))}
                 className={`h-10 rounded-xl px-3 text-sm font-semibold ${
                   filters.active_only
-                    ? 'bg-[#FFF7ED] text-[#D97706]'
+                    ? 'bg-[#FFF7ED] text-[#B45309]'
                     : 'border border-slate-200 bg-white text-slate-700'
                 }`}
               >
@@ -1101,7 +1101,7 @@ function InlineSignal({
 }) {
   const style =
     tone === 'warning'
-      ? 'bg-[#FFFBEB] text-[#D97706]'
+      ? 'bg-[#FFFBEB] text-[#B45309]'
       : tone === 'danger'
         ? 'bg-[#FEF2F2] text-[#DC2626]'
         : 'bg-[#F0FDF4] text-[#16A34A]'

@@ -51,7 +51,7 @@ export function ComingSoonPage({
                 href={whatsappHref}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-[52px] w-full items-center justify-center rounded-full bg-[#D97706] px-7 text-[16px] font-medium text-white shadow-[0_14px_30px_rgba(217,119,6,0.22)] transition hover:bg-[#B45309] sm:w-auto"
+                className="inline-flex min-h-[52px] w-full items-center justify-center rounded-full bg-[#B45309] px-7 text-[16px] font-medium text-white shadow-[0_14px_30px_rgba(217,119,6,0.22)] transition hover:bg-[#92400E] sm:w-auto"
               >
                 שלחו הודעה בוואטסאפ
               </a>

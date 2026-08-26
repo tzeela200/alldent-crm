@@ -171,14 +171,14 @@ export function IntakeMergeDialog({ row, target, targetId, onClose }: Props) {
                   </label>
                   <label className={`cursor-pointer p-3 ${choice === 'incoming' ? 'bg-[#FFF7E8]' : ''}`}>
                     <div className="flex items-start gap-2">
-                      <input type="radio" name={`choice-${diff.key}`} checked={choice === 'incoming'} onChange={() => setChoices((c) => ({ ...c, [diff.key]: 'incoming' }))} className="mt-0.5 accent-[#D97706]" />
+                      <input type="radio" name={`choice-${diff.key}`} checked={choice === 'incoming'} onChange={() => setChoices((c) => ({ ...c, [diff.key]: 'incoming' }))} className="mt-0.5 accent-[#B45309]" />
                       <span dir={isLtrField(diff.key) ? 'ltr' : 'auto'}>{displayValue(diff.key, diff.incoming)}</span>
                     </div>
                     {diff.fillsEmpty && <div className="mt-1 text-[11px] text-[#008080]">השלמת מידע חסר</div>}
                   </label>
                   <div className={`p-3 ${choice === 'manual' ? 'bg-[#FFFBEB]' : ''}`}>
                     <label className="flex cursor-pointer items-start gap-2">
-                      <input type="radio" name={`choice-${diff.key}`} checked={choice === 'manual'} onChange={() => setChoices((c) => ({ ...c, [diff.key]: 'manual' }))} className="mt-0.5 accent-[#D97706]" />
+                      <input type="radio" name={`choice-${diff.key}`} checked={choice === 'manual'} onChange={() => setChoices((c) => ({ ...c, [diff.key]: 'manual' }))} className="mt-0.5 accent-[#B45309]" />
                       <span>ערך אחר</span>
                     </label>
                     {choice === 'manual' && manualEditor(diff)}

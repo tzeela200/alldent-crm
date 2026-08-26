@@ -133,7 +133,7 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
         <div className="border-b border-[#EFEFEF] px-6 py-5">
           <div className="flex items-start justify-between gap-4">
             <div className="text-right">
-              <p className="mb-1 text-[12px] font-semibold text-[#D97706]">
+              <p className="mb-1 text-[12px] font-semibold text-[#B45309]">
                 משרה {jobCode}
               </p>
               <h2 className="text-[22px] font-bold leading-tight text-[#1A1A1A]">
@@ -171,7 +171,7 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
               icon={AlertCircle}
               title="המועמדות כבר קיימת"
               text="נראה שכבר שלחת מועמדות למשרה הזו."
-              iconClass="text-[#D97706]"
+              iconClass="text-[#B45309]"
             />
           )}
 
@@ -239,7 +239,7 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
                 <button
                   type="button"
                   onClick={() => fileRef.current?.click()}
-                  className="flex h-12 w-full items-center justify-between gap-3 rounded-2xl border border-[#D9D9D9] bg-white px-4 text-right text-[14px] transition hover:border-[#D97706] hover:bg-[#FFF8F0]"
+                  className="flex h-12 w-full items-center justify-between gap-3 rounded-2xl border border-[#D9D9D9] bg-white px-4 text-right text-[14px] transition hover:border-[#B45309] hover:bg-[#FFF8F0]"
                 >
                   <span className={cvFile ? 'truncate text-[#1A1A1A]' : 'text-[#9CA3AF]'}>
                     {cvFile ? cvFile.name : 'העלאת קובץ PDF / Word'}
@@ -266,7 +266,7 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
                   type="checkbox"
                   checked={form.consent}
                   onChange={handleChange}
-                  className="mt-1 h-4 w-4 shrink-0 rounded border-[#D9D9D9] text-[#D97706] focus:ring-[#D97706]"
+                  className="mt-1 h-4 w-4 shrink-0 rounded border-[#D9D9D9] text-[#B45309] focus:ring-[#B45309]"
                 />
 
                 <span className="text-[13px] leading-6 text-[#6B6B6B]">
@@ -277,7 +277,7 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
               <button
                 type="submit"
                 disabled={status === 'loading' || !form.consent}
-                className="flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#D97706] px-6 py-3.5 text-[15px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.25)] transition hover:bg-[#B45309] disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex h-13 w-full items-center justify-center gap-2 rounded-2xl bg-[#B45309] px-6 py-3.5 text-[15px] font-bold text-white shadow-[0_10px_24px_rgba(217,119,6,0.25)] transition hover:bg-[#92400E] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {status === 'loading' && <Loader2 className="h-4 w-4 animate-spin" />}
                 שליחת מועמדות
@@ -295,7 +295,7 @@ export default function ApplyModal({ isOpen, onClose, jobCode }: Props) {
 }
 
 const inputCls =
-  'h-12 w-full rounded-2xl border border-[#D9D9D9] bg-white px-4 text-[15px] text-[#1A1A1A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#D97706] focus:ring-4 focus:ring-[#D97706]/10'
+  'h-12 w-full rounded-2xl border border-[#D9D9D9] bg-white px-4 text-[15px] text-[#1A1A1A] outline-none transition placeholder:text-[#9CA3AF] focus:border-[#B45309] focus:ring-4 focus:ring-[#B45309]/10'
 
 function Field({
   label,
@@ -310,7 +310,7 @@ function Field({
     <div>
       <label className="mb-1.5 block text-right text-[13px] font-semibold text-[#2D2D2D]">
         {label}
-        {required && <span className="mr-1 text-[#D97706]">*</span>}
+        {required && <span className="mr-1 text-[#B45309]">*</span>}
       </label>
 
       {children}

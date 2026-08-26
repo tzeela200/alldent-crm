@@ -55,7 +55,7 @@ const num = (v: string) => (v.trim() === '' ? null : Number(v))
 const INPUT =
   'w-full border-0 border-b border-rule bg-transparent px-0.5 py-3 text-[16.5px] ' +
   'transition-colors duration-300 placeholder:text-ink/25 placeholder: ' +
-  'hover:border-ink/25 focus:border-[#D97706] focus:outline-none rounded-none'
+  'hover:border-ink/25 focus:border-[#B45309] focus:outline-none rounded-none'
 
 function Field({
   label,
@@ -74,7 +74,7 @@ function Field({
     <div className={`flex flex-col gap-2 ${wide ? 'sm:col-span-2' : ''}`}>
       <label className="text-[13px] font-medium text-ink/72">
         {label}
-        {required && <span className="text-[#D97706]"> *</span>}
+        {required && <span className="text-[#B45309]"> *</span>}
       </label>
       {children}
       {hint && <span className="text-[12px] text-ink/60">{hint}</span>}
@@ -120,11 +120,11 @@ function CheckGrid({
             />
             <span
               className={`relative h-4 w-4 shrink-0 rounded-[1px] border transition-all duration-300 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary ${
-                on ? 'border-[#D97706]' : 'border-ink/25'
+                on ? 'border-[#B45309]' : 'border-ink/25'
               }`}
             >
               <span
-                className={`absolute inset-[3px] bg-[#D97706] transition-transform duration-300 ${
+                className={`absolute inset-[3px] bg-[#B45309] transition-transform duration-300 ${
                   on ? 'scale-100' : 'scale-0'
                 }`}
               />
@@ -346,7 +346,7 @@ export default function DentalAssetRequestPage() {
               >
                 <span
                   className={`absolute inset-0 origin-right transition-transform duration-700 ease-out-expo ${
-                    i + 1 === step ? 'scale-x-100 bg-[#D97706]' : i + 1 < step ? 'scale-x-100 bg-ink' : 'scale-x-0 bg-ink'
+                    i + 1 === step ? 'scale-x-100 bg-[#B45309]' : i + 1 < step ? 'scale-x-100 bg-ink' : 'scale-x-0 bg-ink'
                   }`}
                 />
               </button>
@@ -455,7 +455,7 @@ export default function DentalAssetRequestPage() {
                   >
                     <span className="flex items-center justify-between gap-3.5">
                       <h4 className="text-[20px] font-black leading-[1.1] tracking-[-0.03em]">{d.label}</h4>
-                      <span className={`h-2 w-2 shrink-0 rounded-full border transition-colors duration-500 ${on ? 'border-[#D97706] bg-[#D97706]' : 'border-ink/25'}`} />
+                      <span className={`h-2 w-2 shrink-0 rounded-full border transition-colors duration-500 ${on ? 'border-[#B45309] bg-[#B45309]' : 'border-ink/25'}`} />
                     </span>
                     <p className={`mt-2 text-[13.5px] leading-[1.65] ${on ? 'text-white/75' : 'text-ink/72'}`}>{d.hint}</p>
                   </button>
@@ -578,7 +578,7 @@ export default function DentalAssetRequestPage() {
             <p className="mb-8 max-w-[48ch] text-[16.5px] leading-[1.8] text-ink/72 text-pretty">
               עד {HD_MAX_IMAGES} תמונות. אנחנו בוחרים מתוכן מה יופיע ובאיזה סדר.
             </p>
-            <label className="block cursor-pointer rounded-sm border border-dashed border-ink/25 px-6 py-[clamp(40px,6vw,72px)] text-center transition-colors duration-500 hover:border-[#D97706] hover:bg-[rgba(217,119,6,0.035)]">
+            <label className="block cursor-pointer rounded-sm border border-dashed border-ink/25 px-6 py-[clamp(40px,6vw,72px)] text-center transition-colors duration-500 hover:border-[#B45309] hover:bg-[rgba(217,119,6,0.035)]">
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => addFiles(e.target.files)} />
               <b className="block text-[19px] font-bold tracking-[-0.02em]">בחרו תמונות</b>
               <small className="mt-2 block font-mono text-[12.5px] tracking-[0.12em] text-ink/60">JPG · PNG · WEBP · 10MB</small>
@@ -672,7 +672,7 @@ export default function DentalAssetRequestPage() {
               type="button"
               disabled={saving}
               onClick={handleSubmit}
-              className="rounded-sm bg-[#D97706] px-8 py-4 text-[14.5px] font-semibold text-white transition-colors duration-500 hover:bg-[#B45309] disabled:opacity-40"
+              className="rounded-sm bg-[#B45309] px-8 py-4 text-[14.5px] font-semibold text-white transition-colors duration-500 hover:bg-[#92400E] disabled:opacity-40"
             >
               {saving ? 'שולח…' : 'שליחת הבקשה'}
             </button>
@@ -717,7 +717,7 @@ function Review({
       <div className="mb-4 flex items-baseline justify-between gap-4">
         <h4 className="text-[21px] font-black tracking-[-0.03em]">{title}</h4>
         {step && (
-          <button type="button" onClick={() => onEdit(step)} className="font-mono text-[12px] tracking-[0.16em] text-ink/60 transition-colors duration-300 hover:text-[#D97706]">
+          <button type="button" onClick={() => onEdit(step)} className="font-mono text-[12px] tracking-[0.16em] text-ink/60 transition-colors duration-300 hover:text-[#B45309]">
             עריכה
           </button>
         )}

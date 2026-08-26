@@ -44,7 +44,7 @@ export function CareerCategoriesCarousel() {
     <section className="bg-white py-20 md:py-28 overflow-hidden" dir="rtl">
       <div className="mx-auto max-w-7xl px-5 md:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <p className="text-[#D97706] text-[12px] font-extrabold tracking-[0.24em] uppercase" dir="ltr">
+          <p className="text-[#B45309] text-[12px] font-extrabold tracking-[0.24em] uppercase" dir="ltr">
             Career Categories
           </p>
           <h2 className="mt-3 text-[#2D2D2D] text-[34px] md:text-[52px] leading-[1.06] font-black tracking-[-0.035em]">

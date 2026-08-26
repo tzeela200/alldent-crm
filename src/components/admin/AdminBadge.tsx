@@ -12,7 +12,7 @@ const variants: Record<AdminBadgeVariant, string> = {
   neutral: 'bg-[#F3F4F6] text-[#6B6B6B] border-[#D9D9D9]',
   info:    'bg-[#EFF6FF] text-[#3B82F6] border-[#BFDBFE]',
   purple:  'bg-[#F5F3FF] text-[#7C3AED] border-[#DDD6FE]',
-  amber:   'bg-[#FFFBEB] text-[#D97706] border-[#FDE68A]',
+  amber:   'bg-[#FFFBEB] text-[#B45309] border-[#FDE68A]',
   teal:    'bg-[#E6F3F3] text-[#008080] border-[#99D6D6]',
 }
 

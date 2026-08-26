@@ -438,7 +438,7 @@ export default function CandidateProfilePage() {
                 className="h-11 w-full rounded-xl border-[#E5E7EB] px-5 text-[15px] text-[#111827] hover:bg-[#F9FAFB] sm:w-auto"
                 onClick={() => setShowWriter(true)}
               >
-                <Sparkles className="me-2 h-4 w-4 text-[#D97706]" />
+                <Sparkles className="me-2 h-4 w-4 text-[#B45309]" />
                 שדרוג AI
               </Button>
               <Button

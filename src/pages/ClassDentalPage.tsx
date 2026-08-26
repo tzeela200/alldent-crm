@@ -5,7 +5,7 @@ import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon'
 
 // קבועי העיצוב שנלקחו ישירות מקוד מיתוג המעסיקים שלך
 const WHATSAPP_CLASS =
-  'inline-flex min-h-[50px] items-center justify-center gap-2.5 rounded-[18px] bg-[#D97706] px-7 py-3 text.5 font-bold text-white shadow-[0_12px_24px_rgba(217,119,6,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#B45309] hover:shadow-[0_14px_28px_rgba(217,119,6,0.24)]'
+  'inline-flex min-h-[50px] items-center justify-center gap-2.5 rounded-[18px] bg-[#B45309] px-7 py-3 text.5 font-bold text-white shadow-[0_12px_24px_rgba(217,119,6,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#92400E] hover:shadow-[0_14px_28px_rgba(217,119,6,0.24)]'
 
 const CLASS_HIGHLIGHTS = [
   'אזור תוכן',

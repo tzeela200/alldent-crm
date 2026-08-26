@@ -252,7 +252,7 @@ export default function DentalAssetsPage() {
             <div className="flex flex-wrap items-center justify-center gap-4">
               <Link
                 to="/dental-assets/terms"
-                className="inline-flex items-center gap-2 rounded-full bg-[#D97706] px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-[#B45309]"
+                className="inline-flex items-center gap-2 rounded-full bg-[#B45309] px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-[#92400E]"
               >
                 <MessageCircle className="h-4 w-4" />
                 פרסמו נכס
@@ -305,7 +305,7 @@ export default function DentalAssetsPage() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Link
               to="/dental-assets/terms"
-              className="inline-flex items-center gap-2 rounded-full bg-[#D97706] px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-[#B45309]"
+              className="inline-flex items-center gap-2 rounded-full bg-[#B45309] px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-[#92400E]"
             >
               <MessageCircle className="h-4 w-4" />
               פרסמו נכס
