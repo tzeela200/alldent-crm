@@ -197,15 +197,13 @@ export default function DentalAssetsPage() {
               מרפאות, מעבדות והזדמנויות עסקיות בעולם הדנטל — מכירה, השכרה, שותפויות והעברת פעילות.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <a
-                href="https://wa.me/972533951003"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                to="/dental-assets/terms"
                 className="inline-flex items-center gap-2 rounded-full bg-[#D97706] px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-[#B45309]"
               >
                 <MessageCircle className="h-4 w-4" />
                 פרסמו נכס
-              </a>
+              </Link>
               <a
                 href="#properties"
                 className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-white/15"
@@ -252,15 +250,13 @@ export default function DentalAssetsPage() {
             פרסמו את הנכס שלכם ותגיעו לאלפי אנשי מקצוע בעולם הדנטל בישראל.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <a
-              href="https://wa.me/972533951003"
-              target="_blank"
-              rel="noopener noreferrer"
+            <Link
+              to="/dental-assets/terms"
               className="inline-flex items-center gap-2 rounded-full bg-[#D97706] px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-[#B45309]"
             >
               <MessageCircle className="h-4 w-4" />
               פרסמו נכס
-            </a>
+            </Link>
             <Link
               to="/"
               className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-7 py-3.5 text-[14px] font-bold text-white transition hover:bg-white/15"

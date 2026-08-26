@@ -31,11 +31,20 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
+    // INC-3130: קטגוריה עצמאית. הפריט הראשי מוביל ללוח הקיים, ומתחתיו
+    // עמוד השירות לבעלי נכסים. יצא מתוך "שירותים דנטליים" (החלטה 13).
+    label: 'נכסים דנטליים',
+    to: '/dental-assets',
+    children: [
+      { label: 'לוח הנכסים', to: '/dental-assets' },
+      { label: 'פרסמו נכס', to: '/dental-assets/terms' },
+    ],
+  },
+  {
     label: 'שירותים דנטליים',
     to: '/dental-shop',
     children: [
       { label: 'חנות דנטלית', to: '/dental-shop' },
-      { label: 'נכסים דנטליים', to: '/dental-assets' },
       { label: 'כיתה דנטלית', to: '/class-dental' },
     ],
   },

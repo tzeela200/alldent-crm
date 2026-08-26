@@ -52,6 +52,8 @@ import EmployersBrandingPage from '@/pages/EmployersBrandingPage'
 import RecruitmentRequestPage from '@/pages/RecruitmentRequestPage'
 import DentalShopPage from '@/pages/DentalShopPage'
 import DentalAssetsPage from '@/pages/DentalAssetsPage'
+import DentalAssetTermsPage from '@/pages/DentalAssetTermsPage'
+import DentalAssetRequestPage from '@/pages/DentalAssetRequestPage'
 import ClassDentalPage from '@/pages/ClassDentalPage'
 import ContactPage from '@/pages/ContactPage'
 
@@ -129,6 +131,9 @@ export default function App() {
         {/* Dental services */}
         <Route path="/dental-shop" element={<DentalShopPage />} />
         <Route path="/dental-assets" element={<DentalAssetsPage />} />
+        {/* INC-3130 — נתיבים סטטיים לפני /dental-assets/:code שיתווסף בחבילה D */}
+        <Route path="/dental-assets/terms" element={<DentalAssetTermsPage />} />
+        <Route path="/dental-assets/terms/request" element={<DentalAssetRequestPage />} />
         <Route path="/class-dental" element={<ClassDentalPage />} />
 
         {/* Contact */}
