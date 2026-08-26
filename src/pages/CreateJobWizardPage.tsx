@@ -47,6 +47,7 @@ type FormState = {
   salary_type_ids: number[]
   work_schedule_text: string
   job_description: string
+  description_image_url: string
   job_requirements: string
   employer_notes: string
   notes: string
@@ -85,6 +86,7 @@ const EMPTY_FORM: FormState = {
   salary_type_ids: [],
   work_schedule_text: '',
   job_description: '',
+  description_image_url: '',
   job_requirements: '',
   employer_notes: '',
   notes: '',
@@ -284,6 +286,7 @@ export default function CreateJobWizardPage() {
         show_salary_public: form.show_salary_public,
         work_schedule_text: cleanText(form.work_schedule_text),
         job_description: cleanText(form.job_description),
+        description_image_url: cleanText(form.description_image_url),
         job_requirements: cleanText(form.job_requirements),
         rel_employer_contact: form.rel_employer_contact ?? null,
         rel_recruiter_contact: form.rel_recruiter_contact ?? null,
@@ -413,7 +416,7 @@ export default function CreateJobWizardPage() {
                   <span>להציג שכר באתר הציבורי לאחר פרסום</span>
                   <input type="checkbox" checked={form.show_salary_public} onChange={(event) => setField('show_salary_public', event.target.checked)} className="h-4 w-4 accent-[#008080]" />
                 </label>
-                <TextAreaField label="תיאור המשרה" value={form.job_description} onChange={(value) => setField('job_description', value)} labelSuffix={<JobAIWriter mode="admin" field="job_description" currentValue={form.job_description} jobContext={{ title: form.job_title, role: form.job_role }} onApply={(v) => setField('job_description', v)} />} />
+                <TextAreaField label="תיאור המשרה" rows={14} value={form.job_description} onChange={(value) => setField('job_description', value)} labelSuffix={<JobAIWriter mode="admin" field="job_description" currentValue={form.job_description} jobContext={{ title: form.job_title, role: form.job_role }} onApply={(v) => setField('job_description', v)} />} />
                 <TextAreaField label="דרישות המשרה" value={form.job_requirements} onChange={(value) => setField('job_requirements', value)} labelSuffix={<JobAIWriter mode="admin" field="job_requirements" currentValue={form.job_requirements} jobContext={{ title: form.job_title, role: form.job_role }} onApply={(v) => setField('job_requirements', v)} />} />
                 <TextAreaField label="תקציר ציבורי" value={form.public_excerpt} onChange={(value) => setField('public_excerpt', value)} labelSuffix={<JobAIWriter mode="admin" field="public_excerpt" currentValue={form.public_excerpt} jobContext={{ title: form.job_title }} onApply={(v) => setField('public_excerpt', v)} />} />
                 <TextAreaField label="הערות פנימיות" value={form.notes} onChange={(value) => setField('notes', value)} />
@@ -422,11 +425,19 @@ export default function CreateJobWizardPage() {
             </section>
 
             <JobImageUpload
+              value={form.description_image_url}
+              onChange={(url) => setField('description_image_url', url)}
+              jobCode={form.job_code || 'new-job'}
+              label="תיאור המשרה כתמונה (אופציונלי)"
+              helperText="אפשר להעלות תמונה במקום המלל, או בנוסף אליו. בעמוד הציבורי המלל יופיע ראשון והתמונה מתחתיו, בגודלה המקורי. PNG / JPG / WEBP, עד 5MB."
+            />
+
+            <JobImageUpload
               value={form.public_image_url}
               onChange={(url) => setField('public_image_url', url)}
               jobCode={form.job_code || 'new-job'}
-              label="תמונת משרה לאדמין"
-              helperText="גרירת תמונה או בחירת קובץ. התמונה נשמרת לשימוש בדף המשרה לאחר אישור שלך."
+              label="תמונת רקע למשרה (כותרת ושיתוף)"
+              helperText="תמונת הרקע בראש עמוד המשרה הציבורי ובתצוגה המקדימה בשיתוף. אינה תמונת התיאור."
             />
           </main>
 
@@ -439,7 +450,8 @@ export default function CreateJobWizardPage() {
               <SummaryRow label="קוד" value={form.job_code || '—'} />
               <SummaryRow label="כותרת" value={form.job_title || '—'} />
               <SummaryRow label="עיר" value={cities.find((c) => String(c.id) === String(form.city_id))?.name ?? '—'} />
-              <SummaryRow label="תמונה" value={form.public_image_url ? 'קיימת' : 'לא הועלתה'} />
+              <SummaryRow label="תיאור כתמונה" value={form.description_image_url ? 'קיימת' : 'לא הועלתה'} />
+              <SummaryRow label="תמונת רקע" value={form.public_image_url ? 'קיימת' : 'לא הועלתה'} />
               <div className="mt-5 rounded-xl bg-[#E6F3F3] p-4 text-[13px] leading-6 text-[#006D6D]">
                 אין פרסום מהמסך הזה. המשרה נשמרת כטיוטה מוסתרת, ואת מאשרת ומפרסמת ידנית בדף המשרה.
               </div>
@@ -485,8 +497,8 @@ function MultiSelectField({ label, values, onChange, options }: { label: string;
   return <div className="flex flex-col gap-1.5"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span><div className="max-h-44 overflow-y-auto rounded-xl border border-[#D9D9D9] bg-white p-2">{options.length ? options.map((option) => { const numeric = Number(option.value); const checked = values.includes(numeric); return <label key={option.value} className="flex cursor-pointer items-center justify-between rounded-lg px-2 py-1.5 text-[13px] hover:bg-[#F3F4F6]"><span>{option.label}</span><input type="checkbox" checked={checked} onChange={() => onChange(checked ? values.filter((id) => id !== numeric) : [...values, numeric])} className="h-4 w-4 accent-[#008080]" /></label> }) : <div className="px-2 py-2 text-[13px] text-[#6B6B6B]">אין אפשרויות</div>}</div></div>
 }
 
-function TextAreaField({ label, value, onChange, className = '', labelSuffix }: { label: string; value: string; onChange: (value: string) => void; className?: string; labelSuffix?: React.ReactNode }) {
-  return <div className={`flex flex-col gap-1.5 ${className}`}><div className="flex items-center justify-between"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>{labelSuffix}</div><textarea dir="rtl" rows={5} value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[14px] leading-7 text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]" /></div>
+function TextAreaField({ label, value, onChange, className = '', labelSuffix, rows = 5 }: { label: string; value: string; onChange: (value: string) => void; className?: string; labelSuffix?: React.ReactNode; rows?: number }) {
+  return <div className={`flex flex-col gap-1.5 ${className}`}><div className="flex items-center justify-between"><span className="text-[13px] font-semibold text-[#6B6B6B]">{label}</span>{labelSuffix}</div><textarea dir="rtl" rows={rows} value={value} onChange={(event) => onChange(event.target.value)} className="rounded-xl border border-[#D9D9D9] bg-white px-3 py-2 text-[14px] leading-7 text-[#2D2D2D] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]" /></div>
 }
 
 function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
