@@ -82,6 +82,14 @@ const PAGE_OG = {
     description: 'שירות סינון מועמדים, דיסקרטיות ומיקוד — בלי לחשוף את שם המרפאה בשלב הראשוני.',
     image: 'https://www.alldent.co.il/images/jobs-og/employers-discreet.png',
   },
+  // INC-3130 — לוח הנכסים
+  'dental-assets': {
+    path: '/dental-assets',
+    title: 'HOME DENT | נכסים דנטליים למכירה והשכרה',
+    description:
+      'מרפאות שיניים, חדרי טיפול, מעבדות והזדמנויות עסקיות בעולם הדנטל — מכירה, השכרה, שותפויות והעברת פעילות.',
+    image: DEFAULT_IMAGE,
+  },
 }
 
 // בריחת תווים כדי שכותרת/תיאור לא ישברו את תגיות ה-meta ולא יאפשרו הזרקה
@@ -96,6 +104,10 @@ function esc(value) {
 export default async function handler(req, res) {
   const slug = typeof req.query.slug === 'string' ? req.query.slug : ''
   const pageKey = typeof req.query.page === 'string' ? req.query.page.trim() : ''
+  // INC-3130 — קוד נכס HOME DENT. נקרא רק מ-v_dental_asset_public, ולכן
+  // נכס שפג או שהוסר לא מחזיר preview ישן אלא נופל לברירת המחדל.
+  const assetCode =
+    typeof req.query.asset === 'string' ? req.query.asset.trim().toUpperCase() : ''
   const jobCode = slug ? slug.trim().toUpperCase() : ''
   const rolePage = slug ? ROLE_OG[slug.trim()] : undefined
   const pageEntry = pageKey ? PAGE_OG[pageKey] : undefined
@@ -116,7 +128,35 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (!pageEntry && !rolePage && jobCode && jobCode !== 'NONE') {
+    if (assetCode && /^HD\d{4,}$/.test(assetCode)) {
+      const { data: asset, error } = await supabase
+        .from('v_dental_asset_public')
+        .select('public_page')
+        .eq('asset_code', assetCode)
+        .maybeSingle()
+
+      const seo = asset?.public_page?.seo
+      if (!error && asset) {
+        title = `${assetCode} · ${seo?.og_title || asset.public_page?.title || 'נכס דנטלי'} | HOME DENT`
+        description =
+          seo?.og_description ||
+          asset.public_page?.description ||
+          'נכס דנטלי בלוח HOME DENT של AllDent. לפרטים המלאים היכנסו לאתר.'
+        // og_image הוא נתיב בדלי האחסון הציבורי, לא URL מלא
+        if (seo?.og_image) {
+          const { data: pub } = supabase.storage
+            .from('dental-assets-public')
+            .getPublicUrl(seo.og_image)
+          if (pub?.publicUrl) imageUrl = pub.publicUrl
+        }
+      }
+    }
+  } catch {
+    // בכשל — נשארים עם ברירות המחדל של המותג
+  }
+
+  try {
+    if (!assetCode && !pageEntry && !rolePage && jobCode && jobCode !== 'NONE') {
       const { data: job, error } = await supabase
         .from('v_job_public')
         .select('job_title, public_excerpt, public_image_url')
@@ -136,7 +176,9 @@ export default async function handler(req, res) {
     // בכשל — נשארים עם ברירות המחדל של המותג
   }
 
-  const relativePath = pageEntry
+  const relativePath = assetCode && /^HD\d{4,}$/.test(assetCode)
+    ? '/dental-assets/' + assetCode
+    : pageEntry
     ? pageEntry.path
     : rolePage
       ? '/jobs/' + slug.trim()

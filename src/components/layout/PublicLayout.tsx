@@ -16,9 +16,26 @@ function isPublicJobDetailsPath(pathname: string): boolean {
   }
 }
 
+/**
+ * INC-3130 — דף נכס HOME DENT. יש בו סרגל CTA דביק במובייל, ולכן
+ * כפתורי השיתוף מורמים כדי שלא יישבו עליו.
+ * ⚠️ הפוטר כאן **לא** מוסתר, בשונה מדף המשרה: ההדר והפוטר זהים
+ * לשאר האתר. הסרגל הוא sticky בתוך העמוד ולכן נעצר לפני הפוטר.
+ */
+function isDentalAssetDetailsPath(pathname: string): boolean {
+  const match = pathname.match(/^\/dental-assets\/([^/]+)\/?$/)
+  if (!match?.[1]) return false
+  try {
+    return /^HD\d{4,}$/i.test(decodeURIComponent(match[1]).trim())
+  } catch {
+    return false
+  }
+}
+
 export default function PublicLayout() {
   const { pathname } = useLocation()
   const isJobDetailsPage = isPublicJobDetailsPath(pathname)
+  const isAssetDetailsPage = isDentalAssetDetailsPath(pathname)
 
   // Scroll to top on route change
   useEffect(() => {
@@ -45,7 +62,7 @@ export default function PublicLayout() {
         <SiteFooter />
       )}
 
-      <SocialShare elevatedOnMobile={isJobDetailsPage} />
+      <SocialShare elevatedOnMobile={isJobDetailsPage || isAssetDetailsPage} />
     </div>
   )
 }

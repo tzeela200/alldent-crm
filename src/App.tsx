@@ -55,6 +55,7 @@ import DentalAssetsPage from '@/pages/DentalAssetsPage'
 import DentalAssetTermsPage from '@/pages/DentalAssetTermsPage'
 import DentalAssetRequestPage from '@/pages/DentalAssetRequestPage'
 import AdminDentalAssetsPage from '@/pages/AdminDentalAssetsPage'
+import PublicDentalAssetPage from '@/pages/PublicDentalAssetPage'
 import ClassDentalPage from '@/pages/ClassDentalPage'
 import ContactPage from '@/pages/ContactPage'
 
@@ -107,6 +108,20 @@ function JobsSlugDispatch() {
   return <NotFoundPage />
 }
 
+/**
+ * INC-3130 — /dental-assets/<X>.
+ * רק קוד נכס תקין נפתח כדף נכס. כל שאר הערכים נופלים ל-404 ולא
+ * מגיעים ל-Supabase בכלל, כדי שלא ניתן יהיה לסרוק את הלוח בכתובות.
+ */
+function DentalAssetSlugDispatch() {
+  const { slug } = useParams<{ slug: string }>()
+  const code = (slug ? decodeURIComponent(slug) : '').trim().toUpperCase()
+  if (/^HD\d{4,}$/.test(code)) {
+    return <PublicDentalAssetPage />
+  }
+  return <NotFoundPage />
+}
+
 
 export default function App() {
   return (
@@ -132,9 +147,10 @@ export default function App() {
         {/* Dental services */}
         <Route path="/dental-shop" element={<DentalShopPage />} />
         <Route path="/dental-assets" element={<DentalAssetsPage />} />
-        {/* INC-3130 — נתיבים סטטיים לפני /dental-assets/:code שיתווסף בחבילה D */}
+        {/* INC-3130 — הנתיבים הסטטיים חייבים לקדום ל-:slug */}
         <Route path="/dental-assets/terms" element={<DentalAssetTermsPage />} />
         <Route path="/dental-assets/terms/request" element={<DentalAssetRequestPage />} />
+        <Route path="/dental-assets/:slug" element={<DentalAssetSlugDispatch />} />
         <Route path="/class-dental" element={<ClassDentalPage />} />
 
         {/* Contact */}

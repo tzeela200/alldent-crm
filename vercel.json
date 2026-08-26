@@ -55,6 +55,20 @@
       ],
       "destination": "/api/og?page=employers-discreet"
     },
+    {
+      "source": "/dental-assets",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Applebot|SkypeUriPreview|Embedly|Iframely|Googlebot|bingbot).*" }
+      ],
+      "destination": "/api/og?page=dental-assets"
+    },
+    {
+      "source": "/dental-assets/:code(HD[0-9]{4,})",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Applebot|SkypeUriPreview|Embedly|Iframely|Googlebot|bingbot).*" }
+      ],
+      "destination": "/api/og?asset=:code"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

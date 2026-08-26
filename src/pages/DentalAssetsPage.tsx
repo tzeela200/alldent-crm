@@ -1,7 +1,10 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { MapPin, MessageCircle } from 'lucide-react'
+import { usePublicDentalAssets } from '@/hooks/usePublicDentalAssets'
+import { assetImageUrl, type PublicAssetCard } from '@/services/publicDentalAssetsService'
+import { HD_OFFER_LABELS } from '@/lib/homeDentStatuses'
 
 const PROPERTIES = [
   {
@@ -80,11 +83,19 @@ const PROPERTIES = [
 
 // ─── Property card — cinematic split reveal ────────────────────────────────────
 
+/**
+ * INC-3130 — הכרטיס מקבל עכשיו שני מקורות: ששת הנכסים הישנים שיושבים
+ * בקוד, ונכסי HOME DENT שמגיעים מ-v_dental_asset_public. הצורה זהה,
+ * ולכן ההבדל היחיד הוא `href`: קיים ⇒ Link לדף הנכס, חסר ⇒ הקישור
+ * הישיר לוואטסאפ כמו עד היום.
+ */
+type PropertyItem = (typeof PROPERTIES)[number] & { href?: string }
+
 function PropertyRevealCard({
   prop,
   reversed,
 }: {
-  prop: typeof PROPERTIES[number]
+  prop: PropertyItem
   reversed: boolean
 }) {
   const [imgError, setImgError] = useState(false)
@@ -152,14 +163,23 @@ function PropertyRevealCard({
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-3">
-          <a
-            href={prop.contact}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-full bg-[#008080] px-6 py-3 text-[14px] font-bold text-white transition hover:bg-[#006D6D]"
-          >
-            לפרטים נוספים ←
-          </a>
+          {prop.href ? (
+            <Link
+              to={prop.href}
+              className="inline-flex items-center gap-2 rounded-full bg-[#008080] px-6 py-3 text-[14px] font-bold text-white transition hover:bg-[#006D6D]"
+            >
+              לפרטים נוספים ←
+            </Link>
+          ) : (
+            <a
+              href={prop.contact}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-full bg-[#008080] px-6 py-3 text-[14px] font-bold text-white transition hover:bg-[#006D6D]"
+            >
+              לפרטים נוספים ←
+            </a>
+          )}
           <span className="font-mono text-[12px] text-white/40">{prop.contactName}</span>
         </div>
       </motion.div>
@@ -167,9 +187,42 @@ function PropertyRevealCard({
   )
 }
 
+/**
+ * public_card → אותו prop שהכרטיס כבר מקבל. אין כאן שום lookup: כל
+ * הערכים כבר פתורים לעברית בתוך ה-snapshot שנבנה ב-Publish.
+ */
+function cardToProperty(card: PublicAssetCard): PropertyItem {
+  const types = (card.offer_types ?? []).map((t) => HD_OFFER_LABELS[t] ?? t)
+  return {
+    id: card.asset_code,
+    index: '',
+    title: card.title || 'נכס דנטלי',
+    location: card.location || '',
+    type: card.type_label || types.join(' · ') || 'נכס דנטלי',
+    description: card.excerpt || '',
+    highlights: card.highlights ?? [],
+    image: assetImageUrl(card.image?.path) ?? '',
+    contact: `/dental-assets/${card.asset_code}`,
+    contactName: card.asset_code,
+    href: `/dental-assets/${card.asset_code}`,
+  }
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DentalAssetsPage() {
+  // כשל שליפה לא מפיל את הלוח — ששת הנכסים הישנים ממשיכים להיות מוצגים.
+  const { data: published } = usePublicDentalAssets()
+
+  const items = useMemo<PropertyItem[]>(
+    () =>
+      [...(published ?? []).map(cardToProperty), ...PROPERTIES].map((p, i) => ({
+        ...p,
+        index: String(i + 1).padStart(2, '0'),
+      })),
+    [published],
+  )
+
   return (
     <div className="min-h-screen bg-[#1e1e1e] text-white" dir="rtl">
       {/* Hero */}
@@ -218,7 +271,7 @@ export default function DentalAssetsPage() {
       {/* Properties list */}
       <section id="properties" className="mx-auto max-w-5xl px-5 md:px-8">
         <div className="divide-y divide-white/[0.07]">
-          {PROPERTIES.map((prop, i) => (
+          {items.map((prop, i) => (
             <motion.div
               key={prop.id}
               initial={{ opacity: 0, y: 80, scale: 0.94 }}
