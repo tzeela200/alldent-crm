@@ -113,6 +113,23 @@ export const HD_RPC_ERRORS: Record<string, string> = {
   offer_type_is_invalid: 'סוג עסקה שנבחר אינו תקין.',
   too_many_images: 'ניתן לצרף עד 15 תמונות.',
   image_path_outside_token: 'אירעה תקלה בהעלאת התמונות. רעננו את העמוד ונסו שוב.',
+  lead_name_is_missing: 'נא למלא שם.',
+  lead_phone_is_invalid: 'מספר הנייד אינו תקין.',
+  duplicate_recent_lead: 'כבר קיבלנו את הפרטים שלכם. נחזור אליכם בהקדם.',
+  consent_was_not_given: 'יש לאשר את תנאי השימוש.',
+  offer_not_on_this_asset: 'המסלול שנבחר אינו שייך לנכס הזה.',
+  asset_is_not_published: 'הנכס אינו מפורסם.',
+
+  // ── שגיאות שער הפרסום באדמין (§8 — חוסם רק מה ששובר תצוגה) ──
+  public_title_is_empty: 'חסרה כותרת ציבורית לכרטיס הנכס. בלעדיה אין מה להציג בלוח.',
+  no_published_image: 'אין אף תמונה מסומנת לפרסום. נדרשת לפחות אחת.',
+  image_copy_is_pending: 'תמונה סומנה לפרסום אך הקובץ הציבורי שלה חסר. סמני אותה מחדש.',
+  nothing_selected_for_publishing: 'לא נבחר שום נתון לפרסום ואין מסלול עסקה פעיל. הדף היה יוצא ריק.',
+  no_live_publication: 'אין גרסה חיה לעדכן. יש לבצע פרסום ראשון.',
+  payload_contains_private_key: 'הפרסום נחסם: זוהה ניסיון להוציא שדה פרטי. פנו לתמיכה — זו תקלה במערכת.',
+  new_end_date_missing: 'נא לבחור תאריך סיום חדש.',
+  not_authenticated: 'החיבור פג. התחברי מחדש ונסי שוב.',
+  submission_snapshot_is_immutable: 'לא ניתן לשנות את חומר המקור שהלקוח מסר.',
 }
 
 export function hdErrorToHebrew(raw: unknown): string {

@@ -55,6 +55,7 @@ import DentalAssetsPage from '@/pages/DentalAssetsPage'
 import DentalAssetTermsPage from '@/pages/DentalAssetTermsPage'
 import DentalAssetRequestPage from '@/pages/DentalAssetRequestPage'
 import AdminDentalAssetsPage from '@/pages/AdminDentalAssetsPage'
+import AdminDentalAssetDetailPage from '@/pages/AdminDentalAssetDetailPage'
 import PublicDentalAssetPage from '@/pages/PublicDentalAssetPage'
 import ClassDentalPage from '@/pages/ClassDentalPage'
 import ContactPage from '@/pages/ContactPage'
@@ -193,6 +194,7 @@ export default function App() {
         <Route path="applications" element={<AdminApplicationsPage />} />
           {/* INC-3130 — HOME DENT */}
           <Route path="dental-assets" element={<AdminDentalAssetsPage />} />
+          <Route path="dental-assets/:assetCode" element={<AdminDentalAssetDetailPage />} />
         <Route path="pipeline" element={<ATSPipelinePage />} />
         <Route path="ats" element={<ATSPipelinePage />} />
 

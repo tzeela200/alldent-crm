@@ -9,6 +9,7 @@
  * ולא מזהה ממילון, ולכן AdminBadge ולא StatusBadge (ראו homeDentStatuses).
  */
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { Building2 } from 'lucide-react'
 import { toast } from 'sonner'
 import {
@@ -71,6 +72,7 @@ export default function AdminDentalAssetsPage() {
 
   const { data, isLoading, error, refetch } = useDentalAssets(filters, page, sortBy, sortDir)
   const { data: kpis } = useDentalAssetKpis()
+  const navigate = useNavigate()
   const { publish, publishUpdate, unpublish } = useDentalAssetMutations()
 
   const rows = data?.rows ?? []
@@ -98,7 +100,7 @@ export default function AdminDentalAssetsPage() {
   function rowActions(row: DentalAssetRow): AdminActionMenuItem[] {
     const isPublished = row.publication_state === 'published'
     return [
-      { key: 'open', label: 'פתיחת הנכס', onClick: () => toast.info('מסך ניהול הנכס — בחבילה הבאה') },
+      { key: 'open', label: 'פתיחת הנכס', onClick: () => navigate(`/admin/dental-assets/${row.asset_code}`) },
       {
         key: 'publish',
         label: isPublished ? 'פרסום עדכון' : 'פרסום',
@@ -336,6 +338,7 @@ export default function AdminDentalAssetsPage() {
         columns={columns}
         data={rows}
         keyField="id"
+        onRowClick={(row) => navigate(`/admin/dental-assets/${row.asset_code}`)}
         isLoading={isLoading}
         error={error ? 'טעינת הנכסים נכשלה. נסו לרענן.' : undefined}
         hasActiveFilter={hasFilter}
