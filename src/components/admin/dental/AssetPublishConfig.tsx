@@ -18,6 +18,7 @@ import {
 } from '@/lib/homeDentPublishFields'
 import type { HdCardConfig, HdCta, HdPublicContact } from '@/hooks/useDentalAsset'
 import {
+  ADMIN_INPUT,
   AdminCard,
   CheckField,
   FieldLabel,
@@ -462,7 +463,7 @@ export function AssetContactCta({
                     <label className="block">
                       <FieldLabel>טקסט הכפתור</FieldLabel>
                       <input
-                        className="h-10 w-full rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13.5px] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
+                        className={`${ADMIN_INPUT} h-10 text-[13.5px]`}
                         value={cta.label}
                         onChange={(e) => patchCta(type, { label: e.target.value })}
                       />
@@ -472,7 +473,7 @@ export function AssetContactCta({
                         <FieldLabel>יעד</FieldLabel>
                         <input
                           dir="ltr"
-                          className="h-10 w-full rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13px] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
+                          className={`${ADMIN_INPUT} h-10 text-[13px]`}
                           value={cta.target ?? ''}
                           placeholder={autoTarget || 'https://…'}
                           onChange={(e) => patchCta(type, { target: e.target.value })}

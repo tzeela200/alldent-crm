@@ -31,6 +31,7 @@ import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { DictionaryMultiSelect } from '@/components/ui/DictionaryMultiSelect'
 import { AdminTable } from '@/components/admin/AdminTable'
 import {
+  ADMIN_INPUT,
   AdminCard,
   FieldLabel,
   NumberField,
@@ -474,7 +475,7 @@ export default function AdminDentalAssetDetailPage() {
                   />
                   {notesKey && (
                     <input
-                      className="mt-2 h-10 w-full rounded-xl border border-[#D9D9D9] bg-white px-3 text-[13.5px] outline-none transition focus:border-[#008080] focus:ring-2 focus:ring-[#E6F3F3]"
+                      className={`${ADMIN_INPUT} mt-2 h-10 text-[13.5px]`}
                       placeholder="הערה חופשית לקבוצה"
                       value={(value[notesKey] as string) ?? ''}
                       onChange={(e) => set(notesKey, e.target.value as never)}
@@ -671,7 +672,7 @@ export default function AdminDentalAssetDetailPage() {
                     <select
                       value={r.status}
                       onChange={(e) => void m.saveInquiry(r.id, { status: e.target.value })}
-                      className="h-8 rounded-lg border border-[#D9D9D9] bg-white px-2 text-[12.5px] outline-none focus:border-[#008080]"
+                      className={`${ADMIN_INPUT} h-8 w-auto px-2 text-[12.5px]`}
                     >
                       {asFilterOptions(HD_INQUIRY).map((o) => (
                         <option key={o.value} value={o.value}>
