@@ -57,7 +57,7 @@ export default function PublicJobPage() {
   if (!job) return <JobNotFound title="המשרה לא נמצאה" />
 
   const locationText = [job.city_name, job.region_name].filter(Boolean).join(' · ')
-  const hasMainContent = Boolean(job.public_excerpt || job.job_description || job.job_requirements)
+  const hasMainContent = Boolean(job.public_excerpt || job.job_description || job.description_image_url || job.job_requirements)
 
   return (
     <div
@@ -86,9 +86,16 @@ export default function PublicJobPage() {
               </section>
             )}
 
-            {job.job_description && (
+            {(job.job_description || job.description_image_url) && (
               <ContentSection title="תיאור המשרה">
-                <MarkdownContent>{job.job_description}</MarkdownContent>
+                {job.job_description && <MarkdownContent>{job.job_description}</MarkdownContent>}
+                {job.description_image_url && (
+                  <JobDescriptionImage
+                    src={job.description_image_url}
+                    alt={job.job_title}
+                    hasText={Boolean(job.job_description)}
+                  />
+                )}
               </ContentSection>
             )}
 
@@ -218,6 +225,26 @@ function DetailRow({ label, value }: DetailItem) {
       <dt className="mb-1 text-[12px] font-semibold text-[#6B6B6B]">{label}</dt>
       <dd className="text-[14px] font-semibold leading-6 text-[#0F0F10]">{value}</dd>
     </div>
+  )
+}
+
+function JobDescriptionImage({ src, alt, hasText }: { src: string; alt: string; hasText: boolean }) {
+  return (
+    <figure className={hasText ? 'mt-5 border-t border-[#D9D9D9] pt-5' : ''}>
+      <a href={src} target="_blank" rel="noopener noreferrer" className="block">
+        {/*
+          התמונה מוצגת בגודלה המקורי (w-auto/h-auto) ושומרת על הפרופורציה שלה.
+          max-w-full הוא ההגבלה היחידה — כדי שתמונה רחבה לא תיחתך בנייד.
+        */}
+        <img
+          src={src}
+          alt={alt}
+          loading="lazy"
+          className="mx-auto h-auto w-auto max-w-full rounded-xl border border-[#D9D9D9]"
+        />
+      </a>
+      <figcaption className="mt-2 text-center text-xs text-[#6B6B6B]">לחצו על התמונה לצפייה בגודל מלא</figcaption>
+    </figure>
   )
 }
 

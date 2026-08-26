@@ -38,6 +38,8 @@ export interface PublicJob {
   work_schedule_text: string | null
 
   job_description: string | null
+  /** INC-3131: תמונת תיאור המשרה (פלייר). נפרדת מ-public_image_url ששימושה רקע ושיתוף. */
+  description_image_url: string | null
   job_requirements: string | null
 
   salary_type_ids: number[] | null
@@ -104,6 +106,7 @@ const PUBLIC_JOB_FIELDS = [
   'tax_type_name',
 
   'job_description',
+  'description_image_url',
   'job_requirements',
 
   'salary_type_ids',
@@ -177,6 +180,7 @@ export function stripPrivateInfo(row: Record<string, unknown>): PublicJob {
     work_schedule_text: null, // v_job_public does not expose this column
 
     job_description: typeof row.job_description === 'string' ? row.job_description : null,
+    description_image_url: typeof row.description_image_url === 'string' ? row.description_image_url : null,
     job_requirements: typeof row.job_requirements === 'string' ? row.job_requirements : null,
 
     salary_type_ids: asNumberArray(row.salary_type_ids),
