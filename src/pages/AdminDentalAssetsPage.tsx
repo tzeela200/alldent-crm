@@ -253,6 +253,12 @@ export default function AdminDentalAssetsPage() {
       icon={Building2}
       actions={
         <>
+          <ActionButton
+            variant="secondary"
+            onClick={() => navigate('/admin/dental-assets/inquiries')}
+          >
+            פניות
+          </ActionButton>
           <ActionButton variant="secondary" onClick={() => refetch()}>
             רענון
           </ActionButton>
@@ -281,7 +287,12 @@ export default function AdminDentalAssetsPage() {
           onClick={() => setFilters({ ...HD_EMPTY_FILTERS, publication: 'published' })}
         />
         <KPICard label="פג בקרוב" value={kpi(kpis?.expiringSoon)} hint="פחות מ-30 יום" />
-        <KPICard label="פניות חדשות" value={kpi(kpis?.newInquiries)} hint="ממתינות לטיפול" />
+        <KPICard
+          label="פניות חדשות"
+          value={kpi(kpis?.newInquiries)}
+          hint="ממתינות לטיפול"
+          onClick={() => navigate('/admin/dental-assets/inquiries')}
+        />
       </div>
 
       {/* פילטרים — נשמרים ל-localStorage */}

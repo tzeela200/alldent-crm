@@ -56,6 +56,7 @@ import DentalAssetTermsPage from '@/pages/DentalAssetTermsPage'
 import DentalAssetRequestPage from '@/pages/DentalAssetRequestPage'
 import AdminDentalAssetsPage from '@/pages/AdminDentalAssetsPage'
 import AdminDentalAssetDetailPage from '@/pages/AdminDentalAssetDetailPage'
+import AdminDentalInquiriesPage from '@/pages/AdminDentalInquiriesPage'
 import PublicDentalAssetPage from '@/pages/PublicDentalAssetPage'
 import ClassDentalPage from '@/pages/ClassDentalPage'
 import ContactPage from '@/pages/ContactPage'
@@ -194,6 +195,8 @@ export default function App() {
         <Route path="applications" element={<AdminApplicationsPage />} />
           {/* INC-3130 — HOME DENT */}
           <Route path="dental-assets" element={<AdminDentalAssetsPage />} />
+          {/* ⚠️ נתיב סטטי לפני :assetCode — אחרת "inquiries" נקלט כקוד נכס */}
+          <Route path="dental-assets/inquiries" element={<AdminDentalInquiriesPage />} />
           <Route path="dental-assets/:assetCode" element={<AdminDentalAssetDetailPage />} />
         <Route path="pipeline" element={<ATSPipelinePage />} />
         <Route path="ats" element={<ATSPipelinePage />} />

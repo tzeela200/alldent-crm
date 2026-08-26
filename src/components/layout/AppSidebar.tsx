@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Home,
   Inbox,
+  MessageSquare,
   Users,
   UserCheck,
   Building2,
@@ -54,6 +55,7 @@ const navGroups: { title?: string; items: NavItem[] }[] = [
     title: 'נכסים דנטליים',
     items: [
       { to: '/admin/dental-assets', label: 'ניהול נכסים', icon: Home },
+      { to: '/admin/dental-assets/inquiries', label: 'פניות לנכסים', icon: MessageSquare },
     ],
   },
   {
