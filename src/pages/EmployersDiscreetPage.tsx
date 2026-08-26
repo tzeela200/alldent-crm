@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { BackLink } from '@/components/public/BackLink'
 import {
   ArrowDown,
   ArrowRight,
@@ -527,16 +528,7 @@ export default function EmployersDiscreetPage() {
         <div className="pointer-events-none absolute end-[-5rem] top-10 h-64 w-64 rounded-full bg-[#D9A928]/12 blur-3xl" />
 
         <div className="relative mx-auto max-w-7xl">
-          <Link
-            to="/employers"
-            className="inline-flex items-center gap-1.5 text-[13px] font-bold text-white/58 transition hover:text-white"
-          >
-            <ArrowRight
-              className="h-3.5 w-3.5 rtl:scale-x-[-1]"
-              aria-hidden="true"
-            />
-            חזרה למסלולי הגיוס
-          </Link>
+          <BackLink to="/employers">חזרה למסלולי הגיוס</BackLink>
 
           <div className="mt-8 grid gap-10 lg:grid-cols-[1.12fr_0.88fr] lg:items-center">
             <div className="text-start">

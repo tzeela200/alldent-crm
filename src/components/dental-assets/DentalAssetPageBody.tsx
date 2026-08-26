@@ -10,7 +10,7 @@
  * פונקציה בונה את שניהם.
  */
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { BackLink } from '@/components/public/BackLink'
 import {
   assetImageUrl,
   submitAssetInquiry,
@@ -59,65 +59,65 @@ function OfferCard({ offer }: { offer: PublicAssetOffer }) {
       {hasPrice ? (
         <div className="mt-3.5 text-[clamp(32px,4.4vw,60px)] font-black leading-none tracking-[-0.03em]">
           {nis(Number(offer.price_amount))}
-          <small className="ms-2 text-[14px] font-normal tracking-normal text-white/40">
+          <small className="ms-2 text-[14px] font-normal tracking-normal text-white/60">
             {UNIT_SUFFIX[offer.price_unit ?? 'total'] ?? '₪'}
           </small>
         </div>
       ) : (
-        <div className="mt-3.5 text-[clamp(19px,2.2vw,26px)] font-bold tracking-[-0.02em] text-white/64">
+        <div className="mt-3.5 text-[clamp(19px,2.2vw,26px)] font-bold tracking-[-0.02em] text-white/75">
           {offer.price_note || 'מחיר יימסר בפנייה'}
         </div>
       )}
 
       {hasPrice && offer.price_note && (
-        <p className="mt-2 text-[13.5px] font-light text-white/40">{offer.price_note}</p>
+        <p className="mt-2 text-[13.5px] text-white/60">{offer.price_note}</p>
       )}
 
       <dl className="mt-6 grid grid-cols-[auto_1fr] gap-x-5 gap-y-2 text-[14px]">
         {offer.availability_note && (
           <>
-            <dt className="pt-0.5 font-mono text-[10px] tracking-[0.16em] text-white/40">זמינות</dt>
-            <dd className="m-0 font-light text-white/64">{offer.availability_note}</dd>
+            <dt className="pt-0.5 text-[11.5px] font-black tracking-[0.08em] text-white/60">זמינות</dt>
+            <dd className="m-0 text-white/75">{offer.availability_note}</dd>
           </>
         )}
         {offer.available_from && (
           <>
-            <dt className="pt-0.5 font-mono text-[10px] tracking-[0.16em] text-white/40">מתאריך</dt>
-            <dd className="m-0 font-light text-white/64">
+            <dt className="pt-0.5 text-[11.5px] font-black tracking-[0.08em] text-white/60">מתאריך</dt>
+            <dd className="m-0 text-white/75">
               {new Date(offer.available_from).toLocaleDateString('he-IL')}
             </dd>
           </>
         )}
         {!!offer.days?.length && (
           <>
-            <dt className="pt-0.5 font-mono text-[10px] tracking-[0.16em] text-white/40">ימים</dt>
-            <dd className="m-0 font-light text-white/64">
+            <dt className="pt-0.5 text-[11.5px] font-black tracking-[0.08em] text-white/60">ימים</dt>
+            <dd className="m-0 text-white/75">
               {offer.days.map((d) => DAYS[d]).join(' · ')}
             </dd>
           </>
         )}
         {offer.hours && (
           <>
-            <dt className="pt-0.5 font-mono text-[10px] tracking-[0.16em] text-white/40">שעות</dt>
-            <dd className="m-0 font-light text-white/64">{offer.hours}</dd>
+            <dt className="pt-0.5 text-[11.5px] font-black tracking-[0.08em] text-white/60">שעות</dt>
+            <dd className="m-0 text-white/75">{offer.hours}</dd>
           </>
         )}
         {!!offer.sale_includes?.length && (
           <>
-            <dt className="pt-0.5 font-mono text-[10px] tracking-[0.16em] text-white/40">כלול</dt>
-            <dd className="m-0 font-light text-white/64">{offer.sale_includes.join(' · ')}</dd>
+            <dt className="pt-0.5 text-[11.5px] font-black tracking-[0.08em] text-white/60">כלול</dt>
+            <dd className="m-0 text-white/75">{offer.sale_includes.join(' · ')}</dd>
           </>
         )}
         {offer.extra_costs_note && (
           <>
-            <dt className="pt-0.5 font-mono text-[10px] tracking-[0.16em] text-white/40">נוסף</dt>
-            <dd className="m-0 font-light text-white/64">{offer.extra_costs_note}</dd>
+            <dt className="pt-0.5 text-[11.5px] font-black tracking-[0.08em] text-white/60">נוסף</dt>
+            <dd className="m-0 text-white/75">{offer.extra_costs_note}</dd>
           </>
         )}
         {offer.terms_note && (
           <>
-            <dt className="pt-0.5 font-mono text-[10px] tracking-[0.16em] text-white/40">תנאים</dt>
-            <dd className="m-0 font-light text-white/64">{offer.terms_note}</dd>
+            <dt className="pt-0.5 text-[11.5px] font-black tracking-[0.08em] text-white/60">תנאים</dt>
+            <dd className="m-0 text-white/75">{offer.terms_note}</dd>
           </>
         )}
       </dl>
@@ -172,14 +172,14 @@ function LeadForm({
 
   const input =
     'w-full rounded-none border-0 border-b border-white/15 bg-transparent px-0.5 py-3 ' +
-    'text-[16px] text-white placeholder:text-white/30 focus:border-[#D97706] focus:outline-none'
+    'text-[16px] text-white placeholder:text-white/50 focus:border-[#D97706] focus:outline-none'
 
   if (state === 'done') {
     return (
       <div className="border border-white/10 p-8 text-center">
         <p className="font-mono text-[11px] tracking-[0.24em] text-[#7CECEC]">התקבל</p>
         <p className="mt-3 text-[18px] font-bold">הפרטים שלכם התקבלו</p>
-        <p className="mt-2 text-[15px] font-light text-white/64">נחזור אליכם בהקדם.</p>
+        <p className="mt-2 text-[15px] text-white/75">נחזור אליכם בהקדם.</p>
       </div>
     )
   }
@@ -252,16 +252,13 @@ export function DentalAssetPageBody({
         />
         <div className="relative w-full px-[clamp(24px,5vw,72px)] pb-[clamp(30px,4vw,52px)] pt-[clamp(28px,4vw,56px)]">
           <div className="mx-auto max-w-[1280px]">
-            <Link to="/dental-assets"
-              className="font-mono text-[10.5px] tracking-[0.24em] text-white/40 transition hover:text-white">
-              → חזרה ללוח הנכסים
-            </Link>
+            <BackLink to="/dental-assets">חזרה ללוח הנכסים</BackLink>
             <div className="mt-5 flex flex-wrap gap-2">
               <span className="rounded-sm border border-[#D97706]/70 bg-[#D97706]/[0.18] px-3 py-1.5 font-mono text-[10.5px] tracking-[0.18em] text-[#F0A03C]">
                 {page.asset_code}
               </span>
               {page.asset_type && (
-                <span className="rounded-sm border border-white/15 bg-black/40 px-3 py-1.5 font-mono text-[10.5px] tracking-[0.18em] text-white/64 backdrop-blur">
+                <span className="rounded-sm border border-white/15 bg-black/40 px-3 py-1.5 font-mono text-[10.5px] tracking-[0.18em] text-white/75 backdrop-blur">
                   {HD_ASSET_TYPE_LABELS[page.asset_type] ?? page.asset_type}
                 </span>
               )}
@@ -276,7 +273,7 @@ export function DentalAssetPageBody({
               {page.title || page.clinic_name || 'נכס דנטלי'}
             </h1>
             {locationText && (
-              <p className="mt-4 text-[15.5px] font-light text-white/64">{locationText}</p>
+              <p className="mt-4 text-[15.5px] text-white/75">{locationText}</p>
             )}
           </div>
         </div>
@@ -291,10 +288,10 @@ export function DentalAssetPageBody({
                 className={`px-[clamp(14px,2vw,26px)] py-[clamp(20px,2.6vw,34px)] ${
                   i === 0 ? '' : 'border-white/10 sm:border-s'
                 } ${i >= 2 ? 'border-t border-white/10 lg:border-t-0' : ''}`}>
-                <span className="font-mono text-[10px] tracking-[0.22em] text-white/40">{f.label}</span>
+                <span className="text-[11.5px] font-black tracking-[0.08em] text-white/60">{f.label}</span>
                 <div className="mt-2 text-[clamp(24px,3vw,40px)] font-black tracking-[-0.03em]">
                   {f.value}
-                  {f.unit && <small className="ms-1.5 text-[14px] font-normal tracking-normal text-white/40">{f.unit}</small>}
+                  {f.unit && <small className="ms-1.5 text-[14px] font-normal tracking-normal text-white/60">{f.unit}</small>}
                 </div>
               </div>
             ))}
@@ -304,7 +301,7 @@ export function DentalAssetPageBody({
         {/* ═══ מסלולי עסקה ═══ */}
         {!!offers.length && (
           <section className="border-b border-white/10 py-[clamp(44px,6vw,88px)]">
-            <span className="mb-6 block font-mono text-[10.5px] tracking-[0.24em] text-white/40">
+            <span className="mb-6 block text-[12px] font-black tracking-[0.08em] text-white/60">
               מסלולי עסקה
             </span>
             <div className="grid gap-px border border-white/10 bg-white/10 md:grid-cols-2">
@@ -316,13 +313,13 @@ export function DentalAssetPageBody({
         {/* ═══ על הנכס ═══ */}
         {page.description && (
           <section className="border-b border-white/10 py-[clamp(44px,6vw,88px)]">
-            <span className="mb-6 block font-mono text-[10.5px] tracking-[0.24em] text-white/40">על הנכס</span>
+            <span className="mb-6 block text-[12px] font-black tracking-[0.08em] text-white/60">על הנכס</span>
             {page.subtitle && (
               <h2 className="max-w-[16ch] text-[clamp(24px,3.2vw,42px)] font-black leading-[1.06] tracking-[-0.03em]">
                 {page.subtitle}
               </h2>
             )}
-            <p className="mt-6 max-w-[62ch] whitespace-pre-line text-[16.5px] font-light leading-[1.9] text-white/64 text-pretty">
+            <p className="mt-6 max-w-[62ch] whitespace-pre-line text-[16.5px] leading-[1.9] text-white/75 text-pretty">
               {page.description}
             </p>
           </section>
@@ -331,13 +328,13 @@ export function DentalAssetPageBody({
         {/* ═══ גלריה ═══ */}
         {!!gallery.length && (
           <section className="border-b border-white/10 py-[clamp(44px,6vw,88px)]">
-            <span className="mb-6 block font-mono text-[10.5px] tracking-[0.24em] text-white/40">גלריה</span>
+            <span className="mb-6 block text-[12px] font-black tracking-[0.08em] text-white/60">גלריה</span>
             <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
               {gallery.map((g, i) => (
                 <figure key={g.path ?? i} className="relative aspect-[4/3] overflow-hidden">
                   <Img img={g} />
                   {g.caption && (
-                    <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-[12px] font-light text-white/80">
+                    <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 text-[12px] text-white/80">
                       {g.caption}
                     </figcaption>
                   )}
@@ -352,18 +349,18 @@ export function DentalAssetPageBody({
           <section className="border-b border-white/10 py-[clamp(44px,6vw,88px)]">
             {Object.entries(page.groups).map(([key, g], i) => (
               <div key={key} className={i === 0 ? '' : 'mt-10'}>
-                <span className="mb-4 block font-mono text-[10.5px] tracking-[0.24em] text-white/40">
+                <span className="mb-4 block text-[12px] font-black tracking-[0.08em] text-white/60">
                   {g.label}
                 </span>
                 <div className="flex flex-wrap gap-2">
                   {g.items.map((item) => (
                     <span key={item}
-                      className="rounded-sm border border-white/15 px-4 py-2 text-[13.5px] font-light text-white/64">
+                      className="rounded-sm border border-white/15 px-4 py-2 text-[13.5px] text-white/75">
                       {item}
                     </span>
                   ))}
                 </div>
-                {g.note && <p className="mt-3 text-[14px] font-light text-white/40">{g.note}</p>}
+                {g.note && <p className="mt-3 text-[14px] text-white/60">{g.note}</p>}
               </div>
             ))}
           </section>
@@ -371,7 +368,7 @@ export function DentalAssetPageBody({
 
         {/* ═══ יצירת קשר ═══ */}
         <section className="py-[clamp(44px,6vw,88px)]">
-          <span className="mb-6 block font-mono text-[10.5px] tracking-[0.24em] text-white/40">
+          <span className="mb-6 block text-[12px] font-black tracking-[0.08em] text-white/60">
             יצירת קשר
           </span>
           <h2 className="text-[clamp(24px,3.2vw,42px)] font-black leading-[1.06] tracking-[-0.03em]">
@@ -403,7 +400,7 @@ export function DentalAssetPageBody({
             </div>
           )}
 
-          <p className="mt-8 font-mono text-[10px] tracking-[0.2em] text-white/30">
+          <p className="mt-8 font-mono text-[10px] tracking-[0.2em] text-white/50">
             פרסום HOME DENT
             {expiresAt &&
               ` · מתפרסם עד ${new Date(expiresAt).toLocaleDateString('he-IL')}`}

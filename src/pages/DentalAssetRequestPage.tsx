@@ -54,7 +54,7 @@ const num = (v: string) => (v.trim() === '' ? null : Number(v))
 /* ── שדות ── */
 const INPUT =
   'w-full border-0 border-b border-rule bg-transparent px-0.5 py-3 text-[16.5px] ' +
-  'transition-colors duration-300 placeholder:text-ink/25 placeholder:font-light ' +
+  'transition-colors duration-300 placeholder:text-ink/25 placeholder: ' +
   'hover:border-ink/25 focus:border-[#D97706] focus:outline-none rounded-none'
 
 function Field({
@@ -72,12 +72,12 @@ function Field({
 }) {
   return (
     <div className={`flex flex-col gap-2 ${wide ? 'sm:col-span-2' : ''}`}>
-      <label className="text-[13px] font-medium text-ink/60">
+      <label className="text-[13px] font-medium text-ink/72">
         {label}
         {required && <span className="text-[#D97706]"> *</span>}
       </label>
       {children}
-      {hint && <span className="text-[12px] font-light text-ink/40">{hint}</span>}
+      {hint && <span className="text-[12px] text-ink/60">{hint}</span>}
     </div>
   )
 }
@@ -85,7 +85,7 @@ function Field({
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="mt-[clamp(34px,4vw,56px)] border-t border-rule pt-[clamp(22px,2.6vw,34px)] first:mt-0 first:border-0 first:pt-0">
-      <span className="mb-5 block font-mono text-[11px] tracking-[0.26em] text-ink/40">{label}</span>
+      <span className="mb-5 block text-[12px] font-black tracking-[0.08em] text-ink/60">{label}</span>
       {children}
     </div>
   )
@@ -109,7 +109,7 @@ function CheckGrid({
           <label
             key={o.id}
             className={`grid cursor-pointer select-none grid-cols-[auto_1fr] items-center gap-3.5 border-b border-rule/50 py-3 text-[15px] leading-[1.35] transition-colors duration-300 ${
-              on ? 'font-normal text-ink' : 'font-light text-ink/60 hover:text-ink'
+              on ? 'font-normal text-ink' : ' text-ink/72 hover:text-ink'
             }`}
           >
             <input
@@ -298,15 +298,15 @@ export default function DentalAssetRequestPage() {
     return (
       <div dir="rtl" className="bg-paper text-ink">
         <div className="mx-auto flex max-w-[840px] flex-col items-center gap-5 px-7 py-[clamp(80px,12vw,170px)] text-center">
-          <p className="font-mono text-[11px] tracking-[0.26em] text-ink/40">RECEIVED</p>
+          <p className="text-[12px] font-black tracking-[0.08em] text-ink/60">RECEIVED</p>
           <h1 className="text-[clamp(28px,4.6vw,58px)] font-black leading-[1.02] tracking-[-0.03em]">
             הבקשה התקבלה
           </h1>
-          <p className="max-w-[46ch] text-[clamp(16px,1.5vw,20px)] font-light leading-[1.8] text-ink/60 text-pretty">
+          <p className="max-w-[46ch] text-[clamp(16px,1.5vw,20px)] leading-[1.8] text-ink/72 text-pretty">
             פרטי הנכס והתמונות הגיעו אלינו. צוות AllDent יעבור על החומרים ויחזור אליכם במידת הצורך.
           </p>
-          <p className="font-mono text-[13px] tracking-[0.2em] text-ink/40">מספר בקשה: {done}</p>
-          <p className="max-w-[44ch] text-[13px] font-light leading-[1.7] text-ink/40">
+          <p className="font-mono text-[13px] tracking-[0.2em] text-ink/60">מספר בקשה: {done}</p>
+          <p className="max-w-[44ch] text-[13px] leading-[1.7] text-ink/60">
             הנכס אינו מתפרסם אוטומטית. הוא יעלה לאתר רק לאחר שנבנה את הפרסום.
           </p>
           <button
@@ -330,7 +330,7 @@ export default function DentalAssetRequestPage() {
         <div className="mx-auto max-w-[1280px] px-[clamp(24px,5vw,72px)] py-4">
           <div className="flex items-baseline justify-between gap-5">
             <span className="text-[20px] font-black tracking-[-0.03em]">{STEPS[step - 1]}</span>
-            <span className="font-mono text-[11px] tracking-[0.2em] text-ink/40">
+            <span className="font-mono text-[11px] tracking-[0.2em] text-ink/60">
               {pad2(step)} / 07
             </span>
           </div>
@@ -358,7 +358,7 @@ export default function DentalAssetRequestPage() {
       <div className="mx-auto max-w-[900px] px-[clamp(24px,5vw,72px)] pb-[clamp(80px,10vw,140px)] pt-[clamp(44px,6vw,88px)]">
         {/* כותרת השלב */}
         <div className="mb-[clamp(34px,4.5vw,60px)]">
-          <span className="mb-4 block font-mono text-[11px] tracking-[0.26em] text-ink/40">
+          <span className="mb-4 block text-[12px] font-black tracking-[0.08em] text-ink/60">
             שלב {pad2(step)} / 07
           </span>
           <h1 className="text-[clamp(26px,4.4vw,58px)] font-black leading-none tracking-[-0.03em]">
@@ -440,7 +440,7 @@ export default function DentalAssetRequestPage() {
         {/* ─── שלב 2 ─── */}
         {step === 2 && (
           <>
-            <p className="mb-8 max-w-[48ch] text-[16.5px] font-light leading-[1.8] text-ink/60 text-pretty">
+            <p className="mb-8 max-w-[48ch] text-[16.5px] leading-[1.8] text-ink/72 text-pretty">
               אפשר לבחור כמה אפשרויות. לכל אחת נבקש מחיר ותנאים בנפרד.
             </p>
             <div className="grid gap-px border border-rule bg-rule sm:grid-cols-2">
@@ -457,12 +457,12 @@ export default function DentalAssetRequestPage() {
                       <h4 className="text-[20px] font-black leading-[1.1] tracking-[-0.03em]">{d.label}</h4>
                       <span className={`h-2 w-2 shrink-0 rounded-full border transition-colors duration-500 ${on ? 'border-[#D97706] bg-[#D97706]' : 'border-ink/25'}`} />
                     </span>
-                    <p className={`mt-2 text-[13.5px] font-light leading-[1.65] ${on ? 'text-white/64' : 'text-ink/60'}`}>{d.hint}</p>
+                    <p className={`mt-2 text-[13.5px] leading-[1.65] ${on ? 'text-white/75' : 'text-ink/72'}`}>{d.hint}</p>
                   </button>
                 )
               })}
             </div>
-            <p className="mt-5 text-[13px] font-light text-ink/40">
+            <p className="mt-5 text-[13px] text-ink/60">
               {deals.length ? `נבחרו ${deals.length} סוגי עסקה.` : 'בחרו לפחות אפשרות אחת כדי להמשיך.'}
             </p>
           </>
@@ -471,7 +471,7 @@ export default function DentalAssetRequestPage() {
         {/* ─── שלב 3 ─── */}
         {step === 3 && (
           <>
-            {optionsLoading && <p className="text-[15px] font-light text-ink/40">טוען רשימות…</p>}
+            {optionsLoading && <p className="text-[15px] text-ink/60">טוען רשימות…</p>}
             {(['imaging', 'equipment', 'services'] as const).map((g) => (
               <Group key={g} label={HD_OPTION_GROUPS[g]}>
                 <CheckGrid options={opt(g)} selected={picked[g]} onToggle={toggleOption(g)} />
@@ -492,7 +492,7 @@ export default function DentalAssetRequestPage() {
         {/* ─── שלב 4 — נבנה לפי שלב 2 ─── */}
         {step === 4 && (
           deals.length === 0 ? (
-            <p className="text-[16px] font-light text-ink/60">
+            <p className="text-[16px] text-ink/72">
               לא נבחר סוג עסקה. חזרו לשלב 2 ובחרו לפחות אפשרות אחת.
             </p>
           ) : (
@@ -502,7 +502,7 @@ export default function DentalAssetRequestPage() {
               return (
                 <div key={k} className="mt-[clamp(30px,3.6vw,48px)] border-t border-rule pt-[clamp(22px,2.6vw,32px)] first:mt-0 first:border-0 first:pt-0">
                   <div className="mb-6 flex items-baseline gap-4">
-                    <span className="font-mono text-[11px] tracking-[0.26em] text-ink/40">{pad2(i + 1)}</span>
+                    <span className="text-[12px] font-black tracking-[0.08em] text-ink/60">{pad2(i + 1)}</span>
                     <h4 className="text-[clamp(20px,2.4vw,32px)] font-black tracking-[-0.03em]">{meta.label}</h4>
                   </div>
                   <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
@@ -543,7 +543,7 @@ export default function DentalAssetRequestPage() {
 
                   {k === 'sale' && (
                     <div className="mt-7">
-                      <span className="mb-4 block font-mono text-[11px] tracking-[0.26em] text-ink/40">
+                      <span className="mb-4 block text-[12px] font-black tracking-[0.08em] text-ink/60">
                         {HD_OPTION_GROUPS.sale_includes}
                       </span>
                       <CheckGrid options={opt('sale_includes')} selected={picked.sale_includes} onToggle={toggleOption('sale_includes')} />
@@ -552,7 +552,7 @@ export default function DentalAssetRequestPage() {
 
                   {(k === 'rent_daily' || k === 'rent_shift') && (
                     <div className="mt-7">
-                      <span className="mb-4 block font-mono text-[11px] tracking-[0.26em] text-ink/40">ימים פנויים</span>
+                      <span className="mb-4 block text-[12px] font-black tracking-[0.08em] text-ink/60">ימים פנויים</span>
                       <CheckGrid
                         options={HD_WEEKDAYS.map((w) => ({ id: w.value, name: w.label }))}
                         selected={offerDays(k)}
@@ -575,13 +575,13 @@ export default function DentalAssetRequestPage() {
         {/* ─── שלב 5 ─── */}
         {step === 5 && (
           <>
-            <p className="mb-8 max-w-[48ch] text-[16.5px] font-light leading-[1.8] text-ink/60 text-pretty">
+            <p className="mb-8 max-w-[48ch] text-[16.5px] leading-[1.8] text-ink/72 text-pretty">
               עד {HD_MAX_IMAGES} תמונות. אנחנו בוחרים מתוכן מה יופיע ובאיזה סדר.
             </p>
             <label className="block cursor-pointer rounded-sm border border-dashed border-ink/25 px-6 py-[clamp(40px,6vw,72px)] text-center transition-colors duration-500 hover:border-[#D97706] hover:bg-[rgba(217,119,6,0.035)]">
               <input type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => addFiles(e.target.files)} />
               <b className="block text-[19px] font-bold tracking-[-0.02em]">בחרו תמונות</b>
-              <small className="mt-2 block font-mono text-[12.5px] tracking-[0.12em] text-ink/40">JPG · PNG · WEBP · 10MB</small>
+              <small className="mt-2 block font-mono text-[12.5px] tracking-[0.12em] text-ink/60">JPG · PNG · WEBP · 10MB</small>
             </label>
             {previews.length > 0 && (
               <div className="mt-6 grid grid-cols-[repeat(auto-fill,minmax(116px,1fr))] gap-2">
@@ -601,8 +601,8 @@ export default function DentalAssetRequestPage() {
               </div>
             )}
             <div className="mt-5 flex flex-wrap justify-between gap-4">
-              <span className="font-mono text-[11px] tracking-[0.2em] text-ink/40">{pad2(files.length)} / {HD_MAX_IMAGES}</span>
-              <span className="text-[13px] font-light text-ink/40">נשמרות באופן פרטי ואינן מתפרסמות אוטומטית</span>
+              <span className="font-mono text-[11px] tracking-[0.2em] text-ink/60">{pad2(files.length)} / {HD_MAX_IMAGES}</span>
+              <span className="text-[13px] text-ink/60">נשמרות באופן פרטי ואינן מתפרסמות אוטומטית</span>
             </div>
           </>
         )}
@@ -610,7 +610,7 @@ export default function DentalAssetRequestPage() {
         {/* ─── שלב 6 ─── */}
         {step === 6 && (
           <>
-            <p className="mb-8 max-w-[48ch] text-[16.5px] font-light leading-[1.8] text-ink/60 text-pretty">
+            <p className="mb-8 max-w-[48ch] text-[16.5px] leading-[1.8] text-ink/72 text-pretty">
               הפרטים משמשים אותנו כדי לחזור אליכם. הם אינם מתפרסמים אוטומטית בדף הנכס.
             </p>
             <div className="grid gap-x-8 gap-y-5 sm:grid-cols-2">
@@ -703,11 +703,11 @@ function Review({
 
   const Row = ({ k, v }: { k: string; v: string | number | null | undefined }) => (
     <div className="grid items-baseline gap-4 border-b border-rule/50 py-2.5 sm:grid-cols-[clamp(120px,15vw,180px)_1fr]">
-      <span className="font-mono text-[10.5px] tracking-[0.14em] text-ink/40">{k}</span>
+      <span className="font-mono text-[10.5px] tracking-[0.14em] text-ink/60">{k}</span>
       {v !== null && v !== undefined && String(v).trim() !== '' ? (
         <span className="text-[15.5px] leading-[1.6]">{v}</span>
       ) : (
-        <span className="text-[15.5px] font-light italic text-ink/25">לא צוין</span>
+        <span className="text-[15.5px] italic text-ink/25">לא צוין</span>
       )}
     </div>
   )
@@ -717,7 +717,7 @@ function Review({
       <div className="mb-4 flex items-baseline justify-between gap-4">
         <h4 className="text-[21px] font-black tracking-[-0.03em]">{title}</h4>
         {step && (
-          <button type="button" onClick={() => onEdit(step)} className="font-mono text-[12px] tracking-[0.16em] text-ink/40 transition-colors duration-300 hover:text-[#D97706]">
+          <button type="button" onClick={() => onEdit(step)} className="font-mono text-[12px] tracking-[0.16em] text-ink/60 transition-colors duration-300 hover:text-[#D97706]">
             עריכה
           </button>
         )}
@@ -728,7 +728,7 @@ function Review({
 
   return (
     <>
-      <p className="mb-8 max-w-[48ch] text-[16.5px] font-light leading-[1.8] text-ink/60 text-pretty">
+      <p className="mb-8 max-w-[48ch] text-[16.5px] leading-[1.8] text-ink/72 text-pretty">
         עברו על הפרטים. אפשר לחזור ולתקן כל מקטע.
       </p>
 
@@ -736,7 +736,7 @@ function Review({
         <Row k="תקופת פרסום" v={`${packageDays} יום`} />
         <Row k="מחיר" v={`${nis(packageDays === 60 ? 700 : 800)} ₪ + מע״מ`} />
         <Row k="טיפול בפניות" v={screening ? 'AllDent' : 'ישירות אליכם'} />
-        <p className="mt-2 text-[13px] font-light text-ink/40">נבחר בעמוד המסלולים ואינו נבחר מחדש כאן.</p>
+        <p className="mt-2 text-[13px] text-ink/60">נבחר בעמוד המסלולים ואינו נבחר מחדש כאן.</p>
       </Block>
 
       <Block title="הנכס" step={1}>

@@ -11,7 +11,8 @@
  * המלל כולו ב-src/content/homeDentTerms.ts.
  */
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
+import { BackLink } from '@/components/public/BackLink'
 import {
   HD_CONSENT_LABEL,
   HD_FAQ,
@@ -90,9 +91,11 @@ function Option({
       }`}
     >
       <span className="flex items-center justify-between gap-4">
+        {/* התקופה היא הסיבה להפרש המחיר — לכן היא בכתום ובגודל קריא,
+            ולא תווית זעירה באפור. */}
         <span
-          className={`font-mono text-[10.5px] tracking-[0.24em] ${
-            checked ? 'text-white/40' : 'text-ink/40'
+          className={`text-[clamp(15px,1.5vw,18px)] font-black tracking-[-0.01em] ${
+            checked ? 'text-[#F0A03C]' : 'text-[#B45309]'
           }`}
         >
           {tag}
@@ -111,7 +114,7 @@ function Option({
           {nis(price)}
           <sup
             className={`ms-1.5 align-super text-[15px] font-normal tracking-normal ${
-              checked ? 'text-white/50' : 'text-ink/40'
+              checked ? 'text-white/70' : 'text-ink/70'
             }`}
           >
             ₪ + מע״מ
@@ -123,9 +126,11 @@ function Option({
         </span>
       )}
 
+      {/* בלי max-w — המידה הצרה שברה את המשפט באמצע ביטוי.
+          text-balance מחלק את השורות בנקודה טבעית. */}
       <p
-        className={`max-w-[32ch] text-[14.5px] font-light leading-[1.75] text-pretty ${
-          checked ? 'text-white/64' : 'text-ink/60'
+        className={`text-[15.5px] leading-[1.8] text-balance ${
+          checked ? 'text-white/80' : 'text-ink/75'
         }`}
       >
         {body}
@@ -190,14 +195,11 @@ export default function DentalAssetTermsPage() {
           aria-hidden="true"
         />
         <div className="relative z-10 mx-auto flex max-w-[880px] flex-col items-center gap-6 px-7 text-center">
-          <Link
-            to="/dental-assets"
-            className="self-start font-mono text-[10.5px] tracking-[0.24em] text-white/40 transition hover:text-white"
-          >
-            → חזרה ללוח הנכסים
-          </Link>
+          <BackLink to="/dental-assets" className="self-start">
+            חזרה ללוח הנכסים
+          </BackLink>
           <p
-            className="font-mono text-[11px] tracking-[0.26em] text-[#D97706]"
+            className="text-[12px] font-black tracking-[0.08em] text-[#D97706]"
             dir="ltr"
           >
             {HD_HERO.eyebrow}
@@ -206,7 +208,7 @@ export default function DentalAssetTermsPage() {
             {HD_HERO.lineA}
             <span className="mt-1 block text-[#F0A03C]">{HD_HERO.lineB}</span>
           </h1>
-          <p className="max-w-[34em] text-[clamp(16px,1.5vw,20px)] font-light leading-[1.85] text-white/70 text-pretty">
+          <p className="max-w-[34em] text-[clamp(16px,1.5vw,20px)] leading-[1.85] text-white/70 text-pretty">
             {HD_HERO.lead}
           </p>
           <div className="mt-2 flex flex-wrap justify-center gap-3">
@@ -229,7 +231,7 @@ export default function DentalAssetTermsPage() {
       {/* ═══ הבחירות ═══ */}
       <section id="choose" className="py-[clamp(64px,9vw,140px)]">
         <div className="mx-auto max-w-[1280px] px-[clamp(24px,5vw,72px)]">
-          <p data-reveal="out" className={`font-mono text-[11px] tracking-[0.26em] text-ink/40 ${REVEAL}`}>
+          <p data-reveal="out" className={`text-[12px] font-black tracking-[0.08em] text-[#B45309] ${REVEAL}`}>
             01 — תקופת פרסום · בחירה נדרשת
           </p>
           <h2
@@ -240,12 +242,12 @@ export default function DentalAssetTermsPage() {
           </h2>
           <p
             data-reveal="out"
-            className={`mt-5 max-w-[34ch] text-[clamp(16px,1.5vw,20px)] font-light leading-[1.8] text-ink/60 text-pretty ${REVEAL}`}
+            className={`mt-5 max-w-[34ch] text-[clamp(16px,1.5vw,20px)] leading-[1.8] text-ink/72 text-pretty ${REVEAL}`}
           >
             התקופה נספרת מהיום שהנכס עולה לאוויר, לא מהיום שמילאתם את הטופס.
           </p>
 
-          <p className="mt-[clamp(30px,3.6vw,52px)] font-mono text-[11px] tracking-[0.26em] text-[#D97706] transition-opacity duration-500" style={{ opacity: days === null ? 1 : 0 }}>
+          <p className="mt-[clamp(30px,3.6vw,52px)] text-[12px] font-black tracking-[0.08em] text-[#B45309] transition-opacity duration-500" style={{ opacity: days === null ? 1 : 0 }}>
             ↓ בחרו אחת מהשתיים
           </p>
 
@@ -268,7 +270,7 @@ export default function DentalAssetTermsPage() {
           </div>
 
           <div className="mt-[clamp(64px,9vw,132px)]">
-            <p data-reveal="out" className={`font-mono text-[11px] tracking-[0.26em] text-ink/40 ${REVEAL}`}>
+            <p data-reveal="out" className={`text-[12px] font-black tracking-[0.08em] text-[#B45309] ${REVEAL}`}>
               02 — טיפול בפניות · בחירה נדרשת
             </p>
             <h2
@@ -278,7 +280,7 @@ export default function DentalAssetTermsPage() {
               מי מטפל בפונים?
             </h2>
 
-            <p className="mt-[clamp(30px,3.6vw,52px)] font-mono text-[11px] tracking-[0.26em] text-[#D97706] transition-opacity duration-500" style={{ opacity: screening === null ? 1 : 0 }}>
+            <p className="mt-[clamp(30px,3.6vw,52px)] text-[12px] font-black tracking-[0.08em] text-[#B45309] transition-opacity duration-500" style={{ opacity: screening === null ? 1 : 0 }}>
               ↓ בחרו אחת מהשתיים
             </p>
 
@@ -305,16 +307,16 @@ export default function DentalAssetTermsPage() {
               <dl className="mt-8 grid gap-y-2 border-t border-rule pt-8 sm:grid-cols-[auto_1fr] sm:gap-x-14">
                 {HD_SUCCESS_FEES.map((f) => (
                   <div key={f.key} className="contents">
-                    <dt className="pt-2 font-mono text-[10.5px] tracking-[0.24em] text-ink/40">
+                    <dt className="pt-2 text-[12px] font-black tracking-[0.08em] text-ink/60">
                       {f.label}
                     </dt>
-                    <dd className="border-b border-rule/50 pb-2 text-[16px] font-light text-ink/60 last:border-0">
+                    <dd className="border-b border-rule/50 pb-2 text-[16px] text-ink/72 last:border-0">
                       <b className="font-black tracking-[-0.02em] text-ink">{f.value}</b>
                       {f.suffix ? ` ${f.suffix}` : ''} — במקרה של הצלחה
                     </dd>
                   </div>
                 ))}
-                <p className="mt-4 max-w-[56ch] text-[13px] font-light leading-[1.7] text-ink/40 sm:col-span-2">
+                <p className="mt-4 max-w-[56ch] text-[13px] leading-[1.7] text-ink/60 sm:col-span-2">
                   {HD_SUCCESS_FEE_NOTE}
                 </p>
               </dl>
@@ -326,7 +328,7 @@ export default function DentalAssetTermsPage() {
       {/* ═══ התהליך ═══ */}
       <section id="flow" className="bg-[#1E1E1E] py-[clamp(56px,7vw,104px)] text-white">
         <div className="mx-auto max-w-[1280px] px-[clamp(24px,5vw,72px)]">
-          <p className="font-mono text-[11px] tracking-[0.26em] text-white/40">03 — התהליך</p>
+          <p className="text-[12px] font-black tracking-[0.08em] text-[#F0A03C]">03 — התהליך</p>
           <h2 className="mt-5 max-w-[15ch] text-[clamp(25px,4.8vw,68px)] font-black leading-[1.02] tracking-[-0.03em]">
             חמישה שלבים עד שהנכס באוויר
           </h2>
@@ -336,13 +338,13 @@ export default function DentalAssetTermsPage() {
                 key={step.title}
                 className="grid items-baseline gap-4 border-b border-white/10 py-[clamp(24px,3vw,44px)] md:grid-cols-[clamp(60px,7vw,110px)_1fr_minmax(0,44ch)] md:gap-[clamp(20px,4vw,56px)]"
               >
-                <span className="text-[clamp(26px,3.4vw,50px)] font-black leading-none tracking-[-0.03em] text-white/25">
+                <span className="text-[clamp(26px,3.4vw,50px)] font-black leading-none tracking-[-0.03em] text-white/40">
                   {pad2(i + 1)}
                 </span>
                 <h3 className="text-[clamp(19px,2.3vw,32px)] font-black leading-[1.1] tracking-[-0.03em]">
                   {step.title}
                 </h3>
-                <p className="text-[15.5px] font-light leading-[1.8] text-white/64 text-pretty">
+                <p className="text-[15.5px] leading-[1.8] text-white/75 text-pretty">
                   {step.body}
                 </p>
               </div>
@@ -354,7 +356,7 @@ export default function DentalAssetTermsPage() {
       {/* ═══ שאלות נפוצות ═══ */}
       <section className="py-[clamp(64px,9vw,140px)]">
         <div className="mx-auto max-w-[1280px] px-[clamp(24px,5vw,72px)]">
-          <p className="font-mono text-[11px] tracking-[0.26em] text-ink/40">04 — שאלות נפוצות</p>
+          <p className="text-[12px] font-black tracking-[0.08em] text-[#B45309]">04 — שאלות נפוצות</p>
           <div className="mt-[clamp(28px,3.4vw,48px)] border-t border-rule">
             {HD_FAQ.map((item, i) => {
               const open = openFaq === i
@@ -384,7 +386,7 @@ export default function DentalAssetTermsPage() {
                     }`}
                   >
                     <div className="overflow-hidden">
-                      <p className="max-w-[56ch] pb-[clamp(22px,2.4vw,34px)] text-[15.5px] font-light leading-[1.85] text-ink/60 text-pretty">
+                      <p className="max-w-[56ch] pb-[clamp(22px,2.4vw,34px)] text-[15.5px] leading-[1.85] text-ink/72 text-pretty">
                         {item.a}
                       </p>
                     </div>
@@ -406,19 +408,19 @@ export default function DentalAssetTermsPage() {
             />
             <div className="relative grid items-end gap-[clamp(32px,5vw,88px)] p-[clamp(30px,4.5vw,52px)] lg:grid-cols-[1fr_minmax(0,420px)]">
               <div>
-                <p className="font-mono text-[11px] tracking-[0.26em] text-white/40">05 — מתחילים</p>
+                <p className="text-[12px] font-black tracking-[0.08em] text-[#F0A03C]">05 — מתחילים</p>
                 <h2 className="mt-5 max-w-[11ch] text-[clamp(25px,4.8vw,68px)] font-black leading-[1.02] tracking-[-0.03em]">
                   מוכנים להתחיל?
                 </h2>
-                <p className="mt-5 max-w-[40ch] text-[clamp(16px,1.5vw,20px)] font-light leading-[1.8] text-white/64 text-pretty">
+                <p className="mt-5 max-w-[40ch] text-[clamp(16px,1.5vw,20px)] leading-[1.8] text-white/75 text-pretty">
                   השלב הבא הוא טופס אחד — פרטי הנכס, סוגי העסקה ותמונות. אפשר לחזור ולתקן.
                 </p>
                 <div className="mt-8 border-t border-white/10">
                   {missing.map((m, i) => (
                     <div
                       key={m.label}
-                      className={`flex items-center gap-3.5 border-b border-white/10 py-3.5 text-[14px] font-light transition-colors duration-500 ${
-                        m.ok ? 'text-[#6EE7B7]' : 'text-white/40'
+                      className={`flex items-center gap-3.5 border-b border-white/10 py-3.5 text-[14px] transition-colors duration-500 ${
+                        m.ok ? 'text-[#6EE7B7]' : 'text-white/60'
                       }`}
                     >
                       <span className="font-mono text-[11px] tracking-[0.1em]">{pad2(i + 1)}</span>
@@ -446,7 +448,7 @@ export default function DentalAssetTermsPage() {
                     }}
                     className="mt-1 h-4 w-4 shrink-0 accent-[#D97706]"
                   />
-                  <span className="text-[13.5px] font-light leading-[1.7] text-white/64">
+                  <span className="text-[13.5px] leading-[1.7] text-white/75">
                     {HD_CONSENT_LABEL}
                   </span>
                 </label>
@@ -468,7 +470,7 @@ export default function DentalAssetTermsPage() {
                   המשך לטופס
                 </button>
 
-                <p className="mt-4 text-center font-mono text-[9.5px] tracking-[0.24em] text-white/30">
+                <p className="mt-4 text-center text-[13px] font-semibold text-white/70">
                   מועד האישור נרשם בשרת
                 </p>
               </div>
@@ -486,20 +488,20 @@ export default function DentalAssetTermsPage() {
         <div className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-x-[clamp(20px,3vw,44px)] gap-y-3 px-[clamp(24px,5vw,72px)] py-4">
           <div className="flex flex-1 flex-wrap gap-x-[clamp(20px,3vw,44px)] gap-y-3">
             <div className="flex flex-col gap-0.5">
-              <span className="font-mono text-[9.5px] tracking-[0.24em] text-white/40">תקופה</span>
-              <span className={days ? 'text-[19px] font-bold tracking-[-0.02em]' : 'text-[15px] font-light text-white/40'}>
+              <span className="text-[11.5px] font-black tracking-[0.08em] text-white/60">תקופה</span>
+              <span className={days ? 'text-[19px] font-bold tracking-[-0.02em]' : 'text-[15px] text-white/60'}>
                 {days ? `${days} יום` : 'לא נבחרה'}
               </span>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="font-mono text-[9.5px] tracking-[0.24em] text-white/40">מחיר</span>
-              <span className={price ? 'text-[19px] font-bold tracking-[-0.02em]' : 'text-[15px] font-light text-white/40'}>
+              <span className="text-[11.5px] font-black tracking-[0.08em] text-white/60">מחיר</span>
+              <span className={price ? 'text-[19px] font-bold tracking-[-0.02em]' : 'text-[15px] text-white/60'}>
                 {price ? `${nis(price)} ₪` : '—'}
               </span>
             </div>
             <div className="flex flex-col gap-0.5">
-              <span className="font-mono text-[9.5px] tracking-[0.24em] text-white/40">פניות</span>
-              <span className={screening !== null ? 'text-[19px] font-bold tracking-[-0.02em]' : 'text-[15px] font-light text-white/40'}>
+              <span className="text-[11.5px] font-black tracking-[0.08em] text-white/60">פניות</span>
+              <span className={screening !== null ? 'text-[19px] font-bold tracking-[-0.02em]' : 'text-[15px] text-white/60'}>
                 {screening === null ? 'לא נבחר' : screening ? 'AllDent' : 'ישירות'}
               </span>
             </div>

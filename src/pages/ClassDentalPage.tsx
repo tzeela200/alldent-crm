@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { BackLink } from '@/components/public/BackLink'
 import { ArrowRight, CheckCircle2 } from 'lucide-react'
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon'
 
@@ -22,16 +23,7 @@ export default function ClassDentalPage() {
         <div className="relative mx-auto max-w-7xl">
           <div className="max-w-4xl text-start">
             {/* כפתור החזרה המדויק מהקוד שלך - מנווט לדף הבית */}
-            <Link
-              to="/"
-              className="inline-flex items-center gap-1.5 text-[13px] font-bold text-white/58 transition hover:text-white"
-            >
-              <ArrowRight
-                className="h-3.5 w-3.5 rtl:scale-x-[-1]"
-                aria-hidden="true"
-              />
-              חזרה לדף הבית
-            </Link>
+            <BackLink to="/">חזרה לדף הבית</BackLink>
 
             <div className="mt-8 text-start">
               {/* תגית עליונה מותאמת בטורקיז */}
