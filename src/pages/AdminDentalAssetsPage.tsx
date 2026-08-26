@@ -24,6 +24,7 @@ import { AdminTable, type AdminColumn } from '@/components/admin/AdminTable'
 import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
 import { AdminActionsMenu, type AdminActionMenuItem } from '@/components/admin/AdminActionsMenu'
 import { AdminBadge } from '@/components/admin/AdminBadge'
+import { CreateAssetDialog } from '@/components/admin/dental/CreateAssetDialog'
 import { formatDate } from '@/lib/timeAgo'
 import {
   HD_ASSET_TYPE_LABELS,
@@ -73,6 +74,7 @@ export default function AdminDentalAssetsPage() {
   const { data, isLoading, error, refetch } = useDentalAssets(filters, page, sortBy, sortDir)
   const { data: kpis } = useDentalAssetKpis()
   const navigate = useNavigate()
+  const [createOpen, setCreateOpen] = useState(false)
   const { publish, publishUpdate, unpublish } = useDentalAssetMutations()
 
   const rows = data?.rows ?? []
@@ -264,7 +266,7 @@ export default function AdminDentalAssetsPage() {
           </ActionButton>
           <ActionButton
             variant="primary"
-            onClick={() => toast.info('יצירת נכס ידנית — בחבילה הבאה')}
+            onClick={() => setCreateOpen(true)}
           >
             + נכס חדש
           </ActionButton>
@@ -366,6 +368,12 @@ export default function AdminDentalAssetsPage() {
             onPageChange={setPage}
           />
         }
+      />
+
+      <CreateAssetDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        onCreated={() => void refetch()}
       />
     </Shell>
   )
