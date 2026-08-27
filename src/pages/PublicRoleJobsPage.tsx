@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import PublicJobCard from '@/components/public/PublicJobCard'
 import RegionNav from '@/components/public/RegionNav'
 import { usePublicJobs } from '@/hooks/usePublicJobs'
-import { getRolePage, type RolePageSlug, PUBLIC_ROLE_PAGES, SLUG_TO_JOB_ROLE_IDS } from '@/lib/publicRolePages'
+import { getRolePage, type RolePageSlug, PUBLIC_ROLE_PAGES } from '@/lib/publicRolePages'
 
 // רק בעמודי סייעות ומזכירות מציגים קטגוריית אזורים (ניווט אזורי).
 const ROLES_WITH_REGION_NAV = new Set(['assistants', 'secretaries'])
@@ -56,8 +56,8 @@ export default function PublicRoleJobsPage() {
   const rolePage = slug ? getRolePage(slug) : undefined
   if (!rolePage || !slug) return <Navigate to="/jobs" replace />
 
-  const roleIds = SLUG_TO_JOB_ROLE_IDS[slug as RolePageSlug]
-  const { data: jobs, isLoading } = usePublicJobs({ roleIds })
+  // INC-3132 — סינון לפי לוח: התפקיד עצמו OR סימון ידני של לוח נוסף.
+  const { data: jobs, isLoading } = usePublicJobs({ boardSlug: slug as RolePageSlug })
   const total = jobs?.length ?? 0
 
   return (

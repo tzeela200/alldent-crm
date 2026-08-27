@@ -33,6 +33,39 @@ export const SLUG_TO_JOB_ROLE_IDS: Record<RolePageSlug, number[]> = {
   technicians:        [11],
 }
 
+/**
+ * INC-3132 — שמות הלוחות לבחירה באדמין.
+ *
+ * הבחירה נעשית ברמת הלוח ולא ברמת התפקיד, כי לוח המומחים לבדו מכסה
+ * שבעה מזהי תפקיד (2–8): "שיופיע גם בלוח מומחים" הוא מה שמתכוונים,
+ * ולא "שיופיע גם כמומחה אנדו".
+ */
+export const PUBLIC_BOARD_LABELS: Record<RolePageSlug, string> = {
+  dentists:           'רופאי שיניים',
+  specialists:        'מומחים',
+  hygienists:         'שינניות',
+  assistants:         'סייעות',
+  secretaries:        'מזכירות',
+  'management-sales': 'ניהול ומכירות',
+  technicians:        'טכנאי שיניים',
+}
+
+/**
+ * הלוח שהמשרה שייכת אליו מעצם התפקיד שלה. זהו הלוח שנכלל תמיד ואינו
+ * ניתן להסרה — הבחירה באדמין רק מוסיפה עליו.
+ *
+ * מחזיר null לתפקיד שאינו ממופה לשום לוח (כיום 16 "בעלים" ו-18
+ * "צילום דנטלי"; אין עליהם משרות). ⚠️ תפקיד לא ממופה = משרה שלא תופיע
+ * באף לוח תפקיד, ולכן ה-UI מציג על כך אזהרה מפורשת.
+ */
+export function boardSlugForRoleId(roleId: number | null | undefined): RolePageSlug | null {
+  if (roleId == null) return null
+  for (const slug of ALL_ROLE_SLUGS) {
+    if (SLUG_TO_JOB_ROLE_IDS[slug].includes(Number(roleId))) return slug
+  }
+  return null
+}
+
 // שורש לחיפוש ilike — נשמר לצרכי צבע/תצוגה בלבד
 export const SLUG_TO_SEARCH_ROOT: Record<RolePageSlug, string> = {
   dentists:           'רופא',

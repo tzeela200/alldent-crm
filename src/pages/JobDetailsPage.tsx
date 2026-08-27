@@ -13,6 +13,7 @@ import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import JobImageUpload from '@/components/admin/JobImageUpload'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { JobBoardsPicker, cleanExtraBoards } from '@/components/admin/JobBoardsPicker'
 import { ContactPicker } from '@/components/ui/ContactPicker'
 import { AccountPicker } from '@/components/ui/AccountPicker'
 import RecruitmentRequestPanel from '@/components/admin/RecruitmentRequestPanel'
@@ -27,6 +28,7 @@ type JobDraft = {
   job_status: string
   public_status: string
   job_role: string
+  public_extra_boards: string[]
   job_sub_role: number[]
   account_link: string
   rel_employer_contact: string
@@ -277,6 +279,7 @@ export default function JobDetailsPage() {
         job_status: nextJobStatus,
         public_status: nextPublicStatus,
         job_role: toNullableNumber(draft.job_role),
+        public_extra_boards: cleanExtraBoards(draft.public_extra_boards, toNullableNumber(draft.job_role)),
         job_sub_role: draft.job_sub_role.length ? draft.job_sub_role : [],
         account_link: toNullableNumber(draft.account_link),
         rel_employer_contact: toNullableNumber(draft.rel_employer_contact),
@@ -444,6 +447,11 @@ export default function JobDetailsPage() {
                   subRoleIds={draft.job_sub_role}
                   onRoleChange={(id) => setDraft((prev) => prev ? { ...prev, job_role: id ? String(id) : '', job_sub_role: [] } : prev)}
                   onSubRoleChange={(ids) => setField('job_sub_role', ids)}
+                />
+                <JobBoardsPicker
+                  roleId={draft.job_role ? Number(draft.job_role) : null}
+                  value={draft.public_extra_boards}
+                  onChange={(next) => setField('public_extra_boards', next)}
                 />
                 <CityRegionPicker
                   variant="edit"
@@ -616,7 +624,7 @@ export default function JobDetailsPage() {
 
 function toDraft(job: any): JobDraft {
   return {
-    job_code: String(job.job_code ?? ''), job_title: String(job.job_title ?? ''), job_status: job.job_status != null ? String(job.job_status) : '', public_status: job.public_status != null ? String(job.public_status) : '', job_role: job.job_role != null ? String(job.job_role) : '', job_sub_role: normalizeIds(job.job_sub_role), account_link: job.account_link != null ? String(job.account_link) : '', rel_employer_contact: job.rel_employer_contact != null ? String(job.rel_employer_contact) : '', rel_recruiter_contact: job.rel_recruiter_contact != null ? String(job.rel_recruiter_contact) : '', region_id: job.region_id != null ? String(job.region_id) : '', city_id: job.city_id != null ? String(job.city_id) : '', address: String(job.address ?? ''), scope: normalizeIds(job.scope), required_experience: job.required_experience != null ? String(job.required_experience) : '', required_languages: normalizeIds(job.required_languages), systems_used: normalizeIds(job.systems_used), salary_type_ids: normalizeIds(job.salary_type_ids), tax_type_id: job.tax_type_id != null ? String(job.tax_type_id) : '', mobility_id: job.mobility_id != null ? String(job.mobility_id) : '', salary_expectation_hourly: job.salary_expectation_hourly != null ? String(job.salary_expectation_hourly) : '', salary_expectation_monthly: job.salary_expectation_monthly != null ? String(job.salary_expectation_monthly) : '', show_salary_public: Boolean(job.show_salary_public), work_schedule_text: String(job.work_schedule_text ?? ''), job_description: String(job.job_description ?? ''), description_image_url: String(job.description_image_url ?? ''), job_requirements: String(job.job_requirements ?? ''), employer_notes: String(job.employer_notes ?? ''), notes: String(job.notes ?? ''), public_excerpt: String(job.public_excerpt ?? ''), public_image_url: String(job.public_image_url ?? ''), job_url: String(job.job_url ?? '')
+    job_code: String(job.job_code ?? ''), job_title: String(job.job_title ?? ''), job_status: job.job_status != null ? String(job.job_status) : '', public_status: job.public_status != null ? String(job.public_status) : '', job_role: job.job_role != null ? String(job.job_role) : '', public_extra_boards: Array.isArray(job.public_extra_boards) ? (job.public_extra_boards as string[]) : [], job_sub_role: normalizeIds(job.job_sub_role), account_link: job.account_link != null ? String(job.account_link) : '', rel_employer_contact: job.rel_employer_contact != null ? String(job.rel_employer_contact) : '', rel_recruiter_contact: job.rel_recruiter_contact != null ? String(job.rel_recruiter_contact) : '', region_id: job.region_id != null ? String(job.region_id) : '', city_id: job.city_id != null ? String(job.city_id) : '', address: String(job.address ?? ''), scope: normalizeIds(job.scope), required_experience: job.required_experience != null ? String(job.required_experience) : '', required_languages: normalizeIds(job.required_languages), systems_used: normalizeIds(job.systems_used), salary_type_ids: normalizeIds(job.salary_type_ids), tax_type_id: job.tax_type_id != null ? String(job.tax_type_id) : '', mobility_id: job.mobility_id != null ? String(job.mobility_id) : '', salary_expectation_hourly: job.salary_expectation_hourly != null ? String(job.salary_expectation_hourly) : '', salary_expectation_monthly: job.salary_expectation_monthly != null ? String(job.salary_expectation_monthly) : '', show_salary_public: Boolean(job.show_salary_public), work_schedule_text: String(job.work_schedule_text ?? ''), job_description: String(job.job_description ?? ''), description_image_url: String(job.description_image_url ?? ''), job_requirements: String(job.job_requirements ?? ''), employer_notes: String(job.employer_notes ?? ''), notes: String(job.notes ?? ''), public_excerpt: String(job.public_excerpt ?? ''), public_image_url: String(job.public_image_url ?? ''), job_url: String(job.job_url ?? '')
   }
 }
 function SectionTitle({ icon, title }: { icon: React.ReactNode; title: string }) { return <div className="mb-5 flex items-center gap-2 text-[18px] font-bold text-[#2D2D2D]"><span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#E6F3F3] text-[#008080]">{icon}</span>{title}</div> }

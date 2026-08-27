@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { SLUG_TO_JOB_ROLE_IDS, type RolePageSlug } from '@/lib/publicRolePages'
 
 export interface PublicJob {
   job_code: string
@@ -11,6 +12,9 @@ export interface PublicJob {
   job_role_name: string | null
   job_sub_role: number[] | null
   job_sub_role_names: string[] | null
+
+  /** INC-3132 — לוחות נוספים שנבחרו ידנית. הלוח של job_role אינו נשמר כאן. */
+  public_extra_boards: string[] | null
 
   city_id: number | null
   city_name: string | null
@@ -62,6 +66,11 @@ export interface PublicJobFilters {
   search?: string
   role?: string
   roleIds?: number[]
+  /**
+   * INC-3132 — סינון לפי לוח ולא לפי תפקיד. מחזיר גם משרות שהתפקיד שלהן
+   * שייך ללוח, וגם משרות שסומנו ידנית להופיע בו.
+   */
+  boardSlug?: RolePageSlug
   region?: string
   regionIds?: number[]
   city?: string
@@ -81,6 +90,7 @@ const PUBLIC_JOB_FIELDS = [
   'job_role_name',
   'job_sub_role',
   'job_sub_role_names',
+  'public_extra_boards',
 
   'city_id',
   'city_name',
@@ -145,6 +155,7 @@ export function stripPrivateInfo(row: Record<string, unknown>): PublicJob {
     job_role_name: typeof row.job_role_name === 'string' ? row.job_role_name : null,
     job_sub_role: asNumberArray(row.job_sub_role),
     job_sub_role_names: asStringArray(row.job_sub_role_names),
+    public_extra_boards: asStringArray(row.public_extra_boards),
 
     city_id: typeof row.city_id === 'number' ? row.city_id : row.city_id ? Number(row.city_id) : null,
     city_name: typeof row.city_name === 'string' ? row.city_name : null,
@@ -218,7 +229,18 @@ export async function getPublicJobs(filters: PublicJobFilters = {}): Promise<Pub
     )
   }
 
-  if (filters.roleIds?.length) query = query.in('job_role', filters.roleIds)
+  /**
+   * INC-3132 — לוח ציבורי = התפקיד שלו OR סימון ידני.
+   * ה-OR על job_role תמיד נוכח, ולכן משרה לא יכולה להיעלם מהלוח הטבעי
+   * שלה גם אם נשמר ערך שגוי בעמודת הלוחות הנוספים.
+   * ה-slugs ומזהי התפקיד מגיעים מ-SLUG_TO_JOB_ROLE_IDS ולא מקלט משתמש.
+   */
+  if (filters.boardSlug) {
+    const ids = SLUG_TO_JOB_ROLE_IDS[filters.boardSlug]
+    query = query.or(
+      `job_role.in.(${ids.join(',')}),public_extra_boards.ov.{${filters.boardSlug}}`,
+    )
+  } else if (filters.roleIds?.length) query = query.in('job_role', filters.roleIds)
   else if (filters.role) query = query.ilike('job_role_name', `%${filters.role}%`)
   if (filters.regionIds?.length) query = query.in('region_id', filters.regionIds)
   else if (filters.region) query = query.eq('region_name', filters.region)

@@ -9,6 +9,7 @@ import JobImageUpload from '@/components/admin/JobImageUpload'
 import JobAIWriter from '@/components/admin/JobAIWriter'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { JobBoardsPicker, cleanExtraBoards } from '@/components/admin/JobBoardsPicker'
 import { ContactPicker } from '@/components/ui/ContactPicker'
 import { AccountPicker, type AccountPickerResult } from '@/components/ui/AccountPicker'
 
@@ -31,6 +32,7 @@ type FormState = {
   job_code: string
   job_title: string
   job_role: string
+  public_extra_boards: string[]
   job_sub_role: number[]
   region_id: string
   city_id: string
@@ -70,6 +72,7 @@ const EMPTY_FORM: FormState = {
   job_code: '',
   job_title: '',
   job_role: '',
+  public_extra_boards: [],
   job_sub_role: [],
   region_id: '',
   city_id: '',
@@ -270,6 +273,7 @@ export default function CreateJobWizardPage() {
         public_status: PUBLIC_STATUS_HIDDEN,
         job_title: cleanText(form.job_title),
         job_role: toNullableNumber(form.job_role),
+        public_extra_boards: cleanExtraBoards(form.public_extra_boards, toNullableNumber(form.job_role)),
         job_sub_role: form.job_sub_role.length ? form.job_sub_role : null,
         required_experience: toNullableNumber(form.required_experience),
         region_id: toNullableNumber(form.region_id),
@@ -385,6 +389,11 @@ export default function CreateJobWizardPage() {
                   subRoleIds={form.job_sub_role}
                   onRoleChange={(id) => setForm((prev) => ({ ...prev, job_role: id ? String(id) : '', job_sub_role: [] }))}
                   onSubRoleChange={(ids) => setField('job_sub_role', ids)}
+                />
+                <JobBoardsPicker
+                  roleId={form.job_role ? Number(form.job_role) : null}
+                  value={form.public_extra_boards}
+                  onChange={(next) => setField('public_extra_boards', next)}
                 />
                 <CityRegionPicker
                   variant="edit"
