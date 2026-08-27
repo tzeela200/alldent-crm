@@ -232,11 +232,11 @@ export default function DentalAssetTermsPage() {
           >
             {HD_HERO.eyebrow}
           </p>
-          <h1 className="text-[clamp(38px,7vw,88px)] font-black leading-[1.02] tracking-[-0.03em]">
+          <h1 className="text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em]">
             {HD_HERO.lineA}
             <span className="mt-1 block text-[#F0A03C]">{HD_HERO.lineB}</span>
           </h1>
-          <p className="max-w-[34em] text-[clamp(16px,1.5vw,20px)] leading-[1.85] text-white/70 text-pretty">
+          <p className="max-w-[34em] text-[clamp(16px,1.5vw,19px)] leading-[1.85] text-white/75 text-pretty">
             {HD_HERO.lead}
           </p>
           <div className="mt-2 flex flex-wrap justify-center gap-3">
@@ -264,13 +264,13 @@ export default function DentalAssetTermsPage() {
           </p>
           <h2
             data-reveal="out"
-            className={`mt-5 max-w-[16ch] text-[clamp(25px,4.8vw,68px)] font-black leading-[1.02] tracking-[-0.03em] ${REVEAL}`}
+            className={`mt-5 max-w-[16ch] text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em] ${REVEAL}`}
           >
             כמה זמן הנכס יפורסם?
           </h2>
           <p
             data-reveal="out"
-            className={`mt-5 max-w-[34ch] text-[clamp(16px,1.5vw,20px)] leading-[1.8] text-ink/72 text-pretty ${REVEAL}`}
+            className={`mt-5 max-w-[34ch] text-[clamp(16px,1.5vw,19px)] leading-[1.85] text-ink/75 text-pretty ${REVEAL}`}
           >
             התקופה נספרת מהיום שהנכס עולה לאוויר, לא מהיום שמילאתם את הטופס.
           </p>
@@ -303,7 +303,7 @@ export default function DentalAssetTermsPage() {
             </p>
             <h2
               data-reveal="out"
-              className={`mt-5 max-w-[14ch] text-[clamp(25px,4.8vw,68px)] font-black leading-[1.02] tracking-[-0.03em] ${REVEAL}`}
+              className={`mt-5 max-w-[14ch] text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em] ${REVEAL}`}
             >
               מי מטפל בפונים?
             </h2>
@@ -357,19 +357,19 @@ export default function DentalAssetTermsPage() {
       <section id="flow" className="bg-[#1E1E1E] py-[clamp(56px,7vw,104px)] text-white">
         <div className="mx-auto max-w-[1280px] px-[clamp(24px,5vw,72px)]">
           <p className="text-[12px] font-black tracking-[0.08em] text-[#F0A03C]">03 — התהליך</p>
-          <h2 className="mt-5 max-w-[15ch] text-[clamp(25px,4.8vw,68px)] font-black leading-[1.02] tracking-[-0.03em]">
+          <h2 className="mt-5 max-w-[15ch] text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
             חמישה שלבים עד שהנכס באוויר
           </h2>
-          <div className="mt-[clamp(36px,4.5vw,64px)] border-t border-white/10">
+          <div className="mt-[clamp(28px,3.2vw,44px)] border-t border-white/10">
             {HD_FLOW.map((step, i) => (
               <div
                 key={step.title}
-                className="grid items-baseline gap-4 border-b border-white/10 py-[clamp(24px,3vw,44px)] md:grid-cols-[clamp(60px,7vw,110px)_1fr_minmax(0,44ch)] md:gap-[clamp(20px,4vw,56px)]"
+                className="grid items-baseline gap-3 border-b border-white/10 py-[clamp(20px,2.1vw,28px)] md:grid-cols-[clamp(46px,4.4vw,64px)_minmax(0,220px)_minmax(0,52ch)] md:gap-[clamp(18px,2.6vw,40px)]"
               >
-                <span className="text-[clamp(26px,3.4vw,50px)] font-black leading-none tracking-[-0.03em] text-white/40">
+                <span className="text-[clamp(22px,2.2vw,30px)] font-black leading-none tracking-[-0.03em] text-white/40">
                   {pad2(i + 1)}
                 </span>
-                <h3 className="text-[clamp(19px,2.3vw,32px)] font-black leading-[1.1] tracking-[-0.03em]">
+                <h3 className="text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em]">
                   {step.title}
                 </h3>
                 <p className="text-[15.5px] leading-[1.8] text-white/75 text-pretty">
@@ -396,7 +396,7 @@ export default function DentalAssetTermsPage() {
                     onClick={() => setOpenFaq(open ? null : i)}
                     className="grid w-full grid-cols-[1fr_auto] items-center gap-6 py-[clamp(20px,2.4vw,32px)] text-right transition-opacity duration-500 hover:opacity-50"
                   >
-                    <h3 className="text-[clamp(17px,1.7vw,22px)] font-bold leading-[1.3] tracking-[-0.02em]">
+                    <h3 className="text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em]">
                       {item.q}
                     </h3>
                     <span className="relative h-3.5 w-3.5 shrink-0" aria-hidden="true">
@@ -437,10 +437,10 @@ export default function DentalAssetTermsPage() {
             <div className="relative grid items-end gap-[clamp(32px,5vw,88px)] p-[clamp(30px,4.5vw,52px)] lg:grid-cols-[1fr_minmax(0,420px)]">
               <div>
                 <p className="text-[12px] font-black tracking-[0.08em] text-[#F0A03C]">05 — מתחילים</p>
-                <h2 className="mt-5 max-w-[11ch] text-[clamp(25px,4.8vw,68px)] font-black leading-[1.02] tracking-[-0.03em]">
+                <h2 className="mt-5 max-w-[11ch] text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
                   מוכנים להתחיל?
                 </h2>
-                <p className="mt-5 max-w-[40ch] text-[clamp(16px,1.5vw,20px)] leading-[1.8] text-white/75 text-pretty">
+                <p className="mt-5 max-w-[40ch] text-[clamp(16px,1.5vw,19px)] leading-[1.85] text-white/75 text-pretty">
                   השלב הבא הוא טופס אחד — פרטי הנכס, סוגי העסקה ותמונות. אפשר לחזור ולתקן.
                 </p>
                 <div className="mt-8 border-t border-white/10">

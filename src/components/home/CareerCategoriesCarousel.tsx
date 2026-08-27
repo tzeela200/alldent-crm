@@ -47,7 +47,7 @@ export function CareerCategoriesCarousel() {
           <p className="text-[#B45309] text-[12px] font-extrabold tracking-[0.24em] uppercase" dir="ltr">
             Career Categories
           </p>
-          <h2 className="mt-3 text-[#2D2D2D] text-[34px] md:text-[52px] leading-[1.06] font-black tracking-[-0.035em]">
+          <h2 className="mt-3 text-[#2D2D2D] text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
             בחרו את התחום שלכם
           </h2>
           <p className="mt-4 text-[#2D2D2D]/60 text-[15px] md:text-[17px] leading-relaxed">

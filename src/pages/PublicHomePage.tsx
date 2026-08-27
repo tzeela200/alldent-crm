@@ -100,7 +100,7 @@ function PremiumHero() {
 
           <h1
             id="home-hero-title"
-            className="hero-anim hero-d2 mx-auto max-w-[13ch] text-[clamp(2.55rem,6.1vw,5rem)] font-black leading-[1.04] [text-wrap:balance] text-white lg:mx-0"
+            className="hero-anim hero-d2 mx-auto max-w-[13ch] text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] [text-wrap:balance] text-white lg:mx-0"
           >
             הבית המקצועי של אנשי הדנטל בישראל
           </h1>
@@ -322,7 +322,7 @@ function PropertiesShowcase() {
             <p className="mb-4 inline-flex rounded-full border border-white/10 bg-white/[0.07] px-5 py-2 text-[12px] font-extrabold tracking-[0.28em] text-[#D97706] backdrop-blur" dir="ltr">
               HOME DENT
             </p>
-            <h2 className="text-[40px] font-black tracking-[-0.04em] text-white md:text-[56px]">
+            <h2 className="text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em] text-white">
               נכסים דנטליים
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-base leading-9 text-white/65 md:text-lg">
@@ -362,7 +362,7 @@ function PropertiesShowcase() {
                     <MapPin className="h-3.5 w-3.5 shrink-0" />
                     <span>{item.location}</span>
                   </div>
-                  <h3 className="mt-1 text-[22px] font-black tracking-tight text-white md:text-[28px]">
+                  <h3 className="mt-1 text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em] text-white">
                     {item.title}
                   </h3>
                   <p className="mt-3 text-[15px] leading-7 text-white/60">
@@ -450,7 +450,7 @@ function EcosystemShowcase() {
             <p className="mb-4 inline-flex rounded-full border border-white/10 bg-white/[0.07] px-5 py-2 text-[12px] font-extrabold tracking-[0.28em] text-[#008080] backdrop-blur" dir="ltr">
               ALLDENT ECOSYSTEM
             </p>
-            <h2 className="text-[34px] font-black tracking-[-0.035em] text-white md:text-[44px]">
+            <h2 className="text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em] text-white">
               שירותים ופתרונות לעולם הדנטל
             </h2>
             <p className="mx-auto mt-3 max-w-2xl text-[16px] leading-relaxed text-white/55">
@@ -480,7 +480,7 @@ function EcosystemShowcase() {
               <span className="inline-flex rounded-full bg-[#008080]/20 px-3 py-1 text-[11px] font-extrabold tracking-widest text-[#008080]">
                 {active.label}
               </span>
-              <h3 className="mt-3 text-[26px] font-black tracking-tight text-white">
+              <h3 className="mt-3 text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em] text-white">
                 {active.name}
               </h3>
               <p className="mt-2 text-[15px] leading-relaxed text-white/60">
@@ -564,7 +564,7 @@ export default function PublicHomePage() {
                 <p className="mb-3 text-[12px] font-extrabold tracking-[0.24em] text-[#008080] uppercase" dir="ltr">
                   Latest Opportunities
                 </p>
-                <h2 className="text-[#2D2D2D] text-[34px] md:text-[44px] leading-[1.12] font-black tracking-[-0.035em]">
+                <h2 className="text-[#2D2D2D] text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
                   משרות חדשות בעולם הדנטל
                 </h2>
               </div>

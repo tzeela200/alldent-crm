@@ -269,7 +269,7 @@ export function DentalAssetPageBody({
                 </span>
               ))}
             </div>
-            <h1 className="mt-5 max-w-[18ch] text-[clamp(29px,5vw,70px)] font-black leading-[1.03] tracking-[-0.03em]">
+            <h1 className="mt-5 max-w-[18ch] text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em]">
               {page.title || page.clinic_name || 'נכס דנטלי'}
             </h1>
             {locationText && (
@@ -315,7 +315,7 @@ export function DentalAssetPageBody({
           <section className="border-b border-white/10 py-[clamp(44px,6vw,88px)]">
             <span className="mb-6 block text-[12px] font-black tracking-[0.08em] text-white/60">על הנכס</span>
             {page.subtitle && (
-              <h2 className="max-w-[16ch] text-[clamp(24px,3.2vw,42px)] font-black leading-[1.06] tracking-[-0.03em]">
+              <h2 className="max-w-[16ch] text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
                 {page.subtitle}
               </h2>
             )}
@@ -371,7 +371,7 @@ export function DentalAssetPageBody({
           <span className="mb-6 block text-[12px] font-black tracking-[0.08em] text-white/60">
             יצירת קשר
           </span>
-          <h2 className="text-[clamp(24px,3.2vw,42px)] font-black leading-[1.06] tracking-[-0.03em]">
+          <h2 className="text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
             מעוניינים בנכס?
           </h2>
 

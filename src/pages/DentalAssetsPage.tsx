@@ -141,7 +141,7 @@ function PropertyRevealCard({
           </span>
         </div>
 
-        <h2 className="text-[28px] font-black leading-tight tracking-tight text-white md:text-[40px]">
+        <h2 className="text-[clamp(21px,2.6vw,32px)] font-black leading-[1.12] tracking-[-0.02em] text-white">
           {prop.title}
         </h2>
 
@@ -241,8 +241,8 @@ export default function DentalAssetsPage() {
               HOME DENT
             </p>
             <h1
-              className="font-black leading-[1.1] text-white"
-              style={{ fontSize: 'clamp(38px, 6vw, 72px)', letterSpacing: '-0.03em' }}
+              className="text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em] text-white"
+              
             >
               נכסים דנטליים
             </h1>
@@ -269,7 +269,7 @@ export default function DentalAssetsPage() {
       </section>
 
       {/* Properties list */}
-      <section id="properties" className="mx-auto max-w-5xl px-5 md:px-8">
+      <section id="properties" className="mx-auto max-w-5xl overflow-x-clip px-5 md:px-8">
         <div className="divide-y divide-white/[0.07]">
           {items.map((prop, i) => (
             <motion.div
@@ -296,9 +296,9 @@ export default function DentalAssetsPage() {
           <p className="mb-2 text-[12px] font-extrabold tracking-[0.28em] text-[#D97706]" dir="ltr">
             HOME DENT
           </p>
-          <h3 className="text-[28px] font-black text-white md:text-[36px]">
+          <h2 className="text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em] text-white">
             יש לכם נכס דנטלי?
-          </h3>
+          </h2>
           <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-white/55">
             פרסמו את הנכס שלכם ותגיעו לאלפי אנשי מקצוע בעולם הדנטל בישראל.
           </p>

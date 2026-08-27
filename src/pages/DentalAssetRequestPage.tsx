@@ -299,7 +299,7 @@ export default function DentalAssetRequestPage() {
       <div dir="rtl" className="bg-paper text-ink">
         <div className="mx-auto flex max-w-[840px] flex-col items-center gap-5 px-7 py-[clamp(80px,12vw,170px)] text-center">
           <p className="text-[12px] font-black tracking-[0.08em] text-ink/60">RECEIVED</p>
-          <h1 className="text-[clamp(28px,4.6vw,58px)] font-black leading-[1.02] tracking-[-0.03em]">
+          <h1 className="text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em]">
             הבקשה התקבלה
           </h1>
           <p className="max-w-[46ch] text-[clamp(16px,1.5vw,20px)] leading-[1.8] text-ink/72 text-pretty">
@@ -361,7 +361,7 @@ export default function DentalAssetRequestPage() {
           <span className="mb-4 block text-[12px] font-black tracking-[0.08em] text-ink/60">
             שלב {pad2(step)} / 07
           </span>
-          <h1 className="text-[clamp(26px,4.4vw,58px)] font-black leading-none tracking-[-0.03em]">
+          <h1 className="text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em]">
             {STEPS[step - 1]}
           </h1>
         </div>

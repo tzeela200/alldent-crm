@@ -33,7 +33,7 @@ export default function ClassDentalPage() {
               </span>
 
               {/* מבנה הכותרת הדו-שורתית */}
-              <h1 className="mt-6 text-4xl font-black leading-[1.05] tracking-[-0.04em] md:text-6xl lg:text-[68px]">
+              <h1 className="mt-6 text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em]">
                 כיתה דנטלית
                 <span className="mt-2 block text-[#7CECEC]">בשלבי הקמה</span>
               </h1>

@@ -106,7 +106,7 @@ export default function EmployersPage() {
               AllDent Employers
             </span>
 
-            <h1 className="mt-6 text-4xl font-black leading-[1.05] tracking-[-0.04em] md:text-6xl lg:text-[68px]">
+            <h1 className="mt-6 text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em]">
               גיוס עובדים
               <span className="mt-2 block text-[#7CECEC]">בעולם הדנטל</span>
             </h1>
@@ -159,7 +159,7 @@ export default function EmployersPage() {
               מהו גיוס דנטלי?
             </span>
 
-            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+            <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               גיוס דנטלי דורש היכרות אמיתית עם הענף
             </h2>
 
@@ -189,7 +189,7 @@ export default function EmployersPage() {
                 <p className="text-[12px] font-bold text-[#7CECEC]">
                   מקצועות הדנטל
                 </p>
-                <h3 className="mt-1 text-2xl font-black">המערכת נבנתה עבור הענף</h3>
+                <h3 className="mt-1 text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em]">המערכת נבנתה עבור הענף</h3>
               </div>
             </div>
 
@@ -214,7 +214,7 @@ export default function EmployersPage() {
               עולם העבודה השתנה
             </span>
 
-            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+            <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               עובדים כבר לא מחפשים רק “משרה”
             </h2>
 
@@ -236,7 +236,7 @@ export default function EmployersPage() {
                 key={title}
                 className="rounded-[24px] border border-slate-200 bg-[#FAFBFC] p-6 text-start"
               >
-                <h3 className="text-[19px] font-black">{title}</h3>
+                <h3 className="text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em]">{title}</h3>
                 <p className="mt-3 text-[14px] leading-[1.8] text-[#667085]">
                   {body}
                 </p>
@@ -250,7 +250,7 @@ export default function EmployersPage() {
         <div className="mx-auto max-w-7xl">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-[13px] font-bold text-[#008080]">בחירת מסלול</p>
-            <h2 className="mt-3 text-3xl font-black tracking-tight md:text-4xl">
+            <h2 className="mt-3 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               איך תרצו לגייס?
             </h2>
             <p className="mt-5 text-[16px] leading-[1.9] text-[#667085] md:text-[18px]">
@@ -306,7 +306,7 @@ export default function EmployersPage() {
                     </span>
                   </div>
 
-                  <h3 className="relative mt-8 text-[30px] font-black tracking-tight md:text-[34px]">
+                  <h3 className="relative mt-8 text-[clamp(21px,2.6vw,32px)] font-black leading-[1.12] tracking-[-0.02em]">
                     {track.title}
                   </h3>
 
@@ -396,7 +396,7 @@ export default function EmployersPage() {
             <span className="inline-flex rounded-full border border-white/10 bg-white/7 px-4 py-1.5 text-[13px] font-bold text-white/78">
               בחירה מהירה
             </span>
-            <h2 className="mt-5 text-3xl font-black md:text-4xl">
+            <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               איזה מסלול מתאים לצורך שלכם?
             </h2>
           </div>
@@ -437,7 +437,7 @@ export default function EmployersPage() {
                 טיפ למעסיקים
               </span>
 
-              <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+              <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
                 לפני שאתם פותחים משרה
               </h2>
 
@@ -466,7 +466,7 @@ export default function EmployersPage() {
                     </span>
                   </div>
                   <div>
-                    <h3 className="text-[17px] font-black">{tip.title}</h3>
+                    <h3 className="text-[16px] font-black leading-[1.5] tracking-[-0.01em]">{tip.title}</h3>
                     <p className="mt-2 text-[14px] leading-[1.8] text-[#667085]">
                       {tip.body}
                     </p>
@@ -484,7 +484,7 @@ export default function EmployersPage() {
             <HeartHandshake className="h-7 w-7" aria-hidden="true" />
           </div>
 
-          <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+          <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
             עדיין לא בטוחים איזה מסלול מתאים לכם?
           </h2>
 

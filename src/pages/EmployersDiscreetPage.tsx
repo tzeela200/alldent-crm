@@ -292,7 +292,7 @@ function ProcessTimeline() {
             תהליך אישי, שקט ומבוקר
           </span>
 
-          <h2 className="mt-5 text-3xl font-black tracking-tight text-[#E8CC72] md:text-5xl">
+          <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em] text-[#E8CC72]">
             כך מתנהל מסלול הגיוס הדיסקרטי
           </h2>
 
@@ -356,7 +356,7 @@ function ProcessTimeline() {
                             <p className="text-[12px] font-black tracking-[0.08em] text-[#E8CC72]">
                               {eyebrow}
                             </p>
-                            <h3 className="mt-2 text-[22px] font-black leading-[1.35]">
+                            <h3 className="mt-2 text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em]">
                               {title}
                             </h3>
                           </div>
@@ -466,7 +466,7 @@ function FAQAccordion({
                 >
                   {item.id}
                 </span>
-                <h3 className="min-w-0 flex-1 text-[15px] font-black leading-[1.55] text-[#273142] sm:text-[16px]">
+                <h3 className="min-w-0 flex-1 text-[16px] font-black leading-[1.5] tracking-[-0.01em] text-[#273142]">
                   {item.question}
                 </h3>
               </div>
@@ -537,7 +537,7 @@ export default function EmployersDiscreetPage() {
                 Personal Recruit
               </span>
 
-              <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1.06] tracking-[-0.04em] md:text-6xl lg:text-[64px]">
+              <h1 className="mt-6 max-w-4xl text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em]">
                 גיוס אישי
                 <span className="mt-2 block text-[#E8CC72]">
                   שירות סינון מועמדים, דיסקרטיות ומיקוד
@@ -623,7 +623,7 @@ export default function EmployersDiscreetPage() {
               למי המסלול מתאים
             </span>
 
-            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+            <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               גיוס מקצועי בלי לחשוף את המרפאה בשלב הראשון
             </h2>
 
@@ -643,7 +643,7 @@ export default function EmployersDiscreetPage() {
                     : 'border-[#D9A928]/18 bg-white'
                 }`}
               >
-                <h3 className="text-[20px] font-black">{item.title}</h3>
+                <h3 className="text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em]">{item.title}</h3>
                 <p className="mt-2 text-[14px] leading-[1.8] text-[#6B7280]">
                   {item.body}
                 </p>
@@ -662,7 +662,7 @@ export default function EmployersDiscreetPage() {
               איך נשמרת הדיסקרטיות
             </span>
 
-            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+            <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               מה נחשף — ובאיזה שלב
             </h2>
 
@@ -707,7 +707,7 @@ export default function EmployersDiscreetPage() {
               מחיר ותנאים
             </span>
 
-            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+            <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               500 ₪ + מע״מ לפתיחת המסלול
             </h2>
 
@@ -757,7 +757,7 @@ export default function EmployersDiscreetPage() {
                     />
                   </div>
                   <div>
-                    <h3 className="text-[15px] font-black">{title}</h3>
+                    <h3 className="text-[16px] font-black leading-[1.5] tracking-[-0.01em]">{title}</h3>
                     <p className="mt-1 text-[13px] leading-[1.8] text-white/68">
                       {body}
                     </p>
@@ -787,7 +787,7 @@ export default function EmployersDiscreetPage() {
                 שאלות ותשובות
               </span>
 
-              <h2 className="relative mt-5 text-3xl font-black tracking-tight md:text-4xl">
+              <h2 className="relative mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
                 כל מה שחשוב לדעת
               </h2>
 
@@ -826,7 +826,7 @@ export default function EmployersDiscreetPage() {
                 מתחילים מכאן
               </span>
 
-              <h2 className="mt-5 text-3xl font-black leading-[1.15] tracking-tight md:text-4xl">
+              <h2 className="mt-5 text-[clamp(21px,2.6vw,32px)] font-black leading-[1.12] tracking-[-0.02em]">
                 צריכים לגייס בשקט
                 <span className="mt-1 block text-[#E8CC72]">
                   ולקבל מועמדים בצורה מבוקרת?

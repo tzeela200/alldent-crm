@@ -246,7 +246,7 @@ export default function ContactPage() {
               AllDent Contact
             </span>
 
-            <h1 className="mt-6 text-4xl font-black leading-[1.05] tracking-[-0.04em] md:text-6xl lg:text-[68px]">
+            <h1 className="mt-6 text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em]">
               נשמח לשמוע
               <span className="mt-2 block text-[#7CECEC]">
                 איך נוכל לעזור?
@@ -338,7 +338,7 @@ export default function ContactPage() {
                 className="h-auto w-[190px] max-w-full object-contain"
               />
 
-              <h2 className="mt-7 text-2xl font-black tracking-tight text-slate-900">
+              <h2 className="mt-7 text-[clamp(21px,2.6vw,32px)] font-black leading-[1.12] tracking-[-0.02em] text-slate-900">
                 אנחנו כאן בשבילכם
               </h2>
 
@@ -383,7 +383,7 @@ export default function ContactPage() {
                 </div>
 
                 <div>
-                  <h3 className="font-extrabold text-slate-900">
+                  <h3 className="text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em] text-slate-900">
                     הפרטים נשמרים בצורה מאובטחת
                   </h3>
 
@@ -407,7 +407,7 @@ export default function ContactPage() {
                   />
                 </div>
 
-                <h2 className="mt-6 text-3xl font-black text-slate-900">
+                <h2 className="mt-6 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em] text-slate-900">
                   הפנייה נשלחה בהצלחה
                 </h2>
 
@@ -455,7 +455,7 @@ export default function ContactPage() {
                     טופס יצירת קשר
                   </span>
 
-                  <h2 className="mt-4 text-3xl font-black tracking-tight text-slate-900">
+                  <h2 className="mt-4 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em] text-slate-900">
                     ספרו לנו במה מדובר
                   </h2>
 
@@ -621,7 +621,7 @@ export default function ContactPage() {
                   </FormField>
 
                   <div
-                    className="absolute -left-[10000px] h-px w-px overflow-hidden"
+                    className="pointer-events-none absolute h-px w-px overflow-hidden opacity-0 [clip-path:inset(50%)]"
                     aria-hidden="true"
                   >
                     <label htmlFor="contact-website">

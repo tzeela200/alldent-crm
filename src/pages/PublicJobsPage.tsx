@@ -155,7 +155,7 @@ export default function PublicJobsPage() {
             transition={{ duration: 0.65, ease: [0.16, 1, 0.3, 1] }}
             className="text-white font-black leading-tight mb-3"
             style={{
-              fontSize: 'clamp(34px, 5.5vw, 62px)',
+              fontSize: 'clamp(32px, 5.6vw, 68px)',
               letterSpacing: '-0.025em',
               fontFamily: 'Heebo, sans-serif',
             }}

@@ -300,7 +300,7 @@ function ValueTimeline() {
             אסטרטגיית גיוס עם ערך
           </span>
 
-          <h2 className="mt-5 text-3xl font-black tracking-tight md:text-5xl">
+          <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
             מיתוג מעסיקים הוא מסר של שקיפות, זהות ובחירה
           </h2>
 
@@ -368,7 +368,7 @@ function ValueTimeline() {
                             >
                               {eyebrow}
                             </p>
-                            <h3 className="mt-2 text-[22px] font-black leading-[1.35]">
+                            <h3 className="mt-2 text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em]">
                               {title}
                             </h3>
                           </div>
@@ -498,7 +498,7 @@ function FAQAccordion({
                 >
                   {item.id}
                 </span>
-                <h3 className="min-w-0 flex-1 text-[15px] font-black leading-[1.55] text-[#273142] sm:text-[16px]">
+                <h3 className="min-w-0 flex-1 text-[16px] font-black leading-[1.5] tracking-[-0.01em] text-[#273142]">
                   {item.question}
                 </h3>
               </div>
@@ -579,7 +579,7 @@ export default function EmployersBrandingPage() {
                 Employer Branding
               </span>
 
-              <h1 className="mt-6 max-w-4xl text-4xl font-black leading-[1.06] tracking-[-0.04em] md:text-6xl lg:text-[64px]">
+              <h1 className="mt-6 max-w-4xl text-[clamp(32px,5.6vw,68px)] font-black leading-[1.04] tracking-[-0.03em]">
                 מיתוג מעסיקים
                 <span
                   className="mt-2 block"
@@ -675,7 +675,7 @@ export default function EmployersBrandingPage() {
             >
               למי המסלול מתאים
             </span>
-            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+            <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               לא רק לפרסם משרה — לבנות סיבה לבחור בכם
             </h2>
             <p className="mt-5 text-[16px] leading-[1.9] text-[#667085] md:text-[18px]">
@@ -699,7 +699,7 @@ export default function EmployersBrandingPage() {
                     : { borderColor: BRANDING_COLORS.primaryBorder }
                 }
               >
-                <h3 className="text-[20px] font-black">{item.title}</h3>
+                <h3 className="text-[clamp(17px,1.75vw,22px)] font-black leading-[1.3] tracking-[-0.015em]">{item.title}</h3>
                 <p className="mt-2 text-[14px] leading-[1.8] text-[#6B7280]">
                   {item.body}
                 </p>
@@ -723,7 +723,7 @@ export default function EmployersBrandingPage() {
             >
               השוואה מהירה
             </span>
-            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+            <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               למה לבחור במיתוג מעסיקים
             </h2>
 
@@ -773,7 +773,7 @@ export default function EmployersBrandingPage() {
             <span className="inline-flex rounded-full border border-[#B45309]/22 bg-[#D97706]/12 px-4 py-1.5 text-[13px] font-bold text-[#FFD7A6]">
               מחיר ותנאים
             </span>
-            <h2 className="mt-5 text-3xl font-black tracking-tight md:text-4xl">
+            <h2 className="mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
               2,000 ₪ + מע״מ, חד־פעמי
             </h2>
             <p className="mt-5 text-[16px] leading-[1.9] text-white/76 md:text-[17px]">
@@ -811,7 +811,7 @@ export default function EmployersBrandingPage() {
                     />
                   </div>
                   <div>
-                    <h3 className="text-[15px] font-black">{title}</h3>
+                    <h3 className="text-[16px] font-black leading-[1.5] tracking-[-0.01em]">{title}</h3>
                     <p className="mt-1 text-[13px] leading-[1.8] text-white/68">
                       {body}
                     </p>
@@ -847,7 +847,7 @@ export default function EmployersBrandingPage() {
               >
                 שאלות ותשובות
               </span>
-              <h2 className="relative mt-5 text-3xl font-black tracking-tight md:text-4xl">
+              <h2 className="relative mt-5 text-[clamp(25px,3.6vw,44px)] font-black leading-[1.08] tracking-[-0.025em]">
                 כל מה שחשוב לדעת
               </h2>
               <p className="relative mt-4 max-w-md text-[15px] leading-[1.9] text-[#667085]">
@@ -905,7 +905,7 @@ export default function EmployersBrandingPage() {
                 מתחילים מכאן
               </span>
 
-              <h2 className="mt-5 text-3xl font-black leading-[1.15] tracking-tight md:text-4xl">
+              <h2 className="mt-5 text-[clamp(21px,2.6vw,32px)] font-black leading-[1.12] tracking-[-0.02em]">
                 מוכנים להפוך את הסיפור שלכם
                 <span
                   className="mt-1 block"

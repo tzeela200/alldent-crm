@@ -92,7 +92,7 @@ export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
                 {job.job_role_name}
               </div>
             )}
-            <h3 style={{ color: '#fff', fontSize: 15, fontWeight: 900, lineHeight: 1.3, margin: 0, textShadow: '0 1px 6px rgba(0,0,0,0.4)', maxWidth: '55%' }}>
+            <h3 style={{ color: '#fff', fontSize: 16, fontWeight: 900, lineHeight: 1.5, margin: 0, textShadow: '0 1px 6px rgba(0,0,0,0.4)', maxWidth: '55%' }}>
               {job.job_title}
             </h3>
           </div>
