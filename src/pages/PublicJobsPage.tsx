@@ -163,7 +163,7 @@ export default function PublicJobsPage() {
             הצעות עבודה מקצועיות
           </motion.h1>
 
-          {/* DENTAL JOB — LTR to prevent reversal, Nunito round font */}
+          {/* DENTAL JOB — LTR כדי שהסדר לא יתהפך. Heebo כמו כל האתר. */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -173,7 +173,6 @@ export default function PublicJobsPage() {
             style={{
               fontSize: 'clamp(18px, 2.4vw, 28px)',
               letterSpacing: '0.28em',
-              fontFamily: 'Nunito, sans-serif',
               fontWeight: 900,
               lineHeight: 1,
             }}

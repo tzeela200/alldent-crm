@@ -180,7 +180,7 @@ function PropertyRevealCard({
               לפרטים נוספים ←
             </a>
           )}
-          <span className="font-mono text-[12px] text-white/40">{prop.contactName}</span>
+          <span className="text-[13px] font-semibold text-white/60">{prop.contactName}</span>
         </div>
       </motion.div>
     </div>

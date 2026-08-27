@@ -54,7 +54,7 @@ function OfferCard({ offer }: { offer: PublicAssetOffer }) {
   const hasPrice = offer.price_amount != null
   return (
     <div className="bg-[#1E1E1E] p-7 md:p-10">
-      <span className="font-mono text-[10.5px] tracking-[0.22em] text-[#7CECEC]">{label}</span>
+      <span className="text-[12px] font-extrabold tracking-[0.08em] text-[#7CECEC]">{label}</span>
 
       {hasPrice ? (
         <div className="mt-3.5 text-[clamp(32px,4.4vw,60px)] font-black leading-none tracking-[-0.03em]">
@@ -177,7 +177,7 @@ function LeadForm({
   if (state === 'done') {
     return (
       <div className="border border-white/10 p-8 text-center">
-        <p className="font-mono text-[11px] tracking-[0.24em] text-[#7CECEC]">התקבל</p>
+        <p className="text-[12px] font-extrabold tracking-[0.08em] text-[#7CECEC]">התקבל</p>
         <p className="mt-3 text-[18px] font-bold">הפרטים שלכם התקבלו</p>
         <p className="mt-2 text-[15px] text-white/75">נחזור אליכם בהקדם.</p>
       </div>
@@ -254,17 +254,17 @@ export function DentalAssetPageBody({
           <div className="mx-auto max-w-[1280px]">
             <BackLink to="/dental-assets">חזרה ללוח הנכסים</BackLink>
             <div className="mt-5 flex flex-wrap gap-2">
-              <span className="rounded-sm border border-[#B45309]/70 bg-[#D97706]/[0.18] px-3 py-1.5 font-mono text-[10.5px] tracking-[0.18em] text-[#F0A03C]">
+              <span className="rounded-sm border border-[#B45309]/70 bg-[#D97706]/[0.18] px-3 py-1.5 font-mono text-[11px] tracking-[0.14em] font-semibold text-[#F0A03C]">
                 {page.asset_code}
               </span>
               {page.asset_type && (
-                <span className="rounded-sm border border-white/15 bg-black/40 px-3 py-1.5 font-mono text-[10.5px] tracking-[0.18em] text-white/75 backdrop-blur">
+                <span className="rounded-sm border border-white/15 bg-black/40 px-3 py-1.5 text-[12px] font-extrabold tracking-[0.08em] text-white/75 backdrop-blur">
                   {HD_ASSET_TYPE_LABELS[page.asset_type] ?? page.asset_type}
                 </span>
               )}
               {offers.map((o) => (
                 <span key={o.id}
-                  className="rounded-sm border border-[#7CECEC]/40 bg-[#008080]/[0.22] px-3 py-1.5 font-mono text-[10.5px] tracking-[0.18em] text-[#7CECEC]">
+                  className="rounded-sm border border-[#7CECEC]/40 bg-[#008080]/[0.22] px-3 py-1.5 text-[12px] font-extrabold tracking-[0.08em] text-[#7CECEC]">
                   {HD_OFFER_LABELS[o.offer_type] ?? o.offer_type}
                 </span>
               ))}
@@ -400,7 +400,7 @@ export function DentalAssetPageBody({
             </div>
           )}
 
-          <p className="mt-8 font-mono text-[10px] tracking-[0.2em] text-white/50">
+          <p className="mt-8 text-[12px] font-semibold text-white/60">
             פרסום HOME DENT
             {expiresAt &&
               ` · מתפרסם עד ${new Date(expiresAt).toLocaleDateString('he-IL')}`}

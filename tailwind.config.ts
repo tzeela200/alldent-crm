@@ -8,7 +8,8 @@ const config: Config = {
       fontFamily: {
         heebo: ['Heebo', 'sans-serif'],
         sans: ['Heebo', 'sans-serif'],
-        display: ['"Frank Ruhl Libre"', 'serif'],
+        // ‎.font-display ב-index.css קובע Heebo 900. הטוקן תואם לו.
+        display: ['Heebo', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'monospace'],
       },
       transitionTimingFunction: {
