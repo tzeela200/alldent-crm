@@ -7,7 +7,16 @@
  * ⚠️ טקסטים המסומנים DRAFT הם טיוטה שלי ומחכים לנוסח שלך.
  */
 
-export const HD_TERMS_VERSION = 'hd-terms-2026-08'
+/**
+ * ⚠️ כל שינוי בתנאים המסחריים מחייב במפ של הגרסה.
+ * הערך נשמר על כל נכס ב-`terms_version`, וזו הראיה היחידה לאיזה נוסח
+ * הלקוח הסכים. בלי במפ, רשומה שאישרה 1% הייתה נראית כאילו אישרה 0.5%.
+ *
+ * 2026-08-27 → 08b: עמלת ההצלחה במכירה ירדה מ-1% ל-0.5%.
+ *   hd-terms-2026-08  = השכרה 4,000 ₪ · מכירה 1%
+ *   hd-terms-2026-08b = השכרה 4,000 ₪ · מכירה 0.5%
+ */
+export const HD_TERMS_VERSION = 'hd-terms-2026-08b'
 
 /** שני מסלולי הפרסום. המחיר נשמר כ-snapshot בהגשה. */
 export const HD_PACKAGES = [
@@ -59,7 +68,7 @@ export const HD_SUCCESS_FEES: ReadonlyArray<{
   suffix?: string
 }> = [
   { key: 'rent', label: 'השכרה', value: '4,000 ₪ + מע״מ' },
-  { key: 'sale', label: 'מכירה', value: '1% + מע״מ', suffix: 'ממחיר המכירה' },
+  { key: 'sale', label: 'מכירה', value: '0.5% + מע״מ', suffix: 'ממחיר המכירה' },
 ]
 
 export const HD_SUCCESS_FEE_NOTE =
