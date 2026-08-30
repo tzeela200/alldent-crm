@@ -28,6 +28,7 @@ import { ReclassifyPreviewDialog } from '@/components/employment-intake/Reclassi
 import { ReclassifyResultReport } from '@/components/employment-intake/ReclassifyResultReport'
 import type { BulkFamily, BulkRunReport } from '@/hooks/useEmploymentIntakeBulk'
 import { useReclassifyEligibleCount, type ReclassifyScope, type ReclassifyRunReport } from '@/hooks/useEmploymentIntakeReclassify'
+import { useDismissIntakeRows } from '@/hooks/useEmploymentIntakeActions'
 import { SCREEN_TITLE, SCREEN_SUBTITLE } from '@/lib/employment-intake/labels'
 import {
   useEmploymentIntakeRows,
@@ -61,6 +62,7 @@ export default function EmploymentIntakePage() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [visibleColumns, setVisibleColumns] = useState<string[]>(loadStoredVisibleColumns)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const dismissRows = useDismissIntakeRows()
   const [sourceRow, setSourceRow] = useState<RowWithAction | null>(null)
   const [mobileSourceOpen, setMobileSourceOpen] = useState(false)
   const [editingRow, setEditingRow] = useState<RowWithAction | null>(null)
@@ -215,6 +217,15 @@ export default function EmploymentIntakePage() {
               <BulkActionBar
                 onOpen={setBulkFamily}
                 onReclassify={selectedIds.length > 0 ? () => setReclassifyScope({ mode: 'selected', ids: selectedIds.map(Number) }) : undefined}
+                onDismiss={
+                  selectedIds.length > 0
+                    ? () => {
+                        const picked = rows.filter((r) => selectedIds.includes(String(r.id)))
+                        if (picked.length === 0) return
+                        dismissRows.mutate({ rows: picked }, { onSuccess: () => setSelectedIds([]) })
+                      }
+                    : undefined
+                }
               />
             }
           />

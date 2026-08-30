@@ -39,7 +39,8 @@ export function resolveEffectiveFields(
   row: Pick<
     RowWithAction,
     | 'contact_name' | 'org_name' | 'sender_name'
-    | 'phone' | 'second_phone' | 'email' | 'second_email'
+    | 'phone' | 'phone_norm' | 'second_phone' | 'email' | 'second_email'
+    | 'sender_phone_norm'
     | 'role_id' | 'city_id' | 'region_id'
     | 'facebook_id' | 'facebook_url' | 'facebook_name'
     | 'matched_contact' | 'matched_account'
@@ -48,7 +49,12 @@ export function resolveEffectiveFields(
   const contact: MatchedContactSummary | null = row.matched_contact
   const account: MatchedAccountSummary | null = row.matched_account
 
-  const name = pick(row.contact_name, contact?.display_name ?? account?.account_name ?? row.sender_name)
+  // הנייד של השורה אינו של השולח ⇒ ההודעה על מישהו אחר (מנהלת קבוצה
+  // שמעבירה מודעה של מרפאה). במצב כזה **אסור** ליפול חזרה על שם השולח:
+  // עדיף "—" מאשר להציג את המעבירה כאילו היא הלקוחה.
+  const phoneIsFromMessage = row.phone_norm != null && row.phone_norm !== row.sender_phone_norm
+  const matchedName = contact?.display_name ?? account?.account_name ?? null
+  const name = pick(row.contact_name, phoneIsFromMessage ? matchedName : (matchedName ?? row.sender_name))
   const phone = pick(row.phone, contact?.phone ?? account?.phone)
   const email = pick(row.email, contact?.email ?? account?.email)
   const role = pick(row.role_id, contact?.role)

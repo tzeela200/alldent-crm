@@ -21,7 +21,10 @@ export const CONTENT_TYPE_LABEL: Record<ContentType, string> = {
   job_seeker: 'מחפש עבודה',
   recruiter: 'מגייס',
   group_join: 'הצטרף/צורף לקבוצה',
-  irrelevant: 'לא רלוונטי',
+  // מכוון שונה מ"לא רלוונטי" של dict_social_statuses id 12: הקטגוריה
+  // מתארת את *ההודעה* (פנימי למסך), הסטטוס מתאר את *האדם* ונכתב לכרטיס
+  // ב-contact. אותה מילה בשתי עמודות הייתה מבלבלת בין שני דברים שונים.
+  irrelevant: 'לא קשור לגיוס',
   unclear: 'דורש בדיקה',
   unclassified: 'טרם סווג',
 }

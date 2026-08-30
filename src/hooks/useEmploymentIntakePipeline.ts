@@ -37,7 +37,7 @@ import { supabaseError } from '@/lib/employment-intake/errors'
  * דרך הכלל החדש" מ"רשומה ישנה שנשארה מאחור" — זה בדיוק מה ש"סיווג מחדש"
  * (useEmploymentIntakeReclassify.ts) משתמש בו כדי לדעת מי זכאי. */
 export const ENGINE_VERSION = 'v1'
-export const RULES_VERSION = 'v3'
+export const RULES_VERSION = 'v4'
 
 export interface PipelineInput {
   messages: RawParsedMessage[]
@@ -159,8 +159,30 @@ export async function computeUnitAnalyses(units: UnitAnalysisInput[], cityIndex:
       roleId: identityRoleResult?.roleId ?? null,
       cityCandidate: u.identityCityCandidate,
     })
-    const contactName = structured.contactName ?? targetNameOnly(u.sourceEvent)
-    return { ...u, contactName, trustedExistingName: structured.isStructured, identityRoleResult }
+
+    // כלל מס' 1: "איש הקשר האמיתי = המספר שבתוך ההודעה, לא השולח".
+    // כשההודעה נושאת פרט קשר משלה, הנושא הוא בעל הפרט — מנהלת קבוצה
+    // שמעבירה מודעה של מרפאה אחרת אינה הלקוחה. בלי התנאי הזה שם השולחת
+    // נכתב כ-contact_name ומסתיר את הלקוח האמיתי (211 שורות · 47 שולחים ·
+    // 122 לקוחות מוסתרים, אומת חי). באירוע צירוף/הצטרפות זה לא חל:
+    // identityLabel שם הוא ה-Target, וזו בדיוק הזהות שאנחנו רוצים.
+    const isJoinerEvent = u.sourceEvent.kind === 'join' || u.sourceEvent.kind === 'add'
+    const messageCarriesOwnIdentifier =
+      !isJoinerEvent &&
+      (u.identifiers.phones.some((p) => p.source === 'message') ||
+        u.identifiers.emails.length > 0 ||
+        u.identifiers.facebookId != null ||
+        u.identifiers.facebookUrls.length > 0)
+
+    const senderDerivedName = structured.contactName ?? targetNameOnly(u.sourceEvent)
+    return {
+      ...u,
+      contactName: messageCarriesOwnIdentifier ? null : senderDerivedName,
+      // גם התג "איש קשר שמור" נגזר מתווית השולח בלבד — אסור שיסמן שורה
+      // כ"קיים" כשהיא בכלל על מישהו אחר.
+      trustedExistingName: messageCarriesOwnIdentifier ? false : structured.isStructured,
+      identityRoleResult,
+    }
   })
 
   // 5. התאמה — מזהים חזקים + שמות רק מתווית Google המאושרת. שאילתה

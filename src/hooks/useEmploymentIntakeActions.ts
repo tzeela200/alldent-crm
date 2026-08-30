@@ -368,6 +368,63 @@ export function useMarkIrrelevant() {
   })
 }
 
+// ── הסרה משולחן העבודה (INC-3129) ────────────────────────────────────────
+/**
+ * החלטת אדמין "ההודעה הזו לא קשורה לגיוס" ⇒ `deleted_at`, והשורה נעלמת
+ * מכל המסך. **לא מחיקה פיזית** — `original_text` נשאר שלם, וניקוי השדה
+ * מחזיר את השורה (כלל המשתמשת: "לא למחוק — לא תוכן, לא כפילויות").
+ *
+ * התשתית כבר הייתה קיימת ומנותקת: `deleted_at` מסונן ב-12 מקומות בקוד
+ * (טבלה, KPI, סיווג מחדש, פעולות גורפות, פאנל מקור) אבל שום קוד לא כתב
+ * אליה אף פעם. לכן אין כאן שינוי שאילתות בכלל.
+ *
+ * בניגוד ל-useMarkIrrelevant, אין דרישה ל-Contact מותאם: זו החלטה על
+ * *ההודעה*, לא על *האדם*, ורוב השורות הללו כלל אינן מקושרות לאיש קשר.
+ */
+export function useDismissIntakeRows() {
+  const qc = useQueryClient()
+  const { user } = useAuth()
+
+  return useMutation({
+    mutationFn: async ({ rows }: { rows: RowWithAction[] }) => {
+      if (rows.length === 0) return { dismissed: 0 }
+
+      const ids = rows.map((r) => r.id)
+      // עוגן: הזהות כשהיא קיימת, אחרת עוגן שורה — `anchor_key` הוא NOT NULL
+      // אך אינו FK, ורוב השורות הנדחות הן בדיוק אלה שאין להן זהות.
+      const identity = resolveRowIdentity(rows[0])
+      const anchorKey = identity ? buildAnchorKey(identity) : `r:${ids[0]}`
+
+      const actionId = await insertIntakeAction({
+        anchorKey,
+        identityGroupId: identity?.identityGroupId ?? null,
+        contactId: identity?.contactId ?? null,
+        actionType: 'mark_irrelevant',
+        performedBy: user?.email ?? 'system',
+        sourceIntakeIds: ids,
+        appliedPatch: { deleted_at: 'now()' },
+      })
+
+      const { error } = await supabase
+        .from('employment_intake')
+        .update({ deleted_at: new Date().toISOString(), last_action_id: actionId, updated_at: new Date().toISOString() })
+        .in('id', ids)
+      if (error) throw supabaseError('הסרת ההודעות משולחן העבודה נכשלה', error)
+
+      return { dismissed: ids.length }
+    },
+    onSuccess: (result) => {
+      invalidateIntake(qc)
+      toast.success(
+        result.dismissed === 1
+          ? 'ההודעה הוסרה משולחן העבודה.'
+          : `${result.dismissed} הודעות הוסרו משולחן העבודה.`,
+      )
+    },
+    onError: (err: unknown) => toast.error(describeError(err, 'הסרת הודעות משולחן העבודה')),
+  })
+}
+
 // ── מיזוג מידע חדש לרשומה קיימת (§3.5 פעולה 10) — פר-שדה, ללא דריסה שקטה ──
 const CONTACT_COMPARE_FIELDS = 'display_name, phone, second_phone, email, second_email, facebook_id, facebook_url, facebook_name, role, city_id'
 const ACCOUNT_COMPARE_FIELDS = 'account_name, phone, email, facebook_url, city_id'

@@ -1,6 +1,6 @@
 /** Table First — הטבלה העסקית של מסך "איתור מחפשי עבודה ומגייסים". */
 
-import { Eye, Pencil } from 'lucide-react'
+import { Eye, EyeOff, Pencil } from 'lucide-react'
 import { AdminTable, type AdminColumn } from '@/components/admin/AdminTable'
 import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
 import { AdminActionsMenu } from '@/components/admin/AdminActionsMenu'
@@ -10,6 +10,7 @@ import { formatPhone } from '@/lib/normalizePhone'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { useEmploymentIntakeDicts } from '@/hooks/useEmploymentIntake'
 import { useUpdateEmploymentIntakeRow } from '@/hooks/useEmploymentIntakeRowEdit'
+import { useDismissIntakeRows } from '@/hooks/useEmploymentIntakeActions'
 import { resolveEffectiveFields } from '@/lib/employment-intake/effectiveFields'
 import {
   CONTENT_TYPE_LABEL,
@@ -126,6 +127,7 @@ export function IntakeTable({
   const { data: appDicts } = useApplicationDicts()
   const { data: intakeDicts } = useEmploymentIntakeDicts()
   const updateRow = useUpdateEmploymentIntakeRow()
+  const dismissRows = useDismissIntakeRows()
   const allSelected = rows.length > 0 && rows.every((r) => selectedIds.includes(String(r.id)))
   const someSelected = rows.some((r) => selectedIds.includes(String(r.id)))
 
@@ -241,6 +243,12 @@ export function IntakeTable({
             items={[
               { key: 'details', icon: <Eye className="h-4 w-4" />, label: 'פרטי הרשומה ופעולות', onClick: () => onOpenDetails(row) },
               { key: 'edit', icon: <Pencil className="h-4 w-4" />, label: 'עריכת פרטים / זיהוי', onClick: () => onEditRow(row) },
+              {
+                key: 'dismiss',
+                icon: <EyeOff className="h-4 w-4" />,
+                label: 'הסרה משולחן העבודה',
+                onClick: () => dismissRows.mutate({ rows: [row] }),
+              },
             ]}
           />
         </div>

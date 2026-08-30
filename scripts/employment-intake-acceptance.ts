@@ -631,7 +631,10 @@ check('קטגוריה', 'job_seeker ⇒ "מחפש עבודה" (לא "מחפש/ת
 check('קטגוריה', 'recruiter ⇒ "מגייס" (לא "מגייס/ת עובדים")', L.CONTENT_TYPE_LABEL.recruiter, 'מגייס')
 check('קטגוריה', 'group_join ⇒ "הצטרף/צורף לקבוצה"', L.CONTENT_TYPE_LABEL.group_join, 'הצטרף/צורף לקבוצה')
 check('קטגוריה', 'unclear ⇒ "דורש בדיקה" (לא "לא ברור")', L.CONTENT_TYPE_LABEL.unclear, 'דורש בדיקה')
-check('קטגוריה', 'irrelevant ⇒ "לא רלוונטי"', L.CONTENT_TYPE_LABEL.irrelevant, 'לא רלוונטי')
+// מכוון שונה מ"לא רלוונטי" של סטטוס הטיפול (dict_social_statuses 12):
+// הקטגוריה מתארת את ההודעה, הסטטוס מתאר את האדם ונכתב ל-contact.
+check('קטגוריה', 'irrelevant ⇒ "לא קשור לגיוס" (שונה מסטטוס "לא רלוונטי")', L.CONTENT_TYPE_LABEL.irrelevant, 'לא קשור לגיוס')
+checkTrue('קטגוריה', 'תווית הקטגוריה אינה זהה לתווית סטטוס הטיפול', L.CONTENT_TYPE_LABEL.irrelevant !== 'לא רלוונטי')
 check('קטגוריה', 'unclassified ⇒ "טרם סווג"', L.CONTENT_TYPE_LABEL.unclassified, 'טרם סווג')
 
 // ═══════════════════════════════════════════════════════════
@@ -641,7 +644,8 @@ type EffRow = Parameters<typeof resolveEffectiveFields>[0]
 
 const baseEffRow: EffRow = {
   contact_name: null, org_name: null, sender_name: null,
-  phone: null, second_phone: null, email: null, second_email: null,
+  phone: null, phone_norm: null, second_phone: null, email: null, second_email: null,
+  sender_phone_norm: null,
   role_id: null, city_id: null, region_id: null,
   facebook_id: null, facebook_url: null, facebook_name: null,
   matched_contact: null, matched_account: null,
@@ -681,6 +685,38 @@ const ownWins = resolveEffectiveFields(ownValueWins)
 check('ערך אפקטיבי', 'נייד על השורה עצמה גובר על ה-Contact', ownWins.phone, '0529998888')
 checkTrue('ערך אפקטיבי', 'נייד על השורה עצמה לא מסומן כמגיע מהתאמה', !ownWins.phoneFromMatch)
 check('ערך אפקטיבי', 'תפקיד על השורה עצמה גובר על ה-Contact', ownWins.roleId, 3)
+
+// INC-3129 #1 — מנהלת קבוצה שמעבירה מודעה של מרפאה אחרת אינה הלקוחה.
+// אומת חי: 211 שורות · 47 שולחים · 122 לקוחות אמיתיים הוסתרו מאחורי שם
+// המעבירה. כלל מס' 1: "איש הקשר האמיתי = המספר שבתוך ההודעה, לא השולח".
+const forwardedAdRow: EffRow = {
+  ...baseEffRow,
+  sender_name: 'שרה דהרי סייעת אור-עקיבא',
+  sender_phone_norm: '972535265224',
+  phone: '0544390880',
+  phone_norm: '972544390880', // נייד מגוף ההודעה — של מרפאה אחרת
+  matched_contact: {
+    contact_id: 777, display_name: 'רונית אליאס', phone: '0544390880', second_phone: null,
+    email: null, role: null, city_id: null, region_id: null, social_status: null,
+  },
+}
+check('לקוח אמיתי', 'מודעה מועברת ⇒ מוצג בעל הנייד, לא המעבירה', resolveEffectiveFields(forwardedAdRow).displayName, 'רונית אליאס')
+checkTrue('לקוח אמיתי', 'שם בעל הנייד מסומן כמגיע מהתאמה', resolveEffectiveFields(forwardedAdRow).displayNameFromMatch)
+
+// אותה מודעה מועברת, אך בעל הנייד עדיין לא במאגר — עדיף "—" מאשר להציג
+// את המעבירה כאילו היא הלקוחה (זו בדיוק הטעות שהמשתמשת זיהתה במסך).
+const forwardedAdNoMatch: EffRow = { ...forwardedAdRow, matched_contact: null }
+check('לקוח אמיתי', 'מודעה מועברת בלי התאמה ⇒ לא נופל לשם המעבירה', resolveEffectiveFields(forwardedAdNoMatch).displayName, null)
+
+// לעומת זאת: הנייד הוא של השולח עצמו ⇒ הוא באמת הנושא, ושמו כן מוצג.
+const ownPhoneRow: EffRow = {
+  ...baseEffRow,
+  sender_name: 'רחל ביניאשוילי סייעת מרכז',
+  sender_phone_norm: '972521111111',
+  phone: '0521111111',
+  phone_norm: '972521111111',
+}
+check('לקוח אמיתי', 'הנייד הוא של השולח ⇒ שמו כן מוצג', resolveEffectiveFields(ownPhoneRow).displayName, 'רחל ביניאשוילי סייעת מרכז')
 
 // ═══════════════════════════════════════════════════════════
 // 17. סיווג מחדש — זכאות, שמירה על עריכה ידנית, קיבוץ שינויים

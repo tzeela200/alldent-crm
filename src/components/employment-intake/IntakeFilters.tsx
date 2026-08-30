@@ -10,7 +10,9 @@ import { CONTENT_TYPE_LABEL, DATABASE_STATE_LABEL } from '@/lib/employment-intak
 import { EMPTY_FILTERS, hasActiveFilters, type EmploymentIntakeFilters } from '@/hooks/useEmploymentIntakeRows'
 
 const CONTENT_TYPE_OPTIONS: ContentType[] = ['job_seeker', 'recruiter', 'group_join', 'unclear', 'irrelevant', 'unclassified']
-const DATABASE_STATE_OPTIONS: DatabaseState[] = ['existing', 'not_existing', 'needs_identification', 'google_sync_exception']
+// google_sync_exception הוסר מהבחירה: מאז INC-3128 פורמט Google מסומן
+// "קיים" ישירות, ולכן המצב הזה אינו מיוצר יותר ובחירה בו תמיד ריקה.
+const DATABASE_STATE_OPTIONS: DatabaseState[] = ['existing', 'not_existing', 'needs_identification']
 
 interface Props {
   filters: EmploymentIntakeFilters

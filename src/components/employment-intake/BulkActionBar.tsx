@@ -4,17 +4,19 @@
  * אישור מפורש לפני כתיבה כלשהי.
  */
 
-import { CheckCircle2, Send, PencilLine, RefreshCw } from 'lucide-react'
+import { CheckCircle2, Send, PencilLine, RefreshCw, EyeOff } from 'lucide-react'
 import { ActionButton } from '@/components/layout/Shell'
 import type { BulkFamily } from '@/hooks/useEmploymentIntakeBulk'
 
 interface Props {
   onOpen: (family: BulkFamily) => void
   onReclassify?: () => void
+  /** הסרה משולחן העבודה — deleted_at, לא מחיקה פיזית (INC-3129). */
+  onDismiss?: () => void
   disabled?: boolean
 }
 
-export function BulkActionBar({ onOpen, onReclassify, disabled }: Props) {
+export function BulkActionBar({ onOpen, onReclassify, onDismiss, disabled }: Props) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <ActionButton size="sm" icon={CheckCircle2} disabled={disabled} onClick={() => onOpen('lead_status')}>
@@ -29,6 +31,11 @@ export function BulkActionBar({ onOpen, onReclassify, disabled }: Props) {
       {onReclassify && (
         <ActionButton size="sm" variant="secondary" icon={RefreshCw} disabled={disabled} onClick={onReclassify}>
           סווג מחדש
+        </ActionButton>
+      )}
+      {onDismiss && (
+        <ActionButton size="sm" variant="ghost" icon={EyeOff} disabled={disabled} onClick={onDismiss}>
+          הסרה משולחן העבודה
         </ActionButton>
       )}
     </div>

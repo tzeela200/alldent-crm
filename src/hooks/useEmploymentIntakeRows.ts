@@ -85,25 +85,33 @@ function sanitize(v: string): string {
   return v.replace(/[%,()\"]/g, '')
 }
 
+/**
+ * חייב לשקף **בדיוק** את computeDatabaseState (labels.ts) — אחרת המסך סותר
+ * את עצמו: הטבלה מציגה "קיים" וה-KPI/המסנן סופרים את אותה שורה כ"דורש
+ * בדיקה". זה בדיוק מה שקרה אחרי INC-3128 (התווית תוקנה, השאילתות לא).
+ * סדר העדיפות שם: תג פורמט Google ⇒ קיים · התאמה ⇒ קיים · ambiguous/
+ * probable/needs_context/requires_identification ⇒ נדרש זיהוי · אחרת לא קיים.
+ */
 function applyDatabaseState<T extends { is: Function; not: Function; eq: Function; or: Function; contains: Function; neq: Function }>(query: T, state: DatabaseState | ''): T {
   switch (state) {
     case 'existing':
-      return query.or('match_contact.not.is.null,match_account.not.is.null') as T
+      return query.or('match_contact.not.is.null,match_account.not.is.null,tags.cs.{google_contact_expected_existing}') as T
     case 'not_existing':
       return query
         .is('match_contact', null)
         .is('match_account', null)
-        .not('match_type', 'in', '(ambiguous,probable)')
         .not('tags', 'cs', '{google_contact_expected_existing}')
-        .not('tags', 'cs', '{requires_identification}') as T
+        .not('tags', 'cs', '{requires_identification}')
+        .not('match_type', 'in', '(ambiguous,probable)')
+        .eq('needs_context', false) as T
     case 'needs_identification':
-      return query.or('match_type.in.(ambiguous,probable),needs_context.eq.true,tags.cs.{requires_identification}') as T
-    case 'google_sync_exception':
       return query
         .is('match_contact', null)
         .is('match_account', null)
-        .contains('tags', ['google_contact_expected_existing']) as T
+        .not('tags', 'cs', '{google_contact_expected_existing}')
+        .or('match_type.in.(ambiguous,probable),needs_context.eq.true,tags.cs.{requires_identification}') as T
     default:
+      // google_sync_exception אינו מיוצר יותר (INC-3128) ולכן אינו מסונן.
       return query
   }
 }
@@ -141,7 +149,13 @@ export function useEmploymentIntakeRows(
       if (filters.cityId != null) query = query.eq('city_id', filters.cityId)
       if (filters.dateFrom) query = query.gte('source_published_at', `${filters.dateFrom}T00:00:00`)
       if (filters.dateTo) query = query.lte('source_published_at', `${filters.dateTo}T23:59:59.999`)
-      if (filters.needsReview) query = query.or('match_type.in.(ambiguous,probable),needs_context.eq.true,tags.cs.{requires_identification},tags.cs.{google_contact_expected_existing}')
+      if (filters.needsReview) {
+        query = query
+          .is('match_contact', null)
+          .is('match_account', null)
+          .not('tags', 'cs', '{google_contact_expected_existing}')
+          .or('match_type.in.(ambiguous,probable),needs_context.eq.true,tags.cs.{requires_identification}')
+      }
       query = applyDatabaseState(query as never, filters.databaseState) as typeof query
 
       const from = (page - 1) * PAGE_SIZE
@@ -182,14 +196,21 @@ export function useEmploymentIntakeSummary() {
         base().eq('content_type', 'job_seeker'),
         base().eq('content_type', 'recruiter'),
         base().eq('content_type', 'group_join'),
-        base().or('match_contact.not.is.null,match_account.not.is.null'),
+        // שלושת אלה חייבים לשקף את computeDatabaseState בדיוק — ראו ההערה
+        // ב-applyDatabaseState. אחרת ה-KPI סותר את התווית בטבלה.
+        base().or('match_contact.not.is.null,match_account.not.is.null,tags.cs.{google_contact_expected_existing}'),
         base()
           .is('match_contact', null)
           .is('match_account', null)
-          .not('match_type', 'in', '(ambiguous,probable)')
           .not('tags', 'cs', '{google_contact_expected_existing}')
-          .not('tags', 'cs', '{requires_identification}'),
-        base().or('match_type.in.(ambiguous,probable),needs_context.eq.true,tags.cs.{requires_identification},tags.cs.{google_contact_expected_existing}'),
+          .not('tags', 'cs', '{requires_identification}')
+          .not('match_type', 'in', '(ambiguous,probable)')
+          .eq('needs_context', false),
+        base()
+          .is('match_contact', null)
+          .is('match_account', null)
+          .not('tags', 'cs', '{google_contact_expected_existing}')
+          .or('match_type.in.(ambiguous,probable),needs_context.eq.true,tags.cs.{requires_identification}'),
       ])
 
       const all = [total, jobSeekers, recruiters, groupJoin, existing, notExisting, needsReview]
