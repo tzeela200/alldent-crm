@@ -31,6 +31,12 @@ import { DETAILS_SENT_STATUS, ACCOUNT_STATUS_POTENTIAL } from '@/lib/employment-
 import { detectSourceEvent, parseStructuredGoogleContact, targetNameOnly } from '@/lib/employment-intake/sourceMessage'
 import { resolveEffectiveFields } from '@/lib/employment-intake/effectiveFields'
 import {
+  buildPersonRows,
+  buildNumbersPool,
+  personBelongsToTab,
+  INTAKE_TAB_ORDER,
+} from '@/lib/employment-intake/personRows'
+import {
   isEligibleForReclassify,
   buildRowPatch,
   classifyRowDiff,
@@ -830,6 +836,87 @@ checkTrue('הודעה ריקה', 'classifyText על טקסט ריק ⇒ needsCon
 check('הודעה ריקה', 'classifyText על רווחים/שורות בלבד ⇒ irrelevant', classifyText('   \n\n  ').contentType, 'irrelevant')
 // ודאות: "ההודעה הזו נמחקה" עדיין נתפס נכון אחרי הזזת הבדיקה (§ שאלת המשתמשת השנייה)
 check('הודעה ריקה', '"ההודעה הזו נמחקה" עדיין irrelevant אחרי הסידור מחדש', classifyText('ההודעה הזו נמחקה').contentType, 'irrelevant')
+
+// ═══════════════════════════════════════════════════════════
+// 19. תצוגה ברמת אדם + חמש הלשוניות (INC-3129 שלב 6)
+// ═══════════════════════════════════════════════════════════
+type PRow = Parameters<typeof buildPersonRows>[0][number]
+let prSeq = 0
+function pRow(over: Partial<PRow> = {}): PRow {
+  prSeq++
+  return {
+    id: prSeq,
+    canonical_contact_id: null,
+    identity_group_id: null,
+    identity_conflict: false,
+    sender_name: null,
+    content_type: 'recruiter',
+    tags: [],
+    source_published_at: `2026-08-${String((prSeq % 28) + 1).padStart(2, '0')}T10:00:00Z`,
+    ingested_at: '2026-08-01T00:00:00Z',
+    phone_norm: null,
+    email_norm: null,
+    ...over,
+  } as PRow
+}
+
+// המקרה שהמשתמשת הצביעה עליו: מנהלת קבוצה אחת מעבירה מודעות של מרפאות
+// שונות — כל מודעה נייד אחר ⇒ חייבות להישאר מרפאות **נפרדות**.
+const forwarder = 'שרה דהרי סייעת אור-עקיבא'
+const forwardedAds = [
+  pRow({ sender_name: forwarder, phone_norm: '972544390880', identity_group_id: 'g-1' }),
+  pRow({ sender_name: forwarder, phone_norm: '972522558724', identity_group_id: 'g-2' }),
+  pRow({ sender_name: forwarder, phone_norm: '972507173690', identity_group_id: 'g-3' }),
+]
+const forwardedResult = buildPersonRows(forwardedAds)
+check('רמת אדם', 'מודעות מועברות עם ניידים שונים ⇒ אנשים נפרדים', forwardedResult.people.length, 3)
+checkTrue('רמת אדם', 'אף אחת מהן לא מקובצת תחת המעבירה', forwardedResult.people.every((p) => !p.key.startsWith('s:')))
+
+// אותה שולחת, בלי נייד כלל, בגוף ראשון ⇒ אדם אחד (רחל ביני, 7 הודעות)
+const selfPoster = 'רחל ביניאשוילי סייעת מרכז'
+const selfRows = Array.from({ length: 7 }, () => pRow({ sender_name: selfPoster, content_type: 'job_seeker' }))
+const selfResult = buildPersonRows(selfRows)
+check('רמת אדם', '7 הודעות בלי נייד מאותה שולחת ⇒ אדם אחד', selfResult.people.length, 1)
+check('רמת אדם', 'ספירת ההודעות של אותו אדם', selfResult.people[0].messageCount, 7)
+check('רמת אדם', 'אין שורות ב"לא סווג"', selfResult.unprocessed.length, 0)
+
+// מודעת גיוס מועברת בלי שום דרך ליצור קשר ⇒ "לא סווג", לא נרשמת על המעבירה
+const noContact = buildPersonRows([pRow({ sender_name: forwarder, tags: ['no_contact_info'] })])
+check('רמת אדם', 'גיוס בלי פרטי קשר ⇒ לא סווג', noContact.unprocessed.length, 1)
+check('רמת אדם', 'ולא נרשם על המעבירה', noContact.people.length, 0)
+// שורה בלי מזהה ובלי שם שולח ⇒ אין למי לשייך
+check('רמת אדם', 'בלי מזהה ובלי שם שולח ⇒ לא סווג', buildPersonRows([pRow({ sender_name: null })]).unprocessed.length, 1)
+
+// אפס אובדן: כל שורה מגיעה ליעד — אדם או "לא סווג"
+const personMixed = [...forwardedAds, ...selfRows, pRow({ sender_name: null }), pRow({ tags: ['no_contact_info'], sender_name: forwarder })]
+const personMixedResult = buildPersonRows(personMixed)
+check('רמת אדם', 'אפס אובדן — כל שורה מגיעה ליעד',
+  personMixedResult.people.reduce((n, p) => n + p.messageCount, 0) + personMixedResult.unprocessed.length, personMixed.length)
+
+// הלשוניות הן מסננים, לא חלוקה — אדם עם שני סוגי הודעות מופיע בשתיהן
+const bothKinds = buildPersonRows([
+  pRow({ identity_group_id: 'g-both', content_type: 'recruiter' }),
+  pRow({ identity_group_id: 'g-both', content_type: 'job_seeker' }),
+]).people[0]
+check('לשוניות', 'אדם עם שתי הודעות שונות ⇒ אדם אחד', bothKinds.messageCount, 2)
+checkTrue('לשוניות', 'מופיע גם ב"מגייסים"', personBelongsToTab(bothKinds, 'recruiters'))
+checkTrue('לשוניות', 'וגם ב"מחפשי עבודה"', personBelongsToTab(bothKinds, 'job_seekers'))
+checkTrue('לשוניות', 'ואינו ב"מצטרפים חדשים"', !personBelongsToTab(bothKinds, 'new_joiners'))
+checkTrue('לשוניות', 'הצטרפות ⇒ "מצטרפים חדשים"', personBelongsToTab(buildPersonRows([pRow({ identity_group_id: 'g-j', content_type: 'group_join' })]).people[0], 'new_joiners'))
+check('לשוניות', 'חמש לשוניות בסדר שנקבע', INTAKE_TAB_ORDER.length, 5)
+
+// מאגר מספרים — "כל מספר נייד וכתובת מייל רק פעם אחת" (דרישה מפורשת)
+const pool = buildNumbersPool([
+  pRow({ phone_norm: '972521111111' }),
+  pRow({ phone_norm: '972521111111' }),
+  pRow({ phone_norm: '972522222222', email_norm: 'a@b.com' }),
+  pRow({ email_norm: 'a@b.com' }),
+  pRow({}),
+])
+check('מאגר מספרים', 'כל ערך מופיע פעם אחת בלבד', pool.length, 3)
+check('מאגר מספרים', 'נייד חוזר נספר ולא משוכפל', pool.find((e) => e.value === '972521111111')?.occurrences, 2)
+check('מאגר מספרים', 'מייל חוזר נספר ולא משוכפל', pool.find((e) => e.value === 'a@b.com')?.occurrences, 2)
+checkTrue('מאגר מספרים', 'שורה בלי נייד ובלי מייל אינה נכנסת', !pool.some((e) => e.value === ''))
 
 // ═══════════════════════════════════════════════════════════
 console.log('')

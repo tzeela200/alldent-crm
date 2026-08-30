@@ -10,6 +10,8 @@ import { Shell, ActionButton } from '@/components/layout/Shell'
 import SidePanel from '@/components/ui/SidePanel'
 import { IntakeUploadZone } from '@/components/employment-intake/IntakeUploadZone'
 import { IntakeSummary } from '@/components/employment-intake/IntakeSummary'
+import { IntakeTabs } from '@/components/employment-intake/IntakeTabs'
+import type { IntakeTab } from '@/lib/employment-intake/personRows'
 import { IntakeFilters } from '@/components/employment-intake/IntakeFilters'
 import {
   IntakeTable,
@@ -57,6 +59,7 @@ function loadStoredVisibleColumns(): string[] {
 export default function EmploymentIntakePage() {
   const [showUpload, setShowUpload] = useState(false)
   const [filters, setFilters] = useState<EmploymentIntakeFilters>(EMPTY_FILTERS)
+  const [tab, setTab] = useState<IntakeTab>('job_seekers')
   const [page, setPage] = useState(1)
   const [sortKey, setSortKey] = useState<EmploymentIntakeSortKey>('source_published_at')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
@@ -75,7 +78,7 @@ export default function EmploymentIntakePage() {
   const [reclassifyReport, setReclassifyReport] = useState<ReclassifyRunReport | null>(null)
 
   const { data: reclassifyEligibleCount } = useReclassifyEligibleCount()
-  const { data, isLoading, isError } = useEmploymentIntakeRows(filters, page, sortKey, sortDir)
+  const { data, isLoading, isError } = useEmploymentIntakeRows(filters, page, sortKey, sortDir, tab)
   const rows = data?.rows ?? []
   const total = data?.total ?? 0
   const pageSize = data?.pageSize ?? 25
@@ -190,6 +193,11 @@ export default function EmploymentIntakePage() {
       )}
 
       <IntakeSummary />
+      <IntakeTabs
+        value={tab}
+        counts={data?.tabCounts}
+        onChange={(next) => { setTab(next); setPage(1); setSelectedIds([]) }}
+      />
       <IntakeFilters filters={filters} onChange={handleFiltersChange} />
 
       <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1fr)_380px] xl:grid-cols-[minmax(0,1fr)_420px]">

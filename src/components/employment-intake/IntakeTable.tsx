@@ -20,9 +20,11 @@ import {
   computeDatabaseState,
 } from '@/lib/employment-intake/labels'
 import type { ContentType } from '@/types/employment-intake'
-import type { EmploymentIntakeSortKey, RowWithAction } from '@/hooks/useEmploymentIntakeRows'
+import type { EmploymentIntakeSortKey, RowWithAction, PersonTableRow } from '@/hooks/useEmploymentIntakeRows'
 
-export const EMPLOYMENT_INTAKE_COLUMNS_STORAGE_KEY = 'alldent:employment-intake:visible-columns:v2'
+// v3: המסך עבר לתצוגה ברמת אדם ונוספה עמודת "הודעות" — בלי במפ, בחירת
+// העמודות השמורה מ-v2 הייתה מסתירה את העמודה החדשה מהמשתמשת.
+export const EMPLOYMENT_INTAKE_COLUMNS_STORAGE_KEY = 'alldent:employment-intake:visible-columns:v3'
 
 const CONTENT_TYPE_OPTIONS: ContentType[] = ['job_seeker', 'recruiter', 'group_join', 'unclear', 'irrelevant', 'unclassified']
 
@@ -49,6 +51,7 @@ export const ALL_COLUMNS = [
   { key: 'facebook_url', label: 'Facebook URL' },
   { key: 'ingested_at', label: 'זמן קליטה' },
   { key: 'occurrences', label: 'הופעות' },
+  { key: 'message_count', label: 'הודעות' },
 ] as const
 
 export type IntakeColumnKey = (typeof ALL_COLUMNS)[number]['key']
@@ -63,6 +66,7 @@ export const DEFAULT_COLUMNS: IntakeColumnKey[] = [
   'role_id',
   'city_id',
   'database_state',
+  'message_count',
   'treatment_status',
   'row_actions',
 ]
@@ -292,6 +296,16 @@ export function IntakeTable({
           renderPreview={() => <span>הודעות מקור: {row.context_seqs?.length ? row.context_seqs.length + 1 : 1}</span>}
         />
       ),
+    },
+    // כמה הודעות שלח אותו אדם — היחידה בטבלה היא אדם, לא הודעה (INC-3129).
+    message_count: {
+      key: 'message_count', label: 'הודעות', nowrap: true,
+      render: (row) => {
+        const count = (row as PersonTableRow).personMessageCount ?? 1
+        return count > 1
+          ? <span className="rounded-full bg-[#F3F4F6] px-2 py-0.5 text-[12px] font-semibold text-[#2D2D2D]">{count}</span>
+          : <span className="text-[#9CA3AF]">1</span>
+      },
     },
   }
 

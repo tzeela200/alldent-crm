@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase'
 import type { ContentType, EmploymentIntakeRow } from '@/types/employment-intake'
 import { supabaseError } from '@/lib/employment-intake/errors'
 import type { DatabaseState } from '@/lib/employment-intake/labels'
+import { buildPersonRows, buildNumbersPool, personBelongsToTab, type IntakeTab } from '@/lib/employment-intake/personRows'
 
 export interface EmploymentIntakeFilters {
   search: string
@@ -67,6 +68,17 @@ export interface RowWithAction extends EmploymentIntakeRow {
   matched_account: MatchedAccountSummary | null
 }
 
+/**
+ * שורת האדם כפי שהטבלה מציגה אותה: ההודעה האחרונה שלו (לכל שדות התצוגה
+ * הקיימים) + כמה הודעות יש לו בסך הכול ואילו שורות הן. כך הטבלה נשארת
+ * כפי שהיא ורק *היחידה* משתנה מהודעה לאדם (INC-3129).
+ */
+export interface PersonTableRow extends RowWithAction {
+  personKey: string
+  personMessageCount: number
+  personRowIds: number[]
+}
+
 export type EmploymentIntakeSortKey =
   | 'source_published_at'
   | 'sender_name'
@@ -116,16 +128,30 @@ function applyDatabaseState<T extends { is: Function; not: Function; eq: Functio
   }
 }
 
+/**
+ * INC-3129 — הטבלה עברה מ"שורה לכל הודעה" ל"שורה לכל אדם", ולכן העימוד
+ * חייב לעבור לצד הלקוח: PostgREST אינו יודע GROUP BY, והודעות של אותו
+ * אדם נחתכות בין עמודי שרת. לכן נשלפות **כל** השורות שעונות למסננים
+ * (בדפים של 1,000 — תקרת PostgREST, מלכודת מתועדת בפרויקט), ורק אז
+ * מתבצע קיבוץ, סינון לשונית ועימוד.
+ *
+ * כל לוגיקת המסננים נשארה בשרת בדיוק כפי שהייתה — רק ה-`.range()` הפך
+ * ללולאה.
+ */
+const FETCH_PAGE = 1000
+
 export function useEmploymentIntakeRows(
   filters: EmploymentIntakeFilters,
   page: number,
   sortKey: EmploymentIntakeSortKey = 'source_published_at',
   sortDir: 'asc' | 'desc' = 'desc',
+  tab: IntakeTab = 'job_seekers',
 ) {
   return useQuery({
-    queryKey: ['employment-intake-rows', filters, page, sortKey, sortDir],
+    queryKey: ['employment-intake-rows', filters, page, sortKey, sortDir, tab],
     staleTime: 30_000,
     queryFn: async () => {
+      const buildQuery = () => {
       let query = supabase
         .from('employment_intake')
         .select(
@@ -157,14 +183,45 @@ export function useEmploymentIntakeRows(
           .or('match_type.in.(ambiguous,probable),needs_context.eq.true,tags.cs.{requires_identification}')
       }
       query = applyDatabaseState(query as never, filters.databaseState) as typeof query
+      return query.order(sortKey, { ascending: sortDir === 'asc', nullsFirst: false })
+      }
+
+      // שליפת כל השורות התואמות, בדפים של 1,000
+      const allRows: RowWithAction[] = []
+      for (let from = 0; ; from += FETCH_PAGE) {
+        const { data, error } = await buildQuery().range(from, from + FETCH_PAGE - 1)
+        if (error) throw supabaseError('טעינת התוצאות נכשלה', error)
+        const batch = (data ?? []) as unknown as RowWithAction[]
+        allRows.push(...batch)
+        if (batch.length < FETCH_PAGE) break
+      }
+
+      const { people, unprocessed } = buildPersonRows(allRows)
+
+      // ספירות הלשוניות — מחושבות פעם אחת מאותה שליפה, ובאנשים ולא
+      // בהודעות. "מגייסים 991" ספר הודעות והיה מספר חסר משמעות.
+      const tabCounts: Record<IntakeTab, number> = {
+        job_seekers: people.filter((p) => personBelongsToTab(p, 'job_seekers')).length,
+        recruiters: people.filter((p) => personBelongsToTab(p, 'recruiters')).length,
+        new_joiners: people.filter((p) => personBelongsToTab(p, 'new_joiners')).length,
+        numbers_pool: buildNumbersPool(allRows).length,
+        unprocessed: unprocessed.length,
+      }
+
+      const inTab = tab === 'unprocessed'
+        ? unprocessed.map((row) => ({ ...row, personKey: `row:${row.id}`, personMessageCount: 1, personRowIds: [row.id] }))
+        : people
+            .filter((p) => personBelongsToTab(p, tab))
+            .map((p) => ({ ...p.primary, personKey: p.key, personMessageCount: p.messageCount, personRowIds: p.rows.map((r) => r.id) }))
 
       const from = (page - 1) * PAGE_SIZE
-      const { data, error, count } = await query
-        .order(sortKey, { ascending: sortDir === 'asc', nullsFirst: false })
-        .range(from, from + PAGE_SIZE - 1)
-
-      if (error) throw supabaseError('טעינת התוצאות נכשלה', error)
-      return { rows: (data ?? []) as unknown as RowWithAction[], total: count ?? 0, pageSize: PAGE_SIZE }
+      return {
+        rows: inTab.slice(from, from + PAGE_SIZE) as PersonTableRow[],
+        total: inTab.length,
+        pageSize: PAGE_SIZE,
+        tabCounts,
+        messageCount: allRows.length,
+      }
     },
   })
 }
