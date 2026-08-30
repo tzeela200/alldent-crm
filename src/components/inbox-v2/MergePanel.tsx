@@ -8,7 +8,7 @@ import { AdminBadge } from '@/components/admin/AdminBadge'
 import { ActionButton } from '@/components/layout/Shell'
 import { FieldComparisonRow } from '@/components/inbox-v2/FieldComparisonRow'
 import { useInboxV2Row } from '@/hooks/useInboxV2'
-import { useApplicationDicts } from '@/hooks/useApplicationDicts'
+import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
 import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
 import { useAuth } from '@/contexts/AuthContext'
@@ -205,6 +205,19 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
   const targetName =
     (entity === 'account' ? (target?.account_name as string | null) : (target?.display_name as string | null)) ?? null
 
+  // תפקיד ועיר של הרשומה הקיימת — שם לבדו אינו מספיק כדי לדעת מול מי
+  // מכריעים, במיוחד כשיש שמות חוזרים במאגר (INC-3125).
+  const targetDetails = [
+    entity === 'contact' && target?.role != null
+      ? getDictLabel(dicts?.roles, target.role as number)
+      : null,
+    target?.city_id != null
+      ? (cities?.find((c) => c.id === Number(target.city_id))?.name ?? null)
+      : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+
   const header = (
     <div className="px-5 py-4">
       <div className="flex items-center justify-between gap-2">
@@ -227,6 +240,7 @@ export function MergePanel({ leadId, forcedEntity, onClose }: Props) {
                 {formatPhone(row.phone)}
               </span>
             )}
+            {targetDetails && <span className="me-2">{targetDetails}</span>}
             {source ? `מקור: ${source.full}` : ''}
           </p>
           <p className="text-[12px] text-[#9CA3AF]">

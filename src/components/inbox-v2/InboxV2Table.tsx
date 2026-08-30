@@ -11,7 +11,7 @@ import {
   isDecidableField,
 } from '@/lib/inbox-v2-dicts'
 import { useInboxV2SourceTypes } from '@/hooks/useInboxV2SourceTypes'
-import { useInboxMatchedNames, matchedLabel } from '@/hooks/useInboxMatchedNames'
+import { useInboxMatchedNames, matchedRecord } from '@/hooks/useInboxMatchedNames'
 import { InboxDiffChips } from '@/components/inbox-v2/InboxDiffChips'
 import { entryReasonLabel, matchedByLabel } from '@/lib/inbox-v2-merge'
 import type { InboxV2Row } from '@/types/inbox-v2'
@@ -195,16 +195,20 @@ export function InboxV2Table({
         key: 'match_existing',
         label: 'התאמה לרשומה קיימת',
         // שם הרשומה, לא מזהה טכני (INC-3125).
-        // שם הרשומה + תג "קיים" קטן. מי שרוצה לדעת *איך* נמצאה ההתאמה
-        // מוצא זאת בפאנל, לא בעמודה צרה בטבלה (INC-3125).
+        // שם + תפקיד + עיר של הרשומה הקיימת. שם לבדו אינו מספיק כדי
+        // לדעת למי הותאמה השורה — במאגר יש שמות חוזרים (INC-3125).
         render: (r) => {
-          const label = matchedLabel(r, matchedNames)
-          if (!label) return <span className="text-[13px] text-[#9CA3AF]">לא נמצא במערכת</span>
+          const rec = matchedRecord(r, matchedNames)
+          if (!rec) return <span className="text-[13px] text-[#9CA3AF]">לא נמצא במערכת</span>
+          const details = [rec.role, rec.city].filter(Boolean).join(' · ')
           return (
-            <span className="flex flex-wrap items-center gap-1.5">
-              <span className="text-[13px] text-[#2D2D2D]">{label}</span>
-              <AdminBadge label="קיים" variant="success" />
-            </span>
+            <div className="min-w-0">
+              <span className="flex flex-wrap items-center gap-1.5">
+                <span className="text-[13px] text-[#2D2D2D]">{rec.name}</span>
+                <AdminBadge label="קיים" variant="success" />
+              </span>
+              {details && <div className="text-[11px] text-[#9CA3AF]">{details}</div>}
+            </div>
           )
         },
       },
