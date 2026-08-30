@@ -14,7 +14,7 @@
  * `requires_identification` כלולה בכוונה גם שהמנוע כבר לא כותב אותה
  * (הוסרה בתיקון העסקי הקודם) — כדי ש"סיווג מחדש" ינקה אותה משורות ישנות
  * שעדיין נושאות אותה מלפני התיקון, לא רק ימנע כתיבה חדשה שלה. */
-export const ENGINE_OWNED_TAGS = ['system_noise', 'google_contact_expected_existing', 'requires_identification'] as const
+export const ENGINE_OWNED_TAGS = ['system_noise', 'google_contact_expected_existing', 'requires_identification', 'no_contact_info'] as const
 
 /**
  * כל השדות שהמנוע (Parser/סיווג/התאמה) אי-פעם כותב על שורת employment_intake.

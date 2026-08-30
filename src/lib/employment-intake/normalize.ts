@@ -146,6 +146,23 @@ export interface AttributedPhones {
   unassignedPhones: string[]
 }
 
+/** קו נייח ישראלי: קידומת אזור (2/3/4/8/9) ואחריה 7 ספרות. */
+const LANDLINE_RE = /^(?:\+?972[-\s]?|0)([23489])(?:[-\s]?\d){7}$/
+
+/**
+ * בוחר קו נייח מתוך הטלפונים שלא קיבלו ייחוס. `normalize_il_mobile_phone`
+ * מחזיר NULL לכל מספר שאינו נייד, ולכן קווים נייחים של מרפאות נופלים
+ * ל-`unassigned_phones` ואינם מוצגים בשום מקום — למרות שהמשתמשת קבעה
+ * מפורשות: "להציג אותו — זה לקוח לכל דבר".
+ *
+ * מסונן לדפוס קו נייח בלבד, כדי שמספרים פגומים באמת (למשל `055668007`
+ * בן 9 ספרות) לא יוצגו כאילו היו פרט קשר תקין.
+ */
+export function pickLandline(unassignedPhones: string[] | null | undefined): string | null {
+  if (!unassignedPhones?.length) return null
+  return unassignedPhones.find((raw) => LANDLINE_RE.test(raw.trim())) ?? null
+}
+
 /**
  * מכריע איזה מהטלפונים שחולצו הופך ל-phone/second_phone, ואילו נשארים
  * unassigned. קלט: הטלפונים הגולמיים + תוצאת normalize_il_mobile_phone

@@ -167,8 +167,19 @@ export function IntakeTable({
     phone: {
       key: 'phone', label: 'נייד', sortable: true, nowrap: true,
       render: (row) => {
-        const phone = resolveEffectiveFields(row).phone
-        return phone ? <span dir="ltr" className="inline-block unicode-bidi-isolate">{formatPhone(phone)}</span> : '—'
+        const { phone, landline } = resolveEffectiveFields(row)
+        if (phone) return <span dir="ltr" className="inline-block unicode-bidi-isolate">{formatPhone(phone)}</span>
+        // מרפאה עם קו נייח בלבד היא לקוח לכל דבר — מוצג ומסומן, אך אינו
+        // כשיר להקמת איש קשר (contact.phone_norm מחייב נייד ישראלי).
+        if (landline) {
+          return (
+            <span className="inline-flex items-center gap-1">
+              <span dir="ltr" className="unicode-bidi-isolate">{landline}</span>
+              <span className="text-[11px] text-[#6B6B6B]">(קו נייח)</span>
+            </span>
+          )
+        }
+        return '—'
       },
     },
     original_text: {

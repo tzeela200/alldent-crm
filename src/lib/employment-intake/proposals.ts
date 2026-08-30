@@ -41,10 +41,16 @@ export function proposeAction(input: ProposalInput): ProposalResult {
   const hasContact = matchContact != null
 
   switch (contentType) {
+    // בלי נייד אי אפשר להקים איש קשר (contact.phone_norm מחייב נייד
+    // ישראלי) — הצעת "הקמת איש קשר" על שורה כזו היא הבטחה שלא ניתן לקיים.
+    // עד INC-3129 hasPhone נבדק רק ב-group_join, ולכן מודעת גיוס בלי שום
+    // פרט קשר הציעה יצירה שהייתה נכשלת.
     case 'job_seeker':
-      return { proposedSocialStatus: 1, proposedAction: hasContact ? 'mark_lead_status' : 'create_contact' }
+      if (hasContact) return { proposedSocialStatus: 1, proposedAction: 'mark_lead_status' }
+      return { proposedSocialStatus: 1, proposedAction: hasPhone ? 'create_contact' : null }
     case 'recruiter':
-      return { proposedSocialStatus: 2, proposedAction: hasContact ? 'mark_lead_status' : 'create_contact' }
+      if (hasContact) return { proposedSocialStatus: 2, proposedAction: 'mark_lead_status' }
+      return { proposedSocialStatus: 2, proposedAction: hasPhone ? 'create_contact' : null }
     case 'group_join':
       if (hasContact) return { proposedSocialStatus: 7, proposedAction: 'mark_lead_status' }
       return { proposedSocialStatus: 3, proposedAction: hasPhone ? 'create_contact' : null }

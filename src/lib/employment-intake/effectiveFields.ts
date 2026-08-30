@@ -8,6 +8,7 @@
  */
 
 import type { RowWithAction, MatchedContactSummary, MatchedAccountSummary } from '@/hooks/useEmploymentIntakeRows'
+import { pickLandline } from './normalize'
 
 export interface EffectiveFields {
   displayName: string | null
@@ -16,6 +17,9 @@ export interface EffectiveFields {
   orgName: string | null
   phone: string | null
   phoneFromMatch: boolean
+  /** קו נייח מ-unassigned_phones — מוצג כשאין נייד, כי מרפאה עם קו נייח
+   * היא לקוח לכל דבר (החלטת המשתמשת, INC-3129). */
+  landline: string | null
   secondPhone: string | null
   email: string | null
   emailFromMatch: boolean
@@ -40,7 +44,7 @@ export function resolveEffectiveFields(
     RowWithAction,
     | 'contact_name' | 'org_name' | 'sender_name'
     | 'phone' | 'phone_norm' | 'second_phone' | 'email' | 'second_email'
-    | 'sender_phone_norm'
+    | 'sender_phone_norm' | 'unassigned_phones'
     | 'role_id' | 'city_id' | 'region_id'
     | 'facebook_id' | 'facebook_url' | 'facebook_name'
     | 'matched_contact' | 'matched_account'
@@ -67,6 +71,8 @@ export function resolveEffectiveFields(
     orgName: row.org_name ?? account?.account_name ?? null,
     phone: phone.value,
     phoneFromMatch: phone.fromMatch,
+    // רק כשאין נייד כלל — נייד תמיד גובר על קו נייח.
+    landline: phone.value ? null : pickLandline(row.unassigned_phones),
     secondPhone: row.second_phone,
     email: email.value,
     emailFromMatch: email.fromMatch,

@@ -12,10 +12,10 @@
  * תלויי Supabase).
  */
 
-import { classifyText } from '@/lib/employment-intake/rules'
+import { classifyText, messagePointsAtSender } from '@/lib/employment-intake/rules'
 import { connectContext, buildDraftRows } from '@/lib/employment-intake/context'
 import { extractIdentifiers } from '@/lib/employment-intake/extract'
-import { findCityCandidates, attributePhones, type CityIndexEntry } from '@/lib/employment-intake/normalize'
+import { findCityCandidates, attributePhones, pickLandline, type CityIndexEntry } from '@/lib/employment-intake/normalize'
 import { matchRow, computeMatchStatus, type ContactCandidate, type AccountCandidate } from '@/lib/employment-intake/matching'
 import { resolveRowIdentity, groupRowsByIdentity } from '@/lib/employment-intake/identity'
 import { checkRepeat, buildAnchorKey } from '@/lib/employment-intake/repeatGuard'
@@ -35,6 +35,7 @@ import {
   buildRowPatch,
   classifyRowDiff,
   PIPELINE_OWNED_FIELDS,
+  ENGINE_OWNED_TAGS,
 } from '@/lib/employment-intake/reclassifyDiff'
 import * as L from '@/lib/employment-intake/labels'
 import type { RawParsedMessage, EmploymentIntakeAction } from '@/types/employment-intake'
@@ -229,6 +230,24 @@ check('חילוץ', 'אין מספר בהודעה ⇒ טלפון השולח מש
 
 const ex3 = extractIdentifiers('נייד 052-1234567 ובבית 053-7654321 ועוד 054-1112233', null)
 check('חילוץ', 'שלושה מספרים בהודעה', ex3.phones.length, 3)
+
+// INC-3129 #2 — פורמטים חריגים שנפלו בין הכיסאות והפילו לקוחות אמיתיים
+check('חילוץ', 'נייד בקיבוץ ספרות חריג (054-9920-559) נתפס', extractIdentifiers('דחוף סייעת לגבעתיים 054-9920-559', null).phones.map((p) => p.raw), ['054-9920-559'])
+check('חילוץ', 'קו נייח של מרפאה נתפס', extractIdentifiers('ליצירת קשר : 048700959', null).phones.map((p) => p.raw), ['048700959'])
+check('חילוץ', 'נייד + קו נייח באותה שורה — שניהם', extractIdentifiers('פרטים 054-6944477,08-9264071', null).phones.map((p) => p.raw), ['054-6944477', '08-9264071'])
+check('חילוץ', 'מספר בן 9 ספרות פסול אינו נתפס כמספר שלם', extractIdentifiers('לפרטים:055668007', null).phones.map((p) => p.raw), [])
+// ההרחבה אסור שתייצר זיהוי-שווא על מספרים שאינם טלפון — אלה דפוסים
+// שמופיעים כמעט בכל מודעת גיוס אמיתית.
+for (const noise of ['בשעה 14:00 עד 19:30', 'בתאריכים 22.07 ,27 ,28 29 ו3.08', 'משמרת 9-14:30', 'שכר:65-80 ₪']) {
+  check('חילוץ', `אינו טלפון ואינו נתפס: ${noise}`, extractIdentifiers(noise, null).phones.length, 0)
+}
+
+// קו נייח מוצג כפרט קשר (החלטת המשתמשת: "זה לקוח לכל דבר")
+check('קו נייח', 'קו נייח נבחר מתוך unassigned', pickLandline(['048700959']), '048700959')
+check('קו נייח', 'קו נייח עם מקף', pickLandline(['08-9264071']), '08-9264071')
+check('קו נייח', 'מספר פגום אינו מוצג כקו נייח', pickLandline(['055668007']), null)
+check('קו נייח', 'נייד אינו נחשב קו נייח', pickLandline(['0521234567']), null)
+check('קו נייח', 'רשימה ריקה', pickLandline([]), null)
 
 const ex4 = extractIdentifiers('הפרופיל שלה https://www.facebook.com/profile.php?id=1000123456789', null)
 check('חילוץ', 'Facebook ID חולץ מ-profile.php', ex4.facebookId, '1000123456789')
@@ -645,7 +664,7 @@ type EffRow = Parameters<typeof resolveEffectiveFields>[0]
 const baseEffRow: EffRow = {
   contact_name: null, org_name: null, sender_name: null,
   phone: null, phone_norm: null, second_phone: null, email: null, second_email: null,
-  sender_phone_norm: null,
+  sender_phone_norm: null, unassigned_phones: [],
   role_id: null, city_id: null, region_id: null,
   facebook_id: null, facebook_url: null, facebook_name: null,
   matched_contact: null, matched_account: null,
@@ -717,6 +736,26 @@ const ownPhoneRow: EffRow = {
   phone_norm: '972521111111',
 }
 check('לקוח אמיתי', 'הנייד הוא של השולח ⇒ שמו כן מוצג', resolveEffectiveFields(ownPhoneRow).displayName, 'רחל ביניאשוילי סייעת מרכז')
+
+// INC-3129 #3 — כלל "לא סווג" של המשתמשת: גיוס בלי פרטי קשר ולא מטעם אישי
+check('לא סווג', 'גיוס בלי נייד ובלי התאמה ⇒ אין הצעת הקמה', proposeAction({ contentType: 'recruiter', isActiveRequest: true, matchContact: null, hasPhone: false }).proposedAction, null)
+check('לא סווג', 'גיוס עם נייד ⇒ כן הצעת הקמה', proposeAction({ contentType: 'recruiter', isActiveRequest: true, matchContact: null, hasPhone: true }).proposedAction, 'create_contact')
+check('לא סווג', 'מחפש עבודה בלי נייד ⇒ אין הצעת הקמה', proposeAction({ contentType: 'job_seeker', isActiveRequest: true, matchContact: null, hasPhone: false }).proposedAction, null)
+check('לא סווג', 'יש איש קשר ⇒ עדכון סטטוס גם בלי נייד', proposeAction({ contentType: 'recruiter', isActiveRequest: true, matchContact: 5, hasPhone: false }).proposedAction, 'mark_lead_status')
+
+for (const text of ['למרפאת שיניים בקרית מוצקין דרושה סייעת. לפרטים בפרטי', 'למרפאה ברמת אביב צריכים סייעת, ניתן לפנות אליי בפרטי', 'מחפש סייעת בתל אביב, נא לשלוח הודעה ב-WhatsApp']) {
+  checkTrue('לא סווג', `"פנו אליי" מזוהה ⇒ השולח הוא איש הקשר: ${text.slice(0, 30)}…`, messagePointsAtSender(text))
+}
+for (const text of ['ליום רביעי הבא סייעת בבני ברק משעה 11:00 עד 19:00', 'דרושה סייעת מחליפה למחר מ9-14:30 בחולון']) {
+  checkTrue('לא סווג', `מודעה מועברת בלי דרך ליצור קשר: ${text.slice(0, 30)}…`, !messagePointsAtSender(text))
+}
+checkTrue('לא סווג', 'התג no_contact_info בבעלות המנוע (מתנקה בסיווג מחדש)', (ENGINE_OWNED_TAGS as readonly string[]).includes('no_contact_info'))
+
+// קו נייח מוצג רק כשאין נייד — נייד תמיד גובר
+const landlineOnlyRow: EffRow = { ...baseEffRow, unassigned_phones: ['048700959'] }
+check('קו נייח', 'אין נייד ⇒ הקו הנייח מוצג', resolveEffectiveFields(landlineOnlyRow).landline, '048700959')
+const mobileWinsRow: EffRow = { ...baseEffRow, phone: '0521234567', unassigned_phones: ['048700959'] }
+check('קו נייח', 'יש נייד ⇒ הקו הנייח אינו מוצג', resolveEffectiveFields(mobileWinsRow).landline, null)
 
 // ═══════════════════════════════════════════════════════════
 // 17. סיווג מחדש — זכאות, שמירה על עריכה ידנית, קיבוץ שינויים

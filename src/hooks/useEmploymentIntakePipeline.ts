@@ -19,9 +19,9 @@ import { supabase } from '@/lib/supabase'
 
 import type { EmploymentIntakeRow, RawParsedMessage, ClassificationResult } from '@/types/employment-intake'
 import { connectContext, buildDraftRows, type DraftRow } from '@/lib/employment-intake/context'
-import { classifyText } from '@/lib/employment-intake/rules'
+import { classifyText, messagePointsAtSender } from '@/lib/employment-intake/rules'
 import { extractIdentifiers } from '@/lib/employment-intake/extract'
-import { findCityCandidates, attributePhones, type CityIndexEntry, type AttributedPhones } from '@/lib/employment-intake/normalize'
+import { findCityCandidates, attributePhones, pickLandline, type CityIndexEntry, type AttributedPhones } from '@/lib/employment-intake/normalize'
 import { matchRow, type ContactCandidate, type AccountCandidate, type MatchResult } from '@/lib/employment-intake/matching'
 import { proposeAction, type ProposalResult } from '@/lib/employment-intake/proposals'
 import { normalizeForHash } from '@/lib/employment-intake/hashes'
@@ -243,6 +243,25 @@ export async function computeUnitAnalyses(units: UnitAnalysisInput[], cityIndex:
     const extraTags: string[] = []
     if (u.sourceEvent.kind === 'system_noise') extraTags.push('system_noise')
     if (u.trustedExistingName) extraTags.push('google_contact_expected_existing')
+
+    // כלל המשתמשת (INC-3129): "כל הודעה שהיא גיוס ולא רשום עליה נייד
+    // וההודעה היא לא מטעם אישי כלומר הלקוח עצמו — יש לסווג ל'לא סווג'".
+    // מודעה מועברת בלי שום דרך ליצור קשר אינה ליד: אין למי להתקשר.
+    // חריג: "לפרטים בפרטי" / "פנו אליי" — שם השולח/ת כן איש הקשר.
+    const hasAnyContactDetail =
+      phones.phoneNorm != null ||
+      pickLandline(phones.unassignedPhones) != null ||
+      u.identifiers.emails.length > 0 ||
+      u.identifiers.facebookId != null ||
+      u.identifiers.facebookUrls.length > 0
+    if (
+      u.classification.contentType === 'recruiter' &&
+      !hasAnyContactDetail &&
+      match.matchContact == null &&
+      !messagePointsAtSender(u.unit.combinedText)
+    ) {
+      extraTags.push('no_contact_info')
+    }
 
     perUnit.set(u.unit.key, {
       classification: u.classification,
