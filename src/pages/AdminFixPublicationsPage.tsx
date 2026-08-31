@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Send, Upload, FileSpreadsheet, X, AlertTriangle, CheckCircle2, Loader2,
-  RotateCcw, Columns3, Building2, Layers,
+  RotateCcw, Columns3, Building2, Layers, BarChart3,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -29,9 +29,10 @@ import {
   useCampaignPreview, useCommitCampaign, auditOf,
   EMPTY_FILTERS, hasActiveFilters,
   type PublicationFilters, type PublicationRow, type CampaignPreview, type CampaignPlan,
+  type CampaignSummary,
 } from '@/hooks/useFixPublications'
 
-type Tab = 'overview' | 'import'
+type Tab = 'overview' | 'campaigns' | 'import'
 
 // בורר עמודות — אותו דפוס כמו במסך אנשי קשר (localStorage + איפוס לברירת מחדל)
 const VISIBLE_COLUMNS_STORAGE_KEY = 'alldent.fixPublications.visibleColumns.v2'
@@ -312,6 +313,13 @@ export default function AdminFixPublicationsPage() {
             </details>
           )}
           <ActionButton
+            variant={tab === 'campaigns' ? 'primary' : 'secondary'}
+            icon={BarChart3}
+            onClick={() => setTab(tab === 'campaigns' ? 'overview' : 'campaigns')}
+          >
+            {tab === 'campaigns' ? 'חזרה למצב פרסומים' : 'ביצועי קמפיינים'}
+          </ActionButton>
+          <ActionButton
             variant={tab === 'import' ? 'secondary' : 'primary'}
             icon={Upload}
             onClick={() => setTab(tab === 'import' ? 'overview' : 'import')}
@@ -321,7 +329,9 @@ export default function AdminFixPublicationsPage() {
         </div>
       }
     >
-      {tab === 'overview' ? (
+      {tab === 'campaigns' ? (
+        <CampaignPerformanceTable campaigns={campaigns.data ?? []} isLoading={campaigns.isLoading} />
+      ) : tab === 'overview' ? (
         <>
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
             <KPICard
@@ -417,6 +427,76 @@ export default function AdminFixPublicationsPage() {
         <ImportPanel onDone={() => { setTab('overview'); setPage(0) }} />
       )}
     </Shell>
+  )
+}
+
+// ──────────────────────────── ביצועי קמפיינים ────────────────────────────
+
+/**
+ * שורה לכל קמפיין. המספרים **כבר מחושבים** בטבלת הקמפיינים ומרועננים בסוף כל
+ * קליטה (refreshCampaignCounts), ולכן כאן אין חישוב מחדש — רק תצוגה.
+ */
+function CampaignPerformanceTable({
+  campaigns, isLoading,
+}: {
+  campaigns: CampaignSummary[]
+  isLoading: boolean
+}) {
+  const reachedOf = (c: CampaignSummary) =>
+    Number(c.submitted_count ?? 0) + Number(c.delivered_count ?? 0) + Number(c.read_count ?? 0)
+  const pct = (part: number, whole: number) =>
+    whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—'
+
+  const columns: AdminColumn<CampaignSummary>[] = [
+    {
+      key: 'campaign_name', label: 'קמפיין', minWidth: '220px',
+      render: (c) => c.campaign_name || c.source_file_name || `קמפיין ${c.campaign_id}`,
+    },
+    { key: 'process_name', label: 'תהליך', render: (c) => c.process_name ?? '—' },
+    { key: 'started_at', label: 'מועד פרסום', nowrap: true, render: (c) => formatDateTime(c.started_at) },
+    {
+      key: 'total_recipients', label: 'נשלחו', nowrap: true,
+      render: (c) => Number(c.total_recipients ?? 0).toLocaleString('he-IL'),
+    },
+    { key: 'reached', label: 'הגיעו', nowrap: true, render: (c) => reachedOf(c).toLocaleString('he-IL') },
+    {
+      key: 'reach_rate', label: 'אחוז הגעה', nowrap: true,
+      render: (c) => (
+        <span className="font-semibold text-[#2D2D2D]">
+          {pct(reachedOf(c), Number(c.total_recipients ?? 0))}
+        </span>
+      ),
+    },
+    {
+      key: 'read_rate', label: 'אחוז קריאה', nowrap: true,
+      render: (c) => pct(Number(c.read_count ?? 0), Number(c.total_recipients ?? 0)),
+    },
+    {
+      key: 'failed_count', label: 'נכשלו', nowrap: true,
+      render: (c) => {
+        const failed = Number(c.failed_count ?? 0)
+        return failed
+          ? <span className="font-semibold text-[#D96C6C]">{failed.toLocaleString('he-IL')}</span>
+          : '—'
+      },
+    },
+  ]
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-[#6B6B6B]">
+        ״הגיעו״ = נשלח, נמסר או נקרא — כל תוצאה שאינה כשל. המספרים נספרים מטבלת
+        השליחות בסוף כל קליטה, ולא מהקובץ שהועלה.
+      </p>
+      <AdminTable
+        columns={columns}
+        data={campaigns}
+        keyField="campaign_id"
+        isLoading={isLoading}
+        emptyMessage="עדיין לא נקלט אף קמפיין."
+        minWidth="1000px"
+      />
+    </div>
   )
 }
 

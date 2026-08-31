@@ -287,6 +287,23 @@ export function usePublicationStats() {
   })
 }
 
+/** סיכום קמפיין כפי שהוא נשמר בטבלה — המונים מרועננים בסוף כל קליטה */
+export interface CampaignSummary {
+  campaign_id: number
+  external_campaign_id: string | null
+  campaign_name: string | null
+  process_name: string | null
+  source_file_name: string | null
+  started_at: string | null
+  completed_at: string | null
+  total_recipients: number | null
+  submitted_count: number | null
+  delivered_count: number | null
+  read_count: number | null
+  failed_count: number | null
+  created_at: string | null
+}
+
 export function useCampaigns() {
   return useQuery({
     queryKey: FIX_PUBLICATIONS_KEYS.campaigns,
@@ -300,7 +317,7 @@ export function useCampaigns() {
         .order('started_at', { ascending: false, nullsFirst: false })
         .limit(500)
       if (error) throw error
-      return data ?? []
+      return (data ?? []) as unknown as CampaignSummary[]
     },
   })
 }
