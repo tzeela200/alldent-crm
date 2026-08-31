@@ -104,6 +104,21 @@ export function mapDeliveryStatus(raw: string | null | undefined): DeliveryStatu
 }
 
 /**
+ * קטגוריית הכשל שנשמרת ב-whatsapp_campaign_recipients.failure_category.
+ * ערך ריק לסטטוס שאינו כשל — כדי שהעמודה תישאר ניתנת לקיבוץ ולספירה.
+ */
+export function failureCategoryOf(code: DeliveryStatusCode): string | null {
+  switch (code) {
+    case 'failed_device':     return 'device'
+    case 'failed_rate_limit': return 'rate_limit'
+    case 'failed_blocked':    return 'blocked'
+    case 'failed_provider':   return 'provider'
+    case 'failed_other':      return 'other'
+    default:                  return null
+  }
+}
+
+/**
  * בייבוא חוזר של אותו קמפיין — הסטטוס לא נסוג אחורה.
  * Read לא יוחלף ב-Delivered, ו-Delivered לא יוחלף ב-Submited.
  */
