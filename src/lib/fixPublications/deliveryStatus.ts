@@ -93,9 +93,13 @@ export function mapDeliveryStatus(raw: string | null | undefined): DeliveryStatu
   if (s === 'submited' || s === 'submitted') return 'submitted'
 
   if (s.startsWith('rejected')) {
+    // בקשת הסרה נבדקת ראשונה — הטקסט שלה מכיל "unable to deliver", ואסור
+    // שייקלט כתקלה טכנית. זו החלטה של הנמען, לא כשל.
+    if (isOptOutText(s)) return 'failed_other'
     if (s.includes('not suitable device') || s.includes('undeliverable')) return 'failed_device'
     if (s.includes('auto-limiting') || s.includes('auto limiting')) return 'failed_rate_limit'
     if (s.includes('blocked')) return 'failed_blocked'
+    if (isMediaFailureText(s)) return 'failed_provider'
     if (s.includes('provider error')) return 'failed_provider'
     return 'failed_other'
   }
@@ -104,18 +108,65 @@ export function mapDeliveryStatus(raw: string | null | undefined): DeliveryStatu
 }
 
 /**
+ * הנמען ביקש להפסיק לקבל פרסום ("chosen to stop receiving marketing messages").
+ * זו הקבוצה היחידה שאסור לפנות אליה שוב לעולם, ולכן היא מזוהה בנפרד ולא
+ * נבלעת בתוך "כשל אחר".
+ */
+export function isOptOutText(raw: string | null | undefined): boolean {
+  const s = String(raw ?? '').toLowerCase()
+  return s.includes('chosen to stop receiving') || s.includes('stop receiving marketing')
+}
+
+/**
+ * ההודעה נכשלה כי **המדיה שלנו** לא נטענה (הפלייר של המשרה), לא בגלל הנמען.
+ * אלה אנשים שצריך לשלוח אליהם שוב — לא רשומות בעייתיות.
+ */
+export function isMediaFailureText(raw: string | null | undefined): boolean {
+  const s = String(raw ?? '').toLowerCase()
+  return s.includes('media upload error') || s.includes('invalid resource') ||
+    s.includes('downloading media')
+}
+
+/** ערכי `whatsapp_campaign_recipients.failure_category`. העמודה חופשית (ללא CHECK). */
+export type FailureCategory =
+  | 'device' | 'rate_limit' | 'blocked' | 'provider' | 'media' | 'opt_out' | 'other'
+
+export const FAILURE_CATEGORY_LABELS: Record<FailureCategory, string> = {
+  device:     'אין וואטסאפ על המספר',
+  rate_limit: 'הספק הגביל את השליחה',
+  blocked:    'הספק חסם את ההודעה',
+  provider:   'תקלת ספק',
+  media:      'התמונה שלנו לא נטענה',
+  opt_out:    'ביקש להפסיק לקבל פרסום',
+  other:      'סיבה אחרת',
+}
+
+/**
  * קטגוריית הכשל שנשמרת ב-whatsapp_campaign_recipients.failure_category.
  * ערך ריק לסטטוס שאינו כשל — כדי שהעמודה תישאר ניתנת לקיבוץ ולספירה.
+ *
+ * הקטגוריה מדויקת יותר מהקוד: `failed_other` מתפצל ל-`opt_out` (החלטת הנמען)
+ * מול `other`, ו-`failed_provider` מתפצל ל-`media` (תקלה שלנו) מול `provider`.
+ * זו ההפרדה שמאפשרת להחליט מה לעשות עם כל קבוצה.
  */
-export function failureCategoryOf(code: DeliveryStatusCode): string | null {
+export function failureCategoryOf(
+  code: DeliveryStatusCode,
+  raw?: string | null,
+): FailureCategory | null {
+  if (isOptOutText(raw)) return 'opt_out'
   switch (code) {
     case 'failed_device':     return 'device'
     case 'failed_rate_limit': return 'rate_limit'
     case 'failed_blocked':    return 'blocked'
-    case 'failed_provider':   return 'provider'
+    case 'failed_provider':   return isMediaFailureText(raw) ? 'media' : 'provider'
     case 'failed_other':      return 'other'
     default:                  return null
   }
+}
+
+export function getFailureCategoryLabel(category: string | null | undefined): string | null {
+  if (!category) return null
+  return FAILURE_CATEGORY_LABELS[category as FailureCategory] ?? 'סיבה אחרת'
 }
 
 /**

@@ -454,7 +454,8 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
         } else {
           toast.success(
             `נקלטו ${res.inserted} שליחות ב-${res.campaignsCreated + res.campaignsUpdated} קמפיינים · ` +
-            `${res.contactsUpdated} אנשי קשר ו-${res.accountsUpdated} ארגונים עודכנו`,
+            `${res.contactsUpdated} אנשי קשר ו-${res.accountsUpdated} ארגונים עודכנו` +
+            (res.skippedNoPhone ? ` · ${res.skippedNoPhone} שורות דולגו (אין נייד תקין)` : ''),
           )
           reset()
           onDone()
@@ -553,9 +554,13 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
               hint={preview.counts.statusUpdates ? `${preview.counts.statusUpdates} סטטוסים התקדמו` : undefined}
             />
             <KPICard
-              label="שורות בעייתיות"
-              value={preview.counts.invalidPhone + preview.counts.missingPhone + preview.counts.ambiguous}
-              hint={`${preview.counts.invalidPhone + preview.counts.missingPhone} נייד פסול · ${preview.counts.ambiguous} כפילות`}
+              label="לא ייקלטו"
+              value={preview.counts.invalidPhone + preview.counts.missingPhone}
+              hint={
+                preview.counts.ambiguous
+                  ? `נייד פסול או חסר · ועוד ${preview.counts.ambiguous} בכפילות נייד`
+                  : 'נייד פסול או חסר — אין מזהה לשמירה'
+              }
             />
           </div>
 
@@ -628,6 +633,12 @@ function CampaignPlanTable({ plans }: { plans: CampaignPlan[] }) {
     {
       key: 'existingRows', label: 'כבר קיימות', nowrap: true,
       render: (p) => (p.existingRows ? p.existingRows.toLocaleString('he-IL') : '—'),
+    },
+    {
+      key: 'noPhone', label: 'לא ייקלטו', nowrap: true,
+      render: (p) => (p.noPhone
+        ? <span className="text-[#E8A85C]" title="אין נייד תקין — לא ניתן לשמור">{p.noPhone.toLocaleString('he-IL')}</span>
+        : '—'),
     },
     { key: 'matched', label: 'נמצאו במאגר', nowrap: true, render: (p) => p.matched.toLocaleString('he-IL') },
     { key: 'notFound', label: 'לא נמצאו', nowrap: true, render: (p) => p.notFound.toLocaleString('he-IL') },

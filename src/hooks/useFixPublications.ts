@@ -319,6 +319,8 @@ export interface CampaignPlan {
   rowCount: number
   newRows: number
   existingRows: number
+  /** שורות שלא ניתן לשמור כלל — אין בהן נייד תקין */
+  noPhone: number
   statusUpdates: number
   matched: number
   notFound: number
@@ -444,7 +446,9 @@ export async function buildCampaignPreview(file: File): Promise<CampaignPreview>
       missingPhone: countMatch('missing_phone'),
       alreadyExists,
       statusUpdates: campaigns.reduce((sum, c) => sum + c.statusUpdates, 0),
-      willInsert: rows.filter((r) => !r.alreadyExists).length,
+      // רק שורות עם נייד תקין ניתנות לשמירה (identifier_chk), ורק כאלה
+      // שטרם נקלטו. זה המספר שמופיע על כפתור האישור.
+      willInsert: rows.filter((r) => r.phoneNorm && !r.alreadyExists).length,
       byStatus,
     },
   }
@@ -462,7 +466,10 @@ function buildPlan(
       statusUpdates++
     }
   }
-  const existingRows = group.rows.filter((r) => r.alreadyExists).length
+  // שורה בלי נייד תקין אינה ניתנת לשמירה (identifier_chk) — היא לא נספרת
+  // כ"תיקלט" ולא כ"כבר קיימת", אלא בעמודה נפרדת.
+  const storable = group.rows.filter((r) => r.phoneNorm)
+  const existingRows = storable.filter((r) => r.alreadyExists).length
 
   return {
     campaignKey: group.campaignKey,
@@ -472,8 +479,9 @@ function buildPlan(
     completedAt: group.completedAt,
     processName: group.processName,
     rowCount: group.rows.length,
-    newRows: group.rows.length - existingRows,
+    newRows: storable.length - existingRows,
     existingRows,
+    noPhone: group.rows.length - storable.length,
     statusUpdates,
     matched: group.rows.filter(
       (r) => r.matchResult === 'matched_contact' || r.matchResult === 'matched_account',
@@ -553,6 +561,8 @@ export interface CommitResult {
   campaignsUpdated: number
   inserted: number
   skippedExisting: number
+  /** שורות שלא נשמרו כי אין בהן נייד תקין — אין להן מזהה שהטבלה מקבלת */
+  skippedNoPhone: number
   statusUpdated: number
   contactsUpdated: number
   accountsUpdated: number
@@ -577,7 +587,7 @@ export function useCommitCampaign() {
 async function commitCampaignPreview(preview: CampaignPreview): Promise<CommitResult> {
   const result: CommitResult = {
     campaignsCreated: 0, campaignsUpdated: 0, inserted: 0, skippedExisting: 0,
-    statusUpdated: 0, contactsUpdated: 0, accountsUpdated: 0, errors: [],
+    skippedNoPhone: 0, statusUpdated: 0, contactsUpdated: 0, accountsUpdated: 0, errors: [],
   }
 
   const groups = groupIntoCampaigns(preview.rows)
@@ -620,8 +630,15 @@ async function commitCampaignPreview(preview: CampaignPreview): Promise<CommitRe
     }
 
     // ─── שורות חדשות בלבד. אירוע קיים לעולם אינו נמחק ואינו מוחלף. ───
-    const newRows = group.rows.filter((r) => !r.alreadyExists)
-    result.skippedExisting += group.rows.length - newRows.length
+    //
+    // שורה בלי נייד תקין אינה ניתנת לשמירה כלל: האילוץ החי
+    // whatsapp_campaign_recipients_identifier_chk דורש לפחות אחד מתוך
+    // fix_contact_link_id / fixdigital_id / phone_norm, ודוח תוצאות הקמפיין
+    // אינו מספק את שני הראשונים. שורה כזו הייתה מפילה את כל מנת ה-INSERT.
+    const storable = group.rows.filter((r) => r.phoneNorm)
+    const newRows = storable.filter((r) => !r.alreadyExists)
+    result.skippedNoPhone += group.rows.length - storable.length
+    result.skippedExisting += storable.length - newRows.length
 
     const payload = newRows.map((row) => ({
       campaign_id: campaignId,
@@ -657,7 +674,7 @@ async function commitCampaignPreview(preview: CampaignPreview): Promise<CommitRe
     if (plan?.existingCampaignId != null) {
       result.statusUpdated += await advanceExistingStatuses(group, campaignId, result.errors)
     }
-    committedRows.push(...group.rows.filter((r) => r.alreadyExists))
+    committedRows.push(...storable.filter((r) => r.alreadyExists))
   }
 
   // ─── שדות הסיכום בטבלאות הליבה ───

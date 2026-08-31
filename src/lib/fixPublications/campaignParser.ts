@@ -121,7 +121,10 @@ export async function readCampaignFile(file: File): Promise<SheetRows[]> {
   const multiSheet = wb.SheetNames.length > 1
   const sheets: SheetRows[] = []
   for (const name of wb.SheetNames) {
-    const rows = XLSX.utils.sheet_to_json<RawRow>(wb.Sheets[name], { defval: null })
+    // raw: false מחזיר את הטקסט המעוצב של התא, כפי שרואים אותו ב-Excel.
+    // בלעדיו תא תאריך חוזר כמספר סידורי של Excel (46260.4395…) ולא כתאריך,
+    // וכל מועדי השליחה בקובץ היו נקראים כריקים.
+    const rows = XLSX.utils.sheet_to_json<RawRow>(wb.Sheets[name], { defval: null, raw: false })
     if (rows.length) sheets.push({ sheetName: multiSheet ? name : null, rows })
   }
   return sheets
@@ -166,6 +169,21 @@ function cellOf(row: RawRow, map: Partial<Record<CampaignField, string>>, field:
  */
 export function parseSendingTime(value: string | null): string | null {
   if (!value) return null
+
+  // מספר סידורי של Excel — רשת ביטחון לקובץ שבו לתא התאריך אין עיצוב,
+  // ולכן הוא חוזר כמספר גם עם raw: false. 25569 = הימים שבין 1899-12-30
+  // (אפס הלוח של Excel) ל-1970-01-01. השעה נשמרת כשבר של יממה, ללא אזור
+  // זמן — ולכן היא נקראת כרכיבים ומורכבת מחדש כזמן מקומי.
+  if (/^\d{5}(\.\d+)?$/.test(value.trim())) {
+    const utc = new Date(Math.round((Number(value) - 25569) * 86_400_000))
+    if (!Number.isNaN(utc.getTime())) {
+      return new Date(
+        utc.getUTCFullYear(), utc.getUTCMonth(), utc.getUTCDate(),
+        utc.getUTCHours(), utc.getUTCMinutes(), utc.getUTCSeconds(),
+      ).toISOString()
+    }
+  }
+
   const m = value.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::(\d{2}))?/)
   if (m) {
     const [, y, mo, d, h, mi, s] = m
@@ -318,7 +336,8 @@ export function parseCampaignSheets(sheets: SheetRows[], fallbackLabel: string):
         sentAt: parseSendingTime(cellOf(raw, map, 'sending_time')),
         deliveryStatusRaw,
         deliveryStatus,
-        failureCategory: failed ? failureCategoryOf(deliveryStatus) : null,
+        // הטקסט הגולמי נדרש כדי להפריד בקשת הסרה מכשל טכני, ותקלת מדיה מתקלת ספק
+        failureCategory: failed ? failureCategoryOf(deliveryStatus, deliveryStatusRaw) : null,
         failureMessage: failed ? deliveryStatusRaw : null,
         sourceUniqueKey: buildSourceUniqueKey(campaignKey, rowToken, phoneNorm),
         matchResult: !phoneRaw ? 'missing_phone' : phoneNorm ? 'not_found' : 'invalid_phone',
