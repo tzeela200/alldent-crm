@@ -3,6 +3,7 @@ import type { ContactRow, Contact360Dicts } from "@/hooks/useContact360";
 import { Card, CardContent } from "@/components/ui/card";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { InlineEditableField } from "@/components/contact/InlineEditableField";
+import { publicationOutcomeLabel } from '@/lib/fixPublications/deliveryOutcome'
 
 interface Props {
   contact: ContactRow;
@@ -91,6 +92,10 @@ export function BlockCRM({ contact, dicts, onUpdate }: Props) {
           <h2 className="mb-3 text-lg font-semibold leading-[1.3] text-slate-900">מידע תפעולי ומערכתי</h2>
           <div>
             <ReadOnlyRow label="קמפיין WhatsApp אחרון" value={formatDate(contact.whatsapp_campaign_last_sent)} />
+            <ReadOnlyRow
+              label="מצב שליחת WhatsApp"
+              value={publicationOutcomeLabel(contact.phone_norm, contact.whatsapp_campaign_last_sent, contact.whatsapp_last_delivery_status)}
+            />
             <ReadOnlyRow label="תאריך שינוי סטטוס תעסוקה" value={formatDate(contact.candidate_status_date)} />
             <ReadOnlyRow label="הגשות קודמות" value={contact.prev_applications_count?.toString() ?? "—"} />
             <ReadOnlyRow label="נוצר" value={formatDate(contact.created_timestamp)} />

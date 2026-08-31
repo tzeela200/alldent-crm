@@ -50,6 +50,8 @@ export interface Contact {
   facebook_name: string | null
   facebook_id: string | null
   whatsapp_campaign_last_sent: string | null
+  /** סטטוס המסירה האחרון. שדה סיכום — מקור האמת הוא whatsapp_campaign_recipients */
+  whatsapp_last_delivery_status: string | null
   last_contact_date: string | null
   next_follow_up: string | null
   candidate_status_date: string | null

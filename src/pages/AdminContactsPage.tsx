@@ -30,7 +30,12 @@ import {
   SearchBar,
   SelectFilter,
   ActionButton,
+  StatusPill,
 } from '@/components/layout/Shell'
+import {
+  DELIVERY_OUTCOME_ORDER, DELIVERY_OUTCOMES, OUTCOME_STATUS_CODES,
+  getOutcomeMeta, outcomeOfRecord, type DeliveryOutcome,
+} from '@/lib/fixPublications/deliveryOutcome'
 import { formatPhone, normalizePhone, phoneSearchTerm, whatsappLink } from '@/lib/normalizePhone'
 import { openApplicationCv } from '@/lib/cv'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
@@ -77,6 +82,8 @@ type ExtendedFilters = {
   link_state?: 'linked' | 'unlinked'
   tags?: string
   follow_up_due?: 'yes' | 'no'
+  /** מצב שליחת WhatsApp — הדלי מ-deliveryOutcome, לא קוד סטטוס גולמי */
+  whatsapp_outcome?: DeliveryOutcome
   created_from?: string
   created_to?: string
   updated_from?: string
@@ -271,6 +278,7 @@ const ALL_COLUMNS = [
   { key: 'recommendations', label: 'המלצות' },
   { key: 'next_follow_up', label: 'פולו־אפ הבא' },
   { key: 'whatsapp', label: 'תאריך שליחת WhatsApp' },
+  { key: 'whatsapp_status', label: 'מצב שליחת WhatsApp' },
   { key: 'last_contact', label: 'קשר אחרון' },
   { key: 'applications_count', label: 'מספר הגשות' },
   { key: 'created', label: 'נוצר' },
@@ -1030,6 +1038,11 @@ export default function AdminContactsPage() {
           ? (accountNameById.get(Number(contact.account_link)) || contact.linked_org_name || '')
           : (contact.linked_org_name ?? ''),
         'תאריך שליחת וואטאפ': formatDate(contact.whatsapp_campaign_last_sent),
+        'מצב שליחת וואטאפ': getOutcomeMeta(outcomeOfRecord({
+          phoneNorm: contact.phone_norm,
+          lastSentAt: contact.whatsapp_campaign_last_sent,
+          lastStatus: contact.whatsapp_last_delivery_status,
+        })).label,
         'קשר אחרון': formatDate(contact.last_contact_date),
         'מספר הגשות': contact.prev_applications_count ?? 0,
       }))
@@ -1527,7 +1540,25 @@ export default function AdminContactsPage() {
       key: 'whatsapp',
       label: 'תאריך שליחת WhatsApp',
       nowrap: true,
+      // sortColMap כבר הכיל את המיפוי לעמודה הזו, אבל בלי sortable הוא היה בלתי נגיש
+      sortable: true,
       render: (contact) => formatDate(contact.whatsapp_campaign_last_sent),
+    })
+  }
+
+  if (visibleColumns.includes('whatsapp_status')) {
+    contactColumns.push({
+      key: 'whatsapp_status',
+      label: 'מצב שליחת WhatsApp',
+      nowrap: true,
+      render: (contact) => {
+        const meta = getOutcomeMeta(outcomeOfRecord({
+          phoneNorm: contact.phone_norm,
+          lastSentAt: contact.whatsapp_campaign_last_sent,
+          lastStatus: contact.whatsapp_last_delivery_status,
+        }))
+        return <span title={meta.description}><StatusPill label={meta.label} variant={meta.tone} /></span>
+      },
     })
   }
 
@@ -1944,6 +1975,7 @@ export default function AdminContactsPage() {
                     <SelectFilter value={String(filters.link_state ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, link_state: value ? value as 'linked' | 'unlinked' : undefined }))} options={[{ value: 'linked', label: 'מקושר לארגון' }, { value: 'unlinked', label: 'ללא שיוך ארגוני' }]} placeholder="שיוך ארגוני" />
                     <SelectFilter value={String(filters.tags ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, tags: value || undefined }))} options={candidateTagOptions.map((item) => ({ value: String(item.id), label: item.name }))} placeholder="תגית" />
                     <SelectFilter value={String(filters.follow_up_due ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, follow_up_due: value ? value as 'yes' | 'no' : undefined }))} options={[{ value: 'yes', label: 'פולו־אפ שהגיע מועדו' }, { value: 'no', label: 'ללא פולו־אפ פתוח' }]} placeholder="פולו־אפ" />
+                    <SelectFilter value={String(filters.whatsapp_outcome ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, whatsapp_outcome: value ? value as DeliveryOutcome : undefined }))} options={DELIVERY_OUTCOME_ORDER.map((code) => ({ value: code, label: DELIVERY_OUTCOMES[code].label }))} placeholder="מצב שליחת WhatsApp" />
                     <DateField label="נוצר מתאריך" value={filters.created_from ?? ''} onChange={(value) => setFilters((prev) => ({ ...prev, created_from: value || undefined }))} />
                     <DateField label="נוצר עד תאריך" value={filters.created_to ?? ''} onChange={(value) => setFilters((prev) => ({ ...prev, created_to: value || undefined }))} />
                     <DateField label="עודכן מתאריך" value={filters.updated_from ?? ''} onChange={(value) => setFilters((prev) => ({ ...prev, updated_from: value || undefined }))} />
@@ -2343,6 +2375,14 @@ export default function AdminContactsPage() {
                   <AdminPanelField label="מספר הגשות קודמות" mode="view" viewValue={String(selectedContact.prev_applications_count ?? 0)} />
                   <AdminPanelField label="קשר אחרון" mode="view" viewValue={formatDate(selectedContact.last_contact_date)} />
                   <AdminPanelField label="WhatsApp קמפיין אחרון" mode="view" viewValue={formatDate(selectedContact.whatsapp_campaign_last_sent)} />
+                  <AdminPanelField label="מצב שליחת WhatsApp" mode="view" viewValue={(() => {
+                    const meta = getOutcomeMeta(outcomeOfRecord({
+                      phoneNorm: selectedContact.phone_norm,
+                      lastSentAt: selectedContact.whatsapp_campaign_last_sent,
+                      lastStatus: selectedContact.whatsapp_last_delivery_status,
+                    }))
+                    return <span title={meta.description}><StatusPill label={meta.label} variant={meta.tone} /></span>
+                  })()} />
                   <AdminPanelField label="נוצר" mode="view" viewValue={formatDate(selectedContact.created_timestamp)} />
                   <AdminPanelField label="עודכן" mode="view" viewValue={formatDate(selectedContact.updated_timestamp)} />
                   <AdminPanelField label="סיכום AI" mode="view" viewValue={selectedContact.ai_profile_summary ?? 'אין עדיין סיכום AI'} fullWidth />
@@ -3392,6 +3432,14 @@ async function runContactsQuery(
   if (filters.link_state === 'unlinked') query = query.is('account_link', null)
   if (filters.follow_up_due === 'yes') query = query.lte('next_follow_up', new Date().toISOString()).not('next_follow_up', 'is', null)
   if (filters.follow_up_due === 'no') query = query.or(`next_follow_up.is.null,next_follow_up.gt.${new Date().toISOString()}`)
+  if (filters.whatsapp_outcome) {
+    // מקור אמת יחיד לתרגום דלי → קודי סטטוס (lib/fixPublications/deliveryOutcome).
+    // "מעולם לא נשלח" ו"אין נייד" אינם נגזרים מהסטטוס אלא משדות אחרים.
+    const outcome = filters.whatsapp_outcome
+    if (outcome === 'no_phone') query = query.is('phone_norm', null)
+    else if (outcome === 'never_sent') query = query.not('phone_norm', 'is', null).is('whatsapp_campaign_last_sent', null)
+    else query = query.in('whatsapp_last_delivery_status', OUTCOME_STATUS_CODES[outcome])
+  }
   if (filters.created_from) query = query.gte('created_timestamp', filters.created_from)
   if (filters.created_to) query = query.lte('created_timestamp', filters.created_to + 'T23:59:59')
   if (filters.updated_from) query = query.gte('updated_timestamp', filters.updated_from)

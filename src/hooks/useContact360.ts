@@ -76,6 +76,7 @@ export interface ContactRow {
   facebook_name: string | null;
   facebook_id: number | null;
   whatsapp_campaign_last_sent: string | null;
+  whatsapp_last_delivery_status: string | null;
   last_contact_date: string | null;
   next_follow_up: string | null;
   candidate_status_date: string | null;

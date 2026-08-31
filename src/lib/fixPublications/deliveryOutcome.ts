@@ -12,7 +12,7 @@
  */
 
 import {
-  DELIVERY_STATUS_ORDER, isOptOutText,
+  DELIVERY_STATUS_ORDER, isOptOutText, getDeliveryStatusMeta,
   type DeliveryStatusCode,
 } from './deliveryStatus'
 
@@ -138,4 +138,26 @@ export function assertOutcomeCoverage(): string[] {
     }
   }
   return problems
+}
+
+/**
+ * תווית אחת לתצוגה על רשומה — ההחלטה, ואחריה הסטטוס המדויק כשיש כזה.
+ * לדוגמה: "הגיע · נקרא" או "אל תשלחי שוב · נכשל – מכשיר לא מתאים".
+ *
+ * ⚠️ אינה מכירה בקשות הסרה, כי אלה נקבעות מטבלת הנמענים ולא משדות הסיכום.
+ *    התצוגה המלאה, כולל בקשות הסרה, נמצאת בפאנל היסטוריית הפרסומים.
+ */
+export function publicationOutcomeLabel(
+  phoneNorm: string | null | undefined,
+  lastSentAt: string | null | undefined,
+  lastStatus: string | null | undefined,
+): string {
+  const outcome = outcomeOfRecord({
+    phoneNorm: phoneNorm ?? null,
+    lastSentAt: lastSentAt ?? null,
+    lastStatus: lastStatus ?? null,
+  })
+  const label = DELIVERY_OUTCOMES[outcome].label
+  if (outcome === 'never_sent' || outcome === 'no_phone') return label
+  return lastStatus ? `${label} · ${getDeliveryStatusMeta(lastStatus).label}` : label
 }

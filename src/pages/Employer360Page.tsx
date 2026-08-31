@@ -42,6 +42,7 @@ import { CityRegionPicker } from "@/components/ui/CityRegionPicker";
 import { OrgContactPicker } from "@/components/ui/OrgContactPicker";
 import { StatusBadge } from "@/components/admin/StatusBadge";
 import { whatsappLink, formatPhone } from "@/lib/normalizePhone";
+import { publicationOutcomeLabel } from '@/lib/fixPublications/deliveryOutcome'
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -75,6 +76,7 @@ type AccountRow = {
   last_contact_date: string | null;
   next_follow_up: string | null;
   whatsapp_last_sent: string | null;
+  whatsapp_last_delivery_status: string | null;
   created_timestamp: string | null;
   updated_timestamp: string | null;
   clinic_type: string | null;
@@ -236,6 +238,7 @@ const PREVIEW_ACCOUNT: AccountRow = {
   last_contact_date: null,
   next_follow_up: null,
   whatsapp_last_sent: null,
+  whatsapp_last_delivery_status: null,
   created_timestamp: "2026-05-23T19:16:53.879744+00:00",
   updated_timestamp: "2026-05-23T19:16:53.879744+00:00",
   clinic_type: null,
@@ -1262,6 +1265,7 @@ function CommunicationDetails({ account, edit }: { account: AccountRow; edit?: E
         }
       />
       <LabelValue label="WhatsApp אחרון" value={formatDateTime(account.whatsapp_last_sent)} />
+      <LabelValue label="מצב שליחת WhatsApp" value={publicationOutcomeLabel(account.phone, account.whatsapp_last_sent, account.whatsapp_last_delivery_status)} />
     </SectionCard>
   );
 }
@@ -1650,6 +1654,7 @@ function CrmPanel({ account, edit }: { account: AccountRow; edit?: EditCtx | nul
         <div className="rounded-2xl bg-slate-50 p-4">
           <div className="text-xs text-slate-500">WhatsApp אחרון</div>
           <div className="mt-1 text-sm font-bold text-slate-900">{formatDateTime(account.whatsapp_last_sent)}</div>
+          <div className="mt-1 text-xs text-slate-600">{publicationOutcomeLabel(account.phone, account.whatsapp_last_sent, account.whatsapp_last_delivery_status)}</div>
         </div>
       </div>
       <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">

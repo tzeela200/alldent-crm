@@ -3,6 +3,7 @@ import { useContactMutations } from "@/hooks/useContactMutations";
 import { openApplicationCv, applicationHasCv } from "@/lib/cv";
 import { getRoleColorHex } from "@/lib/roleColors";
 import ContactHistoryPanel from "@/components/admin/ContactHistoryPanel";
+import ContactPublicationsPanel from "@/components/admin/ContactPublicationsPanel";
 import ContactMessagesPanel from "@/components/admin/ContactMessagesPanel";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useNavigate, useLocation } from "react-router-dom";
@@ -1541,6 +1542,7 @@ export default function Candidate360Page() {
       {/* ===== הודעות מהמועמד + היסטוריית שינויים ===== */}
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <ContactMessagesPanel contactId={resolvedId} />
+        <ContactPublicationsPanel contactId={resolvedId} />
         <ContactHistoryPanel contactId={resolvedId} />
       </div>
 
