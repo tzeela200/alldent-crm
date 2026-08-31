@@ -1,8 +1,17 @@
 # פרסומי WhatsApp — מקור אמת יחיד (SSOT)
 
-עודכן: 31/08/2026
+עודכן: 31/08/2026 (INC-3136)
+
+שני מסכים, שתי עבודות:
+
+| מסך | שורה = | מתי נכנסים |
+|---|---|---|
+| **פרסומי WhatsApp** `/admin/fix-publications` | שליחה אחת | קליטת קובץ · מה קרה בקמפיין מסוים |
+| **מאגר לפי פרסום** `/admin/whatsapp-database` | **אדם אחד** | יום-יום: מי קיבל, מי לא, למי לא לשלוח |
 
 המסך: `/admin/fix-publications` → [AdminFixPublicationsPage.tsx](../src/pages/AdminFixPublicationsPage.tsx)
+המסך השני: `/admin/whatsapp-database` → [AdminPublicationDatabasePage.tsx](../src/pages/AdminPublicationDatabasePage.tsx) + [usePublicationDatabase.ts](../src/hooks/usePublicationDatabase.ts)
+שכבת ההחלטה: [deliveryOutcome.ts](../src/lib/fixPublications/deliveryOutcome.ts)
 שכבת הנתונים: [useFixPublications.ts](../src/hooks/useFixPublications.ts)
 פרסור הקובץ: [campaignParser.ts](../src/lib/fixPublications/campaignParser.ts)
 מיפוי סטטוסים: [deliveryStatus.ts](../src/lib/fixPublications/deliveryStatus.ts)
@@ -261,3 +270,75 @@ BOM, תווי כיווניות וכיווץ רווחים) — `מס׳ רשומה
 6. **אשרי וקלטי** → בסיום מוצגת הודעה עם מה נקלט ומה עודכן. אם מנה נכשלה,
    הפירוט מוצג במסך והשאר נשמר.
 7. המסך מתרענן לבד — אין צורך ב-refresh ידני.
+
+
+---
+
+## 10. שכבת ההחלטה — "מה עושים עכשיו" (INC-3136)
+
+`delivery_status` מספר מה קרה להודעה. הוא לא אומר מה לעשות. `deliveryOutcome.ts`
+הוא **מקור האמת היחיד** שמתרגם 9 קודים לשש החלטות. אין להעתיק את המיפוי לאף מסך.
+
+| החלטה | תווית | ממה נגזרת | הפיך? |
+|---|---|---|---|
+| `reached` | הגיע | `read` / `delivered` / `submitted` | — |
+| `do_not_send` | אל תשלחי שוב | `failed_device`, **או** קיום שורת נמען עם `failure_category='opt_out'` | המכשיר — כן. ההסרה — לא |
+| `retry` | שווה לנסות שוב | `failed_rate_limit` / `failed_blocked` / `failed_provider` / `failed_other` | — |
+| `never_sent` | מעולם לא נשלח | `whatsapp_campaign_last_sent is null` **ו**-`phone_norm is not null` | — |
+| `no_phone` | אין נייד | `phone_norm is null` | — |
+| `unknown` | ללא מידע | `no_status` | — |
+
+**„קיבל" = נשלח + נמסר + נקרא** — כל תוצאה שאינה כשל. הכרעת המשתמשת, 31/08/2026.
+
+### שתי קבוצות שחייבות להישאר נפרדות
+
+`failed_other` הכיל שתי קבוצות עם משמעות עסקית הפוכה. `failure_category`
+(עמודה חופשית, ללא CHECK — לכן אין שינוי סכמה) מפריד ביניהן:
+
+| `failure_category` | תווית | מקור הזיהוי | מה עושים |
+|---|---|---|---|
+| `opt_out` | ביקש להפסיק לקבל פרסום | `chosen to stop receiving` בטקסט הגולמי | **לעולם לא לשלוח שוב** |
+| `media` | התמונה שלנו לא נטענה | `Media upload error` / `Invalid resource` | **לשלוח שוב — התקלה שלנו** |
+| `device` | אין וואטסאפ על המספר | `Not suitable device` / `undeliverable` | לא לשלוח, עד שיצליח |
+| `rate_limit` | הספק הגביל | `Auto-limiting` | לנסות שוב |
+| `blocked` | הספק חסם | `Message Blocked by Provider` | לנסות שוב |
+| `provider` / `other` | תקלת ספק / סיבה אחרת | שאר ה-Rejected | לנסות שוב |
+
+⚠️ בקשת ההסרה נבדקת **ראשונה** ב-`mapDeliveryStatus`, כי הטקסט שלה מכיל
+`unable to deliver` ואסור שייקלט ככשל טכני.
+
+בקובץ הרופאים (5,507 שורות): 458 `device` · 224 `rate_limit` · 109 `blocked` ·
+8 `media` · 2 `opt_out` ⇒ 4,568 הגיע · 460 אל תשלחי · 341 נסי שוב · 138 ללא מידע.
+
+### מדוע הסימון נגזר ולא נשמר
+
+אין עמודת `do_not_send` ואין צורך בה:
+
+- **אין מכשיר** נגזר מ-`contact.whatsapp_last_delivery_status`. קמפיין מוצלח
+  עתידי דורס את הערך — והסימון יורד לבד. סימון שנשמר היה מתיישן ומוציא אנשים
+  מהמאגר לנצח.
+- **בקשת הסרה** נגזרת מקיום שורת נמען, ולכן **אינה נדרסת** ע"י קמפיין מאוחר.
+  זה בדיוק ההבדל בין השניים.
+
+סימון ידני ("אמר בטלפון לא לפנות") אינו אפשרי בלי עמודה — דורש אישור Supabase נפרד.
+
+---
+
+## 11. מסך "מאגר לפי פרסום"
+
+הבסיס הוא `contact`, לא `whatsapp_campaign_recipients` — ולכן מופיעים גם מי
+שמעולם לא נכלל בקמפיין. הסינון, המיון והעימוד בשרת על שדות הסיכום.
+
+- 6 כרטיסי KPI לחיצים; כל כרטיס משתמש **באותה** `applyOutcomeFilter` של הטבלה,
+  ולכן המספר תמיד תואם את הרשימה שהלחיצה מציגה.
+- ספירת הקמפיינים לכל אדם נשלפת **לעמוד המוצג בלבד**, מעומדת מול תקרת 1,000.
+- רשימת ה-opt-out נשלפת פעם אחת ומוזרקת ל-`.or()`. מוגבלת ל-1,000 מזהים,
+  ומעל זה המסך **מתריע** ולא חותך בשקט.
+- **„ייצוא רשימת שליחה נקייה"** — אותו קהל פחות `do_not_send` ו-`no_phone`,
+  עם דיווח מפורש כמה הוצאו ולמה. זה מה שהופך את הסימון מהצגה להגנה.
+
+## 12. בדיקות קבלה
+
+`npx tsx scripts/whatsapp-publications-acceptance.ts` — 75 בדיקות: פרסור,
+כותרות עברית/אנגלית, 9 הסטטוסים, הפרדת הקטגוריות, שכבת ההחלטה, וההחלטה
+ברמת הרשומה. **כל שינוי בכללים חייב בדיקה שם.**
