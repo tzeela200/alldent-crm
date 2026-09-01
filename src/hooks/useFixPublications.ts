@@ -144,11 +144,37 @@ export function auditOf(row: PublicationRow): RecipientAudit {
  * עמודות המיון. שם הנמען אינו עמודה בטבלה — הוא יושב בתוך raw_payload,
  * ולכן המיון עליו נעשה דרך נתיב ה-JSON (נתמך ב-PostgREST).
  */
+/**
+ * מיון בשרת לכל עמודה בטבלה.
+ *
+ * ⚠️ עמודות מילוניות (תפקיד/אזור/עיר/סטטוס פנייה) ממוינות כאן לפי **סדר
+ *    המילון** ולא לפי השם בעברית: הבסיס הוא טבלת הנמענים, ולכן השם יושב שתי
+ *    רמות embed מתחת (recipients → contact → dict), ו-PostgREST אינו תומך
+ *    בכך (אומת: מחזיר 400). המיון עדיין מקבץ תפקידים דומים יחד, שזה מה
+ *    שמיון לפי תפקיד נועד לו. במסך "מאגר לפי פרסום" הבסיס הוא contact
+ *    ולכן שם המיון כן אלפביתי.
+ */
 export const PUBLICATION_SORT_COLUMNS: Record<string, string> = {
   entity_name: 'raw_payload->_alldent->>full_name',
+  entity_type: 'contact_id',
   phone: 'phone_norm',
+  role_name: 'contact(role)',
+  region_name: 'contact(region_id)',
+  city_name: 'contact(city_id)',
+  social_status_name: 'contact(social_status)',
   last_delivery_status: 'delivery_status',
   last_sent_at: 'sent_at',
+  campaign_name: 'campaign(campaign_name)',
+  fix_name: 'raw_payload->_alldent->>full_name',
+  email: 'raw_payload->_alldent->>email',
+  fix_status_raw: 'raw_payload->_alldent->>fix_status',
+  fix_process_raw: 'raw_payload->_alldent->>fix_process',
+  delivery_status_raw: 'delivery_status_raw',
+  failure_message: 'failure_message',
+  source_file: 'raw_payload->_alldent->>source_file',
+  source_row: 'raw_payload->_alldent->>source_row',
+  record_number: 'raw_payload->_alldent->>record_number',
+  fix_digital_id: 'fixdigital_id',
 }
 
 const PAGE_SIZE = 25

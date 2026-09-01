@@ -98,12 +98,45 @@ const ROW_COLUMNS =
   'contact_id, full_name, display_name, phone, phone_norm, role, region_id, city_id, ' +
   'social_status, locality_type, whatsapp_campaign_last_sent, whatsapp_last_delivery_status'
 
+/**
+ * מיון בשרת לכל עמודה שיש לה מקור אמיתי במסד.
+ *
+ * עמודות מילוניות (תפקיד/אזור/עיר/סטטוס פנייה) ממוינות לפי **השם בעברית**
+ * ולא לפי המזהה, דרך embed על ה-FK. אומת מול PostgREST החי.
+ *
+ * ⚠️ העמודות "קמפיינים", "נקראו" ו"קמפיין אחרון" **אינן ניתנות למיון**:
+ *    הן מחושבות לעמוד המוצג בלבד מתוך טבלת הנמענים, ומיון עליהן היה ממיין
+ *    25 שורות מתוך אלפים — כלומר משקר. מיון אמיתי עליהן דורש View או RPC
+ *    עם GROUP BY, כלומר שינוי Supabase באישור נפרד.
+ */
 export const PUBLICATION_DB_SORT_COLUMNS: Record<string, string> = {
   name: 'full_name',
   phone: 'phone_norm',
+  locality_type: 'locality_type',
   last_sent: 'whatsapp_campaign_last_sent',
   last_status: 'whatsapp_last_delivery_status',
+  // ההחלטה נגזרת מהסטטוס; nullsLast מקבץ בסוף את מי שמעולם לא נשלח אליו
+  outcome: 'whatsapp_last_delivery_status',
+  role: 'sort_role(name)',
+  region: 'sort_region(name)',
+  city: 'sort_city(name)',
+  social_status: 'sort_social(name)',
 }
+
+/**
+ * ה-embed שצריך להתווסף ל-select כדי שמיון מילוני יעבוד.
+ * מתווסף **רק** כשממיינים לפיו — אין סיבה לצרף JOIN לכל שאילתה.
+ * שמות ה-FK מפורשים כדי שלא תהיה עמימות בין קשרים שונים לאותה טבלה.
+ */
+const SORT_EMBEDS: Record<string, string> = {
+  role: 'sort_role:dict_roles!contact_role_fkey(name)',
+  region: 'sort_region:dict_regions!contact_region_id_fkey(name)',
+  city: 'sort_city:dict_cities!contact_city_id_fkey(name)',
+  social_status: 'sort_social:dict_social_statuses!contact_social_status_fkey(name)',
+}
+
+/** העמודות שאין להן מיון אמיתי — הערך מחושב לעמוד המוצג בלבד */
+export const PUBLICATION_DB_UNSORTABLE = new Set(['campaigns', 'read', 'last_campaign'])
 
 // ───────────────────── מי ביקש להפסיק לקבל פרסום ─────────────────────
 
@@ -218,7 +251,10 @@ export function usePublicationDatabase(
     placeholderData: (prev) => prev,
     staleTime: 30_000,
     queryFn: async () => {
-      let query = supabase.from('contact').select(ROW_COLUMNS, { count: 'exact' })
+      const embed = SORT_EMBEDS[sortBy]
+      const selectColumns = embed ? `${ROW_COLUMNS}, ${embed}` : ROW_COLUMNS
+
+      let query = supabase.from('contact').select(selectColumns, { count: 'exact' })
       query = applyBaseFilters(query, filters)
       query = applyOutcomeFilter(query, filters.outcomes, optedOutIds)
 

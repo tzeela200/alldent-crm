@@ -19,6 +19,8 @@ import { Shell, Toolbar, SearchBar, ActionButton, StatusPill, KPICard } from '@/
 import { AdminTable, type AdminColumn } from '@/components/admin/AdminTable'
 import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
 import { DictionaryMultiSelect } from '@/components/ui/DictionaryMultiSelect'
+import { DateRangeFilter } from '@/components/admin/DateRangeFilter'
+import { useClientTableSort } from '@/hooks/useClientTableSort'
 import { formatPhone } from '@/lib/normalizePhone'
 import {
   DELIVERY_STATUS_ORDER, getDeliveryStatusMeta, type DeliveryTone,
@@ -94,20 +96,6 @@ function formatDateTime(value: string | null | undefined): string {
 function formatDate(value: string | null | undefined): string {
   const full = formatDateTime(value)
   return full === '—' ? full : full.split(' ')[0]
-}
-
-function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs text-[#6B6B6B]">{label}</span>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-11 rounded-[14px] border border-[#D9D9D9] bg-white px-3 text-sm outline-none transition-colors focus:border-[#008080]"
-      />
-    </label>
-  )
 }
 
 export default function AdminFixPublicationsPage() {
@@ -193,7 +181,7 @@ export default function AdminFixPublicationsPage() {
       },
     },
     {
-      key: 'entity_type', label: 'סוג רשומה', nowrap: true,
+      key: 'entity_type', label: 'סוג רשומה', sortable: true, nowrap: true,
       render: (row) =>
         row.contact_id ? 'איש קשר' : row.account_id ? 'ארגון' : <span className="text-[#6B6B6B]">—</span>,
     },
@@ -202,7 +190,7 @@ export default function AdminFixPublicationsPage() {
       render: (row) => formatPhone(row.contact?.phone || row.account?.phone || row.phone_norm) || '—',
     },
     {
-      key: 'role_name', label: 'תפקיד',
+      key: 'role_name', label: 'תפקיד', sortable: true,
       // לארגון אין תפקיד מקצועי — מוצג סוג הארגון במקום, ולא ניחוש
       render: (row) => {
         if (row.contact?.role) return dicts.data?.roleById.get(Number(row.contact.role)) ?? '—'
@@ -214,14 +202,14 @@ export default function AdminFixPublicationsPage() {
       },
     },
     {
-      key: 'region_name', label: 'אזור',
+      key: 'region_name', label: 'אזור', sortable: true,
       render: (row) => {
         const id = row.contact?.region_id ?? row.account?.region_id
         return id ? dicts.data?.regionById.get(Number(id)) ?? '—' : '—'
       },
     },
     {
-      key: 'city_name', label: 'עיר',
+      key: 'city_name', label: 'עיר', sortable: true,
       render: (row) => {
         const id = row.contact?.city_id ?? row.account?.city_id
         return id ? dicts.data?.cityById.get(Number(id)) ?? '—' : '—'
@@ -239,22 +227,22 @@ export default function AdminFixPublicationsPage() {
       },
     },
     { key: 'last_sent_at', label: 'תאריך פרסום', sortable: true, nowrap: true, render: (row) => formatDateTime(row.sent_at) },
-    { key: 'campaign_name', label: 'קמפיין', render: (row) => row.campaign?.campaign_name ?? '—' },
+    { key: 'campaign_name', label: 'קמפיין', sortable: true, render: (row) => row.campaign?.campaign_name ?? '—' },
     {
-      key: 'social_status_name', label: 'סטטוס פנייה',
+      key: 'social_status_name', label: 'סטטוס פנייה', sortable: true,
       render: (row) => (row.contact?.social_status ? dicts.data?.socialStatusById.get(Number(row.contact.social_status)) ?? '—' : '—'),
     },
     // ─── עמודות פיקס, מוסתרות כברירת מחדל. כולן נקראות מתוך raw_payload. ───
-    { key: 'fix_name',            label: 'שם בפיקס',          render: (row) => auditOf(row).full_name ?? '—' },
-    { key: 'email',               label: 'אימייל',            render: (row) => auditOf(row).email ?? '—' },
-    { key: 'fix_status_raw',      label: 'סטטוס ליד בפיקס',   render: (row) => auditOf(row).fix_status ?? '—' },
-    { key: 'fix_process_raw',     label: 'תהליך בפיקס',       render: (row) => auditOf(row).fix_process ?? '—' },
-    { key: 'delivery_status_raw', label: 'סטטוס שליחה מקורי', render: (row) => row.delivery_status_raw ?? '—' },
-    { key: 'failure_message',     label: 'סיבת הכשל',         render: (row) => row.failure_message ?? '—' },
-    { key: 'source_file',         label: 'קובץ מקור',         render: (row) => auditOf(row).source_file ?? row.campaign?.source_file_name ?? '—' },
-    { key: 'source_row',          label: 'שורת מקור', nowrap: true, render: (row) => auditOf(row).source_row ?? '—' },
-    { key: 'record_number',       label: 'מס׳ רשומה', nowrap: true, render: (row) => auditOf(row).record_number ?? '—' },
-    { key: 'fix_digital_id',      label: 'מזהה Fix', nowrap: true, render: (row) => row.fixdigital_id ?? '—' },
+    { key: 'fix_name',            label: 'שם בפיקס', sortable: true,          render: (row) => auditOf(row).full_name ?? '—' },
+    { key: 'email',               label: 'אימייל', sortable: true,            render: (row) => auditOf(row).email ?? '—' },
+    { key: 'fix_status_raw',      label: 'סטטוס ליד בפיקס', sortable: true,   render: (row) => auditOf(row).fix_status ?? '—' },
+    { key: 'fix_process_raw',     label: 'תהליך בפיקס', sortable: true,       render: (row) => auditOf(row).fix_process ?? '—' },
+    { key: 'delivery_status_raw', label: 'סטטוס שליחה מקורי', sortable: true, render: (row) => row.delivery_status_raw ?? '—' },
+    { key: 'failure_message',     label: 'סיבת הכשל', sortable: true,         render: (row) => row.failure_message ?? '—' },
+    { key: 'source_file',         label: 'קובץ מקור', sortable: true,         render: (row) => auditOf(row).source_file ?? row.campaign?.source_file_name ?? '—' },
+    { key: 'source_row',          label: 'שורת מקור', sortable: true, nowrap: true, render: (row) => auditOf(row).source_row ?? '—' },
+    { key: 'record_number',       label: 'מס׳ רשומה', sortable: true, nowrap: true, render: (row) => auditOf(row).record_number ?? '—' },
+    { key: 'fix_digital_id',      label: 'מזהה Fix', sortable: true, nowrap: true, render: (row) => row.fixdigital_id ?? '—' },
   ]
 
   // סדר התצוגה נקבע ע"י ALL_COLUMNS, לא ע"י סדר הסימון בבורר
@@ -354,8 +342,10 @@ export default function AdminFixPublicationsPage() {
                 onChange={(v) => patch({ search: v })}
                 placeholder="חיפוש לפי שם או נייד..."
               />
-              <DateField label="מתאריך" value={filters.sentFrom} onChange={(v) => patch({ sentFrom: v })} />
-              <DateField label="עד תאריך" value={filters.sentTo} onChange={(v) => patch({ sentTo: v })} />
+              <DateRangeFilter
+                from={filters.sentFrom} to={filters.sentTo}
+                onChange={({ from, to }) => patch({ sentFrom: from, sentTo: to })}
+              />
               {filtered && (
                 <ActionButton variant="ghost" icon={RotateCcw} onClick={() => { setFilters(EMPTY_FILTERS); setPage(0) }}>
                   נקה מסננים
@@ -446,21 +436,33 @@ function CampaignPerformanceTable({
     Number(c.submitted_count ?? 0) + Number(c.delivered_count ?? 0) + Number(c.read_count ?? 0)
   const pct = (part: number, whole: number) =>
     whole > 0 ? `${Math.round((part / whole) * 100)}%` : '—'
+  const rate = (part: number, whole: number) => (whole > 0 ? part / whole : -1)
+
+  const sort = useClientTableSort<CampaignSummary>(campaigns, {
+    campaign_name: (c) => c.campaign_name || c.source_file_name || '',
+    process_name: (c) => c.process_name,
+    started_at: (c) => c.started_at,
+    total_recipients: (c) => Number(c.total_recipients ?? 0),
+    reached: (c) => reachedOf(c),
+    reach_rate: (c) => rate(reachedOf(c), Number(c.total_recipients ?? 0)),
+    read_rate: (c) => rate(Number(c.read_count ?? 0), Number(c.total_recipients ?? 0)),
+    failed_count: (c) => Number(c.failed_count ?? 0),
+  }, 'started_at', 'desc')
 
   const columns: AdminColumn<CampaignSummary>[] = [
     {
-      key: 'campaign_name', label: 'קמפיין', minWidth: '220px',
+      key: 'campaign_name', label: 'קמפיין', sortable: true, minWidth: '220px',
       render: (c) => c.campaign_name || c.source_file_name || `קמפיין ${c.campaign_id}`,
     },
-    { key: 'process_name', label: 'תהליך', render: (c) => c.process_name ?? '—' },
-    { key: 'started_at', label: 'מועד פרסום', nowrap: true, render: (c) => formatDateTime(c.started_at) },
+    { key: 'process_name', label: 'תהליך', sortable: true, render: (c) => c.process_name ?? '—' },
+    { key: 'started_at', label: 'מועד פרסום', sortable: true, nowrap: true, render: (c) => formatDateTime(c.started_at) },
     {
-      key: 'total_recipients', label: 'נשלחו', nowrap: true,
+      key: 'total_recipients', label: 'נשלחו', sortable: true, nowrap: true,
       render: (c) => Number(c.total_recipients ?? 0).toLocaleString('he-IL'),
     },
-    { key: 'reached', label: 'הגיעו', nowrap: true, render: (c) => reachedOf(c).toLocaleString('he-IL') },
+    { key: 'reached', label: 'הגיעו', sortable: true, nowrap: true, render: (c) => reachedOf(c).toLocaleString('he-IL') },
     {
-      key: 'reach_rate', label: 'אחוז הגעה', nowrap: true,
+      key: 'reach_rate', label: 'אחוז הגעה', sortable: true, nowrap: true,
       render: (c) => (
         <span className="font-semibold text-[#2D2D2D]">
           {pct(reachedOf(c), Number(c.total_recipients ?? 0))}
@@ -468,11 +470,11 @@ function CampaignPerformanceTable({
       ),
     },
     {
-      key: 'read_rate', label: 'אחוז קריאה', nowrap: true,
+      key: 'read_rate', label: 'אחוז קריאה', sortable: true, nowrap: true,
       render: (c) => pct(Number(c.read_count ?? 0), Number(c.total_recipients ?? 0)),
     },
     {
-      key: 'failed_count', label: 'נכשלו', nowrap: true,
+      key: 'failed_count', label: 'נכשלו', sortable: true, nowrap: true,
       render: (c) => {
         const failed = Number(c.failed_count ?? 0)
         return failed
@@ -490,11 +492,14 @@ function CampaignPerformanceTable({
       </p>
       <AdminTable
         columns={columns}
-        data={campaigns}
+        data={sort.sorted}
         keyField="campaign_id"
         isLoading={isLoading}
         emptyMessage="עדיין לא נקלט אף קמפיין."
         minWidth="1000px"
+        sortKey={sort.sortBy}
+        sortDir={sort.sortDir}
+        onSort={sort.onSort}
       />
     </div>
   )
@@ -773,10 +778,23 @@ function CampaignIdentityNotice({ plans }: { plans: CampaignPlan[] }) {
  * זו הנקודה שבה רואים שקובץ מאוחד של 12 דוחות אינו הופך לקמפיין אחד ענק.
  */
 function CampaignPlanTable({ plans }: { plans: CampaignPlan[] }) {
+  const sort = useClientTableSort<CampaignPlan>(plans, {
+    label: (p) => p.label,
+    state: (p) => (p.identityMatch ? p.identityMatch.kind : p.existingCampaignId ? 'קיים' : 'חדש'),
+    startedAt: (p) => p.startedAt,
+    processName: (p) => p.processName,
+    rowCount: (p) => p.rowCount,
+    newRows: (p) => p.newRows,
+    existingRows: (p) => p.existingRows,
+    noPhone: (p) => p.noPhone,
+    matched: (p) => p.matched,
+    notFound: (p) => p.notFound,
+  }, 'startedAt')
+
   const columns: AdminColumn<CampaignPlan>[] = [
-    { key: 'label', label: 'קמפיין', minWidth: '220px', render: (p) => p.label },
+    { key: 'label', label: 'קמפיין', sortable: true, minWidth: '220px', render: (p) => p.label },
     {
-      key: 'state', label: 'מצב', nowrap: true, minWidth: '190px',
+      key: 'state', label: 'מצב', sortable: true, nowrap: true, minWidth: '190px',
       render: (p) => {
         const m = p.identityMatch
         if (m && m.kind !== 'external_id') {
@@ -797,7 +815,7 @@ function CampaignPlanTable({ plans }: { plans: CampaignPlan[] }) {
     {
       // Fix שולח קמפיין שלם באותה דקה, ולכן בדרך כלל יש רק חותמת אחת.
       // כשהשליחה נמשכה — מוצג הטווח, כי זה מה שמבדיל בין שתי שליחות.
-      key: 'startedAt', label: 'תאריך ושעת שליחה', nowrap: true, minWidth: '170px',
+      key: 'startedAt', label: 'תאריך ושעת שליחה', sortable: true, nowrap: true, minWidth: '170px',
       render: (p) => {
         if (!p.startedAt) return '—'
         const from = formatDateTime(p.startedAt)
@@ -809,11 +827,11 @@ function CampaignPlanTable({ plans }: { plans: CampaignPlan[] }) {
         )
       },
     },
-    { key: 'processName', label: 'תהליך', render: (p) => p.processName ?? '—' },
-    { key: 'rowCount', label: 'שורות', nowrap: true, render: (p) => p.rowCount.toLocaleString('he-IL') },
-    { key: 'newRows', label: 'ייקלטו', nowrap: true, render: (p) => p.newRows.toLocaleString('he-IL') },
+    { key: 'processName', label: 'תהליך', sortable: true, render: (p) => p.processName ?? '—' },
+    { key: 'rowCount', label: 'שורות', sortable: true, nowrap: true, render: (p) => p.rowCount.toLocaleString('he-IL') },
+    { key: 'newRows', label: 'ייקלטו', sortable: true, nowrap: true, render: (p) => p.newRows.toLocaleString('he-IL') },
     {
-      key: 'existingRows', label: 'נקלטו בעבר', nowrap: true,
+      key: 'existingRows', label: 'נקלטו בעבר', sortable: true, nowrap: true,
       render: (p) => (
         <span title="שורות שכבר קיימות במערכת מקליטה קודמת — ידולגו ולא ייקלטו פעם שנייה">
           {p.existingRows ? p.existingRows.toLocaleString('he-IL') : '—'}
@@ -821,13 +839,13 @@ function CampaignPlanTable({ plans }: { plans: CampaignPlan[] }) {
       ),
     },
     {
-      key: 'noPhone', label: 'לא ייקלטו', nowrap: true,
+      key: 'noPhone', label: 'לא ייקלטו', sortable: true, nowrap: true,
       render: (p) => (p.noPhone
         ? <span className="text-[#E8A85C]" title="אין נייד תקין — לא ניתן לשמור">{p.noPhone.toLocaleString('he-IL')}</span>
         : '—'),
     },
-    { key: 'matched', label: 'נמצאו במאגר', nowrap: true, render: (p) => p.matched.toLocaleString('he-IL') },
-    { key: 'notFound', label: 'לא נמצאו', nowrap: true, render: (p) => p.notFound.toLocaleString('he-IL') },
+    { key: 'matched', label: 'נמצאו במאגר', sortable: true, nowrap: true, render: (p) => p.matched.toLocaleString('he-IL') },
+    { key: 'notFound', label: 'לא נמצאו', sortable: true, nowrap: true, render: (p) => p.notFound.toLocaleString('he-IL') },
   ]
 
   return (
@@ -837,10 +855,13 @@ function CampaignPlanTable({ plans }: { plans: CampaignPlan[] }) {
       </h2>
       <AdminTable
         columns={columns}
-        data={plans}
+        data={sort.sorted}
         keyField="campaignKey"
         emptyMessage="לא זוהה אף קמפיין בקובץ"
         minWidth="1000px"
+        sortKey={sort.sortBy}
+        sortDir={sort.sortDir}
+        onSort={sort.onSort}
       />
     </div>
   )
@@ -855,21 +876,33 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
     [preview.rows, showOnlyIssues],
   )
 
+  const sort = useClientTableSort<(typeof preview.rows)[number]>(rows, {
+    campaignLabel: (r) => r.campaignLabel,
+    rowNumber: (r) => Number(r.sourceRow ?? r.rowNumber),
+    fullNameRaw: (r) => r.fullNameRaw,
+    phoneRaw: (r) => r.phoneNorm ?? r.phoneRaw,
+    sentAt: (r) => r.sentAt,
+    deliveryStatus: (r) => getDeliveryStatusMeta(r.deliveryStatus).label,
+    matchResult: (r) => MATCH_RESULT_LABELS[r.matchResult] ?? r.matchResult,
+    alreadyExists: (r) => (r.alreadyExists ? 1 : 0),
+    fixStatusRaw: (r) => r.fixStatusRaw,
+  }, 'rowNumber')
+
   const columns: AdminColumn<(typeof preview.rows)[number]>[] = [
-    { key: 'campaignLabel', label: 'קמפיין', render: (r) => r.campaignLabel },
-    { key: 'rowNumber', label: 'שורה', nowrap: true, width: '70px', render: (r) => r.sourceRow ?? r.rowNumber },
-    { key: 'fullNameRaw', label: 'שם בפיקס', render: (r) => r.fullNameRaw ?? '—' },
-    { key: 'phoneRaw', label: 'נייד', nowrap: true, render: (r) => formatPhone(r.phoneRaw) || r.phoneRaw || '—' },
+    { key: 'campaignLabel', label: 'קמפיין', sortable: true, render: (r) => r.campaignLabel },
+    { key: 'rowNumber', label: 'שורה', sortable: true, nowrap: true, width: '70px', render: (r) => r.sourceRow ?? r.rowNumber },
+    { key: 'fullNameRaw', label: 'שם בפיקס', sortable: true, render: (r) => r.fullNameRaw ?? '—' },
+    { key: 'phoneRaw', label: 'נייד', sortable: true, nowrap: true, render: (r) => formatPhone(r.phoneRaw) || r.phoneRaw || '—' },
     {
       // מועד השליחה של השורה עצמה, כפי שהוא בקובץ. בדרך כלל זהה לכל שורות
       // הקמפיין, אבל מוצג ברמת השורה כי הוא מה שנשמר ב-sent_at.
-      key: 'sentAt', label: 'תאריך ושעת שליחה', nowrap: true, minWidth: '150px',
+      key: 'sentAt', label: 'תאריך ושעת שליחה', sortable: true, nowrap: true, minWidth: '150px',
       render: (r) => (r.sentAt
         ? formatDateTime(r.sentAt)
         : <span className="text-[#E8A85C]" title="לא נמצא מועד שליחה בשורה">חסר</span>),
     },
     {
-      key: 'deliveryStatus', label: 'סטטוס שליחה', nowrap: true,
+      key: 'deliveryStatus', label: 'סטטוס שליחה', sortable: true, nowrap: true,
       render: (r) => {
         const meta = getDeliveryStatusMeta(r.deliveryStatus)
         return (
@@ -880,7 +913,7 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
       },
     },
     {
-      key: 'matchResult', label: 'התאמה', nowrap: true,
+      key: 'matchResult', label: 'התאמה', sortable: true, nowrap: true,
       render: (r) => (
         <StatusPill
           label={MATCH_RESULT_LABELS[r.matchResult] ?? r.matchResult}
@@ -889,14 +922,14 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
       ),
     },
     {
-      key: 'alreadyExists', label: 'נקלט בעבר', nowrap: true, minWidth: '110px',
+      key: 'alreadyExists', label: 'נקלט בעבר', sortable: true, nowrap: true, minWidth: '110px',
       render: (r) => (r.alreadyExists
         ? <span title="השורה הזו כבר קיימת במערכת מקליטה קודמת — היא תדולג ולא תיקלט פעם שנייה">
             <StatusPill label="כן — ידולג" variant="default" />
           </span>
         : <span title="שורה חדשה — תיקלט עכשיו" className="text-[#6B6B6B]">חדשה</span>),
     },
-    { key: 'fixStatusRaw', label: 'סטטוס ב-Fix', render: (r) => r.fixStatusRaw ?? '—' },
+    { key: 'fixStatusRaw', label: 'סטטוס ב-Fix', sortable: true, render: (r) => r.fixStatusRaw ?? '—' },
   ]
 
   const issueCount = preview.rows.filter((r) => isIssue(r.matchResult)).length
@@ -926,10 +959,13 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
       </div>
       <AdminTable
         columns={columns}
-        data={rows}
+        data={sort.sorted}
         keyField="sourceUniqueKey"
         emptyMessage="אין שורות להצגה"
-        minWidth="1000px"
+        minWidth="1150px"
+        sortKey={sort.sortBy}
+        sortDir={sort.sortDir}
+        onSort={sort.onSort}
       />
     </div>
   )

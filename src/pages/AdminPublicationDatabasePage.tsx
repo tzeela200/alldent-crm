@@ -23,6 +23,7 @@ import { DictionaryMultiSelect } from '@/components/ui/DictionaryMultiSelect'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { RegionBadge } from '@/components/admin/RegionBadge'
 import { PublicationDateCell, PUBLICATION_DATE_CELL_WIDTH } from '@/components/admin/PublicationDateCell'
+import { DateRangeFilter } from '@/components/admin/DateRangeFilter'
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon'
 import { formatPhone, whatsappLink } from '@/lib/normalizePhone'
 import { getDeliveryStatusMeta } from '@/lib/fixPublications/deliveryStatus'
@@ -34,7 +35,7 @@ import { usePublicationDicts } from '@/hooks/useFixPublications'
 import {
   usePublicationDatabase, usePublicationDbStats, useOptedOutContactIds,
   fetchAllPublicationRows,
-  EMPTY_DB_FILTERS, hasActiveDbFilters, LOCALITY_FILTER_OPTIONS,
+  EMPTY_DB_FILTERS, hasActiveDbFilters, LOCALITY_FILTER_OPTIONS, PUBLICATION_DB_UNSORTABLE,
   type PublicationDbFilters, type PublicationDbRow,
 } from '@/hooks/usePublicationDatabase'
 
@@ -83,20 +84,6 @@ function formatDate(value: string | null | undefined): string {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`
 }
 
-function DateField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="text-xs text-[#6B6B6B]">{label}</span>
-      <input
-        type="date"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="h-11 rounded-[14px] border border-[#D9D9D9] bg-white px-3 text-sm outline-none transition-colors focus:border-[#008080]"
-      />
-    </label>
-  )
-}
-
 /** הכרטיסים שמוצגים למעלה, בסדר שבו המשתמשת מקבלת החלטה */
 const KPI_OUTCOMES: DeliveryOutcome[] = [
   'reached', 'never_sent', 'do_not_send', 'retry', 'no_phone',
@@ -128,6 +115,8 @@ export default function AdminPublicationDatabasePage() {
   }
 
   const onSort = (key: string) => {
+    // עמודות שמחושבות לעמוד המוצג בלבד אינן ניתנות למיון אמיתי בשרת
+    if (PUBLICATION_DB_UNSORTABLE.has(key)) return
     if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortBy(key); setSortDir('desc') }
     setPage(0)
@@ -156,26 +145,26 @@ export default function AdminPublicationDatabasePage() {
       ),
     },
     {
-      key: 'role', label: 'תפקיד', nowrap: true,
+      key: 'role', label: 'תפקיד', sortable: true, nowrap: true,
       render: (row) => {
         const label = row.role ? dicts.data?.roleById.get(Number(row.role)) : null
         return label ? <RoleBadge roleId={Number(row.role)} label={label} /> : '—'
       },
     },
     {
-      key: 'region', label: 'אזור', nowrap: true,
+      key: 'region', label: 'אזור', sortable: true, nowrap: true,
       render: (row) => {
         const label = row.region_id ? dicts.data?.regionById.get(Number(row.region_id)) : null
         return label ? <RegionBadge regionId={Number(row.region_id)} label={label} /> : '—'
       },
     },
     {
-      key: 'city', label: 'עיר',
+      key: 'city', label: 'עיר', sortable: true,
       render: (row) => (row.city_id ? dicts.data?.cityById.get(Number(row.city_id)) ?? '—' : '—'),
     },
     {
       // נגזר מהעיר ע"י טריגר במסד — תצוגה בלבד, לא נערך כאן
-      key: 'locality_type', label: 'סוג יישוב', nowrap: true,
+      key: 'locality_type', label: 'סוג יישוב', sortable: true, nowrap: true,
       render: (row) => row.locality_type ?? <span className="text-[#6B6B6B]">—</span>,
     },
     {
@@ -200,7 +189,7 @@ export default function AdminPublicationDatabasePage() {
       },
     },
     {
-      key: 'outcome', label: 'מצב', nowrap: true,
+      key: 'outcome', label: 'מצב', sortable: true, nowrap: true,
       render: (row) => {
         const meta = getOutcomeMeta(row.outcome)
         return <span title={meta.description}><StatusPill label={meta.label} variant={meta.tone} /></span>
@@ -237,7 +226,7 @@ export default function AdminPublicationDatabasePage() {
     },
     { key: 'last_campaign', label: 'קמפיין אחרון', render: (row) => row.lastCampaignName ?? '—' },
     {
-      key: 'social_status', label: 'סטטוס פנייה',
+      key: 'social_status', label: 'סטטוס פנייה', sortable: true,
       render: (row) => (row.social_status
         ? dicts.data?.socialStatusById.get(Number(row.social_status)) ?? '—'
         : '—'),
@@ -401,8 +390,11 @@ export default function AdminPublicationDatabasePage() {
             onChange={(v) => patch({ search: v })}
             placeholder="חיפוש לפי שם או נייד..."
           />
-          <DateField label="פורסם מתאריך" value={filters.sentFrom} onChange={(v) => patch({ sentFrom: v })} />
-          <DateField label="עד תאריך" value={filters.sentTo} onChange={(v) => patch({ sentTo: v })} />
+          <DateRangeFilter
+            from={filters.sentFrom} to={filters.sentTo}
+            onChange={({ from, to }) => patch({ sentFrom: from, sentTo: to })}
+            fromLabel="פורסם מתאריך"
+          />
           {filtered && (
             <ActionButton
               variant="ghost" icon={RotateCcw}
