@@ -22,6 +22,7 @@ import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
 import { DictionaryMultiSelect } from '@/components/ui/DictionaryMultiSelect'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { RegionBadge } from '@/components/admin/RegionBadge'
+import { PublicationDateCell, PUBLICATION_DATE_CELL_WIDTH } from '@/components/admin/PublicationDateCell'
 import { WhatsAppIcon } from '@/components/icons/WhatsAppIcon'
 import { formatPhone, whatsappLink } from '@/lib/normalizePhone'
 import { getDeliveryStatusMeta } from '@/lib/fixPublications/deliveryStatus'
@@ -205,8 +206,19 @@ export default function AdminPublicationDatabasePage() {
         : '—'),
     },
     {
+      // ניתן לעריכה — לרישום פרסום שנשלח אישית ולא דרך קמפיין.
+      // רוחב קבוע בשני המצבים כדי שהטבלה לא תזוז בכניסה לעריכה.
       key: 'last_sent', label: 'פרסום אחרון', sortable: true, nowrap: true,
-      render: (row) => formatDate(row.whatsapp_campaign_last_sent),
+      width: PUBLICATION_DATE_CELL_WIDTH,
+      render: (row) => (
+        <PublicationDateCell
+          contactId={row.contact_id}
+          phoneNorm={row.phone_norm}
+          lastSentAt={row.whatsapp_campaign_last_sent}
+          lastStatus={row.whatsapp_last_delivery_status}
+          hasManualRecord={row.hasManualRecord}
+        />
+      ),
     },
     {
       key: 'campaigns', label: 'קמפיינים', nowrap: true,

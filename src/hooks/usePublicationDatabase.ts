@@ -71,6 +71,8 @@ export interface PublicationDbRow {
   campaignCount: number
   readCount: number
   lastCampaignName: string | null
+  /** קיים רישום ידני (פרסום אישי) לאדם הזה — קובע אם מוצג כפתור המחיקה בתא */
+  hasManualRecord: boolean
 }
 
 const ROW_COLUMNS =
@@ -208,7 +210,8 @@ export function usePublicationDatabase(
       const { data, error, count } = await query
       if (error) throw error
 
-      type BaseRow = Omit<PublicationDbRow, 'outcome' | 'campaignCount' | 'readCount' | 'lastCampaignName'>
+      type BaseRow = Omit<PublicationDbRow,
+        'outcome' | 'campaignCount' | 'readCount' | 'lastCampaignName' | 'hasManualRecord'>
       const base = (data ?? []) as unknown as BaseRow[]
       const optedOut = new Set(optedOutIds)
       const enrichment = await fetchPageEnrichment(base.map((r) => r.contact_id))
@@ -224,6 +227,7 @@ export function usePublicationDatabase(
         campaignCount: enrichment.get(r.contact_id)?.campaigns ?? 0,
         readCount: enrichment.get(r.contact_id)?.read ?? 0,
         lastCampaignName: enrichment.get(r.contact_id)?.lastCampaign ?? null,
+        hasManualRecord: enrichment.get(r.contact_id)?.hasManual ?? false,
       }))
 
       return { rows, total: count ?? 0, pageSize: PAGE_SIZE }
@@ -236,6 +240,7 @@ interface Enrichment {
   read: number
   lastCampaign: string | null
   lastSent: string | null
+  hasManual: boolean
 }
 
 /**
@@ -251,7 +256,7 @@ async function fetchPageEnrichment(contactIds: number[]): Promise<Map<number, En
   for (let page = 0; ; page++) {
     const { data, error } = await supabase
       .from('whatsapp_campaign_recipients')
-      .select('contact_id, delivery_status, sent_at, campaign:whatsapp_campaigns(campaign_name)')
+      .select('contact_id, delivery_status, sent_at, source_unique_key, campaign:whatsapp_campaigns(campaign_name)')
       .in('contact_id', contactIds)
       .order('sent_at', { ascending: false, nullsFirst: false })
       .range(page * 1000, page * 1000 + 999)
@@ -259,8 +264,10 @@ async function fetchPageEnrichment(contactIds: number[]): Promise<Map<number, En
 
     for (const row of data ?? []) {
       const id = Number(row.contact_id)
-      const entry = out.get(id) ?? { campaigns: 0, read: 0, lastCampaign: null, lastSent: null }
+      const entry = out.get(id) ?? { campaigns: 0, read: 0, lastCampaign: null, lastSent: null, hasManual: false }
       entry.campaigns++
+      // רישום ידני מזוהה לפי המפתח הדטרמיניסטי שלו (ראו useManualPublication)
+      if (String(row.source_unique_key ?? '').startsWith('manual|')) entry.hasManual = true
       if (row.delivery_status === 'read') entry.read++
       const sentAt = (row.sent_at as string | null) ?? null
       if (!entry.lastSent || (sentAt && sentAt > entry.lastSent)) {
@@ -375,7 +382,7 @@ export async function fetchAllPublicationRows(
           continue
         }
       }
-      collected.push({ ...raw, outcome, campaignCount: 0, readCount: 0, lastCampaignName: null })
+      collected.push({ ...raw, outcome, campaignCount: 0, readCount: 0, lastCampaignName: null, hasManualRecord: false })
     }
     if (!data || data.length < 1000) break
   }
