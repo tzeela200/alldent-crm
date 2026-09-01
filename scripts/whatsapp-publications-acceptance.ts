@@ -9,7 +9,7 @@
 import * as XLSX from 'xlsx'
 import {
   readCampaignFile, parseCampaignSheets, groupIntoCampaigns, validateCampaignFile,
-  detectFieldMap, parseSendingTime, buildSourceUniqueKey, campaignKeyOf,
+  detectFieldMap, parseSendingTime, buildSourceUniqueKey, campaignKeyOf, rekeyCampaignGroup,
 } from '@/lib/fixPublications/campaignParser'
 import { mapDeliveryStatus, failureCategoryOf, isOptOutText, isMediaFailureText } from '@/lib/fixPublications/deliveryStatus'
 import { outcomeOf, outcomeOfRecord, assertOutcomeCoverage, OUTCOME_STATUS_CODES } from '@/lib/fixPublications/deliveryOutcome'
@@ -190,6 +190,35 @@ async function main() {
   check('אין מכשיר ברשומה', outcomeOfRecord({ phoneNorm: '972501234567', lastSentAt: '2026-08-26T07:33:00Z', lastStatus: 'failed_device' }), 'do_not_send')
   check('הסרה גוברת גם על סטטוס מוצלח מאוחר', outcomeOfRecord({ phoneNorm: '972501234567', lastSentAt: '2026-08-30T00:00:00Z', lastStatus: 'read', isOptedOut: true }), 'do_not_send')
   check('דלי הצלחה = 3 קודים', OUTCOME_STATUS_CODES.reached.length, 3)
+
+
+  // ── 12. זיהוי אותו קובץ בשם אחר (INC-3136) ──
+  const fixA = makeFile([{ name: 'Sheet1', rows: [
+    { fullname: 'דר א', phone: '0501111111', sending_status: 'Read',      sending_time: '2026-08-26 10:33' },
+    { fullname: 'דר ב', phone: '0502222222', sending_status: 'Delivered', sending_time: '2026-08-26 10:33' },
+  ] }], 'export (37).csv')
+  const fixB = makeFile([{ name: 'Sheet1', rows: [
+    { fullname: 'דר א', phone: '0501111111', sending_status: 'Read',      sending_time: '2026-08-26 10:33' },
+    { fullname: 'דר ב', phone: '0502222222', sending_status: 'Delivered', sending_time: '2026-08-26 10:33' },
+  ] }], 'רופאים קבוצה 6.csv')
+
+  const gA = groupIntoCampaigns(parseCampaignSheets(await readCampaignFile(fixA), fixA.name))
+  const gB = groupIntoCampaigns(parseCampaignSheets(await readCampaignFile(fixB), fixB.name))
+
+  check('שם קובץ שונה → מזהה קמפיין שונה', gA[0].campaignKey !== gB[0].campaignKey, true)
+  check('ולכן גם מפתחות השורות שונים',
+    gA[0].rows[0].sourceUniqueKey !== gB[0].rows[0].sourceUniqueKey, true)
+  check('אותו מועד שליחה בשני הקבצים', gA[0].startedAt === gB[0].startedAt, true)
+
+  // הזיהוי ממפה את הקבוצה השנייה למזהה הקיים
+  rekeyCampaignGroup(gB[0], gA[0].campaignKey)
+  check('אחרי הזיהוי — אותו מזהה קמפיין', gB[0].campaignKey, gA[0].campaignKey)
+  check('אחרי הזיהוי — כל מפתחות השורות זהים',
+    gB[0].rows.map((r) => r.sourceUniqueKey), gA[0].rows.map((r) => r.sourceUniqueKey))
+  check('ולכן כל השורות יזוהו כקיימות ולא ייקלטו שוב',
+    gB[0].rows.every((r, i) => r.sourceUniqueKey === gA[0].rows[i].sourceUniqueKey), true)
+  check('מיפוי לאותו מזהה אינו משנה דבר',
+    (() => { const before = gA[0].rows[0].sourceUniqueKey; rekeyCampaignGroup(gA[0], gA[0].campaignKey); return gA[0].rows[0].sourceUniqueKey === before })(), true)
 
   console.log(failures ? `\n${failures} בדיקות נכשלו` : '\nכל הבדיקות עברו')
   process.exit(failures ? 1 : 0)

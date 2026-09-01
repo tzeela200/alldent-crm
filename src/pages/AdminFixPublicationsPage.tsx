@@ -506,20 +506,31 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [preview, setPreview] = useState<CampaignPreview | null>(null)
+  const [lastFile, setLastFile] = useState<File | null>(null)
+  /** זיהוי אוטומטי של קמפיין שכבר נקלט תחת שם קובץ אחר */
+  const [autoMatch, setAutoMatch] = useState(true)
 
   const previewMutation = useCampaignPreview()
   const commitMutation = useCommitCampaign()
 
-  const handleFile = (file: File) => {
+  const handleFile = (file: File, match = autoMatch) => {
     setPreview(null)
-    previewMutation.mutate(file, {
+    setLastFile(file)
+    previewMutation.mutate({ file, autoMatch: match }, {
       onSuccess: setPreview,
       onError: (err) => toast.error((err as Error).message),
     })
   }
 
+  /** שינוי הזיהוי האוטומטי מחייב ניתוח מחדש — הוא משנה את מפתחות השורות */
+  const toggleAutoMatch = (next: boolean) => {
+    setAutoMatch(next)
+    if (lastFile) handleFile(lastFile, next)
+  }
+
   const reset = () => {
     setPreview(null)
+    setLastFile(null)
     if (inputRef.current) inputRef.current.value = ''
   }
 
@@ -586,6 +597,22 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
         </div>
       </Toolbar>
 
+      <label className="flex cursor-pointer items-start gap-2 px-1 text-sm text-[#2D2D2D]">
+        <input
+          type="checkbox" className="mt-0.5 h-4 w-4 accent-[#008080]"
+          checked={autoMatch}
+          onChange={(e) => toggleAutoMatch(e.target.checked)}
+          disabled={previewMutation.isPending}
+        />
+        <span>
+          זהה אוטומטית קמפיין שכבר נקלט
+          <span className="block text-[#6B6B6B]">
+            קובץ זהה בשם אחר, או ייצוא חוזר של אותה שליחה (אותו תאריך ושעה, אותם
+            נמענים) — יאוחדו לקמפיין הקיים במקום להיקלט פעם שנייה.
+          </span>
+        </span>
+      </label>
+
       {commitMutation.data?.errors.length ? (
         <Toolbar className="border-r-4 !border-r-[#D96C6C]">
           <div className="flex items-start gap-3">
@@ -644,7 +671,7 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
             />
           </div>
 
-          <DuplicateCampaignWarning plans={preview.campaigns} />
+          <CampaignIdentityNotice plans={preview.campaigns} />
 
           <CampaignPlanTable plans={preview.campaigns} />
 
@@ -693,47 +720,47 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
 }
 
 /**
- * אזהרה כשקמפיין בקובץ נראה כמו כזה שכבר נקלט בשם אחר.
+ * הודעה כשקמפיין בקובץ זוהה ככזה שכבר נקלט — בשם קובץ אחר.
  *
- * מזהה הקמפיין נגזר משם הקובץ (או מעמודת "קובץ מקור"), ולכן דוח FIX רגיל
- * שהועלה פעמיים בשני שמות ייקלט כשני קמפיינים והשליחות יוכפלו. שתי הבדיקות
- * כאן — אותו קובץ בדיוק, או אותו מועד שליחה — תופסות בדיוק את המקרה הזה.
- *
- * האזהרה **אינה חוסמת**: ייתכן ששני פרסומים שונים יצאו באותה דקה, ורק
- * המשתמשת יודעת. חסימה שקטה הייתה מאבדת נתונים אמיתיים.
+ * זו לא אזהרה על משהו שעומד להשתבש, אלא דיווח על מה שהמערכת כבר עשתה:
+ * הקבוצה מופתה למזהה הקמפיין הקיים, ולכן השורות יזוהו כקיימות ולא ייקלטו
+ * פעם שנייה. מוצג במפורש כדי שההחלטה לא תהיה שקטה.
  */
-function DuplicateCampaignWarning({ plans }: { plans: CampaignPlan[] }) {
-  const flagged = plans.filter((p) => p.duplicateWarning)
-  if (!flagged.length) return null
+function CampaignIdentityNotice({ plans }: { plans: CampaignPlan[] }) {
+  const matched = plans.filter(
+    (p) => p.identityMatch && p.identityMatch.kind !== 'external_id',
+  )
+  if (!matched.length) return null
 
   return (
-    <Toolbar className="border-r-4 !border-r-[#D96C6C]">
+    <Toolbar className="border-r-4 !border-r-[#0F7B6C]">
       <div className="flex items-start gap-3">
-        <AlertTriangle className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#D96C6C]" />
+        <CheckCircle2 className="mt-0.5 h-5 w-5 flex-shrink-0 text-[#0F7B6C]" />
         <div className="space-y-2">
           <p className="font-semibold text-[#2D2D2D]">
-            {flagged.length === 1
-              ? 'ייתכן שהקמפיין הזה כבר נקלט בעבר'
-              : `ייתכן ש-${flagged.length} מהקמפיינים כבר נקלטו בעבר`}
+            {matched.length === 1
+              ? 'הקמפיין הזה כבר נקלט — זוהה למרות שם הקובץ השונה'
+              : `${matched.length} קמפיינים כבר נקלטו — זוהו למרות שם הקובץ השונה`}
           </p>
           <ul className="list-inside list-disc space-y-1 text-sm text-[#6B6B6B]">
-            {flagged.map((p) => (
-              <li key={p.campaignKey}>
-                <strong>{p.label}</strong>{' '}
-                {p.duplicateWarning!.kind === 'same_file'
-                  ? 'הוא בדיוק אותו קובץ שנקלט כבר'
-                  : 'נשלח באותה דקה בדיוק'}
-                {' '}כמו <strong>{p.duplicateWarning!.existingCampaignName}</strong>
-                {p.duplicateWarning!.existingSourceFile
-                  ? ` (מהקובץ ${p.duplicateWarning!.existingSourceFile})`
-                  : ''}.
-              </li>
-            ))}
+            {matched.map((p) => {
+              const m = p.identityMatch!
+              return (
+                <li key={p.campaignKey}>
+                  <strong>{p.label}</strong>{' '}
+                  {m.kind === 'file_hash'
+                    ? 'הוא בדיוק אותו קובץ'
+                    : `נשלח באותו מועד ולאותם נמענים (${m.overlapPct}% חפיפה)`}
+                  {' '}כמו <strong>{m.existingCampaignName}</strong>
+                  {m.existingSourceFile ? ` (מהקובץ ${m.existingSourceFile})` : ''}.
+                </li>
+              )
+            })}
           </ul>
           <p className="text-sm text-[#2D2D2D]">
-            אם זה אותו פרסום — עדיף לבטל, לשנות את שם הקובץ לשם שכבר נקלט, ולהעלות שוב.
-            כך הוא יזוהה כאותו קמפיין במקום להיווצר פעם שנייה. אם אלה באמת שתי שליחות
-            שונות, אפשר להמשיך.
+            לא ייווצר קמפיין חדש, והשורות שכבר קיימות לא ייקלטו שוב. רק סטטוסים
+            שהתקדמו יתעדכנו. אם אלה בכל זאת שתי שליחות שונות — ניתן לבטל את
+            הזיהוי האוטומטי ולהעלות מחדש.
           </p>
         </div>
       </div>
@@ -749,23 +776,13 @@ function CampaignPlanTable({ plans }: { plans: CampaignPlan[] }) {
   const columns: AdminColumn<CampaignPlan>[] = [
     { key: 'label', label: 'קמפיין', minWidth: '220px', render: (p) => p.label },
     {
-      key: 'state', label: 'מצב', nowrap: true, minWidth: '210px',
+      key: 'state', label: 'מצב', nowrap: true, minWidth: '190px',
       render: (p) => {
-        if (p.duplicateWarning) {
-          const w = p.duplicateWarning
+        const m = p.identityMatch
+        if (m && m.kind !== 'external_id') {
           return (
-            <span
-              className="inline-flex items-center gap-1.5"
-              title={
-                (w.kind === 'same_file'
-                  ? 'הקובץ הזה כבר נקלט בעבר, תחת שם אחר.'
-                  : 'קיים כבר קמפיין שנשלח באותה דקה בדיוק.') +
-                ` קמפיין קיים: ${w.existingCampaignName}` +
-                (w.existingSourceFile ? ` (מהקובץ ${w.existingSourceFile})` : '')
-              }
-            >
-              <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0 text-[#D96C6C]" />
-              <StatusPill label="ייתכן שכבר נקלט" variant="danger" />
+            <span title={`זוהה כ-${m.existingCampaignName}`}>
+              <StatusPill label="כבר נקלט — יזוהה" variant="info" />
             </span>
           )
         }

@@ -38,7 +38,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import {
   readCampaignFile, parseCampaignSheets, validateCampaignFile, groupIntoCampaigns,
-  computeFileHash, inferCampaignSentAt, suggestCampaignName,
+  computeFileHash, inferCampaignSentAt, suggestCampaignName, rekeyCampaignGroup,
   type ParsedCampaignRow, type CampaignGroup, type FileValidation, type MatchResult,
 } from '@/lib/fixPublications/campaignParser'
 import { pickHigherStatus, type DeliveryStatusCode } from '@/lib/fixPublications/deliveryStatus'
@@ -341,18 +341,26 @@ export interface CampaignPlan {
   statusUpdates: number
   matched: number
   notFound: number
-  /**
-   * חשד שהקמפיין הזה כבר נקלט בשם אחר. אינו חוסם — רק מתריע, כי רק
-   * המשתמשת יודעת אם מדובר באותו פרסום או בשליחה נוספת באותה דקה.
-   */
-  duplicateWarning: DuplicateWarning | null
+  /** איך הקמפיין זוהה ככזה שכבר קיים. null = קמפיין חדש לגמרי */
+  identityMatch: CampaignIdentityMatch | null
 }
 
-export interface DuplicateWarning {
-  /** same_file = אותו קובץ בדיוק (חתימת SHA-256) · same_time = אותו מועד שליחה */
-  kind: 'same_file' | 'same_time'
+/**
+ * איך הקמפיין בקובץ זוהה כקמפיין שכבר קיים במערכת.
+ *
+ * `external_id` — אותו מזהה בדיוק (אותה תווית "קובץ מקור" או אותו שם קובץ).
+ * `file_hash`   — **אותו קובץ בדיוק**, בשם אחר. חתימת SHA-256 זהה.
+ * `same_send`   — אותו מועד שליחה **וגם** אותם נמענים. ייצוא חוזר שבו
+ *                 סטטוסים התקדמו, ולכן החתימה שונה.
+ */
+export type CampaignMatchKind = 'external_id' | 'file_hash' | 'same_send'
+
+export interface CampaignIdentityMatch {
+  kind: CampaignMatchKind
   existingCampaignName: string
   existingSourceFile: string | null
+  /** אחוז חפיפת הנמענים — רק ב-same_send */
+  overlapPct?: number
 }
 
 export interface CampaignPreview {
@@ -408,7 +416,11 @@ async function fetchExistingRecipients(campaignIds: number[]): Promise<Map<strin
  * ההתאמה היא לפי נייד מנורמל בלבד (normalizeIlMobile — פורט מדויק של
  * public.normalize_il_mobile_phone). לא לפי שם ולא לפי אימייל.
  */
-export async function buildCampaignPreview(file: File): Promise<CampaignPreview> {
+export async function buildCampaignPreview(
+  file: File,
+  /** לזהות אוטומטית קמפיין שכבר נקלט תחת שם אחר */
+  autoMatch = true,
+): Promise<CampaignPreview> {
   const sheets = await readCampaignFile(file)
   if (!sheets.length) throw new Error('הקובץ ריק או שלא נמצאו בו שורות נתונים.')
 
@@ -438,22 +450,23 @@ export async function buildCampaignPreview(file: File): Promise<CampaignPreview>
     for (const c of data ?? []) existingCampaigns.set(c.external_campaign_id as string, Number(c.campaign_id))
   }
 
+  // זיהוי הקמפיין הקיים **לפני** חישוב מה כבר קיים — כי הזיהוי ממפה מחדש
+  // את מפתחות השורות, ובלי זה כל שורה הייתה נראית חדשה.
+  const resolved = await resolveCampaignIdentities(groups, existingCampaigns, fileHash, autoMatch)
+
   const existingRecipients = await fetchExistingRecipients(
-    Array.from(existingCampaigns.values()),
+    Array.from(resolved.values()).map((r) => r.campaignId),
   )
 
   for (const row of rows) {
-    const prior = existingRecipients.get(row.sourceUniqueKey)
-    row.alreadyExists = !!prior
+    row.alreadyExists = existingRecipients.has(row.sourceUniqueKey)
   }
-
-  const warnings = await detectDuplicateCampaigns(groups, existingCampaigns, fileHash)
 
   const campaigns: CampaignPlan[] = groups.map((group) => buildPlan(
     group,
-    existingCampaigns.get(group.campaignKey) ?? null,
+    resolved.get(group.campaignKey)?.campaignId ?? null,
     existingRecipients,
-    warnings.get(group.campaignKey) ?? null,
+    resolved.get(group.campaignKey)?.match ?? null,
   ))
 
   const byStatus: Record<string, number> = {}
@@ -487,80 +500,135 @@ export async function buildCampaignPreview(file: File): Promise<CampaignPreview>
   }
 }
 
+/** חפיפת נמענים מינימלית כדי לזהות ייצוא חוזר של אותו קמפיין */
+const SAME_SEND_MIN_OVERLAP = 0.9
+
 /**
- * מאתר קמפיינים שכבר נקלטו וסביר שהם אותו פרסום, גם אם שם הקובץ שונה.
+ * מזהה איזה קמפיין קיים במערכת הוא **אותו קמפיין** שבקובץ, גם אם שם הקובץ שונה.
  *
- * שני סימנים, שניהם לא-חוסמים:
- *  1. **אותו קובץ בדיוק** — חתימת SHA-256 זהה לקמפיין קיים.
- *  2. **אותו מועד שליחה** — Fix שולח קמפיין שלם באותה דקה, ולכן שני
- *     קמפיינים שנפתחים באותה חותמת זמן הם כמעט תמיד אותו פרסום.
+ * שלושה מסלולים, לפי סדר ודאות יורד:
  *
- * למה רק להתריע ולא לחסום: ייתכן ששני פרסומים שונים באמת יצאו באותה דקה,
- * ורק המשתמשת יודעת. חסימה שקטה הייתה מאבדת נתונים אמיתיים.
+ * 1. **אותו מזהה** — אותה תווית "קובץ מקור" או אותו שם קובץ. תמיד ודאי.
+ * 2. **אותו קובץ בדיוק** — חתימת SHA-256 זהה. ודאי לחלוטין: אותם בתים.
+ *    מוגבל לקובץ שמפיק קמפיין **אחד** — בקובץ מאוחד אין דרך לדעת איזה
+ *    מ-12 הקמפיינים מתאים למי, וממילא מסלול 1 כבר תופס אותו.
+ * 3. **אותו מועד שליחה + אותם נמענים** — ייצוא חוזר של אותו קמפיין שבו
+ *    סטטוסים התקדמו, ולכן החתימה שונה. Fix שולח קמפיין שלם באותה דקה,
+ *    ובשילוב עם חפיפת נמענים של 90%+ זה אותו פרסום.
+ *
+ * כשנמצאת התאמה, הקבוצה **ממופה מחדש** למזהה הקיים (rekeyCampaignGroup) —
+ * אחרת מזהה הקמפיין שבתוך source_unique_key היה שונה וכל שורה הייתה נקלטת
+ * בשנית. זה הלב של מניעת הכפילות.
  */
-async function detectDuplicateCampaigns(
+async function resolveCampaignIdentities(
   groups: CampaignGroup[],
   existingCampaigns: Map<string, number>,
   fileHash: string,
-): Promise<Map<string, DuplicateWarning>> {
-  const out = new Map<string, DuplicateWarning>()
+  autoMatch: boolean,
+): Promise<Map<string, { campaignId: number; match: CampaignIdentityMatch }>> {
+  const out = new Map<string, { campaignId: number; match: CampaignIdentityMatch }>()
 
-  // 1. אותו קובץ בדיוק
-  const { data: sameFile } = await supabase
-    .from('whatsapp_campaigns')
-    .select('campaign_name, source_file_name, external_campaign_id')
-    .eq('raw_payload->>file_hash', fileHash)
-    .limit(20)
+  // ── מסלול 1: אותו מזהה ──
+  const unresolved: CampaignGroup[] = []
+  for (const group of groups) {
+    const id = existingCampaigns.get(group.campaignKey)
+    if (id != null) {
+      out.set(group.campaignKey, {
+        campaignId: id,
+        match: { kind: 'external_id', existingCampaignName: group.label, existingSourceFile: null },
+      })
+    } else {
+      unresolved.push(group)
+    }
+  }
+  if (!autoMatch || !unresolved.length) return out
 
-  const sameFileOther = (sameFile ?? []).filter(
-    (c) => !groups.some((g) => g.campaignKey === c.external_campaign_id),
-  )
-
-  // 2. אותו מועד שליחה, תחת מזהה אחר
-  const stamps = groups.map((g) => g.startedAt).filter(Boolean) as string[]
-  const byStamp = new Map<string, { campaign_name: string | null; source_file_name: string | null; external_campaign_id: string | null }>()
-  if (stamps.length) {
+  // ── מסלול 2: אותו קובץ בדיוק (רק כשהקובץ מפיק קמפיין אחד) ──
+  if (groups.length === 1 && unresolved.length === 1) {
     const { data } = await supabase
       .from('whatsapp_campaigns')
-      .select('campaign_name, source_file_name, started_at, external_campaign_id')
-      .in('started_at', Array.from(new Set(stamps)))
-      .limit(200)
-    for (const c of data ?? []) {
-      if (c.started_at) byStamp.set(String(c.started_at), c)
+      .select('campaign_id, campaign_name, source_file_name, external_campaign_id')
+      .eq('raw_payload->>file_hash', fileHash)
+      .limit(1)
+    const hit = (data ?? [])[0]
+    if (hit) {
+      const group = unresolved[0]
+      rekeyCampaignGroup(group, String(hit.external_campaign_id))
+      out.set(group.campaignKey, {
+        campaignId: Number(hit.campaign_id),
+        match: {
+          kind: 'file_hash',
+          existingCampaignName: hit.campaign_name ?? 'קמפיין ללא שם',
+          existingSourceFile: hit.source_file_name ?? null,
+        },
+      })
+      return out
     }
   }
 
-  for (const group of groups) {
-    // קמפיין שכבר מזוהה לפי המזהה שלו אינו "כפילות" — הוא פשוט אותו קמפיין
-    if (existingCampaigns.has(group.campaignKey)) continue
+  // ── מסלול 3: אותו מועד שליחה + חפיפת נמענים ──
+  const stamps = Array.from(new Set(unresolved.map((g) => g.startedAt).filter(Boolean))) as string[]
+  if (!stamps.length) return out
 
-    const fileMatch = sameFileOther[0]
-    if (fileMatch) {
-      out.set(group.campaignKey, {
-        kind: 'same_file',
-        existingCampaignName: fileMatch.campaign_name ?? 'קמפיין ללא שם',
-        existingSourceFile: fileMatch.source_file_name ?? null,
-      })
-      continue
-    }
+  const { data: candidates } = await supabase
+    .from('whatsapp_campaigns')
+    .select('campaign_id, campaign_name, source_file_name, started_at, external_campaign_id')
+    .in('started_at', stamps)
+    .limit(200)
 
-    const timeMatch = group.startedAt ? byStamp.get(group.startedAt) : null
-    if (timeMatch && timeMatch.external_campaign_id !== group.campaignKey) {
-      out.set(group.campaignKey, {
-        kind: 'same_time',
-        existingCampaignName: timeMatch.campaign_name ?? 'קמפיין ללא שם',
-        existingSourceFile: timeMatch.source_file_name ?? null,
-      })
-    }
+  for (const group of unresolved) {
+    if (out.has(group.campaignKey)) continue
+    const candidate = (candidates ?? []).find(
+      (c) => c.started_at === group.startedAt && c.external_campaign_id !== group.campaignKey,
+    )
+    if (!candidate) continue
+
+    const overlap = await recipientOverlap(Number(candidate.campaign_id), group)
+    if (overlap < SAME_SEND_MIN_OVERLAP) continue
+
+    rekeyCampaignGroup(group, String(candidate.external_campaign_id))
+    out.set(group.campaignKey, {
+      campaignId: Number(candidate.campaign_id),
+      match: {
+        kind: 'same_send',
+        existingCampaignName: candidate.campaign_name ?? 'קמפיין ללא שם',
+        existingSourceFile: candidate.source_file_name ?? null,
+        overlapPct: Math.round(overlap * 100),
+      },
+    })
   }
+
   return out
+}
+
+/** איזה חלק מנמעני הקבוצה כבר קיימים בקמפיין הקיים */
+async function recipientOverlap(campaignId: number, group: CampaignGroup): Promise<number> {
+  const groupPhones = new Set(group.rows.map((r) => r.phoneNorm).filter(Boolean) as string[])
+  if (!groupPhones.size) return 0
+
+  const existing = new Set<string>()
+  for (let page = 0; ; page++) {
+    const { data, error } = await supabase
+      .from('whatsapp_campaign_recipients')
+      .select('phone_norm')
+      .eq('campaign_id', campaignId)
+      .range(page * 1000, page * 1000 + 999)
+    if (error) return 0
+    for (const r of data ?? []) if (r.phone_norm) existing.add(String(r.phone_norm))
+    if (!data || data.length < 1000) break
+  }
+  if (!existing.size) return 0
+
+  let hits = 0
+  for (const phone of groupPhones) if (existing.has(phone)) hits++
+  return hits / groupPhones.size
 }
 
 function buildPlan(
   group: CampaignGroup,
   existingCampaignId: number | null,
   existingRecipients: Map<string, ExistingRecipient>,
-  duplicateWarning: DuplicateWarning | null,
+  identityMatch: CampaignIdentityMatch | null,
 ): CampaignPlan {
   let statusUpdates = 0
   for (const row of group.rows) {
@@ -590,7 +658,7 @@ function buildPlan(
       (r) => r.matchResult === 'matched_contact' || r.matchResult === 'matched_account',
     ).length,
     notFound: group.rows.filter((r) => r.matchResult === 'not_found').length,
-    duplicateWarning,
+    identityMatch,
   }
 }
 
@@ -655,7 +723,10 @@ async function matchRowsToRecords(rows: ParsedCampaignRow[]): Promise<void> {
 }
 
 export function useCampaignPreview() {
-  return useMutation({ mutationFn: buildCampaignPreview })
+  return useMutation({
+    mutationFn: ({ file, autoMatch }: { file: File; autoMatch: boolean }) =>
+      buildCampaignPreview(file, autoMatch),
+  })
 }
 
 // ─────────────────────── קליטת דוח קמפיין: Commit ───────────────────────

@@ -244,6 +244,11 @@ export interface ParsedCampaignRow {
   failureCategory: string | null
   failureMessage: string | null
 
+  /**
+   * אסימון השורה בתוך הקמפיין. נשמר בנפרד כדי שאפשר יהיה לבנות מחדש את
+   * המפתח אם הקמפיין זוהה כקמפיין קיים תחת מזהה אחר (ראו rekeyCampaignGroup).
+   */
+  rowToken: string
   /** מפתח דטרמיניסטי — קליטה חוזרת של אותה שורה לא תיצור רשומה נוספת */
   sourceUniqueKey: string
 
@@ -339,6 +344,7 @@ export function parseCampaignSheets(sheets: SheetRows[], fallbackLabel: string):
         // הטקסט הגולמי נדרש כדי להפריד בקשת הסרה מכשל טכני, ותקלת מדיה מתקלת ספק
         failureCategory: failed ? failureCategoryOf(deliveryStatus, deliveryStatusRaw) : null,
         failureMessage: failed ? deliveryStatusRaw : null,
+        rowToken,
         sourceUniqueKey: buildSourceUniqueKey(campaignKey, rowToken, phoneNorm),
         matchResult: !phoneRaw ? 'missing_phone' : phoneNorm ? 'not_found' : 'invalid_phone',
         contactId: null,
@@ -402,6 +408,24 @@ export function groupIntoCampaigns(rows: ParsedCampaignRow[]): CampaignGroup[] {
   }
 
   return Array.from(groups.values()).sort((a, b) => (a.startedAt ?? '').localeCompare(b.startedAt ?? ''))
+}
+
+/**
+ * ממפה קבוצה שלמה למזהה קמפיין אחר.
+ *
+ * נדרש כשמתברר שהקובץ שהועלה הוא **אותו קמפיין** שכבר נקלט תחת שם אחר.
+ * מזהה הקמפיין הוא חלק מ-`source_unique_key`, ולכן בלי מיפוי מחדש כל שורה
+ * הייתה מקבלת מפתח חדש ונקלטת בשנית — בדיוק הכפילות שאנחנו מונעים.
+ *
+ * משנה את השורות במקום (הן נוצרו בפרסור ואינן משותפות לאף אחד אחר).
+ */
+export function rekeyCampaignGroup(group: CampaignGroup, canonicalKey: string): void {
+  if (group.campaignKey === canonicalKey) return
+  group.campaignKey = canonicalKey
+  for (const row of group.rows) {
+    row.campaignKey = canonicalKey
+    row.sourceUniqueKey = buildSourceUniqueKey(canonicalKey, row.rowToken, row.phoneNorm)
+  }
 }
 
 /**
