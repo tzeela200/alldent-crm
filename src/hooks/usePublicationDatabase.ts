@@ -30,6 +30,21 @@ export const PUBLICATION_DB_KEYS = {
   optOut: ['publication-database', 'opt-out-ids'] as const,
 }
 
+/**
+ * סוג יישוב — שדה טקסט על `contact`, נגזר מהעיר ע"י
+ * `trg_contact_fill_region_locality_from_city`. שני ערכים בלבד במסד
+ * (אומת 01/09/2026: 29,279 יהודי · 2,031 ערבי · 382 ריק).
+ * ה-382 הריקים הם רשומות בלי עיר — ולכן יש להם אפשרות סינון משלהם,
+ * אחרת הם היו נעלמים בשקט בכל סינון לפי סוג יישוב.
+ */
+export const LOCALITY_TYPES = ['יישוב יהודי', 'יישוב ערבי'] as const
+export const LOCALITY_UNCLASSIFIED = '__unclassified__'
+
+export const LOCALITY_FILTER_OPTIONS: { value: string; label: string }[] = [
+  ...LOCALITY_TYPES.map((v) => ({ value: v, label: v })),
+  { value: LOCALITY_UNCLASSIFIED, label: 'ללא סיווג (אין עיר)' },
+]
+
 export const PAGE_SIZE = 25
 /** כמה מזהים נכנסים ל-in(...) אחד לפני שה-URL של PostgREST נחתך */
 const IN_CHUNK = 250
@@ -40,16 +55,19 @@ export interface PublicationDbFilters {
   regionIds: number[]
   cityIds: number[]
   outcomes: DeliveryOutcome[]
+  /** ערך מ-LOCALITY_TYPES, או LOCALITY_UNCLASSIFIED, או '' לכולם */
+  localityType: string
   sentFrom: string
   sentTo: string
 }
 
 export const EMPTY_DB_FILTERS: PublicationDbFilters = {
-  search: '', roleIds: [], regionIds: [], cityIds: [], outcomes: [], sentFrom: '', sentTo: '',
+  search: '', roleIds: [], regionIds: [], cityIds: [], outcomes: [],
+  localityType: '', sentFrom: '', sentTo: '',
 }
 
 export function hasActiveDbFilters(f: PublicationDbFilters): boolean {
-  return !!f.search || !!f.sentFrom || !!f.sentTo ||
+  return !!f.search || !!f.sentFrom || !!f.sentTo || !!f.localityType ||
     f.roleIds.length > 0 || f.regionIds.length > 0 || f.cityIds.length > 0 || f.outcomes.length > 0
 }
 
@@ -63,6 +81,7 @@ export interface PublicationDbRow {
   region_id: number | null
   city_id: number | null
   social_status: number | null
+  locality_type: string | null
   whatsapp_campaign_last_sent: string | null
   whatsapp_last_delivery_status: string | null
   /** נגזר — לא עמודה במסד */
@@ -77,7 +96,7 @@ export interface PublicationDbRow {
 
 const ROW_COLUMNS =
   'contact_id, full_name, display_name, phone, phone_norm, role, region_id, city_id, ' +
-  'social_status, whatsapp_campaign_last_sent, whatsapp_last_delivery_status'
+  'social_status, locality_type, whatsapp_campaign_last_sent, whatsapp_last_delivery_status'
 
 export const PUBLICATION_DB_SORT_COLUMNS: Record<string, string> = {
   name: 'full_name',
@@ -175,6 +194,8 @@ function applyBaseFilters<Q>(queryIn: Q, f: PublicationDbFilters): Q {
   if (f.roleIds.length) q = q.in('role', f.roleIds)
   if (f.regionIds.length) q = q.in('region_id', f.regionIds)
   if (f.cityIds.length) q = q.in('city_id', f.cityIds)
+  if (f.localityType === LOCALITY_UNCLASSIFIED) q = q.is('locality_type', null)
+  else if (f.localityType) q = q.eq('locality_type', f.localityType)
   if (f.sentFrom) q = q.gte('whatsapp_campaign_last_sent', f.sentFrom)
   if (f.sentTo) q = q.lte('whatsapp_campaign_last_sent', `${f.sentTo}T23:59:59`)
   return q

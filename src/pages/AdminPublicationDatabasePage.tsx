@@ -34,7 +34,7 @@ import { usePublicationDicts } from '@/hooks/useFixPublications'
 import {
   usePublicationDatabase, usePublicationDbStats, useOptedOutContactIds,
   fetchAllPublicationRows,
-  EMPTY_DB_FILTERS, hasActiveDbFilters,
+  EMPTY_DB_FILTERS, hasActiveDbFilters, LOCALITY_FILTER_OPTIONS,
   type PublicationDbFilters, type PublicationDbRow,
 } from '@/hooks/usePublicationDatabase'
 
@@ -45,6 +45,7 @@ const ALL_COLUMNS: { key: string; label: string }[] = [
   { key: 'role',          label: 'תפקיד' },
   { key: 'region',        label: 'אזור' },
   { key: 'city',          label: 'עיר' },
+  { key: 'locality_type', label: 'סוג יישוב' },
   { key: 'phone',         label: 'נייד' },
   { key: 'outcome',       label: 'מצב' },
   { key: 'last_status',   label: 'סטטוס אחרון' },
@@ -58,7 +59,8 @@ const ALL_COLUMNS: { key: string; label: string }[] = [
 const ALL_COLUMN_KEYS = new Set(ALL_COLUMNS.map((c) => c.key))
 
 const DEFAULT_COLUMNS = [
-  'name', 'role', 'region', 'city', 'phone', 'outcome', 'last_sent', 'campaigns', 'read',
+  'name', 'role', 'region', 'city', 'locality_type', 'phone', 'outcome', 'last_sent',
+  'campaigns', 'read',
 ]
 
 function loadStoredVisibleColumns(): string[] {
@@ -172,6 +174,11 @@ export default function AdminPublicationDatabasePage() {
       render: (row) => (row.city_id ? dicts.data?.cityById.get(Number(row.city_id)) ?? '—' : '—'),
     },
     {
+      // נגזר מהעיר ע"י טריגר במסד — תצוגה בלבד, לא נערך כאן
+      key: 'locality_type', label: 'סוג יישוב', nowrap: true,
+      render: (row) => row.locality_type ?? <span className="text-[#6B6B6B]">—</span>,
+    },
+    {
       key: 'phone', label: 'נייד', sortable: true, nowrap: true,
       render: (row) => {
         const display = formatPhone(row.phone_norm ?? row.phone)
@@ -266,6 +273,7 @@ export default function AdminPublicationDatabasePage() {
         'תפקיד': (row.role ? dicts.data?.roleById.get(Number(row.role)) : '') ?? '',
         'אזור': (row.region_id ? dicts.data?.regionById.get(Number(row.region_id)) : '') ?? '',
         'עיר': (row.city_id ? dicts.data?.cityById.get(Number(row.city_id)) : '') ?? '',
+        'סוג יישוב': row.locality_type ?? '',
         'נייד': formatPhone(row.phone_norm ?? row.phone) || '',
         'מצב': getOutcomeMeta(row.outcome).label,
         'סטטוס אחרון': row.whatsapp_last_delivery_status
@@ -405,7 +413,7 @@ export default function AdminPublicationDatabasePage() {
           )}
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <DictionaryMultiSelect
             label="תפקיד" options={dicts.data?.roles ?? []} value={filters.roleIds}
             onChange={(v) => patch({ roleIds: v })} maxHeightClassName="max-h-36"
@@ -419,6 +427,15 @@ export default function AdminPublicationDatabasePage() {
             options={cityOptions} value={filters.cityIds}
             onChange={(v) => patch({ cityIds: v })} maxHeightClassName="max-h-36"
           />
+          <label className="flex flex-col gap-1">
+            <span className="text-xs text-[#6B6B6B]">סוג יישוב</span>
+            <SelectFilter
+              value={filters.localityType}
+              onChange={(value) => patch({ localityType: value })}
+              options={LOCALITY_FILTER_OPTIONS}
+              placeholder="כל סוגי היישוב"
+            />
+          </label>
           <label className="flex flex-col gap-1">
             <span className="text-xs text-[#6B6B6B]">מצב שליחה</span>
             <SelectFilter
