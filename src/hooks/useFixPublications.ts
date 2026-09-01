@@ -341,6 +341,18 @@ export interface CampaignPlan {
   statusUpdates: number
   matched: number
   notFound: number
+  /**
+   * חשד שהקמפיין הזה כבר נקלט בשם אחר. אינו חוסם — רק מתריע, כי רק
+   * המשתמשת יודעת אם מדובר באותו פרסום או בשליחה נוספת באותה דקה.
+   */
+  duplicateWarning: DuplicateWarning | null
+}
+
+export interface DuplicateWarning {
+  /** same_file = אותו קובץ בדיוק (חתימת SHA-256) · same_time = אותו מועד שליחה */
+  kind: 'same_file' | 'same_time'
+  existingCampaignName: string
+  existingSourceFile: string | null
 }
 
 export interface CampaignPreview {
@@ -435,10 +447,14 @@ export async function buildCampaignPreview(file: File): Promise<CampaignPreview>
     row.alreadyExists = !!prior
   }
 
-  const campaigns: CampaignPlan[] = groups.map((group) => {
-    const plan = buildPlan(group, existingCampaigns.get(group.campaignKey) ?? null, existingRecipients)
-    return plan
-  })
+  const warnings = await detectDuplicateCampaigns(groups, existingCampaigns, fileHash)
+
+  const campaigns: CampaignPlan[] = groups.map((group) => buildPlan(
+    group,
+    existingCampaigns.get(group.campaignKey) ?? null,
+    existingRecipients,
+    warnings.get(group.campaignKey) ?? null,
+  ))
 
   const byStatus: Record<string, number> = {}
   for (const r of rows) byStatus[r.deliveryStatus] = (byStatus[r.deliveryStatus] ?? 0) + 1
@@ -471,10 +487,80 @@ export async function buildCampaignPreview(file: File): Promise<CampaignPreview>
   }
 }
 
+/**
+ * מאתר קמפיינים שכבר נקלטו וסביר שהם אותו פרסום, גם אם שם הקובץ שונה.
+ *
+ * שני סימנים, שניהם לא-חוסמים:
+ *  1. **אותו קובץ בדיוק** — חתימת SHA-256 זהה לקמפיין קיים.
+ *  2. **אותו מועד שליחה** — Fix שולח קמפיין שלם באותה דקה, ולכן שני
+ *     קמפיינים שנפתחים באותה חותמת זמן הם כמעט תמיד אותו פרסום.
+ *
+ * למה רק להתריע ולא לחסום: ייתכן ששני פרסומים שונים באמת יצאו באותה דקה,
+ * ורק המשתמשת יודעת. חסימה שקטה הייתה מאבדת נתונים אמיתיים.
+ */
+async function detectDuplicateCampaigns(
+  groups: CampaignGroup[],
+  existingCampaigns: Map<string, number>,
+  fileHash: string,
+): Promise<Map<string, DuplicateWarning>> {
+  const out = new Map<string, DuplicateWarning>()
+
+  // 1. אותו קובץ בדיוק
+  const { data: sameFile } = await supabase
+    .from('whatsapp_campaigns')
+    .select('campaign_name, source_file_name, external_campaign_id')
+    .eq('raw_payload->>file_hash', fileHash)
+    .limit(20)
+
+  const sameFileOther = (sameFile ?? []).filter(
+    (c) => !groups.some((g) => g.campaignKey === c.external_campaign_id),
+  )
+
+  // 2. אותו מועד שליחה, תחת מזהה אחר
+  const stamps = groups.map((g) => g.startedAt).filter(Boolean) as string[]
+  const byStamp = new Map<string, { campaign_name: string | null; source_file_name: string | null; external_campaign_id: string | null }>()
+  if (stamps.length) {
+    const { data } = await supabase
+      .from('whatsapp_campaigns')
+      .select('campaign_name, source_file_name, started_at, external_campaign_id')
+      .in('started_at', Array.from(new Set(stamps)))
+      .limit(200)
+    for (const c of data ?? []) {
+      if (c.started_at) byStamp.set(String(c.started_at), c)
+    }
+  }
+
+  for (const group of groups) {
+    // קמפיין שכבר מזוהה לפי המזהה שלו אינו "כפילות" — הוא פשוט אותו קמפיין
+    if (existingCampaigns.has(group.campaignKey)) continue
+
+    const fileMatch = sameFileOther[0]
+    if (fileMatch) {
+      out.set(group.campaignKey, {
+        kind: 'same_file',
+        existingCampaignName: fileMatch.campaign_name ?? 'קמפיין ללא שם',
+        existingSourceFile: fileMatch.source_file_name ?? null,
+      })
+      continue
+    }
+
+    const timeMatch = group.startedAt ? byStamp.get(group.startedAt) : null
+    if (timeMatch && timeMatch.external_campaign_id !== group.campaignKey) {
+      out.set(group.campaignKey, {
+        kind: 'same_time',
+        existingCampaignName: timeMatch.campaign_name ?? 'קמפיין ללא שם',
+        existingSourceFile: timeMatch.source_file_name ?? null,
+      })
+    }
+  }
+  return out
+}
+
 function buildPlan(
   group: CampaignGroup,
   existingCampaignId: number | null,
   existingRecipients: Map<string, ExistingRecipient>,
+  duplicateWarning: DuplicateWarning | null,
 ): CampaignPlan {
   let statusUpdates = 0
   for (const row of group.rows) {
@@ -504,6 +590,7 @@ function buildPlan(
       (r) => r.matchResult === 'matched_contact' || r.matchResult === 'matched_account',
     ).length,
     notFound: group.rows.filter((r) => r.matchResult === 'not_found').length,
+    duplicateWarning,
   }
 }
 
@@ -629,6 +716,7 @@ async function commitCampaignPreview(preview: CampaignPreview): Promise<CommitRe
           completed_at: group.completedAt,
           raw_payload: {
             imported_from: preview.fileName,
+            // נשמר כדי לזהות בעתיד אותו קובץ בדיוק שהועלה בשם אחר
             file_hash: preview.fileHash,
             source_label: group.label,
             imported_at: new Date().toISOString(),
