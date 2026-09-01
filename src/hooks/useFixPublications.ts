@@ -39,6 +39,7 @@ import { supabase } from '@/lib/supabase'
 import {
   readCampaignFile, parseCampaignSheets, validateCampaignFile, groupIntoCampaigns,
   computeFileHash, inferCampaignSentAt, suggestCampaignName, rekeyCampaignGroup,
+  markInFileDuplicates, sendEventKey,
   type ParsedCampaignRow, type CampaignGroup, type FileValidation, type MatchResult,
 } from '@/lib/fixPublications/campaignParser'
 import { pickHigherStatus, type DeliveryStatusCode } from '@/lib/fixPublications/deliveryStatus'
@@ -405,6 +406,10 @@ export interface CampaignPreview {
     invalidPhone: number
     missingPhone: number
     alreadyExists: number
+    /** אותו אדם, אותו מועד שליחה — חוזר בתוך הקובץ */
+    duplicateInFile: number
+    /** אותו אדם, אותו מועד שליחה — כבר נרשם, גם תחת קמפיין אחר */
+    duplicateAlreadySent: number
     statusUpdates: number
     willInsert: number
     byStatus: Record<string, number>
@@ -413,6 +418,36 @@ export interface CampaignPreview {
 
 /** הסטטוס הקיים לשורה שכבר נקלטה — משמש כדי לדעת אם הסטטוס התקדם */
 type ExistingRecipient = { recipient_id: number; delivery_status: DeliveryStatusCode }
+
+/**
+ * כל אירועי השליחה שכבר רשומים עבור הניידים שבקובץ — **בכל הקמפיינים**.
+ *
+ * תופס שני מקרים שזהות-הקמפיין לא תופסת:
+ *  · אותו קובץ שהועלה בשני שמות, כשייצוא מחדש שינה את החתימה
+ *  · קובץ מאוחד שבולע דוחות בודדים שכבר נקלטו בנפרד
+ * בשני המקרים זה אותו אדם ואותה שנייה — כלומר אותו אירוע.
+ */
+async function fetchExistingSendEvents(phones: string[]): Promise<Set<string>> {
+  const out = new Set<string>()
+  for (let i = 0; i < phones.length; i += IN_CHUNK) {
+    const chunk = phones.slice(i, i + IN_CHUNK)
+    for (let page = 0; ; page++) {
+      const { data, error } = await supabase
+        .from('whatsapp_campaign_recipients')
+        .select('phone_norm, sent_at')
+        .in('phone_norm', chunk)
+        .not('sent_at', 'is', null)
+        .range(page * 1000, page * 1000 + 999)
+      if (error) throw error
+      for (const row of data ?? []) {
+        const key = sendEventKey(row.phone_norm as string, row.sent_at as string)
+        if (key) out.add(key)
+      }
+      if (!data || data.length < 1000) break
+    }
+  }
+  return out
+}
 
 async function fetchExistingRecipients(campaignIds: number[]): Promise<Map<string, ExistingRecipient>> {
   const out = new Map<string, ExistingRecipient>()
@@ -488,6 +523,21 @@ export async function buildCampaignPreview(
     row.alreadyExists = existingRecipients.has(row.sourceUniqueKey)
   }
 
+  // ── שכבת ההגנה החזקה: אדם + מועד שליחה ──
+  // זהות הקמפיין נגזרת משם הקובץ ולכן שבירה; מפתח האירוע אינו תלוי בשם כלל.
+  const duplicateInFile = markInFileDuplicates(rows)
+  const filePhones = Array.from(new Set(rows.map((r) => r.phoneNorm).filter(Boolean))) as string[]
+  const existingEvents = await fetchExistingSendEvents(filePhones)
+  let duplicateAlreadySent = 0
+  for (const row of rows) {
+    if (row.duplicateReason || row.alreadyExists) continue
+    const key = sendEventKey(row.phoneNorm, row.sentAt)
+    if (key && existingEvents.has(key)) {
+      row.duplicateReason = 'already_sent'
+      duplicateAlreadySent++
+    }
+  }
+
   const campaigns: CampaignPlan[] = groups.map((group) => buildPlan(
     group,
     resolved.get(group.campaignKey)?.campaignId ?? null,
@@ -517,10 +567,12 @@ export async function buildCampaignPreview(
       invalidPhone: countMatch('invalid_phone'),
       missingPhone: countMatch('missing_phone'),
       alreadyExists,
+      duplicateInFile,
+      duplicateAlreadySent,
       statusUpdates: campaigns.reduce((sum, c) => sum + c.statusUpdates, 0),
-      // רק שורות עם נייד תקין ניתנות לשמירה (identifier_chk), ורק כאלה
-      // שטרם נקלטו. זה המספר שמופיע על כפתור האישור.
-      willInsert: rows.filter((r) => r.phoneNorm && !r.alreadyExists).length,
+      // רק שורות עם נייד תקין ניתנות לשמירה (identifier_chk), שטרם נקלטו,
+      // ושאינן חזרה על אירוע שליחה שכבר קיים. זה המספר שעל כפתור האישור.
+      willInsert: rows.filter((r) => r.phoneNorm && !r.alreadyExists && !r.duplicateReason).length,
       byStatus,
     },
   }
@@ -837,7 +889,9 @@ async function commitCampaignPreview(preview: CampaignPreview): Promise<CommitRe
     // whatsapp_campaign_recipients_identifier_chk דורש לפחות אחד מתוך
     // fix_contact_link_id / fixdigital_id / phone_norm, ודוח תוצאות הקמפיין
     // אינו מספק את שני הראשונים. שורה כזו הייתה מפילה את כל מנת ה-INSERT.
-    const storable = group.rows.filter((r) => r.phoneNorm)
+    // שורה שמתארת אירוע שכבר נרשם (אותו אדם, אותה שנייה) אינה נשמרת —
+    // בין אם החזרה היא בתוך הקובץ ובין אם מול מה שכבר במערכת.
+    const storable = group.rows.filter((r) => r.phoneNorm && !r.duplicateReason)
     const newRows = storable.filter((r) => !r.alreadyExists)
     result.skippedNoPhone += group.rows.length - storable.length
     result.skippedExisting += storable.length - newRows.length

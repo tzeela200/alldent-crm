@@ -257,6 +257,15 @@ export interface ParsedCampaignRow {
   accountId: number | null
   /** האם השורה כבר קיימת ב-Supabase (נקבע מול המאגר, לא מהקובץ) */
   alreadyExists: boolean
+  /**
+   * השורה מתארת שליחה שכבר נרשמה — אותו אדם, אותו מועד שליחה בדיוק.
+   * `in_file`      — הופיעה יותר מפעם אחת בקובץ שהועלה
+   * `already_sent` — כבר קיימת במערכת, גם אם תחת קמפיין אחר
+   *
+   * אדם לא יכול לקבל את אותה הודעה פעמיים באותה שנייה. זה מזהה האירוע
+   * האמיתי, והוא חזק יותר מזהות הקמפיין (שנגזרת משם הקובץ).
+   */
+  duplicateReason: 'in_file' | 'already_sent' | null
   /** שורת המקור כפי שהתקבלה, ללא שינוי */
   rawPayload: RawRow
 }
@@ -350,6 +359,7 @@ export function parseCampaignSheets(sheets: SheetRows[], fallbackLabel: string):
         contactId: null,
         accountId: null,
         alreadyExists: false,
+        duplicateReason: null,
         rawPayload: raw,
       })
     })
@@ -408,6 +418,40 @@ export function groupIntoCampaigns(rows: ParsedCampaignRow[]): CampaignGroup[] {
   }
 
   return Array.from(groups.values()).sort((a, b) => (a.startedAt ?? '').localeCompare(b.startedAt ?? ''))
+}
+
+/**
+ * מפתח האירוע האמיתי: אדם + מועד שליחה מדויק.
+ *
+ * זהות הקמפיין נגזרת משם הקובץ ולכן שבירה — אותו דוח בשני שמות, או קובץ
+ * מאוחד שבולע דוחות בודדים, יוצרים "קמפיינים" שונים לאותה שליחה. מפתח
+ * האירוע אינו תלוי בשם הקובץ כלל, ולכן הוא התופס האמיתי של כפילויות.
+ *
+ * הזמן מנורמל ל-epoch כדי שפורמטים שונים (ISO עם/בלי מילישניות, אזור זמן)
+ * ייתנו את אותו מפתח.
+ */
+export function sendEventKey(phoneNorm: string | null, sentAt: string | null): string | null {
+  if (!phoneNorm || !sentAt) return null
+  const t = new Date(sentAt).getTime()
+  return Number.isNaN(t) ? null : `${phoneNorm}|${t}`
+}
+
+/**
+ * מסמן שורות שחוזרות **בתוך הקובץ עצמו** — אותו אדם, אותו מועד שליחה.
+ * הופעה ראשונה נשמרת; השאר מסומנות ומדולגות.
+ *
+ * זה קורה בפועל: קובץ שנצפה הכיל 469 שורות ורק 236 אנשים.
+ */
+export function markInFileDuplicates(rows: ParsedCampaignRow[]): number {
+  const seen = new Set<string>()
+  let marked = 0
+  for (const row of rows) {
+    const key = sendEventKey(row.phoneNorm, row.sentAt)
+    if (!key) continue
+    if (seen.has(key)) { row.duplicateReason = 'in_file'; marked++ }
+    else seen.add(key)
+  }
+  return marked
 }
 
 /**

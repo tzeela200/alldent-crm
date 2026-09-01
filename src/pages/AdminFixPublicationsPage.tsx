@@ -651,7 +651,7 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
             </Toolbar>
           )}
 
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4 xl:grid-cols-7">
             <KPICard label="שורות בקובץ" value={preview.counts.total} />
             <KPICard label="קמפיינים בקובץ" value={preview.counts.campaigns} icon={Layers} />
             <KPICard
@@ -664,6 +664,14 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
               label="כבר קיימות"
               value={preview.counts.alreadyExists}
               hint={preview.counts.statusUpdates ? `${preview.counts.statusUpdates} סטטוסים התקדמו` : undefined}
+            />
+            <KPICard
+              label="שליחות כפולות"
+              value={preview.counts.duplicateInFile + preview.counts.duplicateAlreadySent}
+              hint={
+                `${preview.counts.duplicateInFile} חוזרות בקובץ · ` +
+                `${preview.counts.duplicateAlreadySent} כבר נרשמו במערכת`
+              }
             />
             <KPICard
               label="לא ייקלטו"
@@ -884,7 +892,7 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
     sentAt: (r) => r.sentAt,
     deliveryStatus: (r) => getDeliveryStatusMeta(r.deliveryStatus).label,
     matchResult: (r) => MATCH_RESULT_LABELS[r.matchResult] ?? r.matchResult,
-    alreadyExists: (r) => (r.alreadyExists ? 1 : 0),
+    alreadyExists: (r) => (r.duplicateReason ? 2 : r.alreadyExists ? 1 : 0),
     fixStatusRaw: (r) => r.fixStatusRaw,
   }, 'rowNumber')
 
@@ -922,12 +930,28 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
       ),
     },
     {
-      key: 'alreadyExists', label: 'נקלט בעבר', sortable: true, nowrap: true, minWidth: '110px',
-      render: (r) => (r.alreadyExists
-        ? <span title="השורה הזו כבר קיימת במערכת מקליטה קודמת — היא תדולג ולא תיקלט פעם שנייה">
-            <StatusPill label="כן — ידולג" variant="default" />
-          </span>
-        : <span title="שורה חדשה — תיקלט עכשיו" className="text-[#6B6B6B]">חדשה</span>),
+      key: 'alreadyExists', label: 'נקלט בעבר', sortable: true, nowrap: true, minWidth: '150px',
+      render: (r) => {
+        if (r.duplicateReason === 'in_file') {
+          return (
+            <span title="אותו אדם ואותו מועד שליחה מופיעים יותר מפעם אחת בקובץ הזה — רק ההופעה הראשונה תיקלט">
+              <StatusPill label="כפולה בקובץ" variant="warning" />
+            </span>
+          )
+        }
+        if (r.duplicateReason === 'already_sent') {
+          return (
+            <span title="השליחה הזו כבר רשומה במערכת — אותו אדם, אותו מועד שליחה, גם אם תחת קמפיין אחר">
+              <StatusPill label="נשלחה כבר" variant="warning" />
+            </span>
+          )
+        }
+        return r.alreadyExists
+          ? <span title="השורה הזו כבר קיימת במערכת מקליטה קודמת — היא תדולג ולא תיקלט פעם שנייה">
+              <StatusPill label="כן — ידולג" variant="default" />
+            </span>
+          : <span title="שורה חדשה — תיקלט עכשיו" className="text-[#6B6B6B]">חדשה</span>
+      },
     },
     { key: 'fixStatusRaw', label: 'סטטוס ב-Fix', sortable: true, render: (r) => r.fixStatusRaw ?? '—' },
   ]
@@ -942,8 +966,10 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
             תצוגה מקדימה {rows.length < preview.rows.length && `(${rows.length} ראשונות מתוך ${preview.rows.length})`}
           </h2>
           <p className="mt-0.5 text-[13px] text-[#6B6B6B]">
-            עמודת „נקלט בעבר" אומרת אם השורה כבר נמצאת במערכת מקליטה קודמת.
-            שורה כזו תדולג — לא תיווצר כפילות.
+            עמודת „נקלט בעבר" אומרת אם השורה תיקלט או תדולג. „כפולה בקובץ" =
+            אותו אדם ואותו מועד שליחה מופיעים יותר מפעם אחת בקובץ הזה.
+            „נשלחה כבר" = השליחה הזו כבר רשומה במערכת, גם אם תחת קמפיין בשם אחר.
+            בכל המקרים האלה השורה תדולג ולא תיווצר כפילות.
           </p>
         </div>
         {issueCount > 0 && (

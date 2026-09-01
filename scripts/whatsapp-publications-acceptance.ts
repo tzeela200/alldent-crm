@@ -10,6 +10,7 @@ import * as XLSX from 'xlsx'
 import {
   readCampaignFile, parseCampaignSheets, groupIntoCampaigns, validateCampaignFile,
   detectFieldMap, parseSendingTime, buildSourceUniqueKey, campaignKeyOf, rekeyCampaignGroup,
+  markInFileDuplicates, sendEventKey,
 } from '@/lib/fixPublications/campaignParser'
 import { mapDeliveryStatus, failureCategoryOf, isOptOutText, isMediaFailureText } from '@/lib/fixPublications/deliveryStatus'
 import { outcomeOf, outcomeOfRecord, assertOutcomeCoverage, OUTCOME_STATUS_CODES } from '@/lib/fixPublications/deliveryOutcome'
@@ -219,6 +220,33 @@ async function main() {
     gB[0].rows.every((r, i) => r.sourceUniqueKey === gA[0].rows[i].sourceUniqueKey), true)
   check('מיפוי לאותו מזהה אינו משנה דבר',
     (() => { const before = gA[0].rows[0].sourceUniqueKey; rekeyCampaignGroup(gA[0], gA[0].campaignKey); return gA[0].rows[0].sourceUniqueKey === before })(), true)
+
+
+  // ── 13. אירוע שליחה = אדם + מועד. ההגנה החזקה (INC-3136) ──
+  check('מפתח אירוע זהה לשני פורמטי זמן',
+    sendEventKey('972501111111', '2026-07-19T21:00:00.000Z') ===
+    sendEventKey('972501111111', '2026-07-19 21:00:00+00'), true)
+  check('בלי נייד אין מפתח', sendEventKey(null, '2026-07-19T21:00:00Z'), null)
+  check('בלי מועד אין מפתח', sendEventKey('972501111111', null), null)
+
+  // קובץ שבו כל אדם מופיע פעמיים ברצף — בדיוק מה שנצפה בפועל
+  const dupFile = makeFile([{ name: 'Sheet1', rows: [
+    { fullname: 'דר א', phone: '0501111111', sending_status: 'Delivered', sending_time: '2026-07-20 00:00' },
+    { fullname: 'דר א', phone: '0501111111', sending_status: 'Delivered', sending_time: '2026-07-20 00:00' },
+    { fullname: 'דר ב', phone: '0502222222', sending_status: 'Read',      sending_time: '2026-07-20 00:00' },
+    { fullname: 'דר ב', phone: '0502222222', sending_status: 'Read',      sending_time: '2026-07-20 00:00' },
+  ] }], '2026-07-20 469.csv')
+  const dupRows = parseCampaignSheets(await readCampaignFile(dupFile), dupFile.name)
+  check('4 שורות בקובץ', dupRows.length, 4)
+  check('מפתחות שורה שונים (אינדקס שונה)',
+    dupRows[0].sourceUniqueKey !== dupRows[1].sourceUniqueKey, true)
+  check('אבל מפתח האירוע זהה',
+    sendEventKey(dupRows[0].phoneNorm, dupRows[0].sentAt) === sendEventKey(dupRows[1].phoneNorm, dupRows[1].sentAt), true)
+  check('סומנו 2 כפילויות בקובץ', markInFileDuplicates(dupRows), 2)
+  check('ההופעה הראשונה נשמרת', dupRows[0].duplicateReason, null)
+  check('השנייה מסומנת', dupRows[1].duplicateReason, 'in_file')
+  check('רק 2 שורות ייקלטו', dupRows.filter((r) => !r.duplicateReason).length, 2)
+  check('הרצה חוזרת לא מסמנת שוב', markInFileDuplicates(dupRows), 2)
 
   console.log(failures ? `\n${failures} בדיקות נכשלו` : '\nכל הבדיקות עברו')
   process.exit(failures ? 1 : 0)
