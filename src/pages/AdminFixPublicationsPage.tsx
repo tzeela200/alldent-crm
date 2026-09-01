@@ -794,13 +794,31 @@ function CampaignPlanTable({ plans }: { plans: CampaignPlan[] }) {
         )
       },
     },
-    { key: 'startedAt', label: 'מועד פרסום', nowrap: true, render: (p) => formatDateTime(p.startedAt) },
+    {
+      // Fix שולח קמפיין שלם באותה דקה, ולכן בדרך כלל יש רק חותמת אחת.
+      // כשהשליחה נמשכה — מוצג הטווח, כי זה מה שמבדיל בין שתי שליחות.
+      key: 'startedAt', label: 'תאריך ושעת שליחה', nowrap: true, minWidth: '170px',
+      render: (p) => {
+        if (!p.startedAt) return '—'
+        const from = formatDateTime(p.startedAt)
+        const to = p.completedAt ? formatDateTime(p.completedAt) : from
+        return from === to ? from : (
+          <span title="השליחה נמשכה לאורך זמן">
+            {from} <span className="text-[#6B6B6B]">עד</span> {to}
+          </span>
+        )
+      },
+    },
     { key: 'processName', label: 'תהליך', render: (p) => p.processName ?? '—' },
     { key: 'rowCount', label: 'שורות', nowrap: true, render: (p) => p.rowCount.toLocaleString('he-IL') },
     { key: 'newRows', label: 'ייקלטו', nowrap: true, render: (p) => p.newRows.toLocaleString('he-IL') },
     {
-      key: 'existingRows', label: 'כבר קיימות', nowrap: true,
-      render: (p) => (p.existingRows ? p.existingRows.toLocaleString('he-IL') : '—'),
+      key: 'existingRows', label: 'נקלטו בעבר', nowrap: true,
+      render: (p) => (
+        <span title="שורות שכבר קיימות במערכת מקליטה קודמת — ידולגו ולא ייקלטו פעם שנייה">
+          {p.existingRows ? p.existingRows.toLocaleString('he-IL') : '—'}
+        </span>
+      ),
     },
     {
       key: 'noPhone', label: 'לא ייקלטו', nowrap: true,
@@ -843,6 +861,14 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
     { key: 'fullNameRaw', label: 'שם בפיקס', render: (r) => r.fullNameRaw ?? '—' },
     { key: 'phoneRaw', label: 'נייד', nowrap: true, render: (r) => formatPhone(r.phoneRaw) || r.phoneRaw || '—' },
     {
+      // מועד השליחה של השורה עצמה, כפי שהוא בקובץ. בדרך כלל זהה לכל שורות
+      // הקמפיין, אבל מוצג ברמת השורה כי הוא מה שנשמר ב-sent_at.
+      key: 'sentAt', label: 'תאריך ושעת שליחה', nowrap: true, minWidth: '150px',
+      render: (r) => (r.sentAt
+        ? formatDateTime(r.sentAt)
+        : <span className="text-[#E8A85C]" title="לא נמצא מועד שליחה בשורה">חסר</span>),
+    },
+    {
       key: 'deliveryStatus', label: 'סטטוס שליחה', nowrap: true,
       render: (r) => {
         const meta = getDeliveryStatusMeta(r.deliveryStatus)
@@ -863,8 +889,12 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
       ),
     },
     {
-      key: 'alreadyExists', label: 'קיים כבר', nowrap: true,
-      render: (r) => (r.alreadyExists ? <StatusPill label="כן" variant="default" /> : '—'),
+      key: 'alreadyExists', label: 'נקלט בעבר', nowrap: true, minWidth: '110px',
+      render: (r) => (r.alreadyExists
+        ? <span title="השורה הזו כבר קיימת במערכת מקליטה קודמת — היא תדולג ולא תיקלט פעם שנייה">
+            <StatusPill label="כן — ידולג" variant="default" />
+          </span>
+        : <span title="שורה חדשה — תיקלט עכשיו" className="text-[#6B6B6B]">חדשה</span>),
     },
     { key: 'fixStatusRaw', label: 'סטטוס ב-Fix', render: (r) => r.fixStatusRaw ?? '—' },
   ]
@@ -874,9 +904,15 @@ function PreviewTable({ preview }: { preview: CampaignPreview }) {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="text-[15px] font-semibold text-[#2D2D2D]">
-          תצוגה מקדימה {rows.length < preview.rows.length && `(${rows.length} ראשונות מתוך ${preview.rows.length})`}
-        </h2>
+        <div>
+          <h2 className="text-[15px] font-semibold text-[#2D2D2D]">
+            תצוגה מקדימה {rows.length < preview.rows.length && `(${rows.length} ראשונות מתוך ${preview.rows.length})`}
+          </h2>
+          <p className="mt-0.5 text-[13px] text-[#6B6B6B]">
+            עמודת „נקלט בעבר" אומרת אם השורה כבר נמצאת במערכת מקליטה קודמת.
+            שורה כזו תדולג — לא תיווצר כפילות.
+          </p>
+        </div>
         {issueCount > 0 && (
           <label className="flex cursor-pointer items-center gap-2 text-sm text-[#2D2D2D]">
             <input
