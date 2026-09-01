@@ -5,26 +5,58 @@ import { supabase } from '@/lib/supabase'
  * מצב הסנכרון הנכנס מ-Google Contacts (INC-3125).
  *
  * מקור: `integration_sync_runs`, workflow `GOOGLE-01B — Google Inbound Delta`.
- * זהו הכיוון הנכנס בלבד (Google → Supabase); הכיוון ההפוך הוא 01C ואינו מוצג כאן.
+ * זהו הכיוון הנכנס בלבד (Google → Supabase); 01C ו-01D הם היוצאים ואינם מוצגים כאן.
  *
  * ⚠ `started_at` נשמר ב-UTC. ההמרה לשעון ישראל נעשית **כאן ולא בקומפוננטה**,
  * אחרת המסך יציג הרצה של 12:00 כאילו רצה ב-09:00.
  *
- * ההרצה מכסה את שלושת החשבונות יחד, ולכן זמן ההרצה זהה לשלושתם. מה שכן
- * שונה בין החשבונות הוא מתי נכנס מכל אחד מהם מידע בפועל.
+ * ═══ שני מדדים נפרדים, ולא אחד ═══
+ *
+ * הכרטיס הציג בעבר תאריך אחד לכל חשבון, שנלקח מ-`max(inbox_v2.created_at)`,
+ * ונקרא "נכנס לאחרונה". זה היה מטעה: `inbox_v2` היא **החלטה של המערכת**
+ * שמשהו שווה טיפול, ולא רישום של מה ש-Google החזיר.
+ *
+ * הראיה: הרצת 01B ב-31/08 10:00 (run 295) החזירה 39 שינויים ב-google_workers
+ * ועדכנה אותם (`records_updated: 39`) — ולתור לא נכנסה ולו שורה אחת
+ * (`inbox_upserts: 0`). המסך הציג 28/08 והיה נראה כאילו החשבון לא נסרק שבוע.
+ *
+ * לכן:
+ *   scannedAt    = מתי החשבון **נסרק**   (זמן ההרצה)
+ *   lastQueuedAt = מתי נכנסה ממנו **שורה לתור** (inbox_v2)
+ *
+ * ⚠ `google_contact_links.last_synced_at` **אינו** משמש כאן. הוא נכתב על ידי
+ * כל ארבעת ה-workflows (01A/01B/01C/01D) ולכן אינו מבחין בין נכנס ליוצא:
+ * ב-01/09 הנגיעות היו ב-08:30 וב-10:15 — חלונות 01D ו-01C היוצאים — בעוד
+ * 01B הנכנס רץ ב-10:00 ולא נגע באף קישור.
  */
 
 const WORKFLOW = 'GOOGLE-01B%'
 const IL_TZ = 'Asia/Jerusalem'
 
-/** שלוש הרצות ביום עד 18:00, כל שעתיים מ-08:00. לו"ז קבוע וידוע. */
+/** שש הרצות ביום, כל שעתיים מ-08:00 עד 18:00. לו"ז קבוע וידוע. */
 const RUN_HOURS = [8, 10, 12, 14, 16, 18]
+
+/**
+ * `delta` = סנכרון רגיל מול sync_token — רק מה שהשתנה.
+ * `recovery` = ה-token פג, והמערכת קוראת מחדש את כל ספר הכתובות,
+ * עמוד אחד בכל הרצה, וקולטת רק רשומות שהשתנו אחרי ה-cutoff.
+ */
+export type SyncMode = 'delta' | 'recovery'
 
 export interface GoogleAccountSync {
   /** המפתח הטכני — google_doctors / google_workers / ... */
   key: string
-  /** מתי נכנס מהחשבון הזה מידע לאחרונה (שעון ישראל), null אם מעולם לא */
-  lastRowAt: Date | null
+  /**
+   * מתי החשבון נסרק לאחרונה (שעון ישראל).
+   * זהו זמן ההרצה, אך **רק אם הסמן של החשבון התקדם בה בפועל** — אחרת אין
+   * לנו ראיה שהוא נקרא, ואנחנו לא טוענים שנסרק.
+   */
+  scannedAt: Date | null
+  /** מתי נכנסה ממנו לאחרונה שורה לתור (שעון ישראל), null אם מעולם לא */
+  lastQueuedAt: Date | null
+  mode: SyncMode
+  /** עמוד ה-Recovery הנוכחי; null כשהחשבון ב-Delta רגיל */
+  recoveryPage: number | null
 }
 
 export interface GoogleSyncStatus {
@@ -66,6 +98,38 @@ function nextRunLabel(): string | null {
   return next != null ? `${String(next).padStart(2, '0')}:00` : `מחר ${String(RUN_HOURS[0]).padStart(2, '0')}:00`
 }
 
+type CursorNode = Record<string, unknown>
+
+function deltaOf(cursor: unknown): Record<string, CursorNode> {
+  const d = (cursor as Record<string, unknown> | null)?.delta
+  return (d ?? {}) as Record<string, CursorNode>
+}
+
+function recoveryOf(node: CursorNode | undefined): CursorNode | null {
+  const rec = node?.recovery
+  return rec && typeof rec === 'object' ? (rec as CursorNode) : null
+}
+
+/**
+ * חתימת ההתקדמות של חשבון בתוך הסמן.
+ *
+ * ההשוואה בין `cursor_before` ל-`cursor_after` היא ההוכחה הישירה היחידה
+ * לכך שחשבון מסוים אכן עובד בהרצה — אין ב-`integration_sync_runs` חותמת
+ * זמן פר-חשבון. אומת על שמונה הרצות רצופות: כל שלושת החשבונות התקדמו
+ * בעמוד אחד בכל הרצה, בלי יוצא מן הכלל.
+ */
+function progressSignature(node: CursorNode | undefined): string {
+  if (!node) return ''
+  const rec = recoveryOf(node)
+  return [
+    node.pages_completed ?? '',
+    node.sync_token ?? '',
+    node.page_token ?? '',
+    rec?.pages_completed ?? '',
+    rec?.page_token ?? '',
+  ].join('|')
+}
+
 export function useGoogleSyncStatus() {
   return useQuery<GoogleSyncStatus>({
     queryKey: ['google-sync-status'],
@@ -74,7 +138,7 @@ export function useGoogleSyncStatus() {
     queryFn: async () => {
       const { data: run, error } = await supabase
         .from('integration_sync_runs')
-        .select('started_at, status, cursor_after')
+        .select('started_at, status, cursor_before, cursor_after')
         .like('workflow_name', WORKFLOW)
         .order('started_at', { ascending: false })
         .limit(1)
@@ -85,14 +149,14 @@ export function useGoogleSyncStatus() {
         return { lastRunAt: null, status: null, accounts: [], nextRunLabel: nextRunLabel() }
       }
 
-      const delta = ((run.cursor_after as Record<string, unknown> | null)?.delta ??
-        {}) as Record<string, unknown>
-      const keys = Object.keys(delta)
+      const after = deltaOf(run.cursor_after)
+      const before = deltaOf(run.cursor_before)
+      const startedAt = toIsrael(run.started_at as string)
 
-      // מתי נכנס מכל חשבון מידע לאחרונה — source_unique_key בתבנית
+      // מתי נכנסה מכל חשבון שורה לתור — source_unique_key בתבנית
       // `google:<account_key>:<resource>` (ראו parseGoogleSource).
       const accounts: GoogleAccountSync[] = await Promise.all(
-        keys.map(async (key) => {
+        Object.keys(after).map(async (key) => {
           const { data } = await supabase
             .from('inbox_v2')
             .select('created_at')
@@ -100,12 +164,24 @@ export function useGoogleSyncStatus() {
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle()
-          return { key, lastRowAt: toIsrael((data?.created_at as string) ?? null) }
+
+          const node = after[key]
+          const rec = recoveryOf(node)
+          const active = rec?.active === true
+          const advanced = progressSignature(before[key]) !== progressSignature(node)
+
+          return {
+            key,
+            scannedAt: advanced ? startedAt : null,
+            lastQueuedAt: toIsrael((data?.created_at as string) ?? null),
+            mode: active ? 'recovery' : 'delta',
+            recoveryPage: active ? Number(rec?.pages_completed ?? 0) || null : null,
+          } satisfies GoogleAccountSync
         })
       )
 
       return {
-        lastRunAt: toIsrael(run.started_at as string),
+        lastRunAt: startedAt,
         status: (run.status as string) ?? null,
         accounts,
         nextRunLabel: nextRunLabel(),
