@@ -187,6 +187,18 @@ export const GENDER_FEMALE_ID = 1
 export const GENDER_MALE_ID = 2
 
 /**
+ * תפקידים ששם התפקיד עצמו נקבי ואינו סובל צורת זכר (INC-3137).
+ * 9 = "סייעת רופא שיניים" · 10 = "שיננית" · 13 = "מזכירה דנטלית".
+ *
+ * **מה שבמכוון אינו כאן**: 12 ("מנהל/ת דנטלי") ו-14 ("עובד/ת דנטלי").
+ * שמם דו-מגדרי, ולכן ניהול אינו מעיד על מגדר — כך הוגדר במפורש.
+ *
+ * זו **ברירת מחדל בלבד**: סימון זכר מפורש בטקסט המקור גובר עליה,
+ * והשדה נשאר פתוח לעריכה לפני היצירה.
+ */
+export const FEMININE_ROLE_IDS: ReadonlySet<number> = new Set([9, 10, 13])
+
+/**
  * מגדר נגזר מכינוי התפקיד שהגיע מ-Google (INC-3125).
  *
  * ב-Google Contacts התפקיד נכתב בתוך שם המשפחה, למשל
@@ -197,7 +209,9 @@ export const GENDER_MALE_ID = 2
  * ההשוואה היא על **מילים שלמות** ולא על הכלה. `` אינו עובד על עברית,
  * ובלי פיצול לטוקנים השם "אולדנט" היה נספר כ"דנטל".
  */
-export function deriveGenderFromSource(row: Pick<InboxV2Row, 'display_name' | 'parsed_payload' | 'raw_payload'>): number | null {
+export function deriveGenderFromSource(
+  row: Pick<InboxV2Row, 'display_name' | 'parsed_payload' | 'raw_payload' | 'temp_role'>
+): number | null {
   const parsed = (row.parsed_payload ?? {}) as Record<string, unknown>
   const raw = (row.raw_payload ?? {}) as Record<string, unknown>
   const names = Array.isArray(raw.names) ? (raw.names as Record<string, unknown>[]) : []
@@ -216,8 +230,14 @@ export function deriveGenderFromSource(row: Pick<InboxV2Row, 'display_name' | 'p
     .flatMap((t) => t.split(/[\s,.\-–—()[\]/|]+/))
     .filter(Boolean)
 
+  // כינוי מפורש גובר תמיד על ברירת המחדל של התפקיד.
   if (tokens.some((t) => t === 'מועמדת')) return GENDER_FEMALE_ID
   if (tokens.some((t) => t === 'דנטל')) return GENDER_MALE_ID
+
+  // אין כינוי — התפקיד עצמו מכריע, אך רק כשהוא נקבי באופן מובהק.
+  if (row.temp_role != null && FEMININE_ROLE_IDS.has(Number(row.temp_role))) {
+    return GENDER_FEMALE_ID
+  }
   return null
 }
 

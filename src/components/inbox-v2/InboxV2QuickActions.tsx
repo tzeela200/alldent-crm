@@ -1,9 +1,10 @@
 import { useState } from 'react'
-import { Ban, CheckCircle2, Eye, EyeOff, Tag, XCircle } from 'lucide-react'
+import { Ban, CheckCircle2, Eye, EyeOff, Tag, UserPlus, XCircle } from 'lucide-react'
 import { ActionButton } from '@/components/layout/Shell'
 import { useInboxV2Mutations } from '@/hooks/useInboxV2'
 import { useAuth } from '@/contexts/AuthContext'
 import { INBOX_ACTION } from '@/lib/inbox-v2-dicts'
+import { BulkCreateDialog } from './BulkCreateDialog'
 import { toast } from 'sonner'
 
 interface Props {
@@ -23,6 +24,7 @@ export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
   const { user } = useAuth()
   const [tagInput, setTagInput] = useState('')
   const [showTagInput, setShowTagInput] = useState(false)
+  const [showBulkCreate, setShowBulkCreate] = useState(false)
 
   const count = selectedIds.length
   const isPending = bulkUpdateStatus.isPending || bulkAddTag.isPending || logAction.isPending
@@ -85,6 +87,26 @@ export function InboxV2QuickActions({ selectedIds, onClearSelection }: Props) {
 
   return (
     <div className="flex flex-wrap items-center gap-2" dir="rtl">
+      {/* היחידה שכותבת רשומות חדשות — לכן מודגשת, ועוברת דרך מסך תוכנית
+          ואישור ולא כותבת ישירות (INC-3137). */}
+      <ActionButton
+        variant="primary"
+        icon={UserPlus}
+        size="sm"
+        onClick={() => setShowBulkCreate(true)}
+        disabled={isPending}
+      >
+        הקם אנשי קשר
+      </ActionButton>
+
+      {showBulkCreate && (
+        <BulkCreateDialog
+          leadIds={selectedIds}
+          onClose={() => setShowBulkCreate(false)}
+          onDone={onClearSelection}
+        />
+      )}
+
       <ActionButton
         variant="secondary"
         icon={CheckCircle2}
