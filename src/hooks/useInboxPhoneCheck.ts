@@ -1,9 +1,10 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { normalizeIlMobile, IL_MOBILE_ERROR } from '@/lib/normalizePhone'
+import { isValidEmail, normalizeEmail } from '@/lib/inbox-v2-merge'
 
 /**
- * בדיקת מספרים — **קריאה בלבד** (INC-3125).
+ * בדיקת נייד ומייל — **קריאה בלבד** (INC-3125, הורחב ל-מייל ב-INC-3139).
  *
  * ⚠ הכלל המחייב: אין כאן שום כתיבה. לא ל-inbox_v2, לא ל-inbox_import_batches
  * ולא ל-inbox_merge_actions. זו הנקודה שמבדילה את הכלי הזה מתיבת ההדבקה
@@ -12,23 +13,32 @@ import { normalizeIlMobile, IL_MOBILE_ERROR } from '@/lib/normalizePhone'
  * המטרה אינה רק "מי קיים" אלא **מי לא קיים** — כדי לדעת את מי אפשר להוסיף
  * למאגר. לכן הפלט מפריד במפורש לשלוש קבוצות: קיים · לא קיים · לא תקין.
  *
- * הבדיקה נעשית set-based (שאילתה אחת לכל טבלה לכל מנה) ולא מספר-מספר,
- * כדי שרשימה של מאות מספרים לא תייצר מאות בקשות.
+ * הבדיקה נעשית set-based (שאילתה אחת לכל טבלה לכל מנה) ולא ערך-ערך,
+ * כדי שרשימה של מאות שורות לא תייצר מאות בקשות.
+ *
+ * ═══ זיהוי לפי השורה, בלי מתג ═══
+ *
+ * שורה שיש בה `@` נבדקת כמייל, כל השאר כנייד. כך אפשר להדביק רשימה
+ * מעורבת כפי שהיא מגיעה מגוגל, בלי למיין אותה מראש.
  */
 
 export type PhoneCheckStatus = 'found' | 'new' | 'invalid'
+
+/** לפי מה נבדקה השורה. קובע גם את הניסוח בתצוגה ("נייד נוסף" מול "מייל נוסף"). */
+export type CheckKind = 'phone' | 'email'
 
 export interface PhoneMatch {
   kind: 'contact' | 'account'
   id: number
   name: string
-  /** באיזה שדה נמצא — נייד ראשי או נוסף */
+  /** באיזה שדה נמצא — ראשי או נוסף */
   field: 'primary' | 'secondary'
 }
 
 export interface PhoneCheckResult {
   index: number
   raw: string
+  kind: CheckKind
   normalized: string | null
   status: PhoneCheckStatus
   /** סיבת פסילה, בעברית */
@@ -42,9 +52,13 @@ export interface PhoneCheckSummary {
   isNew: number
   invalid: number
   duplicatesInInput: number
+  phones: number
+  emails: number
 }
 
 const CHUNK = 100
+
+const EMAIL_ERROR = 'כתובת המייל אינה תקינה'
 
 function chunked<T>(arr: T[], size: number): T[][] {
   const out: T[][] = []
@@ -57,7 +71,7 @@ function toLocal(norm: string): string {
   return '0' + norm.slice(3)
 }
 
-/** מפצל טקסט מודבק למספרים: שורה, פסיק, נקודה-פסיק, טאב או רווח כפול. */
+/** מפצל טקסט מודבק לערכים: שורה, פסיק, נקודה-פסיק או טאב. */
 export function splitPhoneInput(text: string): string[] {
   return text
     .split(/[\n\r,;\t]+/)
@@ -65,12 +79,23 @@ export function splitPhoneInput(text: string): string[] {
     .filter(Boolean)
 }
 
+/** שורה שיש בה `@` היא כתובת מייל; כל השאר נבדק כנייד. */
+export function detectKind(raw: string): CheckKind {
+  return raw.includes('@') ? 'email' : 'phone'
+}
+
+const contactName = (c: Record<string, unknown>) =>
+  (c.display_name as string) || (c.full_name as string) || `איש קשר #${c.contact_id}`
+
+const accountName = (a: Record<string, unknown>) =>
+  (a.account_name as string) || `ארגון #${a.account_id}`
+
 /**
  * חיפוש set-based של מספרים מנורמלים מול contact ו-accounts — **קריאה בלבד**.
  *
- * מיוצא כדי שאשף הייבוא ישתמש באותה לוגיקה בדיוק: אם ה-Preview של הייבוא
- * היה מחשב "קיים/חדש" אחרת מבדיקת המספרים, אותו מספר היה מקבל שתי
- * תשובות שונות בשני מסכים.
+ * מיוצא כדי שאשף הייבוא, יצירת איש קשר וההקמה הגורפת ישתמשו באותה לוגיקה
+ * בדיוק: אם ה-Preview של הייבוא היה מחשב "קיים/חדש" אחרת מבדיקת המספרים,
+ * אותו מספר היה מקבל שתי תשובות שונות בשני מסכים.
  */
 export async function lookupPhonesByNorm(norms: string[]): Promise<Map<string, PhoneMatch[]>> {
   const byNorm = new Map<string, PhoneMatch[]>()
@@ -101,9 +126,6 @@ export async function lookupPhonesByNorm(norms: string[]): Promise<Map<string, P
       contactPrimary.error ?? contactSecondary.error ?? accountPrimary.error ?? accountSecondary.error
     if (firstErr) throw new Error(firstErr.message)
 
-    const contactName = (c: Record<string, unknown>) =>
-      (c.display_name as string) || (c.full_name as string) || `איש קשר #${c.contact_id}`
-
     for (const c of (contactPrimary.data ?? []) as Record<string, unknown>[]) {
       add(c.phone_norm as string, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'primary' })
     }
@@ -112,21 +134,73 @@ export async function lookupPhonesByNorm(norms: string[]): Promise<Map<string, P
       if (norm) add(norm, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'secondary' })
     }
     for (const a of (accountPrimary.data ?? []) as Record<string, unknown>[]) {
-      add(a.phone_norm as string, {
-        kind: 'account', id: a.account_id as number,
-        name: (a.account_name as string) || `ארגון #${a.account_id}`, field: 'primary',
-      })
+      add(a.phone_norm as string, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'primary' })
     }
     for (const a of (accountSecondary.data ?? []) as Record<string, unknown>[]) {
       const norm = normalizeIlMobile(a.second_phone as string)
-      if (norm) add(norm, {
-        kind: 'account', id: a.account_id as number,
-        name: (a.account_name as string) || `ארגון #${a.account_id}`, field: 'secondary',
-      })
+      if (norm) add(norm, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'secondary' })
     }
   }
 
   return byNorm
+}
+
+/**
+ * חיפוש set-based של כתובות מייל מול contact ו-accounts — **קריאה בלבד** (INC-3139).
+ *
+ * המפתח במפה החוזרת הוא תמיד המייל **המנורמל**, גם כשבמסד הוא שמור אחרת:
+ * כל ערך שחוזר מהמסד עובר `normalizeEmail` לפני ההכנסה למפה. כך הקורא
+ * מחפש לפי הצורה המנורמלת שלו בלבד.
+ *
+ * ⚠ `in()` הוא השוואה תלוית-רישיות. לכן שולחים גם את הצורה המנורמלת וגם
+ * את הצורה שהודבקה כפי שהיא — אומת חי: מתוך 14,225 מיילים ב-contact
+ * בדיוק **אחד** שמור עם אותיות גדולות. חיפוש חסין-רישיות מלא היה דורש
+ * RPC, כלומר שינוי Supabase, ולא הוצדק בהיקף הזה.
+ */
+export async function lookupEmails(values: string[]): Promise<Map<string, PhoneMatch[]>> {
+  const byEmail = new Map<string, PhoneMatch[]>()
+  const unique = [...new Set(values.filter(Boolean))]
+  if (!unique.length) return byEmail
+
+  const add = (stored: unknown, m: PhoneMatch) => {
+    const key = normalizeEmail(stored)
+    if (!key) return
+    const list = byEmail.get(key) ?? []
+    if (!list.some((x) => x.kind === m.kind && x.id === m.id && x.field === m.field)) list.push(m)
+    byEmail.set(key, list)
+  }
+
+  for (const chunk of chunked(unique, CHUNK)) {
+    const [contactPrimary, contactSecondary, accountPrimary, accountSecondary] = await Promise.all([
+      supabase.from('contact').select('contact_id, display_name, full_name, email')
+        .in('email', chunk),
+      supabase.from('contact').select('contact_id, display_name, full_name, second_email')
+        .in('second_email', chunk),
+      supabase.from('accounts').select('account_id, account_name, email')
+        .in('email', chunk),
+      supabase.from('accounts').select('account_id, account_name, second_email')
+        .in('second_email', chunk),
+    ])
+
+    const firstErr =
+      contactPrimary.error ?? contactSecondary.error ?? accountPrimary.error ?? accountSecondary.error
+    if (firstErr) throw new Error(firstErr.message)
+
+    for (const c of (contactPrimary.data ?? []) as Record<string, unknown>[]) {
+      add(c.email, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'primary' })
+    }
+    for (const c of (contactSecondary.data ?? []) as Record<string, unknown>[]) {
+      add(c.second_email, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'secondary' })
+    }
+    for (const a of (accountPrimary.data ?? []) as Record<string, unknown>[]) {
+      add(a.email, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'primary' })
+    }
+    for (const a of (accountSecondary.data ?? []) as Record<string, unknown>[]) {
+      add(a.second_email, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'secondary' })
+    }
+  }
+
+  return byEmail
 }
 
 export function useInboxPhoneCheck() {
@@ -142,39 +216,63 @@ export function useInboxPhoneCheck() {
   const check = useCallback(async (rawInput: string) => {
     const raws = splitPhoneInput(rawInput)
     if (!raws.length) {
-      setError('לא הוזנו מספרים לבדיקה')
+      setError('לא הוזנו ניידים או מיילים לבדיקה')
       return
     }
 
     setIsChecking(true)
     setError(null)
     try {
-      // 1. נרמול וולידציה — client-side, אותו כלל בדיוק של normalize_il_mobile_phone
+      // 1. נרמול וולידציה — client-side. לניידים אותו כלל בדיוק של
+      //    normalize_il_mobile_phone ב-Supabase; למיילים normalizeEmail המשותף.
       const rows: PhoneCheckResult[] = raws.map((raw, index) => {
+        if (detectKind(raw) === 'email') {
+          const normalized = normalizeEmail(raw)
+          const valid = isValidEmail(normalized)
+          return {
+            index,
+            raw,
+            kind: 'email' as const,
+            normalized: valid ? normalized : null,
+            status: valid ? ('new' as const) : ('invalid' as const),
+            invalidReason: valid ? null : EMAIL_ERROR,
+            matches: [],
+          }
+        }
         const normalized = normalizeIlMobile(raw)
         return {
           index,
           raw,
+          kind: 'phone' as const,
           normalized,
-          status: normalized ? 'new' : 'invalid',
+          status: normalized ? ('new' as const) : ('invalid' as const),
           invalidReason: normalized ? null : IL_MOBILE_ERROR,
           matches: [],
         }
       })
 
-      const byNorm = await lookupPhonesByNorm(
-        rows.filter((r) => r.normalized).map((r) => r.normalized!)
-      )
+      // 2. שתי בדיקות set-based במקביל. למיילים נשלחת גם הצורה המנורמלת
+      //    וגם מה שהודבק בפועל — ראו ההערה ב-lookupEmails.
+      const [byNorm, byEmail] = await Promise.all([
+        lookupPhonesByNorm(
+          rows.filter((r) => r.kind === 'phone' && r.normalized).map((r) => r.normalized!)
+        ),
+        lookupEmails(
+          rows
+            .filter((r) => r.kind === 'email' && r.normalized)
+            .flatMap((r) => [r.normalized!, r.raw.trim()])
+        ),
+      ])
 
       for (const row of rows) {
         if (!row.normalized) continue
-        row.matches = byNorm.get(row.normalized) ?? []
+        row.matches = (row.kind === 'email' ? byEmail : byNorm).get(row.normalized) ?? []
         row.status = row.matches.length ? 'found' : 'new'
       }
 
       setResults(rows)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'שגיאה בבדיקת המספרים')
+      setError(err instanceof Error ? err.message : 'שגיאה בבדיקה מול המאגר')
       setResults(null)
     } finally {
       setIsChecking(false)
@@ -185,12 +283,14 @@ export function useInboxPhoneCheck() {
 }
 
 export function summarize(results: PhoneCheckResult[]): PhoneCheckSummary {
+  // כפילות נספרת בתוך אותו סוג בלבד — נייד ומייל לעולם אינם אותו ערך.
   const seen = new Set<string>()
   let duplicatesInInput = 0
   for (const r of results) {
     if (!r.normalized) continue
-    if (seen.has(r.normalized)) duplicatesInInput++
-    else seen.add(r.normalized)
+    const key = `${r.kind}:${r.normalized}`
+    if (seen.has(key)) duplicatesInInput++
+    else seen.add(key)
   }
   return {
     total: results.length,
@@ -198,5 +298,7 @@ export function summarize(results: PhoneCheckResult[]): PhoneCheckSummary {
     isNew: results.filter((r) => r.status === 'new').length,
     invalid: results.filter((r) => r.status === 'invalid').length,
     duplicatesInInput,
+    phones: results.filter((r) => r.kind === 'phone').length,
+    emails: results.filter((r) => r.kind === 'email').length,
   }
 }

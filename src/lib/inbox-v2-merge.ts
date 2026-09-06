@@ -126,6 +126,18 @@ export function normalizeText(value: unknown): string {
   return String(value).replace(INVISIBLE_CHARS, '').trim()
 }
 
+/**
+ * כתובת מייל תקינה — אותה בדיקה שכבר קיימת מקומית ב-AdminContactsPage,
+ * ב-AdminEmployersPage וב-Candidate360Page. הועברה לכאן כדי שלא יהיה
+ * עותק רביעי (INC-3139); שלושת המקומות הישנים לא רופקטרו בתיקון הזה.
+ *
+ * מכוון להיות **מקל ולא מחמיר**: הבדיקה פוסלת רק מה שברור שאינו מייל.
+ * ולידציה קפדנית מדי הייתה פוסלת כתובות תקינות ומסתירה אנשים אמיתיים.
+ */
+export function isValidEmail(value: unknown): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typeof value === 'string' ? value : '')
+}
+
 /** נייד ישראלי תקין לפי אותו כלל של normalize_il_mobile_phone ב-Supabase. */
 export function isValidILMobile(value: unknown): boolean {
   return /^9725\d{8}$/.test(normalizePhone(typeof value === 'string' ? value : ''))

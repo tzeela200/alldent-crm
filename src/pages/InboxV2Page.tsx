@@ -34,7 +34,7 @@ type InboxTab = 'queue' | 'phones' | 'import'
 
 const TABS: { id: InboxTab; label: string }[] = [
   { id: 'queue', label: 'שינויים שהגיעו' },
-  { id: 'phones', label: 'בדיקת מספרים' },
+  { id: 'phones', label: 'בדיקת נייד ומייל' },
   { id: 'import', label: 'ייבוא קובץ' },
 ]
 
