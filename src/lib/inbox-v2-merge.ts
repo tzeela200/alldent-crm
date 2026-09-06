@@ -314,6 +314,41 @@ export function fieldsFor(entity: MergeEntity): MergeFieldDef[] {
 }
 
 /**
+ * שדות שמקור מסוים אינו באמת מספק, ולכן אין עליהם מה להחליט (INC-3140).
+ *
+ * **Google לא מספק נתוני Facebook.** ה-People API מחזיר בדיוק
+ * `etag · names · metadata · phoneNumbers · resourceName · organizations ·
+ * emailAddresses` — ותו לא. מה שמגיע אלינו כ"שם Facebook" הוא בפועל שדה
+ * ה-**Organization**: אומת ש-92 מתוך 96 השורות שנשאו `facebook_name`
+ * החזיקו בדיוק את `organizations[0].name`.
+ *
+ * השדה הזה אינו אמין — הוא נושא שמות של אנשים אחרים. דוגמאות חיות מהתור:
+ * "קומיל דז'נייב" קיבל `Katya`, "אנעאם" קיבלה `Esti`, "גפן מנשה" קיבל
+ * `Diana`. בכל אחת מהן הערך **שאצלנו** היה התעתיק הנכון, ואישור היה
+ * מוחק אותו לטובת שם של אדם זר.
+ *
+ * לכן ההשוואה מדלגת על שלושת השדות כשהמקור הוא Google. **29 מתוך 37
+ * השורות הפתוחות בתור היו רק זה.** מקורות אחרים — ייבוא מפייסבוק אמיתי —
+ * אינם מושפעים.
+ *
+ * ⚠ הכלל חייב להיות זהה ל-`inbox_compute_diff` ב-SQL. אחרת הטבלה תספור
+ * פער שהפאנל לא יציג, וזו בדיוק הסתירה שהמסך סבל ממנה.
+ */
+const SOURCE_BLOCKED_FIELDS = new Set(['facebook_name', 'facebook_id', 'facebook_url'])
+
+/** כולל `google:` וגם `google_outbound:` / `google_create_missing:`. */
+export function isGoogleSourced(row: Pick<InboxV2Row, 'source_unique_key'>): boolean {
+  return (row.source_unique_key ?? '').toLowerCase().startsWith('google')
+}
+
+export function isFieldBlockedForSource(
+  key: string,
+  row: Pick<InboxV2Row, 'source_unique_key'>
+): boolean {
+  return SOURCE_BLOCKED_FIELDS.has(key) && isGoogleSourced(row)
+}
+
+/**
  * whitelist סגורה — הגנה אחרונה. גם אם רכיב UI ישלח משהו אחר,
  * buildPatch לא יעביר מפתח שאינו ברשימה.
  */
@@ -464,7 +499,8 @@ export function buildComparisons(
   entity: MergeEntity,
   sourceLabel: string = DEFAULT_SOURCE_LABEL
 ): FieldComparison[] {
-  const defs = fieldsFor(entity)
+  // שדות שהמקור אינו מספק יורדים כאן ולא נשאלים כלל (INC-3140).
+  const defs = fieldsFor(entity).filter((d) => !isFieldBlockedForSource(d.key, row))
   const t = target ?? {}
 
   // כל מפתחות הטלפון והמייל הקיימים בישות — לדדופליקציה חוצת-שדות.
