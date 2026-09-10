@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate, useParams } from 'react-router-dom'
 import { ALL_ROLE_SLUGS } from '@/lib/publicRolePages'
+import { isJobCodeSlug } from '@/lib/publicJobUtils'
 import { isRegionSlug } from '@/lib/publicRegionPages'
 import { resolveLegacyPath } from '@/lib/legacyRedirects'
 
@@ -74,7 +75,7 @@ function LegacyCatchAll() {
 
   // 2. קוד משרה תקין → /jobs/{UPPER}
   const code = decoded.trim().toUpperCase()
-  if (/^[A-Z]{2,5}\d{1,5}$/.test(code)) {
+  if (isJobCodeSlug(code)) {
     return <Navigate to={`/jobs/${code}`} replace />
   }
 
@@ -105,7 +106,7 @@ function JobsSlugDispatch() {
     return <PublicRegionJobsPage />
   }
   const code = decoded.trim().toUpperCase()
-  if (/^[A-Z]{2,5}\d{1,5}$/.test(code)) {
+  if (isJobCodeSlug(code)) {
     return <PublicJobPage />
   }
   return <NotFoundPage />

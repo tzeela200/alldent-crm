@@ -56,3 +56,21 @@ export function buildShareText(job: PublicJob, baseUrl: string): string {
 export function buildPublicJobUrl(jobCode: string): string {
   return `https://www.alldent.co.il/jobs/${jobCode}`
 }
+
+/**
+ * INC-3142 — האם ה-slug בכתובת נראה כמו קוד משרה.
+ *
+ * זהו שומר: נתיב שאינו עומד בו נופל ל-404 **בלי** לפנות ל-Supabase, כדי
+ * שלא ניתן יהיה לסרוק את הלוח בכתובות מומצאות.
+ *
+ * התבנית הקודמת דרשה ספרות (`^[A-Z]{2,5}\d{1,5}$`), כי כל הקודים נוצרו
+ * אוטומטית מ-`dict_roles.job_code_prefix` + מספר רץ (DOC9002, MITOG7).
+ * קוד שנקבע ידנית ואינו נגמר בספרה — כמו DENTUP למשרה עם דף מיתוג —
+ * הוא תקין באותה מידה, ולכן הספרות אופציונליות ואורך האותיות אינו חסום ל-5.
+ *
+ * ⚠️ הפונקציה הזו היא המקור היחיד לתבנית. היא הייתה משוכפלת בשלושה קבצים,
+ * וזה בדיוק מה שגרם לכך ש-DENTUP החזירה 404 אחרי שכבר פורסמה.
+ */
+export function isJobCodeSlug(value: string): boolean {
+  return /^[A-Z][A-Z0-9]{1,15}$/.test(value.trim().toUpperCase())
+}

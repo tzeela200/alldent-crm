@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom'
 import { SiteHeader } from '@/components/public/PublicHeader'
 import { SiteFooter } from '@/components/public/SiteFooter'
 import SocialShare from '@/components/public/SocialShare'
+import { isJobCodeSlug } from '@/lib/publicJobUtils'
 
 function isPublicJobDetailsPath(pathname: string): boolean {
   const match = pathname.match(/^\/jobs\/([^/]+)\/?$/)
@@ -10,7 +11,7 @@ function isPublicJobDetailsPath(pathname: string): boolean {
 
   try {
     const slug = decodeURIComponent(match[1]).trim()
-    return /^[A-Z]{2,5}\d{1,5}$/i.test(slug)
+    return isJobCodeSlug(slug)
   } catch {
     return false
   }
