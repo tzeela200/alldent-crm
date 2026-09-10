@@ -69,6 +69,8 @@
       ],
       "destination": "/api/og?asset=:code"
     },
+    { "source": "/dentup", "destination": "/dentup/index.html" },
+    { "source": "/dentup/", "destination": "/dentup/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

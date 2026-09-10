@@ -122,6 +122,12 @@ export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
             <span style={{ background: C.primary, color: '#fff', fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 999 }}>
               AllDent
             </span>
+            {/* INC-3142 — למשרה יש דף מיתוג מעסיק משלה (job_url). תגית בלבד; הקישור עצמו בעמוד המשרה. */}
+            {job.job_url && (
+              <span style={{ background: '#fff', color: C.primary, border: `1px solid ${C.primary}`, fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999 }}>
+                דף מרפאה
+              </span>
+            )}
           </div>
 
           {/* Expandable excerpt */}

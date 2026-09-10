@@ -207,7 +207,7 @@ function JobDetailsPanel({
         ))}
       </dl>
 
-      <div className="hidden px-5 pb-5 pt-4 md:block">
+      <div className={`hidden px-5 pt-4 md:block ${job.job_url ? '' : 'pb-5'}`}>
         <button
           onClick={onApply}
           className="w-full rounded-full bg-[#B45309] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#92400E] focus:outline-none focus:ring-4 focus:ring-[#B45309]/25 active:scale-[0.98]"
@@ -215,6 +215,24 @@ function JobDetailsPanel({
           הגשת מועמדות
         </button>
       </div>
+
+      {/*
+        INC-3142 — דף מיתוג מעסיק. job_url מחזיק את כתובת הדף הממותג של המרפאה
+        (הדפוס קיים מאז משרות MITOG). הכפתור נוסף ואינו מחליף את «הגשת מועמדות»:
+        המסלול של AllDent נשמר, והדף הממותג הוא יעד נוסף. מוצג רק כשיש כתובת.
+      */}
+      {job.job_url && (
+        <div className="px-5 pb-5 pt-3">
+          <a
+            href={job.job_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block w-full rounded-full border-2 border-[#008080] px-6 py-3 text-center text-sm font-extrabold text-[#008080] transition hover:bg-[#E6F3F3] focus:outline-none focus:ring-4 focus:ring-[#008080]/20 active:scale-[0.98]"
+          >
+            לדף המרפאה
+          </a>
+        </div>
+      )}
     </section>
   )
 }
