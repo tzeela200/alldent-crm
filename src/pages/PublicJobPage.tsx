@@ -111,9 +111,33 @@ export default function PublicJobPage() {
               </section>
             )}
 
-            <p className="border-t border-[#D9D9D9] pt-4 text-sm leading-7 text-[#6B6B6B]">
-              כל המשרות באתר AllDent מוצגות באופן דיסקרטי. פרטי המעסיק יימסרו רק בהמשך התהליך ולא מוצגים באתר הציבורי.
-            </p>
+            {/*
+              INC-3142 — משרת מיתוג מעסיק.
+              הודעת הדיסקרטיות אינה נכונה כאן: היא מבטיחה שפרטי המעסיק אינם
+              מוצגים באתר הציבורי, בעוד שכל מהות דף המיתוג היא לחשוף אותם.
+              לכן במשרה עם job_url היא מוחלפת בקריאה לפעולה — בסוף הקריאה,
+              במקום שבו המועמד סיים לקרוא את התיאור.
+            */}
+            {job.job_url ? (
+              <section className="rounded-xl border border-[#008080]/25 bg-[#F2F9F9] px-6 py-7 text-center shadow-sm">
+                <p className="mb-1 text-[17px] font-extrabold text-[#0F0F10]">רוצים לראות את המרפאה?</p>
+                <p className="mb-5 text-sm leading-6 text-[#52677A]">
+                  דף המרפאה מציג את הצוות, המתחם ופרטי יצירת הקשר הישירים.
+                </p>
+                <a
+                  href={job.job_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block w-full max-w-[380px] rounded-full bg-[#008080] px-8 py-4 text-[16px] font-extrabold text-white shadow-sm transition hover:bg-[#006D6D] focus:outline-none focus:ring-4 focus:ring-[#008080]/25 active:scale-[0.98]"
+                >
+                  לדף המרפאה
+                </a>
+              </section>
+            ) : (
+              <p className="border-t border-[#D9D9D9] pt-4 text-sm leading-7 text-[#6B6B6B]">
+                כל המשרות באתר AllDent מוצגות באופן דיסקרטי. פרטי המעסיק יימסרו רק בהמשך התהליך ולא מוצגים באתר הציבורי.
+              </p>
+            )}
           </article>
         </div>
       </main>
@@ -212,7 +236,7 @@ function JobDetailsPanel({
         משרה בלי job_url — הכפתור נשאר בתחתית, בדיוק כפי שהיה. אפס שינוי.
       */}
       {job.job_url && (
-        <div className="flex flex-col gap-2.5 border-b border-[#D9D9D9] bg-[#FBFDFD] px-5 py-4">
+        <div className="border-b border-[#D9D9D9] bg-[#FBFDFD] px-5 py-4">
           <a
             href={job.job_url}
             target="_blank"
@@ -221,12 +245,6 @@ function JobDetailsPanel({
           >
             לדף המרפאה
           </a>
-          <button
-            onClick={onApply}
-            className="hidden w-full rounded-full border-2 border-[#B45309] px-6 py-3 text-sm font-extrabold text-[#B45309] transition hover:bg-[#FDF3E7] focus:outline-none focus:ring-4 focus:ring-[#B45309]/20 active:scale-[0.98] md:block"
-          >
-            הגשת מועמדות
-          </button>
         </div>
       )}
 
@@ -359,22 +377,14 @@ function JobMobileApplyBar({
         משרה רגילה — הסרגל נשאר בדיוק כפי שהיה.
       */}
       {job.job_url ? (
-        <div className="flex items-center gap-2.5">
-          <a
-            href={job.job_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex-[2] rounded-full bg-[#008080] px-4 py-3 text-center text-sm font-extrabold text-white shadow-sm transition hover:bg-[#006D6D] active:scale-[0.98]"
-          >
-            לדף המרפאה
-          </a>
-          <button
-            onClick={onApply}
-            className="flex-1 shrink-0 rounded-full border-2 border-[#B45309] px-3 py-[10px] text-sm font-extrabold text-[#B45309] transition hover:bg-[#FDF3E7] active:scale-[0.98]"
-          >
-            הגשה
-          </button>
-        </div>
+        <a
+          href={job.job_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block w-full rounded-full bg-[#008080] px-4 py-3.5 text-center text-[15px] font-extrabold text-white shadow-sm transition hover:bg-[#006D6D] active:scale-[0.98]"
+        >
+          לדף המרפאה
+        </a>
       ) : (
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
