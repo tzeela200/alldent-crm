@@ -201,20 +201,18 @@ function JobDetailsPanel({
         <h2 className="text-[15px] font-extrabold leading-6 text-[#0F0F10]">{job.job_title}</h2>
       </div>
 
-      <dl className="divide-y divide-[#D9D9D9] px-5">
-        {details.map((item) => (
-          <DetailRow key={item.label} label={item.label} value={item.value} />
-        ))}
-      </dl>
-
       {/*
         INC-3142 — משרה עם דף מיתוג מעסיק (job_url).
-        היררכיית הכפתורים מתהפכת: המרפאה שילמה על מיתוג, והיעד שהיא מפיצה
-        הוא הדף שלה — לכן הוא הכפתור הראשי. «הגשת מועמדות» נשאר זמין כמשני,
-        כך שמסלול ההשמה של AllDent אינו נסגר. במשרה בלי job_url — אין שינוי.
+        ① היררכיה: המרפאה שילמה על מיתוג, והיעד שהיא מפיצה הוא הדף שלה —
+           לכן הוא הכפתור הראשי (מלא), ו«הגשת מועמדות» משני (מתאר).
+           מסלול ההשמה של AllDent נשאר פתוח ולא נסגר.
+        ② מיקום: הכרטיס נושא ~11 שורות פרטים, ולכן כפתור בתחתיתו יורד מתחת
+           לקיפול במסך גדול. במשרת מיתוג הכפתורים עולים לראש הכרטיס, מתחת
+           לכותרת, כך שהם נראים בלי גלילה.
+        משרה בלי job_url — הכפתור נשאר בתחתית, בדיוק כפי שהיה. אפס שינוי.
       */}
-      <div className="flex flex-col gap-2.5 px-5 pb-5 pt-4">
-        {job.job_url && (
+      {job.job_url && (
+        <div className="flex flex-col gap-2.5 border-b border-[#D9D9D9] bg-[#FBFDFD] px-5 py-4">
           <a
             href={job.job_url}
             target="_blank"
@@ -223,18 +221,31 @@ function JobDetailsPanel({
           >
             לדף המרפאה
           </a>
-        )}
-        <button
-          onClick={onApply}
-          className={
-            job.job_url
-              ? 'hidden w-full rounded-full border-2 border-[#B45309] px-6 py-3 text-sm font-extrabold text-[#B45309] transition hover:bg-[#FDF3E7] focus:outline-none focus:ring-4 focus:ring-[#B45309]/20 active:scale-[0.98] md:block'
-              : 'hidden w-full rounded-full bg-[#B45309] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#92400E] focus:outline-none focus:ring-4 focus:ring-[#B45309]/25 active:scale-[0.98] md:block'
-          }
-        >
-          הגשת מועמדות
-        </button>
-      </div>
+          <button
+            onClick={onApply}
+            className="hidden w-full rounded-full border-2 border-[#B45309] px-6 py-3 text-sm font-extrabold text-[#B45309] transition hover:bg-[#FDF3E7] focus:outline-none focus:ring-4 focus:ring-[#B45309]/20 active:scale-[0.98] md:block"
+          >
+            הגשת מועמדות
+          </button>
+        </div>
+      )}
+
+      <dl className="divide-y divide-[#D9D9D9] px-5">
+        {details.map((item) => (
+          <DetailRow key={item.label} label={item.label} value={item.value} />
+        ))}
+      </dl>
+
+      {!job.job_url && (
+        <div className="hidden px-5 pb-5 pt-4 md:block">
+          <button
+            onClick={onApply}
+            className="w-full rounded-full bg-[#B45309] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#92400E] focus:outline-none focus:ring-4 focus:ring-[#B45309]/25 active:scale-[0.98]"
+          >
+            הגשת מועמדות
+          </button>
+        </div>
+      )}
     </section>
   )
 }
