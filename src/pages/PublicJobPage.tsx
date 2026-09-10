@@ -207,32 +207,34 @@ function JobDetailsPanel({
         ))}
       </dl>
 
-      <div className={`hidden px-5 pt-4 md:block ${job.job_url ? '' : 'pb-5'}`}>
-        <button
-          onClick={onApply}
-          className="w-full rounded-full bg-[#B45309] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#92400E] focus:outline-none focus:ring-4 focus:ring-[#B45309]/25 active:scale-[0.98]"
-        >
-          הגשת מועמדות
-        </button>
-      </div>
-
       {/*
-        INC-3142 — דף מיתוג מעסיק. job_url מחזיק את כתובת הדף הממותג של המרפאה
-        (הדפוס קיים מאז משרות MITOG). הכפתור נוסף ואינו מחליף את «הגשת מועמדות»:
-        המסלול של AllDent נשמר, והדף הממותג הוא יעד נוסף. מוצג רק כשיש כתובת.
+        INC-3142 — משרה עם דף מיתוג מעסיק (job_url).
+        היררכיית הכפתורים מתהפכת: המרפאה שילמה על מיתוג, והיעד שהיא מפיצה
+        הוא הדף שלה — לכן הוא הכפתור הראשי. «הגשת מועמדות» נשאר זמין כמשני,
+        כך שמסלול ההשמה של AllDent אינו נסגר. במשרה בלי job_url — אין שינוי.
       */}
-      {job.job_url && (
-        <div className="px-5 pb-5 pt-3">
+      <div className="flex flex-col gap-2.5 px-5 pb-5 pt-4">
+        {job.job_url && (
           <a
             href={job.job_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="block w-full rounded-full border-2 border-[#008080] px-6 py-3 text-center text-sm font-extrabold text-[#008080] transition hover:bg-[#E6F3F3] focus:outline-none focus:ring-4 focus:ring-[#008080]/20 active:scale-[0.98]"
+            className="block w-full rounded-full bg-[#008080] px-6 py-3.5 text-center text-[15px] font-extrabold text-white shadow-sm transition hover:bg-[#006D6D] focus:outline-none focus:ring-4 focus:ring-[#008080]/25 active:scale-[0.98]"
           >
             לדף המרפאה
           </a>
-        </div>
-      )}
+        )}
+        <button
+          onClick={onApply}
+          className={
+            job.job_url
+              ? 'hidden w-full rounded-full border-2 border-[#B45309] px-6 py-3 text-sm font-extrabold text-[#B45309] transition hover:bg-[#FDF3E7] focus:outline-none focus:ring-4 focus:ring-[#B45309]/20 active:scale-[0.98] md:block'
+              : 'hidden w-full rounded-full bg-[#B45309] px-6 py-3 text-sm font-extrabold text-white transition hover:bg-[#92400E] focus:outline-none focus:ring-4 focus:ring-[#B45309]/25 active:scale-[0.98] md:block'
+          }
+        >
+          הגשת מועמדות
+        </button>
+      </div>
     </section>
   )
 }
@@ -338,17 +340,44 @@ function JobMobileApplyBar({
   onApply: () => void
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 flex items-center justify-between gap-3 border-t border-[#D9D9D9] bg-white/95 px-4 py-3 backdrop-blur md:hidden">
-      <div className="min-w-0">
-        <p className="truncate text-sm font-bold text-[#0F0F10]">{job.job_title}</p>
-        {locationText && <p className="truncate text-xs text-[#6B6B6B]">{locationText}</p>}
-      </div>
-      <button
-        onClick={onApply}
-        className="shrink-0 rounded-full bg-[#B45309] px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#92400E] active:scale-[0.98]"
-      >
-        הגשה
-      </button>
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#D9D9D9] bg-white/95 px-4 py-3 backdrop-blur md:hidden">
+      {/*
+        INC-3142 — במשרה עם דף מיתוג הסרגל נושא שני כפתורים, ולכן שורת הכותרת
+        יורדת: ב-360px אין מקום לטקסט ולשני יעדים, והכפתורים הם מה שנחוץ כאן.
+        «לדף המרפאה» מקבל משקל כפול כי הוא היעד שהמרפאה מפיצה.
+        משרה רגילה — הסרגל נשאר בדיוק כפי שהיה.
+      */}
+      {job.job_url ? (
+        <div className="flex items-center gap-2.5">
+          <a
+            href={job.job_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex-[2] rounded-full bg-[#008080] px-4 py-3 text-center text-sm font-extrabold text-white shadow-sm transition hover:bg-[#006D6D] active:scale-[0.98]"
+          >
+            לדף המרפאה
+          </a>
+          <button
+            onClick={onApply}
+            className="flex-1 shrink-0 rounded-full border-2 border-[#B45309] px-3 py-[10px] text-sm font-extrabold text-[#B45309] transition hover:bg-[#FDF3E7] active:scale-[0.98]"
+          >
+            הגשה
+          </button>
+        </div>
+      ) : (
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-bold text-[#0F0F10]">{job.job_title}</p>
+            {locationText && <p className="truncate text-xs text-[#6B6B6B]">{locationText}</p>}
+          </div>
+          <button
+            onClick={onApply}
+            className="shrink-0 rounded-full bg-[#B45309] px-5 py-2.5 text-sm font-extrabold text-white transition hover:bg-[#92400E] active:scale-[0.98]"
+          >
+            הגשה
+          </button>
+        </div>
+      )}
     </div>
   )
 }
