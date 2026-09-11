@@ -14,6 +14,11 @@ import {
 } from '@/lib/fixPublications/campaignParser'
 import { mapDeliveryStatus, failureCategoryOf, isOptOutText, isMediaFailureText } from '@/lib/fixPublications/deliveryStatus'
 import { outcomeOf, outcomeOfRecord, assertOutcomeCoverage, OUTCOME_STATUS_CODES } from '@/lib/fixPublications/deliveryOutcome'
+  
+import {
+  summarizeSendList, SEND_VERDICTS, verdictFor,
+  type SendListRow, type SendStatus,
+} from '@/lib/fixPublications/sendListVerdict'
 
 let failures = 0
 function check(name: string, actual: unknown, expected: unknown) {
@@ -247,6 +252,54 @@ async function main() {
   check('השנייה מסומנת', dupRows[1].duplicateReason, 'in_file')
   check('רק 2 שורות ייקלטו', dupRows.filter((r) => !r.duplicateReason).length, 2)
   check('הרצה חוזרת לא מסמנת שוב', markInFileDuplicates(dupRows), 2)
+
+
+  // ── 14. פסק דין לרשימת שליחה (INC-3143) ──
+  const listRows: SendListRow[] = [
+    { index: 0, raw: '972501111111', normalized: '972501111111', verdict: 'ok', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
+    { index: 1, raw: '972502222222', normalized: '972502222222', verdict: 'ok', reason: null, permanentBlock: false, matches: [{ kind: 'contact', id: 1, name: 'דר א', field: 'primary' }], outcome: null, lastSentAt: null },
+    { index: 2, raw: '972503333333', normalized: '972503333333', verdict: 'blocked', reason: null, permanentBlock: true, matches: [], outcome: null, lastSentAt: null },
+    { index: 3, raw: '972504444444', normalized: '972504444444', verdict: 'blocked', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
+    { index: 4, raw: '972505555555', normalized: '972505555555', verdict: 'blocked', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
+    { index: 5, raw: '03-1234567', normalized: null, verdict: 'invalid', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
+    { index: 6, raw: '972501111111', normalized: '972501111111', verdict: 'duplicate', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
+  ]
+  const sum = summarizeSendList(listRows)
+  check('סה״כ ברשימה', sum.total, 7)
+  check('תקינים לשליחה', sum.ok, 2)
+  check('אסורים לשליחה', sum.blocked, 3)
+  check('מתוכם ביקשו הסרה', sum.optedOut, 1)
+  check('מתוכם ללא וואטסאפ', sum.noDevice, 2)
+  check('נייד לא תקין', sum.invalid, 1)
+  check('כפול ברשימה', sum.duplicates, 1)
+  check('מהתקינים — כמה במאגר', sum.knownInDatabase, 1)
+  check('הפילוח מסתכם בחסומים', sum.optedOut + sum.noDevice, sum.blocked)
+  check('ארבעת פסקי הדין מתורגמים',
+    ['ok','blocked','invalid','duplicate'].every((v) => !!SEND_VERDICTS[v as keyof typeof SEND_VERDICTS]?.label), true)
+  check('חסימה קבועה מסומנת אדום', SEND_VERDICTS.blocked.tone, 'danger')
+
+
+  // ── 15. פסק הדין לנייד בודד — verdictFor (טהור, בלי מסד) ──
+  const st = (optedOut: boolean, lastStatus: string | null, lastSentAt: string | null): SendStatus =>
+    ({ optedOut, lastStatus, lastSentAt, known: true })
+  const P = '972501111111'
+
+  check('לא מוכר → תקין', verdictFor(undefined, P).verdict, 'ok')
+  check('לא מוכר → מעולם לא נשלח', verdictFor(undefined, P).outcome, 'never_sent')
+  check('ביקש הסרה → חסום', verdictFor(st(true, null, null), P).verdict, 'blocked')
+  check('בקשת הסרה = חסימה קבועה', verdictFor(st(true, null, null), P).permanentBlock, true)
+  check('הסרה גוברת גם על נקרא',
+    verdictFor(st(true, 'read', '2026-09-01T00:00:00Z'), P).verdict, 'blocked')
+  check('אין מכשיר → חסום',
+    verdictFor(st(false, 'failed_device', '2026-08-26T00:00:00Z'), P).verdict, 'blocked')
+  check('אין מכשיר = חסימה הפיכה',
+    verdictFor(st(false, 'failed_device', '2026-08-26T00:00:00Z'), P).permanentBlock, false)
+  check('נקרא → תקין לשליחה',
+    verdictFor(st(false, 'read', '2026-08-26T00:00:00Z'), P).verdict, 'ok')
+  check('כשל זמני → תקין לשליחה',
+    verdictFor(st(false, 'failed_rate_limit', '2026-08-26T00:00:00Z'), P).verdict, 'ok')
+  check('חסום תמיד עם סיבה בעברית',
+    /[\u0590-\u05FF]/.test(verdictFor(st(true, null, null), P).reason ?? ''), true)
 
   console.log(failures ? `\n${failures} בדיקות נכשלו` : '\nכל הבדיקות עברו')
   process.exit(failures ? 1 : 0)

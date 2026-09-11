@@ -11,7 +11,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Send, Upload, FileSpreadsheet, X, AlertTriangle, CheckCircle2, Loader2,
-  RotateCcw, Columns3, Building2, Layers, BarChart3,
+  RotateCcw, Columns3, Building2, Layers, BarChart3, ListChecks,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -26,6 +26,7 @@ import {
   DELIVERY_STATUS_ORDER, getDeliveryStatusMeta, type DeliveryTone,
 } from '@/lib/fixPublications/deliveryStatus'
 import { MATCH_RESULT_LABELS, CAMPAIGN_FIELD_LABELS } from '@/lib/fixPublications/campaignParser'
+import { SendListCheckPanel } from '@/components/fixPublications/SendListCheckPanel'
 import {
   usePublicationsOverview, usePublicationDicts, usePublicationStats, useCampaigns,
   useCampaignPreview, useCommitCampaign, auditOf,
@@ -34,7 +35,7 @@ import {
   type CampaignSummary,
 } from '@/hooks/useFixPublications'
 
-type Tab = 'overview' | 'campaigns' | 'import'
+type Tab = 'overview' | 'campaigns' | 'phone-check' | 'import'
 
 // בורר עמודות — אותו דפוס כמו במסך אנשי קשר (localStorage + איפוס לברירת מחדל)
 const VISIBLE_COLUMNS_STORAGE_KEY = 'alldent.fixPublications.visibleColumns.v2'
@@ -301,6 +302,13 @@ export default function AdminFixPublicationsPage() {
             </details>
           )}
           <ActionButton
+            variant={tab === 'phone-check' ? 'primary' : 'secondary'}
+            icon={ListChecks}
+            onClick={() => setTab(tab === 'phone-check' ? 'overview' : 'phone-check')}
+          >
+            {tab === 'phone-check' ? 'חזרה למצב פרסומים' : 'בדיקת רשימה'}
+          </ActionButton>
+          <ActionButton
             variant={tab === 'campaigns' ? 'primary' : 'secondary'}
             icon={BarChart3}
             onClick={() => setTab(tab === 'campaigns' ? 'overview' : 'campaigns')}
@@ -317,7 +325,9 @@ export default function AdminFixPublicationsPage() {
         </div>
       }
     >
-      {tab === 'campaigns' ? (
+      {tab === 'phone-check' ? (
+        <SendListCheckPanel />
+      ) : tab === 'campaigns' ? (
         <CampaignPerformanceTable campaigns={campaigns.data ?? []} isLoading={campaigns.isLoading} />
       ) : tab === 'overview' ? (
         <>
