@@ -99,6 +99,9 @@ export interface RecipientAudit {
   record_number?: string | null
   match?: MatchResult
   imported_at?: string
+  /** תיקון ידני של הסטטוס — מאיזה ערך, ומתי. הערך מפיקס נשאר ב-delivery_status_raw */
+  status_overridden_from?: string
+  status_overridden_at?: string
 }
 
 export interface PublicationRow {

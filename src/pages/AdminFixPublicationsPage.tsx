@@ -27,6 +27,7 @@ import {
 } from '@/lib/fixPublications/deliveryStatus'
 import { MATCH_RESULT_LABELS, CAMPAIGN_FIELD_LABELS } from '@/lib/fixPublications/campaignParser'
 import { SendListCheckPanel } from '@/components/fixPublications/SendListCheckPanel'
+import { DeliveryStatusCell, DELIVERY_STATUS_CELL_WIDTH } from '@/components/admin/DeliveryStatusCell'
 import {
   usePublicationsOverview, usePublicationDicts, usePublicationStats, useCampaigns,
   useCampaignPreview, useCommitCampaign, auditOf,
@@ -217,15 +218,19 @@ export default function AdminFixPublicationsPage() {
       },
     },
     {
+      // ניתן לעריכה — תיקון ידני של מה שפיקס דיווח. הערך המקורי נשמר.
       key: 'last_delivery_status', label: 'סטטוס שליחה', sortable: true, nowrap: true,
-      render: (row) => {
-        const meta = getDeliveryStatusMeta(row.delivery_status)
-        return (
-          <span title={row.delivery_status_raw ?? ''}>
-            <StatusPill label={meta.label} variant={TONE_TO_PILL[meta.tone]} />
-          </span>
-        )
-      },
+      width: DELIVERY_STATUS_CELL_WIDTH,
+      render: (row) => (
+        <DeliveryStatusCell
+          recipientId={row.recipient_id}
+          contactId={row.contact_id}
+          campaignId={row.campaign_id}
+          status={row.delivery_status}
+          rawStatus={row.delivery_status_raw}
+          overriddenFrom={auditOf(row).status_overridden_from ?? null}
+        />
+      ),
     },
     { key: 'last_sent_at', label: 'תאריך פרסום', sortable: true, nowrap: true, render: (row) => formatDateTime(row.sent_at) },
     { key: 'campaign_name', label: 'קמפיין', sortable: true, render: (row) => row.campaign?.campaign_name ?? '—' },
