@@ -337,6 +337,8 @@ const CONTACT_NUMBER_FIELDS = new Set([
 
 const CONTACT_BOOLEAN_FIELDS = new Set(['preferred_all_country'])
 
+// INC-3144 — כל שדה שנערך בפאנל חייב להופיע כאן, אחרת buildChangedContactPatch
+// משמיט אותו בשקט והמסך מודיע "נשמר" בלי שדבר הגיע ל-Supabase.
 const EDITABLE_CONTACT_FIELDS = [
   'display_name', 'first_name', 'last_name', 'full_name', 'phone', 'second_phone', 'email', 'second_email',
   'gender', 'birth_year', 'role', 'sub_role', 'professional_title', 'experience', 'license_no',
@@ -346,7 +348,7 @@ const EDITABLE_CONTACT_FIELDS = [
   'locality_type', 'work_schedule_text', 'work_status', 'languages', 'account_link', 'linkedin_url',
   'facebook_url', 'facebook_name', 'portfolio_url', 'recommendations_url', 'photo_url', 'personal_summary',
   'candidate_notes', 'notes', 'current_employer', 'source', 'check_status', 'social_status', 'next_follow_up',
-  'cv_link', 'cv_received_date',
+  'cv_link', 'cv_received_date', 'city_id', 'region_id', 'tax_type_id',
 ] as const
 
 type EditableContactField = (typeof EDITABLE_CONTACT_FIELDS)[number]
@@ -2080,6 +2082,9 @@ export default function AdminContactsPage() {
                         <div className="mt-1 flex flex-wrap gap-2">
                           <RoleBadge label={roleName(selectedContact.role)} roleId={Number(selectedContact.role)} />
                           <LightTag tone="slate">{cityName(selectedContact.city_id)}</LightTag>
+                          {selectedContact.region_id != null && (
+                            <RegionBadge regionId={selectedContact.region_id} label={regionName(selectedContact.region_id)} />
+                          )}
                           {(selectedContact.candidate_availability_ids ?? []).map((id) => (
                             <Badge key={id} tone={availabilityTone(id)}>{availabilityName(id)}</Badge>
                           ))}
@@ -2268,6 +2273,9 @@ export default function AdminContactsPage() {
                 </div>
 
                 <AdminPanelSection title="פרטים אישיים">
+                  {/* INC-3144 — עיר ואזור בראש הפאנל: זה מה שנבדק ראשון,
+                      ואין סיבה לגלול בשבילו עד סעיף המיקום. */}
+                  <div className="sm:col-span-2">{isEditing ? <CityRegionPicker cityId={editDraft.city_id ?? null} regionId={editDraft.region_id ?? null} cities={cityOptions} regions={regionOptions} onCityChange={(cityId) => { const city = cityOptions.find((item) => Number(item.id) === Number(cityId)); setEditDraft((draft) => ({ ...draft, city_id: cityId, region_id: city?.region_id ?? draft.region_id })) }} onRegionChange={(regionId) => setEditDraft((draft) => ({ ...draft, region_id: regionId, city_id: draft.city_id && cityOptions.find((city) => city.id === draft.city_id)?.region_id !== regionId ? null : draft.city_id }))} /> : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><AdminPanelField label="אזור" mode="view" viewValue={<RegionBadge regionId={selectedContact.region_id} label={regionName(selectedContact.region_id)} />} /><AdminPanelField label="עיר" mode="view" viewValue={cityName(selectedContact.city_id)} /></div>}</div>
                   <AdminPanelField label="שם תצוגה" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.display_name} editValue={<PanelTextInput id="contact-display-name" value={editDraft.display_name} onChange={(value) => setDraftField('display_name', value)} />} />
                   <AdminPanelField label="שם מלא" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.full_name} editValue={<PanelTextInput id="contact-full-name" value={editDraft.full_name} onChange={(value) => setDraftField('full_name', value)} />} />
                   <AdminPanelField label="שם פרטי" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.first_name} editValue={<PanelTextInput id="contact-first-name" value={editDraft.first_name} onChange={(value) => setDraftField('first_name', value)} />} />
@@ -2327,9 +2335,17 @@ export default function AdminContactsPage() {
                 </AdminPanelSection>
 
                 <AdminPanelSection title="מיקום וניידות">
-                  <div className="sm:col-span-2">{isEditing ? <CityRegionPicker cityId={editDraft.city_id ?? null} regionId={editDraft.region_id ?? null} cities={cityOptions} regions={regionOptions} onCityChange={(cityId) => { const city = cityOptions.find((item) => Number(item.id) === Number(cityId)); setEditDraft((draft) => ({ ...draft, city_id: cityId, region_id: city?.region_id ?? draft.region_id })) }} onRegionChange={(regionId) => setEditDraft((draft) => ({ ...draft, region_id: regionId, city_id: draft.city_id && cityOptions.find((city) => city.id === draft.city_id)?.region_id !== regionId ? null : draft.city_id }))} /> : <div className="grid grid-cols-1 gap-3 sm:grid-cols-2"><AdminPanelField label="אזור" mode="view" viewValue={<RegionBadge regionId={selectedContact.region_id} label={regionName(selectedContact.region_id)} />} /><AdminPanelField label="עיר" mode="view" viewValue={cityName(selectedContact.city_id)} /></div>}</div>
                   <AdminPanelField label="ניידות" mode={isEditing ? 'edit' : 'view'} viewValue={mobilityName(selectedContact.mobility_id)} editValue={<PanelSelectInput id="contact-mobility" value={editDraft.mobility_id} options={mobilityDict} onChange={(value) => setDraftField('mobility_id', value)} />} />
-                  <AdminPanelField label="סוג יישוב" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.locality_type} editValue={<PanelTextInput id="contact-locality" value={editDraft.locality_type} onChange={(value) => setDraftField('locality_type', value)} />} />
+                  {/* INC-3144 — כשיש עיר, טריגר במסד (trg_contact_fill_region_locality_from_city)
+                      גוזר את סוג היישוב מ-dict_cities ודורס כל ערך ידני. עריכה כאן הייתה אשליה,
+                      ולכן היא נפתחת רק כשאין עיר. */}
+                  <AdminPanelField
+                    label="סוג יישוב"
+                    mode={isEditing && !editDraft.city_id ? 'edit' : 'view'}
+                    viewValue={selectedContact.locality_type}
+                    editValue={<PanelTextInput id="contact-locality" value={editDraft.locality_type} onChange={(value) => setDraftField('locality_type', value)} />}
+                    helperText={isEditing && editDraft.city_id ? 'נגזר אוטומטית מהעיר ואינו ניתן לעריכה ידנית.' : undefined}
+                  />
                   <div className="sm:col-span-2">{isEditing ? <DictionaryMultiSelect label="אזורים מועדפים" options={regionOptions} value={editDraft.preferred_regions ?? []} onChange={(ids) => setDraftField('preferred_regions', ids)} /> : <AdminPanelField label="אזורים מועדפים" mode="view" viewValue={formatIdsToNames(selectedContact.preferred_regions, regionName)} />}</div>
                   <div className="sm:col-span-2">{isEditing ? <DictionaryMultiSelect label="ערים מועדפות" options={cityOptions} value={editDraft.preferred_cities ?? []} onChange={(ids) => setDraftField('preferred_cities', ids)} /> : <AdminPanelField label="ערים מועדפות" mode="view" viewValue={formatIdsToNames(selectedContact.preferred_cities, cityName)} />}</div>
                   <AdminPanelField label="כל הארץ" mode={isEditing ? 'edit' : 'view'} viewValue={selectedContact.preferred_all_country ? 'כן' : 'לא'} editValue={<label className="inline-flex items-center gap-2 text-[13px]"><input type="checkbox" checked={Boolean(editDraft.preferred_all_country)} onChange={(event) => setDraftField('preferred_all_country', event.target.checked)} /> מחפש/ת בכל הארץ</label>} />
@@ -3004,6 +3020,7 @@ function createContactEditDraft(contact: ContactRow): Partial<AdminContactRow> {
     cv_received_date: contact.cv_received_date ?? null,
     city_id: contact.city_id ?? null,
     region_id: contact.region_id ?? null,
+    tax_type_id: contact.tax_type_id ?? null,
   }
 }
 
