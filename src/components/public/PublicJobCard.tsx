@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import type { PublicJob } from '@/services/publicJobsService'
-import { getJobImage } from '@/lib/publicJobUtils'
+import { getBrandPageUrl, getJobImage } from '@/lib/publicJobUtils'
 import { roleColorFromName } from '@/lib/publicRolePages'
 import { getRoleColor } from '@/lib/roleColors'
 
@@ -123,7 +123,7 @@ export default function PublicJobCard({ job, onClick, index = 0 }: Props) {
               AllDent
             </span>
             {/* INC-3142 — למשרה יש דף מיתוג מעסיק משלה (job_url). תגית בלבד; הקישור עצמו בעמוד המשרה. */}
-            {job.job_url && (
+            {getBrandPageUrl(job) && (
               <span style={{ background: '#fff', color: C.primary, border: `1px solid ${C.primary}`, fontSize: 11, fontWeight: 700, padding: '3px 9px', borderRadius: 999 }}>
                 דף מרפאה
               </span>

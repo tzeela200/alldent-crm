@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { getBrandPageUrl } from '@/lib/publicJobUtils'
 import { Link, useParams } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import ApplyModal from '@/components/public/ApplyModal'
@@ -118,14 +119,14 @@ export default function PublicJobPage() {
               לכן במשרה עם job_url היא מוחלפת בקריאה לפעולה — בסוף הקריאה,
               במקום שבו המועמד סיים לקרוא את התיאור.
             */}
-            {job.job_url ? (
+            {getBrandPageUrl(job) ? (
               <section className="rounded-xl border border-[#008080]/25 bg-[#F2F9F9] px-6 py-7 text-center shadow-sm">
                 <p className="mb-1 text-[17px] font-extrabold text-[#0F0F10]">רוצים לראות את המרפאה?</p>
                 <p className="mb-5 text-sm leading-6 text-[#52677A]">
                   דף המרפאה מציג את הצוות, המתחם ופרטי יצירת הקשר הישירים.
                 </p>
                 <a
-                  href={job.job_url}
+                  href={getBrandPageUrl(job) ?? undefined}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-block w-full max-w-[380px] rounded-full bg-[#008080] px-8 py-4 text-[16px] font-extrabold text-white shadow-sm transition hover:bg-[#006D6D] focus:outline-none focus:ring-4 focus:ring-[#008080]/25 active:scale-[0.98]"
@@ -235,10 +236,10 @@ function JobDetailsPanel({
            לכותרת, כך שהם נראים בלי גלילה.
         משרה בלי job_url — הכפתור נשאר בתחתית, בדיוק כפי שהיה. אפס שינוי.
       */}
-      {job.job_url && (
+      {getBrandPageUrl(job) && (
         <div className="border-b border-[#D9D9D9] bg-[#FBFDFD] px-5 py-4">
           <a
-            href={job.job_url}
+            href={getBrandPageUrl(job) ?? undefined}
             target="_blank"
             rel="noopener noreferrer"
             className="block w-full rounded-full bg-[#008080] px-6 py-3.5 text-center text-[15px] font-extrabold text-white shadow-sm transition hover:bg-[#006D6D] focus:outline-none focus:ring-4 focus:ring-[#008080]/25 active:scale-[0.98]"
@@ -254,7 +255,7 @@ function JobDetailsPanel({
         ))}
       </dl>
 
-      {!job.job_url && (
+      {!getBrandPageUrl(job) && (
         <div className="hidden px-5 pb-5 pt-4 md:block">
           <button
             onClick={onApply}
@@ -376,9 +377,9 @@ function JobMobileApplyBar({
         «לדף המרפאה» מקבל משקל כפול כי הוא היעד שהמרפאה מפיצה.
         משרה רגילה — הסרגל נשאר בדיוק כפי שהיה.
       */}
-      {job.job_url ? (
+      {getBrandPageUrl(job) ? (
         <a
-          href={job.job_url}
+          href={getBrandPageUrl(job) ?? undefined}
           target="_blank"
           rel="noopener noreferrer"
           className="block w-full rounded-full bg-[#008080] px-4 py-3.5 text-center text-[15px] font-extrabold text-white shadow-sm transition hover:bg-[#006D6D] active:scale-[0.98]"

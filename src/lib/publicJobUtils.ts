@@ -58,6 +58,21 @@ export function buildPublicJobUrl(jobCode: string): string {
 }
 
 /**
+ * INC-3142 — כתובת דף מיתוג המעסיק של המשרה, או null אם אין כזה.
+ *
+ * ⚠️ job_url לבדו אינו סימן למשרת מיתוג: ב-89 מתוך 95 משרות חיות (14.09.2026)
+ * הוא מחזיק את כתובת עמוד המשרה עצמו (alldent.co.il/jobs/<קוד>). כתובת כזו
+ * אינה דף מיתוג, ומשרה כזו חייבת להישאר משרה רגילה עם «הגשת מועמדות».
+ * רק כתובת שאינה עמוד משרה (למשל /dentup, /fleissig) נחשבת לדף מיתוג.
+ */
+export function getBrandPageUrl(job: { job_url: string | null }): string | null {
+  const url = job.job_url?.trim()
+  if (!url) return null
+  if (/^https?:\/\/(www\.)?alldent\.co\.il\/jobs(\/|$)/i.test(url)) return null
+  return url
+}
+
+/**
  * INC-3142 — האם ה-slug בכתובת נראה כמו קוד משרה.
  *
  * זהו שומר: נתיב שאינו עומד בו נופל ל-404 **בלי** לפנות ל-Supabase, כדי
