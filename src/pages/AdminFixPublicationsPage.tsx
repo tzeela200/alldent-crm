@@ -566,7 +566,8 @@ function ImportPanel({ onDone }: { onDone: () => void }) {
           toast.success(
             `נקלטו ${res.inserted} שליחות ב-${res.campaignsCreated + res.campaignsUpdated} קמפיינים · ` +
             `${res.contactsUpdated} אנשי קשר ו-${res.accountsUpdated} ארגונים עודכנו` +
-            (res.skippedNoPhone ? ` · ${res.skippedNoPhone} שורות דולגו (אין נייד תקין)` : ''),
+            (res.skippedNoPhone ? ` · ${res.skippedNoPhone} שורות דולגו (אין נייד תקין)` : '') +
+            (res.contactsBlocked ? ` · ${res.contactsBlocked} סומנו חסום` : ''),
           )
           reset()
           onDone()

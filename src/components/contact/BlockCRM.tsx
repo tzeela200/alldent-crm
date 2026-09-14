@@ -94,7 +94,7 @@ export function BlockCRM({ contact, dicts, onUpdate }: Props) {
             <ReadOnlyRow label="קמפיין WhatsApp אחרון" value={formatDate(contact.whatsapp_campaign_last_sent)} />
             <ReadOnlyRow
               label="מצב שליחת WhatsApp"
-              value={publicationOutcomeLabel(contact.phone_norm, contact.whatsapp_campaign_last_sent, contact.whatsapp_last_delivery_status)}
+              value={publicationOutcomeLabel(contact.phone_norm, contact.whatsapp_campaign_last_sent, contact.whatsapp_last_delivery_status, contact.social_status)}
             />
             <ReadOnlyRow label="תאריך שינוי סטטוס תעסוקה" value={formatDate(contact.candidate_status_date)} />
             <ReadOnlyRow label="הגשות קודמות" value={contact.prev_applications_count?.toString() ?? "—"} />

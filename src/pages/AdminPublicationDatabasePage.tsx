@@ -38,6 +38,7 @@ import {
   EMPTY_DB_FILTERS, hasActiveDbFilters, LOCALITY_FILTER_OPTIONS, PUBLICATION_DB_UNSORTABLE,
   type PublicationDbFilters, type PublicationDbRow,
 } from '@/hooks/usePublicationDatabase'
+import { PublicationOutcomeCell, PUBLICATION_OUTCOME_CELL_WIDTH } from '@/components/admin/PublicationOutcomeCell'
 
 const VISIBLE_COLUMNS_STORAGE_KEY = 'alldent.publicationDatabase.visibleColumns.v1'
 
@@ -99,6 +100,7 @@ export default function AdminPublicationDatabasePage() {
 
   const dicts = usePublicationDicts()
   const optOut = useOptedOutContactIds()
+  const optedOutSet = useMemo(() => new Set(optOut.data?.ids ?? []), [optOut.data?.ids])
   const board = usePublicationDatabase(filters, page, sortBy, sortDir)
   const stats = usePublicationDbStats(filters)
 
@@ -189,11 +191,18 @@ export default function AdminPublicationDatabasePage() {
       },
     },
     {
+      // ניתן לבחירה: סימון „חסום" ידני (נשמר כסטטוס פנייה „הסרה")
       key: 'outcome', label: 'מצב', sortable: true, nowrap: true,
-      render: (row) => {
-        const meta = getOutcomeMeta(row.outcome)
-        return <span title={meta.description}><StatusPill label={meta.label} variant={meta.tone} /></span>
-      },
+      width: PUBLICATION_OUTCOME_CELL_WIDTH,
+      render: (row) => (
+        <PublicationOutcomeCell
+          contactId={row.contact_id}
+          outcome={row.outcome}
+          lastStatus={row.whatsapp_last_delivery_status}
+          socialStatus={row.social_status}
+          isOptedOut={optedOutSet.has(row.contact_id)}
+        />
+      ),
     },
     {
       key: 'last_status', label: 'סטטוס אחרון', sortable: true, nowrap: true,
@@ -276,12 +285,13 @@ export default function AdminPublicationDatabasePage() {
       )
 
       if (mode === 'clean') {
-        const totalExcluded = excluded.noDevice + excluded.optOut + excluded.noPhone
+        const totalExcluded = excluded.noDevice + excluded.optOut + excluded.removed + excluded.noPhone
         toast.success(
           `יוצאו ${rows.length.toLocaleString('he-IL')} שורות. ` +
           (totalExcluded
-            ? `הוצאו ${totalExcluded}: ${excluded.noDevice} ללא וואטסאפ · ` +
-              `${excluded.optOut} ביקשו הסרה · ${excluded.noPhone} ללא נייד.`
+            ? `הוצאו ${totalExcluded}: ${excluded.removed} הוסרו מפרסום · ` +
+              `${excluded.noDevice} ללא וואטסאפ · ${excluded.optOut} ביקשו הסרה · ` +
+              `${excluded.noPhone} ללא נייד.`
             : 'לא הוצאה אף שורה.'),
           { duration: 8000 },
         )

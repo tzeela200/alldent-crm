@@ -13,7 +13,11 @@ import {
   markInFileDuplicates, sendEventKey,
 } from '@/lib/fixPublications/campaignParser'
 import { mapDeliveryStatus, failureCategoryOf, isOptOutText, isMediaFailureText } from '@/lib/fixPublications/deliveryStatus'
-import { outcomeOf, outcomeOfRecord, assertOutcomeCoverage, OUTCOME_STATUS_CODES } from '@/lib/fixPublications/deliveryOutcome'
+import {
+  outcomeOf, outcomeOfRecord, assertOutcomeCoverage, OUTCOME_STATUS_CODES,
+  DELIVERY_OUTCOMES, blockReasonOf, isRemovedFromPublishing, publicationOutcomeLabel,
+  REMOVED_SOCIAL_STATUS,
+} from '@/lib/fixPublications/deliveryOutcome'
   
 import {
   summarizeSendList, SEND_VERDICTS, verdictFor,
@@ -180,7 +184,7 @@ async function main() {
   check('נקרא → הגיע', outcomeOf('read'), 'reached')
   check('נמסר → הגיע', outcomeOf('delivered'), 'reached')
   check('נשלח → הגיע (החלטת צאלה)', outcomeOf('submitted'), 'reached')
-  check('אין מכשיר → אל תשלחי שוב', outcomeOf('failed_device'), 'do_not_send')
+  check('אין מכשיר → חסום', outcomeOf('failed_device'), 'do_not_send')
   check('הגבלה → נסי שוב', outcomeOf('failed_rate_limit'), 'retry')
   check('חסימה → נסי שוב', outcomeOf('failed_blocked'), 'retry')
   check('מדיה → נסי שוב', outcomeOf('failed_provider', 'media'), 'retry')
@@ -258,9 +262,9 @@ async function main() {
   const listRows: SendListRow[] = [
     { index: 0, raw: '972501111111', normalized: '972501111111', verdict: 'ok', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
     { index: 1, raw: '972502222222', normalized: '972502222222', verdict: 'ok', reason: null, permanentBlock: false, matches: [{ kind: 'contact', id: 1, name: 'דר א', field: 'primary' }], outcome: null, lastSentAt: null },
-    { index: 2, raw: '972503333333', normalized: '972503333333', verdict: 'blocked', reason: null, permanentBlock: true, matches: [], outcome: null, lastSentAt: null },
-    { index: 3, raw: '972504444444', normalized: '972504444444', verdict: 'blocked', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
-    { index: 4, raw: '972505555555', normalized: '972505555555', verdict: 'blocked', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
+    { index: 2, raw: '972503333333', normalized: '972503333333', verdict: 'blocked', reason: null, permanentBlock: true, blockKind: 'opt_out', matches: [], outcome: null, lastSentAt: null },
+    { index: 3, raw: '972504444444', normalized: '972504444444', verdict: 'blocked', reason: null, permanentBlock: false, blockKind: 'no_device', matches: [], outcome: null, lastSentAt: null },
+    { index: 4, raw: '972505555555', normalized: '972505555555', verdict: 'blocked', reason: null, permanentBlock: false, blockKind: 'no_device', matches: [], outcome: null, lastSentAt: null },
     { index: 5, raw: '03-1234567', normalized: null, verdict: 'invalid', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
     { index: 6, raw: '972501111111', normalized: '972501111111', verdict: 'duplicate', reason: null, permanentBlock: false, matches: [], outcome: null, lastSentAt: null },
   ]
@@ -300,6 +304,41 @@ async function main() {
     verdictFor(st(false, 'failed_rate_limit', '2026-08-26T00:00:00Z'), P).verdict, 'ok')
   check('חסום תמיד עם סיבה בעברית',
     /[\u0590-\u05FF]/.test(verdictFor(st(true, null, null), P).reason ?? ''), true)
+
+
+  // ── 16. „הסרה" = חסום (INC-3145) ──
+  check('התווית היא „חסום"', DELIVERY_OUTCOMES.do_not_send.label, 'חסום')
+  check('בדיקת חסימה משתמשת בכלל, לא בטקסט', SEND_VERDICTS.blocked.label, 'חסום')
+  check('סטטוס פנייה הסרה = 13', REMOVED_SOCIAL_STATUS, 13)
+  check('13 מזוהה כהסרה', isRemovedFromPublishing(13), true)
+  check('גם כשמגיע כמחרוזת', isRemovedFromPublishing('13'), true)
+  check('סטטוס פנייה אחר אינו הסרה', isRemovedFromPublishing(12), false)
+  check('ריק אינו הסרה', isRemovedFromPublishing(null), false)
+
+  const P2 = '972501111111'
+  check('הסרה חוסמת גם מי שמעולם לא נשלח',
+    outcomeOfRecord({ phoneNorm: P2, lastSentAt: null, lastStatus: null, socialStatus: 13 }), 'do_not_send')
+  check('הסרה חוסמת גם מי שקרא',
+    outcomeOfRecord({ phoneNorm: P2, lastSentAt: '2026-09-01T00:00:00Z', lastStatus: 'read', socialStatus: 13 }), 'do_not_send')
+  check('בלי הסרה — מעולם לא נשלח נשאר כך',
+    outcomeOfRecord({ phoneNorm: P2, lastSentAt: null, lastStatus: null, socialStatus: 12 }), 'never_sent')
+
+  check('סיבה: ביקש הסרה גוברת', blockReasonOf({ isOptedOut: true, lastStatus: 'failed_device', socialStatus: 13 }), 'opt_out')
+  check('סיבה: אין וואטסאפ לפני הסרה', blockReasonOf({ lastStatus: 'failed_device', socialStatus: 13 }), 'no_device')
+  check('סיבה: הוסר מפרסום', blockReasonOf({ lastStatus: 'read', socialStatus: 13 }), 'removed')
+  check('סיבה: לא חסום', blockReasonOf({ lastStatus: 'read', socialStatus: null }), null)
+
+  check('תווית ברשומה: חסום · הוסר מפרסום',
+    publicationOutcomeLabel(P2, null, null, 13), 'חסום · הוסר מפרסום')
+  check('תווית ברשומה: חסום · אין וואטסאפ',
+    publicationOutcomeLabel(P2, '2026-08-26T00:00:00Z', 'failed_device', null), 'חסום · אין וואטסאפ')
+
+  check('בדיקת רשימה: הסרה → חסום',
+    verdictFor({ optedOut: false, lastStatus: null, lastSentAt: null, removed: true, known: true }, P2).verdict, 'blocked')
+  check('בדיקת רשימה: הסרה = קבוע',
+    verdictFor({ optedOut: false, lastStatus: 'read', lastSentAt: null, removed: true, known: true }, P2).permanentBlock, true)
+  check('בדיקת רשימה: סוג החסימה',
+    verdictFor({ optedOut: false, lastStatus: null, lastSentAt: null, removed: true, known: true }, P2).blockKind, 'removed')
 
   console.log(failures ? `\n${failures} בדיקות נכשלו` : '\nכל הבדיקות עברו')
   process.exit(failures ? 1 : 0)

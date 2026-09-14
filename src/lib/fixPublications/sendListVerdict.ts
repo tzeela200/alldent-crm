@@ -26,7 +26,7 @@ export const SEND_VERDICTS: Record<
   { label: string; tone: 'success' | 'danger' | 'warning' | 'default' }
 > = {
   ok:        { label: 'תקין לשליחה',  tone: 'success' },
-  blocked:   { label: 'אסור לשלוח',   tone: 'danger'  },
+  blocked:   { label: 'חסום',          tone: 'danger'  },
   invalid:   { label: 'נייד לא תקין', tone: 'warning' },
   duplicate: { label: 'כפול ברשימה',  tone: 'default' },
 }
@@ -37,9 +37,13 @@ export interface SendStatus {
   optedOut: boolean
   lastStatus: string | null
   lastSentAt: string | null
+  /** סומן „הסרה" (סטטוס פנייה 13) — חסימה ידנית, קבועה עד ביטול */
+  removed?: boolean
   /** הנייד מוכר במערכת (רשומה או שליחה קודמת) */
   known: boolean
 }
+
+export type SendBlockKind = 'opt_out' | 'no_device' | 'removed'
 
 export interface SendListRow {
   index: number
@@ -49,8 +53,10 @@ export interface SendListRow {
   verdict: SendVerdict
   /** למה חסום או פסול — בעברית, מוכן לתצוגה */
   reason: string | null
-  /** האם החסימה קבועה (בקשת הסרה) או הפיכה (אין מכשיר) */
+  /** האם החסימה קבועה (בקשת הסרה / הוסר מפרסום) או הפיכה (אין מכשיר) */
   permanentBlock: boolean
+  /** סוג החסימה, לפילוח בפסק הדין */
+  blockKind?: SendBlockKind | null
   matches: PhoneMatch[]
   outcome: DeliveryOutcome | null
   lastSentAt: string | null
@@ -65,6 +71,7 @@ export interface SendListSummary {
   /** פילוח החסומים — זה מה שמוצג בפסק הדין */
   optedOut: number
   noDevice: number
+  removed: number
   /** כמה מהתקינים כבר נמצאים במאגר */
   knownInDatabase: number
 }
@@ -73,6 +80,7 @@ export interface VerdictDecision {
   verdict: SendVerdict
   reason: string | null
   permanentBlock: boolean
+  blockKind: SendBlockKind | null
   outcome: DeliveryOutcome | null
 }
 
@@ -88,7 +96,7 @@ export interface VerdictDecision {
 export function verdictFor(status: SendStatus | undefined, phoneNorm: string): VerdictDecision {
   if (!status) {
     // נייד תקין שאינו מוכר בכלל — אין סיבה לחסום
-    return { verdict: 'ok', reason: null, permanentBlock: false, outcome: 'never_sent' }
+    return { verdict: 'ok', reason: null, permanentBlock: false, blockKind: null, outcome: 'never_sent' }
   }
 
   if (status.optedOut) {
@@ -96,6 +104,28 @@ export function verdictFor(status: SendStatus | undefined, phoneNorm: string): V
       verdict: 'blocked',
       reason: 'ביקש להפסיק לקבל פרסום — אין לשלוח אליו שוב',
       permanentBlock: true,
+      blockKind: 'opt_out',
+      outcome: 'do_not_send',
+    }
+  }
+
+  // אין מכשיר מוצג לפני „הסרה" כי הוא מסביר יותר — אותו סדר של blockReasonOf
+  if (status.lastStatus === 'failed_device') {
+    return {
+      verdict: 'blocked',
+      reason: 'אין וואטסאפ על המספר — ההודעה לא תגיע',
+      permanentBlock: !!status.removed,
+      blockKind: 'no_device',
+      outcome: 'do_not_send',
+    }
+  }
+
+  if (status.removed) {
+    return {
+      verdict: 'blocked',
+      reason: 'הוסר מפרסום — אין לשלוח אליו',
+      permanentBlock: true,
+      blockKind: 'removed',
       outcome: 'do_not_send',
     }
   }
@@ -106,16 +136,7 @@ export function verdictFor(status: SendStatus | undefined, phoneNorm: string): V
     lastStatus: status.lastStatus,
   })
 
-  if (outcome === 'do_not_send') {
-    return {
-      verdict: 'blocked',
-      reason: 'אין וואטסאפ על המספר — ההודעה לא תגיע',
-      permanentBlock: false,
-      outcome,
-    }
-  }
-
-  return { verdict: 'ok', reason: null, permanentBlock: false, outcome }
+  return { verdict: 'ok', reason: null, permanentBlock: false, blockKind: null, outcome }
 }
 
 export function summarizeSendList(rows: SendListRow[]): SendListSummary {
@@ -125,8 +146,9 @@ export function summarizeSendList(rows: SendListRow[]): SendListSummary {
     blocked: rows.filter((r) => r.verdict === 'blocked').length,
     invalid: rows.filter((r) => r.verdict === 'invalid').length,
     duplicates: rows.filter((r) => r.verdict === 'duplicate').length,
-    optedOut: rows.filter((r) => r.verdict === 'blocked' && r.permanentBlock).length,
-    noDevice: rows.filter((r) => r.verdict === 'blocked' && !r.permanentBlock).length,
+    optedOut: rows.filter((r) => r.verdict === 'blocked' && r.blockKind === 'opt_out').length,
+    noDevice: rows.filter((r) => r.verdict === 'blocked' && r.blockKind === 'no_device').length,
+    removed: rows.filter((r) => r.verdict === 'blocked' && r.blockKind === 'removed').length,
     knownInDatabase: rows.filter((r) => r.verdict === 'ok' && r.matches.length > 0).length,
   }
 }

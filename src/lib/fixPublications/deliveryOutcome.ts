@@ -43,8 +43,8 @@ export const DELIVERY_OUTCOMES: Record<DeliveryOutcome, OutcomeMeta> = {
     description: 'ההודעה יצאה ולא נכשלה — נשלח, נמסר או נקרא',
   },
   do_not_send: {
-    code: 'do_not_send', label: 'אל תשלחי שוב', order: 2, tone: 'danger',
-    description: 'ביקשו להפסיק לקבל פרסום, או שאין וואטסאפ על המספר',
+    code: 'do_not_send', label: 'חסום', order: 2, tone: 'danger',
+    description: 'אין לשלוח — הוסר מפרסום, ביקש הסרה, או שאין וואטסאפ על המספר',
   },
   retry: {
     code: 'retry', label: 'שווה לנסות שוב', order: 3, tone: 'warning',
@@ -110,6 +110,45 @@ export function outcomeOf(
 }
 
 /**
+ * סטטוס הפנייה „הסרה" ב-`dict_social_statuses` (אומת חי: id 13 = "הסרה").
+ *
+ * הכרעת צאלה (14/09/2026): „הסרה" = **לא לשלוח הודעות**. זה הסימון הידני של
+ * חסימה — גם מי שסימנה בעצמה, וגם מי שסומן בקליטה כי אין לו וואטסאפ או
+ * שביקש הסרה. בניגוד ל"אין מכשיר" שנגזר מהסטטוס האחרון, הסימון הזה **קבוע**
+ * עד שמבטלים אותו ידנית.
+ */
+export const REMOVED_SOCIAL_STATUS = 13
+
+export function isRemovedFromPublishing(socialStatus: number | string | null | undefined): boolean {
+  return Number(socialStatus) === REMOVED_SOCIAL_STATUS
+}
+
+/** למה הרשומה חסומה — מוצג לצד „חסום" כדי שיהיה ברור מה עשה אותה חסומה */
+export type BlockReason = 'opt_out' | 'no_device' | 'removed'
+
+export const BLOCK_REASON_LABELS: Record<BlockReason, string> = {
+  opt_out:   'ביקש הסרה',
+  no_device: 'אין וואטסאפ',
+  removed:   'הוסר מפרסום',
+}
+
+/**
+ * הסיבה הספציפית ביותר לחסימה. סדר העדיפות הוא מהמידע המדויק לכללי:
+ * בקשת הסרה מפיקס → אין מכשיר → סימון ידני. מי שסומן „הסרה" וגם אין לו
+ * וואטסאפ יוצג כ"אין וואטסאפ", כי זה מסביר יותר.
+ */
+export function blockReasonOf(args: {
+  isOptedOut?: boolean
+  lastStatus: string | null
+  socialStatus?: number | null
+}): BlockReason | null {
+  if (args.isOptedOut) return 'opt_out'
+  if (args.lastStatus === 'failed_device') return 'no_device'
+  if (isRemovedFromPublishing(args.socialStatus)) return 'removed'
+  return null
+}
+
+/**
  * ההחלטה לרשומה במאגר, על בסיס שדות הסיכום ב-`contact`/`accounts`.
  *
  * `isOptedOut` מגיע מבחוץ ואינו נגזר מהסיכום: הוא נקבע לפי קיום ולו שורת
@@ -121,8 +160,10 @@ export function outcomeOfRecord(args: {
   lastSentAt: string | null
   lastStatus: string | null
   isOptedOut?: boolean
+  /** סטטוס הפנייה של הרשומה — „הסרה" (13) חוסם שליחה */
+  socialStatus?: number | null
 }): DeliveryOutcome {
-  if (args.isOptedOut) return 'do_not_send'
+  if (args.isOptedOut || isRemovedFromPublishing(args.socialStatus)) return 'do_not_send'
   if (!args.phoneNorm) return 'no_phone'
   if (!args.lastSentAt && !args.lastStatus) return 'never_sent'
   return outcomeOf(args.lastStatus as DeliveryStatusCode | null)
@@ -151,13 +192,19 @@ export function publicationOutcomeLabel(
   phoneNorm: string | null | undefined,
   lastSentAt: string | null | undefined,
   lastStatus: string | null | undefined,
+  socialStatus?: number | null,
 ): string {
   const outcome = outcomeOfRecord({
     phoneNorm: phoneNorm ?? null,
     lastSentAt: lastSentAt ?? null,
     lastStatus: lastStatus ?? null,
+    socialStatus,
   })
   const label = DELIVERY_OUTCOMES[outcome].label
+  if (outcome === 'do_not_send') {
+    const reason = blockReasonOf({ lastStatus: lastStatus ?? null, socialStatus })
+    return reason ? `${label} · ${BLOCK_REASON_LABELS[reason]}` : label
+  }
   if (outcome === 'never_sent' || outcome === 'no_phone') return label
   return lastStatus ? `${label} · ${getDeliveryStatusMeta(lastStatus).label}` : label
 }

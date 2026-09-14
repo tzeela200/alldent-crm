@@ -43,6 +43,7 @@ import {
   type ParsedCampaignRow, type CampaignGroup, type FileValidation, type MatchResult,
 } from '@/lib/fixPublications/campaignParser'
 import { pickHigherStatus, type DeliveryStatusCode } from '@/lib/fixPublications/deliveryStatus'
+import { REMOVED_SOCIAL_STATUS } from '@/lib/fixPublications/deliveryOutcome'
 
 export const FIX_PUBLICATIONS_KEYS = {
   all: ['fix-publications'] as const,
@@ -822,6 +823,8 @@ export interface CommitResult {
   statusUpdated: number
   contactsUpdated: number
   accountsUpdated: number
+  /** אנשי קשר שסומנו „חסום" בקליטה — אין וואטסאפ או ביקשו הסרה */
+  contactsBlocked: number
   /** שגיאות ברמת מנה — כישלון במנה אחת אינו מבטל את השאר */
   errors: string[]
 }
@@ -843,7 +846,8 @@ export function useCommitCampaign() {
 async function commitCampaignPreview(preview: CampaignPreview): Promise<CommitResult> {
   const result: CommitResult = {
     campaignsCreated: 0, campaignsUpdated: 0, inserted: 0, skippedExisting: 0,
-    skippedNoPhone: 0, statusUpdated: 0, contactsUpdated: 0, accountsUpdated: 0, errors: [],
+    skippedNoPhone: 0, statusUpdated: 0, contactsUpdated: 0, accountsUpdated: 0,
+    contactsBlocked: 0, errors: [],
   }
 
   const groups = groupIntoCampaigns(preview.rows)
@@ -946,9 +950,68 @@ async function commitCampaignPreview(preview: CampaignPreview): Promise<CommitRe
     (r) => r.accountId, result.errors,
   )
 
+  // ─── סימון „חסום" לפי מה שפיקס דיווח (הכרעת צאלה 14/09/2026) ───
+  result.contactsBlocked = await markBlockedFromReport(committedRows, result.errors)
+
   await refreshCampaignCounts(preview.campaigns.map((c) => c.campaignKey), result.errors)
 
   return result
+}
+
+/**
+ * מסמן „חסום" (סטטוס פנייה „הסרה") את מי שפיקס דיווח עליו שאין לו וואטסאפ,
+ * או שביקש להפסיק לקבל פרסום.
+ *
+ * - **ביקש הסרה** — מסומן תמיד, בלי קשר לתאריך. זו החלטה של הנמען.
+ * - **אין וואטסאפ** — מסומן רק אם זה *הסטטוס האחרון* של הרשומה אחרי הקליטה.
+ *   דוח ישן שבו נכשל, כשמאז קמפיין מאוחר יותר הגיע, לא יחסום אותו.
+ *
+ * רצה אחרי syncSummary, ולכן "הסטטוס האחרון" כבר מעודכן. מי שכבר מסומן
+ * „הסרה" אינו נכתב שוב — אין סיבה לרשומת יומן כפולה.
+ *
+ * ⚠️ הסימון קבוע עד ביטול ידני: גם אם יום אחד יהיה לאדם וואטסאפ, הוא יישאר
+ *    חסום. זו הכרעה מודעת של המשתמשת.
+ */
+async function markBlockedFromReport(rows: ParsedCampaignRow[], errors: string[]): Promise<number> {
+  const optOutIds = new Set<number>()
+  const candidateIds = new Set<number>()
+  for (const row of rows) {
+    if (!row.contactId) continue
+    if (row.failureCategory === 'opt_out') optOutIds.add(row.contactId)
+    if (row.deliveryStatus === 'failed_device') candidateIds.add(row.contactId)
+  }
+  if (!optOutIds.size && !candidateIds.size) return 0
+
+  const toBlock = new Set<number>()
+  const allIds = [...new Set([...optOutIds, ...candidateIds])]
+
+  for (let i = 0; i < allIds.length; i += IN_CHUNK) {
+    const batch = allIds.slice(i, i + IN_CHUNK)
+    const { data, error } = await supabase
+      .from('contact')
+      .select('contact_id, social_status, whatsapp_last_delivery_status')
+      .in('contact_id', batch)
+    if (error) { errors.push(`בדיקת רשומות לחסימה נכשלה: ${error.message}`); return 0 }
+
+    for (const c of data ?? []) {
+      const id = Number(c.contact_id)
+      if (Number(c.social_status) === REMOVED_SOCIAL_STATUS) continue
+      if (optOutIds.has(id) || c.whatsapp_last_delivery_status === 'failed_device') toBlock.add(id)
+    }
+  }
+
+  const ids = [...toBlock]
+  let marked = 0
+  for (let i = 0; i < ids.length; i += IN_CHUNK) {
+    const batch = ids.slice(i, i + IN_CHUNK)
+    const { error } = await supabase
+      .from('contact')
+      .update({ social_status: REMOVED_SOCIAL_STATUS })
+      .in('contact_id', batch)
+    if (error) { errors.push(`סימון חסימה נכשל: ${error.message}`); continue }
+    marked += batch.length
+  }
+  return marked
 }
 
 /**

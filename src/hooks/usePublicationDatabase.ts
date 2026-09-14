@@ -19,7 +19,7 @@ import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { phoneSearchTerm } from '@/lib/normalizePhone'
 import {
-  OUTCOME_STATUS_CODES, outcomeOfRecord,
+  OUTCOME_STATUS_CODES, outcomeOfRecord, REMOVED_SOCIAL_STATUS, blockReasonOf,
   type DeliveryOutcome,
 } from '@/lib/fixPublications/deliveryOutcome'
 
@@ -181,16 +181,38 @@ type AnyQuery = any
 /**
  * מתרגם החלטה לתנאי על `contact`.
  *
- * "אין נייד" ו"מעולם לא נשלח" אינם נגזרים מהסטטוס אלא משדות אחרים, ולכן
- * הם בלעדיים — בחירתם מתעלמת משאר הדליים. שאר הדליים משתלבים ב-in() אחד.
+ * **הדליים זרים זה לזה** — כל רשומה נופלת בדיוק באחד, באותו סדר עדיפות של
+ * `outcomeOfRecord`: חסום (בקשת הסרה / „הסרה") גובר על הכל, ואחריו אין נייד,
+ * מעולם לא נשלח, ולבסוף לפי הסטטוס. בלי ההחרגה, מי שסומן „הסרה" היה נספר גם
+ * ב"חסום" וגם ב"מעולם לא נשלח", והכרטיסים לא היו מסתכמים לסה״כ.
+ *
+ * שני תנאי `or` באותה בקשה מצטרפים ב-AND — אומת אמפירית מול PostgREST
+ * (`or=(1,2)&or=(2,3)` ⇒ רק 2), ולכן אפשר לשלב עם החיפוש.
  */
 function applyOutcomeFilter<Q>(
   queryIn: Q,
   outcomes: DeliveryOutcome[],
   optedOutIds: number[],
 ): Q {
-  const query: AnyQuery = queryIn
+  let query: AnyQuery = queryIn
   if (!outcomes.length) return query
+
+  const optOutIds = optedOutIds.slice(0, IN_CHUNK)
+
+  // ── חסום: אין מכשיר, סומן „הסרה", או ביקש הסרה בפיקס ──
+  if (outcomes.includes('do_not_send')) {
+    const clauses = [
+      // אין מכשיר נחשב חסום רק כשיש נייד; בלי נייד הרשומה היא "אין נייד"
+      `and(whatsapp_last_delivery_status.in.(${OUTCOME_STATUS_CODES.do_not_send.join(',')}),phone_norm.not.is.null)`,
+      `social_status.eq.${REMOVED_SOCIAL_STATUS}`,
+    ]
+    if (optOutIds.length) clauses.push(`contact_id.in.(${optOutIds.join(',')})`)
+    return query.or(clauses.join(','))
+  }
+
+  // כל שאר הדליים — רק מי שאינו חסום
+  query = query.or(`social_status.is.null,social_status.neq.${REMOVED_SOCIAL_STATUS}`)
+  if (optOutIds.length) query = query.not('contact_id', 'in', `(${optOutIds.join(',')})`)
 
   // "אין נייד" — אי אפשר לשלוח בכלל
   if (outcomes.includes('no_phone')) {
@@ -204,15 +226,8 @@ function applyOutcomeFilter<Q>(
 
   const codes = Array.from(new Set(outcomes.flatMap((o) => OUTCOME_STATUS_CODES[o])))
   if (!codes.length) return query
-
-  // בקשת הסרה אינה נגזרת מהסטטוס — היא נשלפת בנפרד ומוזרקת כאן.
-  if (outcomes.includes('do_not_send') && optedOutIds.length) {
-    const ids = optedOutIds.slice(0, IN_CHUNK)
-    return query.or(
-      `whatsapp_last_delivery_status.in.(${codes.join(',')}),contact_id.in.(${ids.join(',')})`,
-    )
-  }
-  return query.in('whatsapp_last_delivery_status', codes)
+  // בלי נייד הרשומה היא "אין נייד" גם אם יש לה סטטוס — אותו סדר של outcomeOfRecord
+  return query.not('phone_norm', 'is', null).in('whatsapp_last_delivery_status', codes)
 }
 
 function applyBaseFilters<Q>(queryIn: Q, f: PublicationDbFilters): Q {
@@ -280,6 +295,7 @@ export function usePublicationDatabase(
           lastSentAt: r.whatsapp_campaign_last_sent,
           lastStatus: r.whatsapp_last_delivery_status,
           isOptedOut: optedOut.has(r.contact_id),
+          socialStatus: r.social_status,
         }),
         campaignCount: enrichment.get(r.contact_id)?.campaigns ?? 0,
         readCount: enrichment.get(r.contact_id)?.read ?? 0,
@@ -395,6 +411,8 @@ export function usePublicationDbStats(filters: PublicationDbFilters) {
 export interface ExportExclusions {
   noDevice: number
   optOut: number
+  /** סומן „הסרה" — ידנית או בקליטה */
+  removed: number
   noPhone: number
 }
 
@@ -412,7 +430,7 @@ export async function fetchAllPublicationRows(
 ): Promise<{ rows: PublicationDbRow[]; excluded: ExportExclusions }> {
   const collected: PublicationDbRow[] = []
   const optedOut = new Set(optedOutIds)
-  const excluded: ExportExclusions = { noDevice: 0, optOut: 0, noPhone: 0 }
+  const excluded: ExportExclusions = { noDevice: 0, optOut: 0, removed: 0, noPhone: 0 }
 
   for (let page = 0; ; page++) {
     let query = supabase.from('contact').select(ROW_COLUMNS)
@@ -429,13 +447,20 @@ export async function fetchAllPublicationRows(
         lastSentAt: raw.whatsapp_campaign_last_sent,
         lastStatus: raw.whatsapp_last_delivery_status,
         isOptedOut: optedOut.has(raw.contact_id),
+        socialStatus: raw.social_status,
       })
 
       if (excludeDoNotSend) {
         if (outcome === 'no_phone') { excluded.noPhone++; continue }
         if (outcome === 'do_not_send') {
-          if (optedOut.has(raw.contact_id)) excluded.optOut++
-          else excluded.noDevice++
+          const reason = blockReasonOf({
+            isOptedOut: optedOut.has(raw.contact_id),
+            lastStatus: raw.whatsapp_last_delivery_status,
+            socialStatus: raw.social_status,
+          })
+          if (reason === 'opt_out') excluded.optOut++
+          else if (reason === 'no_device') excluded.noDevice++
+          else excluded.removed++
           continue
         }
       }

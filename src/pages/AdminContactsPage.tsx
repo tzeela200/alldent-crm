@@ -34,7 +34,7 @@ import {
 } from '@/components/layout/Shell'
 import {
   DELIVERY_OUTCOME_ORDER, DELIVERY_OUTCOMES, OUTCOME_STATUS_CODES,
-  getOutcomeMeta, outcomeOfRecord, type DeliveryOutcome,
+  getOutcomeMeta, outcomeOfRecord, REMOVED_SOCIAL_STATUS, type DeliveryOutcome,
 } from '@/lib/fixPublications/deliveryOutcome'
 import { formatPhone, normalizePhone, phoneSearchTerm, whatsappLink } from '@/lib/normalizePhone'
 import { openApplicationCv } from '@/lib/cv'
@@ -1044,6 +1044,7 @@ export default function AdminContactsPage() {
           phoneNorm: contact.phone_norm,
           lastSentAt: contact.whatsapp_campaign_last_sent,
           lastStatus: contact.whatsapp_last_delivery_status,
+          socialStatus: contact.social_status,
         })).label,
         'קשר אחרון': formatDate(contact.last_contact_date),
         'מספר הגשות': contact.prev_applications_count ?? 0,
@@ -1558,6 +1559,7 @@ export default function AdminContactsPage() {
           phoneNorm: contact.phone_norm,
           lastSentAt: contact.whatsapp_campaign_last_sent,
           lastStatus: contact.whatsapp_last_delivery_status,
+          socialStatus: contact.social_status,
         }))
         return <span title={meta.description}><StatusPill label={meta.label} variant={meta.tone} /></span>
       },
@@ -2396,6 +2398,7 @@ export default function AdminContactsPage() {
                       phoneNorm: selectedContact.phone_norm,
                       lastSentAt: selectedContact.whatsapp_campaign_last_sent,
                       lastStatus: selectedContact.whatsapp_last_delivery_status,
+                      socialStatus: selectedContact.social_status,
                     }))
                     return <span title={meta.description}><StatusPill label={meta.label} variant={meta.tone} /></span>
                   })()} />
@@ -3452,10 +3455,19 @@ async function runContactsQuery(
   if (filters.whatsapp_outcome) {
     // מקור אמת יחיד לתרגום דלי → קודי סטטוס (lib/fixPublications/deliveryOutcome).
     // "מעולם לא נשלח" ו"אין נייד" אינם נגזרים מהסטטוס אלא משדות אחרים.
+    // „הסרה" (סטטוס פנייה 13) = חסום, ולכן הדליים זרים: מי שחסום לא נספר באחרים.
     const outcome = filters.whatsapp_outcome
-    if (outcome === 'no_phone') query = query.is('phone_norm', null)
-    else if (outcome === 'never_sent') query = query.not('phone_norm', 'is', null).is('whatsapp_campaign_last_sent', null)
-    else query = query.in('whatsapp_last_delivery_status', OUTCOME_STATUS_CODES[outcome])
+    if (outcome === 'do_not_send') {
+      query = query.or(
+        `and(whatsapp_last_delivery_status.in.(${OUTCOME_STATUS_CODES.do_not_send.join(',')}),phone_norm.not.is.null),` +
+        `social_status.eq.${REMOVED_SOCIAL_STATUS}`,
+      )
+    } else {
+      query = query.or(`social_status.is.null,social_status.neq.${REMOVED_SOCIAL_STATUS}`)
+      if (outcome === 'no_phone') query = query.is('phone_norm', null)
+      else if (outcome === 'never_sent') query = query.not('phone_norm', 'is', null).is('whatsapp_campaign_last_sent', null)
+      else query = query.not('phone_norm', 'is', null).in('whatsapp_last_delivery_status', OUTCOME_STATUS_CODES[outcome])
+    }
   }
   if (filters.created_from) query = query.gte('created_timestamp', filters.created_from)
   if (filters.created_to) query = query.lte('created_timestamp', filters.created_to + 'T23:59:59')

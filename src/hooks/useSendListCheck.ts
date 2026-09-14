@@ -26,6 +26,7 @@ import { supabase } from '@/lib/supabase'
 import { normalizeIlMobile, IL_MOBILE_ERROR } from '@/lib/normalizePhone'
 import { splitPhoneInput, lookupPhonesByNorm } from '@/hooks/useInboxPhoneCheck'
 import { getDeliveryStatusMeta } from '@/lib/fixPublications/deliveryStatus'
+import { isRemovedFromPublishing } from '@/lib/fixPublications/deliveryOutcome'
 import {
   verdictFor, type SendListRow, type SendStatus,
 } from '@/lib/fixPublications/sendListVerdict'
@@ -75,7 +76,7 @@ export async function lookupSendStatusByPhone(norms: string[]): Promise<Map<stri
         .in('phone_norm', batch),
       supabase
         .from('contact')
-        .select('phone_norm, whatsapp_last_delivery_status, whatsapp_campaign_last_sent')
+        .select('phone_norm, social_status, whatsapp_last_delivery_status, whatsapp_campaign_last_sent')
         .in('phone_norm', batch),
       supabase
         .from('accounts')
@@ -94,6 +95,7 @@ export async function lookupSendStatusByPhone(norms: string[]): Promise<Map<stri
     for (const row of contacts.data ?? []) {
       const entry = touch(String(row.phone_norm))
       entry.known = true
+      if (isRemovedFromPublishing(row.social_status as number | null)) entry.removed = true
       entry.lastStatus = (row.whatsapp_last_delivery_status as string | null) ?? entry.lastStatus
       entry.lastSentAt = (row.whatsapp_campaign_last_sent as string | null) ?? entry.lastSentAt
     }
@@ -178,6 +180,7 @@ export function useSendListCheck() {
           row.verdict = 'blocked'
           row.reason = decision.reason
           row.permanentBlock = decision.permanentBlock
+          row.blockKind = decision.blockKind
         }
       }
 

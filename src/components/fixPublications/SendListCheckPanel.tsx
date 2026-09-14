@@ -188,11 +188,11 @@ export function SendListCheckPanel() {
               hint={summary.knownInDatabase ? `${summary.knownInDatabase} מהם במאגר` : undefined}
             />
             <KPICard
-              label="אסורים לשליחה"
+              label="חסומים"
               value={summary.blocked.toLocaleString('he-IL')}
               hint={
                 summary.blocked
-                  ? `${summary.optedOut} ביקשו הסרה · ${summary.noDevice} ללא וואטסאפ`
+                  ? `${summary.removed} הוסרו מפרסום · ${summary.optedOut} ביקשו הסרה · ${summary.noDevice} ללא וואטסאפ`
                   : undefined
               }
             />
@@ -230,10 +230,16 @@ function VerdictBanner({ summary }: { summary: ReturnType<typeof summarizeSendLi
           <div className="space-y-1">
             <p className="text-[16px] font-bold text-[#D96C6C]">
               {summary.blocked === 1
-                ? 'מספר אחד ברשימה אסור לשליחה'
-                : `${summary.blocked.toLocaleString('he-IL')} מספרים ברשימה אסורים לשליחה`}
+                ? 'מספר אחד ברשימה חסום לשליחה'
+                : `${summary.blocked.toLocaleString('he-IL')} מספרים ברשימה חסומים לשליחה`}
             </p>
             <ul className="list-inside list-disc text-sm text-[#2D2D2D]">
+              {summary.removed > 0 && (
+                <li>
+                  <strong>{summary.removed}</strong> הוסרו מפרסום —
+                  סומנו „חסום" במאגר.
+                </li>
+              )}
               {summary.optedOut > 0 && (
                 <li>
                   <strong>{summary.optedOut}</strong> ביקשו להפסיק לקבל פרסום —
@@ -263,7 +269,7 @@ function VerdictBanner({ summary }: { summary: ReturnType<typeof summarizeSendLi
           <ClipboardCheck className="mt-0.5 h-6 w-6 flex-shrink-0 text-[#E8A85C]" />
           <div className="space-y-1">
             <p className="text-[16px] font-bold text-[#2D2D2D]">
-              אין מספרים אסורים — אבל {summary.invalid.toLocaleString('he-IL')} אינם ניידים תקינים
+              אין מספרים חסומים — אבל {summary.invalid.toLocaleString('he-IL')} אינם ניידים תקינים
             </p>
             <p className="text-sm text-[#6B6B6B]">
               {summary.ok.toLocaleString('he-IL')} מספרים תקינים לשליחה.
@@ -283,7 +289,7 @@ function VerdictBanner({ summary }: { summary: ReturnType<typeof summarizeSendLi
             הרשימה תקינה — כל {summary.ok.toLocaleString('he-IL')} המספרים ניתנים לשליחה
           </p>
           <p className="text-sm text-[#6B6B6B]">
-            אין ברשימה מי שביקש הסרה ואין מספר ללא וואטסאפ.
+            אין ברשימה מספר חסום — לא מי שהוסר מפרסום, לא מי שביקש הסרה, ולא מספר ללא וואטסאפ.
           </p>
         </div>
       </div>
