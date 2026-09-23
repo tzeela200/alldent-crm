@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useContactMutations } from '@/hooks/useContactMutations'
+import { useContactMutations, invalidateAllContactQueries } from '@/hooks/useContactMutations'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
 import {
@@ -48,7 +48,8 @@ import { supabase } from '@/lib/supabase'
 import type { Contact } from '@/types'
 import { RoleBadge } from '@/components/admin/RoleBadge'
 import { RegionBadge } from '@/components/admin/RegionBadge'
-import { MergeRecordsModal } from '@/components/MergeRecordsModal'
+import { LosslessMergeModal } from '@/components/LosslessMergeModal'
+import { buildContactMergeFields, CONTACT_MERGE_SLOTS, contactMergeErrorMessage } from '@/lib/contactMergeFields'
 import { AdminTable, type AdminColumn } from '@/components/admin/AdminTable'
 import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
 import { AdminActionsMenu, type AdminActionMenuItem } from '@/components/admin/AdminActionsMenu'
@@ -838,6 +839,33 @@ export default function AdminContactsPage() {
     return map
   }, [accountsList])
 
+  // INC-3146: כל שדות איש הקשר במיזוג, עם תרגום ערכי המילונים לעברית
+  const mergeFields = buildContactMergeFields({
+    role: (v) => roleName(v as number),
+    subRoles: (v) => subRoleNames(v as number[]),
+    experience: (v) => experienceName(v as number),
+    gender: (v) => genderName(v as number),
+    languages: (v) => languagesName(v as number[]),
+    scopes: (v) => scopeNames(v as number[]),
+    systems: (v) => systemsNames(v as number[]),
+    procedures: (v) => proceduresNames(v as number[]),
+    salaryTypes: (v) => salaryTypeNames(v as number[]),
+    availability: (v) => availabilityNames(v as number[]),
+    taxType: (v) => taxTypeName(v as number),
+    mobility: (v) => mobilityName(v as number),
+    workStatus: (v) => workStatusName(v as number),
+    region: (v) => regionName(v as number),
+    regions: (v) => namesFromIds(v as number[], regionOptions),
+    city: (v) => cityName(v as number),
+    cities: (v) => namesFromIds(v as number[], cityOptions),
+    source: (v) => sourceName(v as number),
+    checkStatus: (v) => checkStatusName(v as number),
+    socialStatus: (v) => socialStatusName(v as number),
+    profileType: (v) => profileTypeName(v as number),
+    account: (v) => accountNameById.get(Number(v)) || `ארגון #${v}`,
+  })
+
+
 
   const enrichedContacts = useMemo<ContactRow[]>(() => {
     const rawPage = contactsResult?.contacts ?? []
@@ -1163,8 +1191,8 @@ export default function AdminContactsPage() {
         dup_ids: dupIds,
         overrides,
       })
-      if (error) throw error
-      queryClient.invalidateQueries({ queryKey: ['contacts-v2'] })
+      if (error) throw new Error(contactMergeErrorMessage(error))
+      void invalidateAllContactQueries(queryClient)
       showToast('הרשומות מוזגו בהצלחה', 'success')
       setMergeOpen(false)
       setMergePrimaryId(null)
@@ -1172,7 +1200,7 @@ export default function AdminContactsPage() {
       setSelectedRows([])
       if (selectedId && dupIds.includes(selectedId)) setSelectedId(null)
     } catch (err) {
-      showToast(err instanceof Error ? `שגיאה במיזוג הרשומות: ${err.message}` : 'שגיאה במיזוג הרשומות', 'error')
+      showToast(err instanceof Error ? err.message : 'שגיאה במיזוג הרשומות', 'error')
     } finally {
       setMergePending(false)
     }
@@ -2546,20 +2574,13 @@ export default function AdminContactsPage() {
 
         {/* Merge Dialog */}
         {mergeOpen && mergeRecords.length >= 2 && (
-          <MergeRecordsModal
+          <LosslessMergeModal
             records={mergeRecords as unknown as Record<string, unknown>[]}
             idField="contact_id"
             nameField="full_name"
-            displayFields={[
-              { key: 'full_name' as never, label: 'שם מלא' },
-              { key: 'phone' as never, label: 'נייד', format: (value) => value ? formatPhone(String(value)) : '—' },
-              { key: 'email' as never, label: 'מייל' },
-              { key: 'role' as never, label: 'תפקיד', format: (value) => roleName(value as number) },
-              { key: 'candidate_availability_ids' as never, label: 'זמינות', format: (value) => availabilityNames(value as number[]) },
-              { key: 'region_id' as never, label: 'אזור', format: (value) => regionName(value as number) },
-              { key: 'city_id' as never, label: 'עיר', format: (value) => cityName(value as number) },
-              { key: 'notes' as never, label: 'הערות' },
-            ]}
+            fields={mergeFields}
+            slots={CONTACT_MERGE_SLOTS}
+            overflowField="notes"
             onConfirm={handleMerge}
             onClose={() => { setMergeOpen(false); setMergePrimaryId(null); setMergeRecords([]) }}
             pending={mergePending}

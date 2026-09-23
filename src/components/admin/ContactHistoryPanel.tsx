@@ -37,7 +37,8 @@ function fmt(ts: string): string {
   } catch { return ts; }
 }
 
-const SOURCE_LABEL: Record<string, string> = { admin: "מנהל", candidate: "מועמד", system: "מערכת" };
+// merge: עותק מלא של רשומה שמוזגה ונמחקה (INC-3146) — נשמר ב-old_data, בלי שדות לשחזור
+const SOURCE_LABEL: Record<string, string> = { admin: "מנהל", candidate: "מועמד", system: "מערכת", merge: "מיזוג" };
 
 export default function ContactHistoryPanel({ contactId }: { contactId: number }) {
   const { data: history = [], isLoading, isError, error } = useContactHistory(contactId);
@@ -92,6 +93,11 @@ export default function ContactHistoryPanel({ contactId }: { contactId: number }
                       {SOURCE_LABEL[h.source ?? ""] ?? h.source ?? "—"}
                     </span>
                   </div>
+                  {h.source === "merge" && (
+                    <p className="text-xs text-slate-600">
+                      רשומה {String(h.new_data?.merged_from ?? "")} ({display(h.old_data?.full_name)}) מוזגה לרשומה הזו. העותק המלא שלה שמור.
+                    </p>
+                  )}
                   <div className="space-y-2">
                     {h.changed_fields.map((f) => (
                       <div key={f} className="rounded-md bg-slate-50 p-2">
