@@ -33,6 +33,12 @@ export interface PhoneMatch {
   name: string
   /** באיזה שדה נמצא — ראשי או נוסף */
   field: 'primary' | 'secondary'
+  /** תפקיד (dict_roles.id) — קיים רק ל-contact, ל-account אין עמודת תפקיד (INC-3149) */
+  role: number | null
+  /** dict_cities.id, קיים גם ל-contact וגם ל-account */
+  cityId: number | null
+  /** contact.updated_timestamp / accounts.updated_timestamp */
+  updatedAt: string | null
 }
 
 export interface PhoneCheckResult {
@@ -90,6 +96,19 @@ const contactName = (c: Record<string, unknown>) =>
 const accountName = (a: Record<string, unknown>) =>
   (a.account_name as string) || `ארגון #${a.account_id}`
 
+/** accounts אין לה עמודת תפקיד — role נשאר null עבורה תמיד (INC-3149) */
+const contactExtras = (c: Record<string, unknown>) => ({
+  role: (c.role as number) ?? null,
+  cityId: (c.city_id as number) ?? null,
+  updatedAt: (c.updated_timestamp as string) ?? null,
+})
+
+const accountExtras = (a: Record<string, unknown>) => ({
+  role: null,
+  cityId: (a.city_id as number) ?? null,
+  updatedAt: (a.updated_timestamp as string) ?? null,
+})
+
 /**
  * חיפוש set-based של מספרים מנורמלים מול contact ו-accounts — **קריאה בלבד**.
  *
@@ -112,13 +131,13 @@ export async function lookupPhonesByNorm(norms: string[]): Promise<Map<string, P
     const locals = chunk.map(toLocal)
 
     const [contactPrimary, contactSecondary, accountPrimary, accountSecondary] = await Promise.all([
-      supabase.from('contact').select('contact_id, display_name, full_name, phone_norm')
+      supabase.from('contact').select('contact_id, display_name, full_name, phone_norm, role, city_id, updated_timestamp')
         .in('phone_norm', chunk),
-      supabase.from('contact').select('contact_id, display_name, full_name, second_phone')
+      supabase.from('contact').select('contact_id, display_name, full_name, second_phone, role, city_id, updated_timestamp')
         .in('second_phone', [...chunk, ...locals]),
-      supabase.from('accounts').select('account_id, account_name, phone_norm')
+      supabase.from('accounts').select('account_id, account_name, phone_norm, city_id, updated_timestamp')
         .in('phone_norm', chunk),
-      supabase.from('accounts').select('account_id, account_name, second_phone')
+      supabase.from('accounts').select('account_id, account_name, second_phone, city_id, updated_timestamp')
         .in('second_phone', [...chunk, ...locals]),
     ])
 
@@ -127,18 +146,18 @@ export async function lookupPhonesByNorm(norms: string[]): Promise<Map<string, P
     if (firstErr) throw new Error(firstErr.message)
 
     for (const c of (contactPrimary.data ?? []) as Record<string, unknown>[]) {
-      add(c.phone_norm as string, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'primary' })
+      add(c.phone_norm as string, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'primary', ...contactExtras(c) })
     }
     for (const c of (contactSecondary.data ?? []) as Record<string, unknown>[]) {
       const norm = normalizeIlMobile(c.second_phone as string)
-      if (norm) add(norm, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'secondary' })
+      if (norm) add(norm, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'secondary', ...contactExtras(c) })
     }
     for (const a of (accountPrimary.data ?? []) as Record<string, unknown>[]) {
-      add(a.phone_norm as string, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'primary' })
+      add(a.phone_norm as string, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'primary', ...accountExtras(a) })
     }
     for (const a of (accountSecondary.data ?? []) as Record<string, unknown>[]) {
       const norm = normalizeIlMobile(a.second_phone as string)
-      if (norm) add(norm, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'secondary' })
+      if (norm) add(norm, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'secondary', ...accountExtras(a) })
     }
   }
 
@@ -172,13 +191,13 @@ export async function lookupEmails(values: string[]): Promise<Map<string, PhoneM
 
   for (const chunk of chunked(unique, CHUNK)) {
     const [contactPrimary, contactSecondary, accountPrimary, accountSecondary] = await Promise.all([
-      supabase.from('contact').select('contact_id, display_name, full_name, email')
+      supabase.from('contact').select('contact_id, display_name, full_name, email, role, city_id, updated_timestamp')
         .in('email', chunk),
-      supabase.from('contact').select('contact_id, display_name, full_name, second_email')
+      supabase.from('contact').select('contact_id, display_name, full_name, second_email, role, city_id, updated_timestamp')
         .in('second_email', chunk),
-      supabase.from('accounts').select('account_id, account_name, email')
+      supabase.from('accounts').select('account_id, account_name, email, city_id, updated_timestamp')
         .in('email', chunk),
-      supabase.from('accounts').select('account_id, account_name, second_email')
+      supabase.from('accounts').select('account_id, account_name, second_email, city_id, updated_timestamp')
         .in('second_email', chunk),
     ])
 
@@ -187,16 +206,16 @@ export async function lookupEmails(values: string[]): Promise<Map<string, PhoneM
     if (firstErr) throw new Error(firstErr.message)
 
     for (const c of (contactPrimary.data ?? []) as Record<string, unknown>[]) {
-      add(c.email, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'primary' })
+      add(c.email, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'primary', ...contactExtras(c) })
     }
     for (const c of (contactSecondary.data ?? []) as Record<string, unknown>[]) {
-      add(c.second_email, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'secondary' })
+      add(c.second_email, { kind: 'contact', id: c.contact_id as number, name: contactName(c), field: 'secondary', ...contactExtras(c) })
     }
     for (const a of (accountPrimary.data ?? []) as Record<string, unknown>[]) {
-      add(a.email, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'primary' })
+      add(a.email, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'primary', ...accountExtras(a) })
     }
     for (const a of (accountSecondary.data ?? []) as Record<string, unknown>[]) {
-      add(a.second_email, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'secondary' })
+      add(a.second_email, { kind: 'account', id: a.account_id as number, name: accountName(a), field: 'secondary', ...accountExtras(a) })
     }
   }
 

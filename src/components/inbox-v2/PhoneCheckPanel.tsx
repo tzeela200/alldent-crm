@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Search, ShieldCheck, UserPlus, Loader2, Mail, Phone } from 'lucide-react'
 import { Toolbar, ActionButton } from '@/components/layout/Shell'
 import { AdminBadge, type AdminBadgeVariant } from '@/components/admin/AdminBadge'
@@ -7,8 +7,12 @@ import {
   summarize,
   type PhoneCheckResult,
   type PhoneCheckStatus,
+  type PhoneMatch,
 } from '@/hooks/useInboxPhoneCheck'
 import { formatPhone } from '@/lib/normalizePhone'
+import { formatDate } from '@/lib/timeAgo'
+import { DICT_ROLES } from '@/lib/dicts'
+import { useInboxV2Cities } from '@/hooks/useInboxV2Cities'
 import { CreateFromLeadDialog } from '@/components/inbox-v2/CreateFromLeadDialog'
 
 /**
@@ -44,10 +48,33 @@ function matchLabel(r: PhoneCheckResult, field: 'primary' | 'secondary', kind: '
   return `${entity} (${r.kind === 'email' ? 'מייל נוסף' : 'נייד נוסף'})`
 }
 
+const roleNameById = new Map(DICT_ROLES.map((r) => [r.id, r.name]))
+
+/** תפקיד · עיר · עודכן ד/ח/שש — כל חלק מוצג רק אם יש לו ערך (INC-3149) */
+function matchDetails(m: PhoneMatch, cityNameById: Map<number, string>): string {
+  const parts: string[] = []
+  if (m.role != null) {
+    const roleName = roleNameById.get(m.role)
+    if (roleName) parts.push(roleName)
+  }
+  if (m.cityId != null) {
+    const cityName = cityNameById.get(m.cityId)
+    if (cityName) parts.push(cityName)
+  }
+  const updated = formatDate(m.updatedAt)
+  if (updated) parts.push(`עודכן ${updated}`)
+  return parts.join(' · ')
+}
+
 export function PhoneCheckPanel() {
   const [text, setText] = useState('')
   const { results, isChecking, error, check, reset } = useInboxPhoneCheck()
   const [addingFor, setAddingFor] = useState<PhoneCheckResult | null>(null)
+  const { data: cities } = useInboxV2Cities()
+  const cityNameById = useMemo(
+    () => new Map((cities ?? []).map((c) => [c.id, c.name])),
+    [cities]
+  )
 
   const summary = results ? summarize(results) : null
 
@@ -154,14 +181,18 @@ export function PhoneCheckPanel() {
 
                   <div className="flex items-center gap-3">
                     {r.status === 'found' && (
-                      <span className="text-[12px] text-[#6B6B6B]">
-                        {r.matches.map((m) => (
-                          <span key={`${m.kind}-${m.id}-${m.field}`} className="me-2">
-                            <span className="text-[#9CA3AF]">{matchLabel(r, m.field, m.kind)}: </span>
-                            {m.name}
-                          </span>
-                        ))}
-                      </span>
+                      <div className="text-[12px] text-[#6B6B6B]">
+                        {r.matches.map((m) => {
+                          const details = matchDetails(m, cityNameById)
+                          return (
+                            <div key={`${m.kind}-${m.id}-${m.field}`}>
+                              <span className="text-[#9CA3AF]">{matchLabel(r, m.field, m.kind)}: </span>
+                              {m.name}
+                              {details && <span className="text-[#9CA3AF]"> — {details}</span>}
+                            </div>
+                          )
+                        })}
+                      </div>
                     )}
 
                     {r.status === 'invalid' && (
