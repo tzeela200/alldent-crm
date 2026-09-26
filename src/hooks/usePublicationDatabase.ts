@@ -22,6 +22,7 @@ import {
   OUTCOME_STATUS_CODES, outcomeOfRecord, REMOVED_SOCIAL_STATUS, blockReasonOf,
   type DeliveryOutcome,
 } from '@/lib/fixPublications/deliveryOutcome'
+import { HIDDEN_FROM_LISTS_SOCIAL_STATUSES } from '@/lib/dicts'
 
 export const PUBLICATION_DB_KEYS = {
   all: ['publication-database'] as const,
@@ -210,8 +211,9 @@ function applyOutcomeFilter<Q>(
     return query.or(clauses.join(','))
   }
 
-  // כל שאר הדליים — רק מי שאינו חסום
-  query = query.or(`social_status.is.null,social_status.neq.${REMOVED_SOCIAL_STATUS}`)
+  // כל שאר הדליים — רק מי שאינו חסום/לא רלוונטי (INC-3147: 12+13, לא רק 13 — לא
+  // משנים את REMOVED_SOCIAL_STATUS עצמו, שנשאר מוגבל ל-13 לצורך החלטת שליחה)
+  query = query.or(`social_status.is.null,social_status.not.in.(${HIDDEN_FROM_LISTS_SOCIAL_STATUSES.join(',')})`)
   if (optOutIds.length) query = query.not('contact_id', 'in', `(${optOutIds.join(',')})`)
 
   // "אין נייד" — אי אפשר לשלוח בכלל

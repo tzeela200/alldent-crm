@@ -1,13 +1,38 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { OPEN_STATUS_IDS } from '@/lib/inbox-v2-dicts'
+import { HIDDEN_FROM_LISTS_SOCIAL_STATUSES } from '@/lib/dicts'
 import type { InboxV2Row, InboxV2Filters, InboxImportBatch, InboxMergeAction } from '@/types/inbox-v2'
 
 const PAGE_SIZE = 20
 
-export function useInboxV2Rows(filters: InboxV2Filters, page: number) {
+/**
+ * מזהי אנשי קשר "לא רלוונטי"/"הסרה" (INC-3147) — `inbox_v2` אין לה עמודת
+ * social_status משלה, אז מוציאים את הרשימה פעם אחת (~169 רשומות, מעומד)
+ * ומסננים לפי `match_contact`. אין מקבילה ל-accounts — לטבלה הזו אין
+ * בכלל עמודת social_status.
+ */
+function useHiddenContactIds() {
   return useQuery({
-    queryKey: ['inbox-v2', filters, page],
+    queryKey: ['contact-hidden-from-lists-ids'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('contact')
+        .select('contact_id')
+        .in('social_status', HIDDEN_FROM_LISTS_SOCIAL_STATUSES)
+      if (error) throw error
+      return (data ?? []).map((r) => r.contact_id as number)
+    },
+    staleTime: 5 * 60_000,
+  })
+}
+
+export function useInboxV2Rows(filters: InboxV2Filters, page: number) {
+  const { data: hiddenContactIds } = useHiddenContactIds()
+
+  return useQuery({
+    queryKey: ['inbox-v2', filters, page, hiddenContactIds],
+    enabled: hiddenContactIds != null,
     queryFn: async () => {
       let query = supabase
         .from('inbox_v2')
@@ -30,6 +55,11 @@ export function useInboxV2Rows(filters: InboxV2Filters, page: number) {
       if (filters.has_new_info) query = query.eq('has_new_information', true)
       if (filters.date_from) query = query.gte('created_at', filters.date_from)
       if (filters.date_to) query = query.lte('created_at', filters.date_to)
+      // "הסרה"/"לא רלוונטי" — הרשומה מוסתרת גם כשהיא כבר הותאמה לאיש קשר חסום
+      // (INC-3147). רשומה שעוד לא הותאמה לאף אחד (match_contact=null) תמיד עוברת.
+      if (hiddenContactIds?.length) {
+        query = query.or(`match_contact.is.null,match_contact.not.in.(${hiddenContactIds.join(',')})`)
+      }
 
       const { data, count, error } = await query
       if (error) throw error
@@ -75,13 +105,22 @@ export function useInboxV2Batches() {
  * KPI גלובליים — ספירה אמיתית מול כל הטבלה (count/head), לא מ-20 שורות העמוד.
  */
 export function useInboxV2Stats() {
+  const { data: hiddenContactIds } = useHiddenContactIds()
+
   return useQuery({
-    queryKey: ['inbox-v2-stats'],
+    queryKey: ['inbox-v2-stats', hiddenContactIds],
+    enabled: hiddenContactIds != null,
     queryFn: async () => {
       const base = () => supabase.from('inbox_v2').select('*', { count: 'exact', head: true })
+      // "ממתינות להכרעה" חייב לספור בדיוק את מה שהתור מציג (INC-3147) —
+      // אחרת ה-KPI וטבלת התור סותרים זה את זה.
+      let openQuery = base().in('merge_status', OPEN_STATUS_IDS)
+      if (hiddenContactIds?.length) {
+        openQuery = openQuery.or(`match_contact.is.null,match_contact.not.in.(${hiddenContactIds.join(',')})`)
+      }
       const [total, open, exists, merged] = await Promise.all([
         base(),
-        base().in('merge_status', OPEN_STATUS_IDS),
+        openQuery,
         // "קיים במערכת" — הותאם בוודאות ואין מה להחליט (INC-3124)
         base().eq('merge_status', 11),
         base().eq('merge_status', 6),

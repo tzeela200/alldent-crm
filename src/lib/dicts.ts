@@ -172,6 +172,15 @@ export const DICT_SOCIAL_STATUSES: DictItem[] = [
   { id: 14, name: 'חבר בפייסבוק' },
 ]
 
+/**
+ * סטטוסי פנייה שגורמים לרשומה להיות מוסתרת כברירת מחדל מרשימות אדמין
+ * (אנשי קשר, שינוי ויבוא רשומות, מאגר לפי פרסום) — INC-3147.
+ * "לא רלוונטי" (12) ו"הסרה" (13). שונה במכוון מ-`REMOVED_SOCIAL_STATUS`
+ * ב-`lib/fixPublications/deliveryOutcome.ts`, שמשמש ספציפית להחלטת
+ * שליחת WhatsApp ונשאר מוגבל ל-13 בלבד — כאן מדובר בתצוגת רשימה, לא בשליחה.
+ */
+export const HIDDEN_FROM_LISTS_SOCIAL_STATUSES = [12, 13] as const
+
 /** SSOT: dict_profile_types */
 export const DICT_PROFILE_TYPES: DictItem[] = [
   { id: 1, name: 'מועמד' },

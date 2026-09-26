@@ -36,6 +36,7 @@ import {
   DELIVERY_OUTCOME_ORDER, DELIVERY_OUTCOMES, OUTCOME_STATUS_CODES,
   getOutcomeMeta, outcomeOfRecord, REMOVED_SOCIAL_STATUS, type DeliveryOutcome,
 } from '@/lib/fixPublications/deliveryOutcome'
+import { HIDDEN_FROM_LISTS_SOCIAL_STATUSES } from '@/lib/dicts'
 import { formatPhone, normalizePhone, phoneSearchTerm, whatsappLink } from '@/lib/normalizePhone'
 import { openApplicationCv } from '@/lib/cv'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
@@ -3455,6 +3456,9 @@ async function runContactsQuery(
   if (filters.profile_type) query = query.eq('profile_type', filters.profile_type)
   if (filters.check_status) query = query.eq('check_status', filters.check_status)
   if (filters.social_status) query = query.eq('social_status', filters.social_status)
+  // ברירת מחדל: "לא רלוונטי"/"הסרה" מוסתרים מהרשימה (INC-3147) — נגישים
+  // בכל זאת דרך בחירה מפורשת בסינון סטטוס פנייה, לצורך ניהול/ביטול חסימה.
+  else query = query.or(`social_status.is.null,social_status.not.in.(${HIDDEN_FROM_LISTS_SOCIAL_STATUSES.join(',')})`)
   if (filters.gender) query = query.eq('gender', filters.gender)
   if (filters.mobility_id) query = query.eq('mobility_id', filters.mobility_id)
   if (filters.tax_type_id) query = query.eq('tax_type_id', filters.tax_type_id)

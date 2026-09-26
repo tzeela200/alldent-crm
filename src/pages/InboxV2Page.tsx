@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Columns3, DatabaseZap, RefreshCw, Sparkles } from 'lucide-react'
+import { Ban, Columns3, DatabaseZap, RefreshCw, Sparkles } from 'lucide-react'
 import { Shell, KPICard, ActionButton } from '@/components/layout/Shell'
 import { useInboxV2Rows, useInboxV2Batches, useInboxV2Stats, PAGE_SIZE } from '@/hooks/useInboxV2'
 import { useInboxV2Matching } from '@/hooks/useInboxV2Matching'
@@ -71,7 +71,7 @@ export default function InboxV2Page() {
   const { data, isLoading, error } = useInboxV2Rows(filters, page)
   const { data: batches } = useInboxV2Batches()
   const { data: stats } = useInboxV2Stats()
-  const { matchBatch, rematchOpenQueue } = useInboxV2Matching()
+  const { matchBatch, rematchOpenQueue, autoBlockByNamePrefix } = useInboxV2Matching()
 
   // הייבוא עבר ל-ImportWizard, שמריץ את ההתאמה בעצמו אחרי האישור.
   // useInboxV2Upload (כתיבה מיידית ללא שער) אינו בשימוש יותר מהמסך הזה.
@@ -129,6 +129,17 @@ export default function InboxV2Page() {
             disabled={rematchOpenQueue.isPending}
           >
             {rematchOpenQueue.isPending ? 'מנתח...' : 'נתח מחדש את התור'}
+          </ActionButton>
+
+          {/* מזהה קידומת חסימה בשם הנכנס (הסרה-/חסום-/לא רלוונטי- וכו'),
+              מסמנת את social_status על איש הקשר וסוגרת את השורה (INC-3148). */}
+          <ActionButton
+            variant="secondary"
+            icon={Ban}
+            onClick={() => autoBlockByNamePrefix.mutate()}
+            disabled={autoBlockByNamePrefix.isPending}
+          >
+            {autoBlockByNamePrefix.isPending ? 'מזהה...' : 'זיהוי חסימות מהשם'}
           </ActionButton>
 
           <details className="relative">
