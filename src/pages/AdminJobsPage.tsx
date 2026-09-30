@@ -75,7 +75,6 @@ const PUBLIC_STATUS_IDS = {
 
 const ALL_JOB_COLUMNS = [
   { key: 'job_code', label: 'קוד' },
-  { key: 'created_time', label: 'תאריך פתיחה' },
   { key: 'job_role', label: 'תפקיד' },
   { key: 'job_status', label: 'סטטוס משרה' },
   { key: 'city_id', label: 'עיר' },
@@ -88,13 +87,13 @@ const ALL_JOB_COLUMNS = [
   { key: 'recruiter_name', label: 'מגייס' },
   { key: 'public_status', label: 'סטטוס פרסום' },
   { key: 'total_applicants', label: 'מועמדים' },
+  { key: 'created_time', label: 'תאריך פתיחה' },
   { key: 'last_publish_date', label: 'פרסום אחרון' },
   { key: 'updated_timestamp', label: 'עודכן' },
 ] as const
 
 const DEFAULT_JOB_COLUMNS = [
   'job_code',
-  'created_time',
   'job_role',
   'job_status',
   'city_id',
@@ -103,6 +102,7 @@ const DEFAULT_JOB_COLUMNS = [
   'account_name',
   'public_status',
   'total_applicants',
+  'created_time',
   'last_publish_date',
 ] as const
 
@@ -1068,7 +1068,6 @@ export default function AdminJobsPage() {
                       <tr className="border-b border-[#D9D9D9] text-[13px] font-bold text-[#6B6B6B]">
                         <th className="w-10 px-3 py-3"><input type="checkbox" checked={pageFullySelected} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
                         {visibleColumns.includes('job_code') && <SortableTh label="קוד" sortKey="job_code" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
-                        {visibleColumns.includes('created_time') && <SortableTh label="תאריך פתיחה" sortKey="created_time" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('job_role') && <SortableTh label="תפקיד" sortKey="job_role" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('job_status') && <SortableTh label="סטטוס משרה" sortKey="job_status" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('city_id') && <SortableTh label="עיר" sortKey="city_id" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
@@ -1081,6 +1080,7 @@ export default function AdminJobsPage() {
                         {visibleColumns.includes('recruiter_name') && <SortableTh label="מגייס" sortKey="recruiter_name" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('public_status') && <SortableTh label="סטטוס פרסום" sortKey="public_status" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('total_applicants') && <SortableTh label="מועמדים" sortKey="total_applicants" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('created_time') && <SortableTh label="תאריך פתיחה" sortKey="created_time" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('last_publish_date') && <SortableTh label="פרסום אחרון" sortKey="last_publish_date" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('updated_timestamp') && <SortableTh label="עודכן" sortKey="updated_timestamp" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         <th className="w-14 px-3 py-3 text-center">פעולות</th>
@@ -1094,7 +1094,6 @@ export default function AdminJobsPage() {
                           <tr key={jobCode} className={`transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#FAFAF7]'}`}>
                             <td className="px-3 py-3"><input type="checkbox" checked={selected} onChange={() => toggleRowSelection(jobCode)} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></td>
                             {visibleColumns.includes('job_code') && <td className="px-3 py-3"><button type="button" onClick={() => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`)} className="font-mono font-bold text-[#008080] hover:underline">{job.job_code}</button></td>}
-                            {visibleColumns.includes('created_time') && <td className="px-3 py-3 text-[#6B6B6B]">{job.created_time ? formatDate(job.created_time) : '—'}</td>}
                             {visibleColumns.includes('job_role') && <td className="px-3 py-3"><RoleBadge roleId={Number(job.job_role)} label={roleName(job.job_role)} /></td>}
                             {visibleColumns.includes('job_status') && (
                               <td className="px-3 py-3">
@@ -1120,6 +1119,7 @@ export default function AdminJobsPage() {
                             {visibleColumns.includes('recruiter_name') && <td className="px-3 py-3 text-[13px] text-[#2D2D2D]">{job.recruiter_contact_name ?? '—'}</td>}
                             {visibleColumns.includes('public_status') && <td className="px-3 py-3"><StatusBadge statusType="public" statusId={Number(job.public_status)} label={publicStatusName(job.public_status)} /></td>}
                             {visibleColumns.includes('total_applicants') && <td className="px-3 py-3"><span className="rounded-[6px] bg-[#F3F4F6] px-2.5 py-1 text-[12px] font-bold">{Number(job.total_applicants ?? 0)}</span></td>}
+                            {visibleColumns.includes('created_time') && <td className="px-3 py-3 text-[#6B6B6B]">{job.created_time ? formatDate(job.created_time) : '—'}</td>}
                             {visibleColumns.includes('last_publish_date') && <td className="px-3 py-3 text-[#6B6B6B]">{job.last_publish_date ? formatDate(job.last_publish_date) : '—'}</td>}
                             {visibleColumns.includes('updated_timestamp') && <td className="px-3 py-3 text-[#6B6B6B]">{job.updated_timestamp ? formatDate(job.updated_timestamp) : '—'}</td>}
                             <td className="px-3 py-3">
