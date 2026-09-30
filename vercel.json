@@ -71,6 +71,8 @@
     },
     { "source": "/dentup", "destination": "/dentup/index.html" },
     { "source": "/dentup/", "destination": "/dentup/index.html" },
+    { "source": "/drshor", "destination": "/drshor/index.html" },
+    { "source": "/drshor/", "destination": "/drshor/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
