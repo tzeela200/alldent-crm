@@ -125,6 +125,10 @@ export interface RoleSubRolePickerProps {
   variant?: 'filter' | 'edit'
   roles?: RoleItem[]
   subRoles?: SubRoleItem[]
+  // אופציונלי, רק ל-variant="filter": קבוצות תפקידים (למשל "כל המומחים") כאפשרות בתוך רשימת התפקיד.
+  roleGroups?: { id: string; label: string; ids: number[] }[]
+  roleGroupId?: string | null
+  onRoleGroupChange?: (groupId: string | null) => void
 }
 
 export function RoleSubRolePicker({
@@ -135,6 +139,9 @@ export function RoleSubRolePicker({
   variant = 'edit',
   roles: rolesProp,
   subRoles: subRolesProp,
+  roleGroups = [],
+  roleGroupId = null,
+  onRoleGroupChange,
 }: RoleSubRolePickerProps) {
   const { data: rolesData = [] } = useRoles()
   const { data: subRolesData = [] } = useSubRoles()
@@ -146,7 +153,18 @@ export function RoleSubRolePicker({
     ? allSubRoles.filter((sr) => Number(sr.role_id) === Number(roleId))
     : []
 
+  const activeGroup = roleGroupId ? roleGroups.find((g) => g.id === roleGroupId) ?? null : null
+
   function handleRoleChange(val: string) {
+    if (val.startsWith('group:')) {
+      const group = roleGroups.find((g) => g.id === val.slice(6))
+      if (!group) return
+      onRoleChange(null)
+      onSubRoleChange([])
+      onRoleGroupChange?.(group.id)
+      return
+    }
+    onRoleGroupChange?.(null)
     const id = val ? Number(val) : null
     onRoleChange(id)
     onSubRoleChange([])
@@ -156,12 +174,15 @@ export function RoleSubRolePicker({
     return (
       <>
         <select
-          value={roleId != null ? String(roleId) : ''}
+          value={activeGroup ? `group:${activeGroup.id}` : roleId != null ? String(roleId) : ''}
           onChange={(e) => handleRoleChange(e.target.value)}
           className="h-11 rounded-[14px] border border-[#D9D9D9] bg-white px-3 text-sm outline-none transition-colors focus:border-[#008080]"
           dir="rtl"
         >
           <option value="">תפקיד</option>
+          {roleGroups.map((g) => (
+            <option key={g.id} value={`group:${g.id}`}>{g.label}</option>
+          ))}
           {roles.map((r) => (
             <option key={r.id} value={String(r.id)}>{r.name}</option>
           ))}

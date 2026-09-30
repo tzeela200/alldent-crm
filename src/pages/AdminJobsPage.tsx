@@ -45,6 +45,8 @@ import { getJobStatusSelectClass } from '@/lib/statusColors'
 import { getRegionColor } from '@/lib/regionColors'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import { RoleSubRolePicker } from '@/components/ui/RoleSubRolePicker'
+import { SearchableSelect } from '@/components/ui/SearchableSelect'
+import { REGION_GROUPS, ROLE_GROUPS } from '@/lib/jobFilterGroups'
 import { ContactPicker } from '@/components/ui/ContactPicker'
 import SidePanel from '@/components/ui/SidePanel'
 import { useReviewNeededJobsCount } from '@/hooks/useReviewNeededJobsCount'
@@ -73,6 +75,7 @@ const PUBLIC_STATUS_IDS = {
 
 const ALL_JOB_COLUMNS = [
   { key: 'job_code', label: 'קוד' },
+  { key: 'created_time', label: 'תאריך פתיחה' },
   { key: 'job_role', label: 'תפקיד' },
   { key: 'job_status', label: 'סטטוס משרה' },
   { key: 'city_id', label: 'עיר' },
@@ -91,16 +94,16 @@ const ALL_JOB_COLUMNS = [
 
 const DEFAULT_JOB_COLUMNS = [
   'job_code',
+  'created_time',
   'job_role',
   'job_status',
   'city_id',
   'region_id',
   'scope',
-  'job_title',
-  'job_sub_role',
   'account_name',
   'public_status',
   'total_applicants',
+  'last_publish_date',
 ] as const
 
 type FilterState = {
@@ -108,9 +111,11 @@ type FilterState = {
   job_status?: number
   public_status?: number
   job_role?: number
+  role_group?: string
   job_sub_role?: number[]
   account_link?: number
   region_id?: number
+  region_group?: string
   city_id?: number
   scope?: number[]
   required_experience?: number
@@ -205,8 +210,8 @@ export default function AdminJobsPage() {
   const [page, setPage] = useState(0)
   const [selectedRows, setSelectedRows] = useState<string[]>([])
   const [visibleColumns, setVisibleColumns] = useState<string[]>([...DEFAULT_JOB_COLUMNS])
-  const [sortField, setSortField] = useState<string | null>(null)
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
+  const [sortField, setSortField] = useState<string | null>('created_time')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
   const [toast, setToast] = useState<ToastState>({ open: false, message: '', tone: 'info' })
   const [rowActionPending, setRowActionPending] = useState<string | null>(null)
   const [panel, setPanel] = useState<PanelState>({ open: false, mode: 'view', jobCode: null })
@@ -462,6 +467,14 @@ export default function AdminJobsPage() {
     if (filters.job_status && Number(job.job_status) !== Number(filters.job_status)) return false
     if (filters.public_status && Number(job.public_status) !== Number(filters.public_status)) return false
     if (filters.job_role && Number(job.job_role) !== Number(filters.job_role)) return false
+    if (filters.role_group) {
+      const group = ROLE_GROUPS.find((g) => g.id === filters.role_group)
+      if (group && !group.ids.includes(Number(job.job_role))) return false
+    }
+    if (filters.region_group) {
+      const group = REGION_GROUPS.find((g) => g.id === filters.region_group)
+      if (group && !group.ids.includes(Number(job.region_id))) return false
+    }
     if (filters.region_id && Number(job.region_id) !== Number(filters.region_id)) return false
     if (filters.city_id && Number(job.city_id) !== Number(filters.city_id)) return false
     if (!options?.ignoreAccount && filters.account_link && Number(job.account_link) !== Number(filters.account_link)) return false
@@ -493,6 +506,7 @@ export default function AdminJobsPage() {
       case 'employer_name': return String(job.employer_contact_name ?? '')
       case 'recruiter_name': return String(job.recruiter_contact_name ?? '')
       case 'total_applicants': return Number(job.total_applicants ?? 0)
+      case 'created_time': return job.created_time ? new Date(job.created_time).getTime() : 0
       case 'last_publish_date': return job.last_publish_date ? new Date(job.last_publish_date).getTime() : 0
       case 'updated_timestamp': return job.updated_timestamp ? new Date(job.updated_timestamp).getTime() : 0
       default: return String(job[field] ?? '')
@@ -878,6 +892,7 @@ export default function AdminJobsPage() {
       'סטטוס משרה': statusName(job.job_status),
       'סטטוס פרסום': publicStatusName(job.public_status),
       מועמדים: Number(job.total_applicants ?? 0),
+      'תאריך פתיחה': job.created_time ?? '',
       'פרסום אחרון': job.last_publish_date ?? '',
     }))
     const csv = buildCsv(rows)
@@ -980,8 +995,8 @@ export default function AdminJobsPage() {
             </div>
             {/* שורה תחתונה — חתכים רוחביים */}
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-              <ListKpiCard title="משרות פעילות לפי תפקיד" items={kpis.byRole} empty="אין פעילות" colorFor={(id) => getRoleColorHex(id)} onItemClick={(id) => setFilters((prev) => ({ ...prev, job_role: Number(id), job_sub_role: undefined }))} />
-              <ListKpiCard title="משרות פעילות לפי אזור" items={kpis.byRegion} empty="אין פעילות" colorFor={(id) => getRegionColor(id).hex} onItemClick={(id) => setFilters((prev) => ({ ...prev, region_id: Number(id), city_id: undefined }))} />
+              <ListKpiCard title="משרות פעילות לפי תפקיד" items={kpis.byRole} empty="אין פעילות" colorFor={(id) => getRoleColorHex(id)} onItemClick={(id) => setFilters((prev) => ({ ...prev, job_role: Number(id), role_group: undefined, job_sub_role: undefined }))} />
+              <ListKpiCard title="משרות פעילות לפי אזור" items={kpis.byRegion} empty="אין פעילות" colorFor={(id) => getRegionColor(id).hex} onItemClick={(id) => setFilters((prev) => ({ ...prev, region_id: Number(id), region_group: undefined, city_id: undefined }))} />
             </div>
           </section>
 
@@ -1000,16 +1015,22 @@ export default function AdminJobsPage() {
                   variant="filter"
                   roleId={filters.job_role ?? null}
                   subRoleIds={filters.job_sub_role ?? []}
+                  roleGroups={ROLE_GROUPS}
+                  roleGroupId={filters.role_group ?? null}
+                  onRoleGroupChange={(id) => setFilters((prev) => ({ ...prev, role_group: id ?? undefined }))}
                   onRoleChange={(id) => setFilters((prev) => ({ ...prev, job_role: id ?? undefined, job_sub_role: undefined }))}
                   onSubRoleChange={(ids) => setFilters((prev) => ({ ...prev, job_sub_role: ids.length ? ids : undefined }))}
                 />
-                <SelectFilter value={String(filters.account_link ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_link: value ? Number(value) : undefined }))} options={accountOptions} placeholder="ארגון" />
+                <SearchableSelect value={String(filters.account_link ?? '')} onChange={(value) => setFilters((prev) => ({ ...prev, account_link: value ? Number(value) : undefined }))} options={accountOptions} placeholder="ארגון" emptyText="לא נמצא ארגון" />
                 <CityRegionPicker
                   variant="filter"
                   cityId={filters.city_id ?? null}
                   regionId={filters.region_id ?? null}
                   cities={cities}
                   regions={regions}
+                  regionGroups={REGION_GROUPS}
+                  regionGroupId={filters.region_group ?? null}
+                  onRegionGroupChange={(id) => setFilters((prev) => ({ ...prev, region_group: id ?? undefined }))}
                   onCityChange={(id) => setFilters((prev) => ({ ...prev, city_id: id ?? undefined }))}
                   onRegionChange={(id) => setFilters((prev) => ({ ...prev, region_id: id ?? undefined }))}
                 />
@@ -1047,6 +1068,7 @@ export default function AdminJobsPage() {
                       <tr className="border-b border-[#D9D9D9] text-[13px] font-bold text-[#6B6B6B]">
                         <th className="w-10 px-3 py-3"><input type="checkbox" checked={pageFullySelected} onChange={togglePageSelection} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></th>
                         {visibleColumns.includes('job_code') && <SortableTh label="קוד" sortKey="job_code" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
+                        {visibleColumns.includes('created_time') && <SortableTh label="תאריך פתיחה" sortKey="created_time" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('job_role') && <SortableTh label="תפקיד" sortKey="job_role" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('job_status') && <SortableTh label="סטטוס משרה" sortKey="job_status" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
                         {visibleColumns.includes('city_id') && <SortableTh label="עיר" sortKey="city_id" sortBy={sortField} sortDir={sortDir} onSort={toggleSort} />}
@@ -1072,6 +1094,7 @@ export default function AdminJobsPage() {
                           <tr key={jobCode} className={`transition ${selected ? 'bg-[#E6F3F3]' : 'hover:bg-[#FAFAF7]'}`}>
                             <td className="px-3 py-3"><input type="checkbox" checked={selected} onChange={() => toggleRowSelection(jobCode)} className="h-4 w-4 rounded border-[#D9D9D9] accent-[#008080]" /></td>
                             {visibleColumns.includes('job_code') && <td className="px-3 py-3"><button type="button" onClick={() => navigate(`/admin/jobs/${encodeURIComponent(jobCode)}`)} className="font-mono font-bold text-[#008080] hover:underline">{job.job_code}</button></td>}
+                            {visibleColumns.includes('created_time') && <td className="px-3 py-3 text-[#6B6B6B]">{job.created_time ? formatDate(job.created_time) : '—'}</td>}
                             {visibleColumns.includes('job_role') && <td className="px-3 py-3"><RoleBadge roleId={Number(job.job_role)} label={roleName(job.job_role)} /></td>}
                             {visibleColumns.includes('job_status') && (
                               <td className="px-3 py-3">

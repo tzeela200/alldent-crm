@@ -203,6 +203,10 @@ interface CityRegionPickerProps {
   variant?: 'filter' | 'edit'
   cities?: CityItem[]
   regions?: RegionItem[]
+  // אופציונלי, רק ל-variant="filter": קבוצות אזורים (למשל "כל הצפון") כאפשרות בתוך רשימת האזור.
+  regionGroups?: { id: string; label: string; ids: number[] }[]
+  regionGroupId?: string | null
+  onRegionGroupChange?: (groupId: string | null) => void
 }
 
 export function CityRegionPicker({
@@ -213,6 +217,9 @@ export function CityRegionPicker({
   variant = 'edit',
   cities: citiesProp,
   regions: regionsProp,
+  regionGroups = [],
+  regionGroupId = null,
+  onRegionGroupChange,
 }: CityRegionPickerProps) {
   const { data: citiesData = [] } = useCitiesAll()
   const { data: regionsData = [] } = useRegions()
@@ -220,9 +227,29 @@ export function CityRegionPicker({
   const cities = citiesProp ?? citiesData
   const regions = regionsProp ?? regionsData
 
-  const filteredCities = regionId
-    ? cities.filter((c) => Number(c.region_id) === Number(regionId))
-    : cities
+  const activeGroup = regionGroupId ? regionGroups.find((g) => g.id === regionGroupId) ?? null : null
+
+  const filteredCities = activeGroup
+    ? cities.filter((c) => activeGroup.ids.includes(Number(c.region_id)))
+    : regionId
+      ? cities.filter((c) => Number(c.region_id) === Number(regionId))
+      : cities
+
+  function handleSelectChange(val: string) {
+    if (val.startsWith('group:')) {
+      const group = regionGroups.find((g) => g.id === val.slice(6))
+      if (!group) return
+      onRegionChange(null)
+      onRegionGroupChange?.(group.id)
+      if (cityId != null) {
+        const current = cities.find((c) => c.id === cityId)
+        if (!(current != null && group.ids.includes(Number(current.region_id)))) onCityChange(null)
+      }
+      return
+    }
+    onRegionGroupChange?.(null)
+    handleRegionChange(val)
+  }
 
   function handleRegionChange(val: string) {
     const id = val ? Number(val) : null
@@ -239,19 +266,22 @@ export function CityRegionPicker({
 
   function handleCityChange(newCityId: number | null, newRegionId: number | null) {
     onCityChange(newCityId)
-    if (newRegionId && !regionId) onRegionChange(newRegionId)
+    if (newRegionId && !regionId && !activeGroup) onRegionChange(newRegionId)
   }
 
   if (variant === 'filter') {
     return (
       <>
         <select
-          value={regionId != null ? String(regionId) : ''}
-          onChange={(e) => handleRegionChange(e.target.value)}
+          value={activeGroup ? `group:${activeGroup.id}` : regionId != null ? String(regionId) : ''}
+          onChange={(e) => handleSelectChange(e.target.value)}
           className="h-11 rounded-[14px] border border-[#D9D9D9] bg-white px-3 text-sm outline-none transition-colors focus:border-[#008080]"
           dir="rtl"
         >
           <option value="">אזור</option>
+          {regionGroups.map((g) => (
+            <option key={g.id} value={`group:${g.id}`}>{g.label}</option>
+          ))}
           {regions.map((r) => (
             <option key={r.id} value={String(r.id)}>{r.name}</option>
           ))}
