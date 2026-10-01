@@ -176,9 +176,11 @@ footer img{width:130px;height:auto}
 
 /* ── שיתוף הדף ─────────────────────────────────────────────────────────────
    מקביל ל-SocialShare של האתר (src/components/public/SocialShare.tsx), אך
+   left פיזי במכוון: רכיב השיתוף של האתר (fixed left-4) מעוגן שמאלה בכל
+   הדפים בלי קשר לכיווניות, ו-inset-inline-start היה מעיף אותו לימין ב-RTL.
    כקישורים רגילים: הדף הזה סטטי ואין בו JavaScript. הכתובת קבועה ולכן
    מקודדת מראש ולא נגזרת מ-window.location. */
-.share-dock{position:fixed;inset-inline-start:16px;bottom:16px;z-index:40;
+.share-dock{position:fixed;left:16px;right:auto;bottom:16px;z-index:40;
   display:flex;flex-direction:column;align-items:center;gap:8px;
   padding:8px;border-radius:999px;background:rgba(255,255,255,.95);
   border:1px solid rgba(0,0,0,.05);box-shadow:0 6px 20px -6px rgba(0,0,0,.25);
@@ -190,7 +192,7 @@ footer img{width:130px;height:auto}
 .share-dock a:focus-visible{outline:3px solid var(--brand-ink);outline-offset:2px}
 .share-dock .wa{background:#25D366}
 .share-dock .fb{background:#1877F2}
-@media (max-width:480px){.share-dock{inset-inline-start:10px;bottom:10px;gap:6px}
+@media (max-width:480px){.share-dock{left:10px;right:auto;bottom:10px;gap:6px}
   .share-dock a{width:36px;height:36px}}
 @media print{.share-dock{display:none}}
 </style>
