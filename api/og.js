@@ -82,6 +82,14 @@ const PAGE_OG = {
     description: 'שירות סינון מועמדים, דיסקרטיות ומיקוד — בלי לחשוף את שם המרפאה בשלב הראשוני.',
     image: 'https://www.alldent.co.il/images/jobs-og/employers-discreet.png',
   },
+  // INC-3151 — רשימת הקורסים והתוכניות
+  'dental-solutions': {
+    path: '/dental-solutions',
+    title: 'שירותים, קורסים ותוכניות | AllDent',
+    description:
+      'הכשרות, תוכניות לימוד ושירותים מקצועיים לאנשי הדנטל — מהגופים המובילים בענף.',
+    image: DEFAULT_IMAGE,
+  },
   // INC-3130 — לוח הנכסים
   'dental-assets': {
     path: '/dental-assets',
@@ -89,6 +97,24 @@ const PAGE_OG = {
     description:
       'מרפאות שיניים, חדרי טיפול, מעבדות והזדמנויות עסקיות בעולם הדנטל — מכירה, השכרה, שותפויות והעברת פעילות.',
     image: DEFAULT_IMAGE,
+  },
+}
+
+// INC-3151 — פרסומים וקורסים.
+// ⚠️ api/ רץ כפונקציית Node ואינו עובר דרך Vite, ולכן אינו יכול לייבא
+//    את src/content/dentalSolutions.ts (TypeScript). המטא-דאטה לבוטים
+//    משוכפלת כאן במכוון. בהוספת פרסום חדש יש לעדכן את שני המקומות —
+//    אחרת הדף יעבוד אבל השיתוף יציג preview גנרי.
+const SOLUTION_OG = {
+  'maccabident-hygiene-program': {
+    title:
+      'תואר ראשון והכשרה בשיננות במימון מלא | מכבידנט × אוניברסיטת אריאל',
+    description:
+      'תוכנית ראשונה מסוגה בישראל: תואר ראשון בניהול מערכות בריאות יחד עם הכשרה לרישיון שיננות של משרד הבריאות — במימון מלא. בשיתוף מכבי, מכבידנט ואוניברסיטת אריאל.',
+    image: 'https://www.alldent.co.il/images/solutions/maccabident-hygiene-program.jpg',
+    name: 'תואר ראשון והכשרה בשיננות – במימון מלא',
+    provider: 'מכבידנט',
+    mode: 'onsite',
   },
 }
 
@@ -108,6 +134,10 @@ export default async function handler(req, res) {
   // נכס שפג או שהוסר לא מחזיר preview ישן אלא נופל לברירת המחדל.
   const assetCode =
     typeof req.query.asset === 'string' ? req.query.asset.trim().toUpperCase() : ''
+  // INC-3151 — slug של פרסום/קורס
+  const solutionSlug =
+    typeof req.query.solution === 'string' ? req.query.solution.trim().toLowerCase() : ''
+  const solution = solutionSlug ? SOLUTION_OG[solutionSlug] : undefined
   const jobCode = slug ? slug.trim().toUpperCase() : ''
   const rolePage = slug ? ROLE_OG[slug.trim()] : undefined
   const pageEntry = pageKey ? PAGE_OG[pageKey] : undefined
@@ -117,7 +147,11 @@ export default async function handler(req, res) {
     'קריירה, קהילה, למידה והתפתחות מקצועית — הכל בפלטפורמה אחת לאנשי הדנטל בישראל.'
   let imageUrl = DEFAULT_IMAGE
 
-  if (pageEntry) {
+  if (solution) {
+    title = solution.title
+    description = solution.description
+    imageUrl = solution.image
+  } else if (pageEntry) {
     title = pageEntry.title
     description = pageEntry.description
     imageUrl = pageEntry.image
@@ -176,7 +210,9 @@ export default async function handler(req, res) {
     // בכשל — נשארים עם ברירות המחדל של המותג
   }
 
-  const relativePath = assetCode && /^HD\d{4,}$/.test(assetCode)
+  const relativePath = solution
+    ? '/dental-solutions/' + solutionSlug
+    : assetCode && /^HD\d{4,}$/.test(assetCode)
     ? '/dental-assets/' + assetCode
     : pageEntry
     ? pageEntry.path
@@ -186,6 +222,70 @@ export default async function handler(req, res) {
         ? '/jobs/' + jobCode
         : '/'
   const canonical = `https://www.alldent.co.il${relativePath}`
+
+  /**
+   * INC-3151 — נתונים מובנים לפרסום/קורס.
+   * ⚠️ מוזרק כאן ולא ברכיב React: מנועי החיפוש ובוטי הרשתות אינם
+   *    מריצים JavaScript של SPA, ולכן JSON-LD שנוסף אחרי הטעינה לא
+   *    נקרא. אותה סיבה בדיוק שבגללה הפונקציה הזו קיימת.
+   * JSON.stringify מבריח " ו-\ ; מחליפים גם < כדי שלא ייסגר התג.
+   */
+  let jsonLd = ''
+  if (solution) {
+    const graph = {
+      '@context': 'https://schema.org',
+      '@graph': [
+        {
+          '@type': 'Course',
+          name: solution.name,
+          description: solution.description,
+          inLanguage: 'he-IL',
+          url: canonical,
+          image: solution.image,
+          provider: {
+            '@type': 'Organization',
+            name: solution.provider,
+          },
+          isAccessibleForFree: true,
+          offers: {
+            '@type': 'Offer',
+            category: 'Fully funded',
+            price: 0,
+            priceCurrency: 'ILS',
+            availability: 'https://schema.org/LimitedAvailability',
+            url: canonical,
+          },
+          hasCourseInstance: {
+            '@type': 'CourseInstance',
+            courseMode: solution.mode,
+            inLanguage: 'he-IL',
+          },
+        },
+        {
+          '@type': 'BreadcrumbList',
+          itemListElement: [
+            { '@type': 'ListItem', position: 1, name: 'AllDent', item: 'https://www.alldent.co.il/' },
+            { '@type': 'ListItem', position: 2, name: 'שירותים, קורסים ותוכניות', item: 'https://www.alldent.co.il/dental-solutions' },
+            { '@type': 'ListItem', position: 3, name: solution.name, item: canonical },
+          ],
+        },
+        {
+          '@type': 'WebPage',
+          url: canonical,
+          name: solution.title,
+          inLanguage: 'he-IL',
+          speakable: {
+            '@type': 'SpeakableSpecification',
+            cssSelector: ['h1', 'h2'],
+          },
+        },
+      ],
+    }
+    jsonLd =
+      '<script type="application/ld+json">' +
+      JSON.stringify(graph).replace(/</g, '\u003c') +
+      '</' + 'script>'
+  }
   const spaTarget = relativePath
 
   const html = `<!DOCTYPE html>
@@ -208,6 +308,7 @@ export default async function handler(req, res) {
   <meta name="twitter:image" content="${esc(imageUrl)}" />
 
   <link rel="canonical" href="${esc(canonical)}" />
+${jsonLd}
   <!-- רשת ביטחון: אם בן-אדם (ולא בוט) מגיע לכאן, נעביר אותו לאתר הרגיל -->
   <script>window.location.replace(${JSON.stringify(spaTarget)});</script>
 </head>

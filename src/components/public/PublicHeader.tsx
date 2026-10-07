@@ -46,6 +46,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'חנות דנטלית', to: '/dental-shop' },
       { label: 'כיתה דנטלית', to: '/class-dental' },
+      { label: 'קורסים ותוכניות', to: '/dental-solutions' },
     ],
   },
   { label: 'צור קשר', to: '/contact' },

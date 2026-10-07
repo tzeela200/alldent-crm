@@ -1,6 +1,8 @@
 // אזור שיתוף קטן שמופיע בכל דף ציבורי (מוזרק ב-PublicLayout).
 // משתף את כתובת הדף הנוכחית ב-WhatsApp ובפייסבוק.
 
+import { useState } from 'react'
+
 type SocialShareProps = {
   elevatedOnMobile?: boolean
 }
@@ -33,6 +35,31 @@ export default function SocialShare({
         shareUrl(),
       )}`,
     )
+
+  // INC-3151 — העתקת קישור. clipboard אינו זמין ב-http או בלי הרשאה,
+  // ולכן יש נפילה ל-execCommand ולא כשל שקט.
+  const [copied, setCopied] = useState(false)
+  async function onCopy() {
+    const url = shareUrl()
+    try {
+      await navigator.clipboard.writeText(url)
+    } catch {
+      const el = document.createElement('textarea')
+      el.value = url
+      el.setAttribute('readonly', '')
+      el.style.position = 'fixed'
+      el.style.opacity = '0'
+      document.body.appendChild(el)
+      el.select()
+      try {
+        document.execCommand('copy')
+      } finally {
+        document.body.removeChild(el)
+      }
+    }
+    setCopied(true)
+    window.setTimeout(() => setCopied(false), 2000)
+  }
 
   const mobilePositionClass = elevatedOnMobile
     ? 'bottom-24 md:bottom-5'
@@ -81,6 +108,30 @@ export default function SocialShare({
           <path d="M24 12.07C24 5.4 18.63 0 12 0S0 5.4 0 12.07C0 18.1 4.39 23.1 10.13 24v-8.44H7.08v-3.49h3.05V9.41c0-3.02 1.79-4.69 4.53-4.69 1.31 0 2.68.24 2.68.24v2.97h-1.51c-1.49 0-1.95.93-1.95 1.88v2.26h3.32l-.53 3.49h-2.79V24C19.61 23.1 24 18.1 24 12.07z" />
         </svg>
       </button>
+
+      <button
+        onClick={onCopy}
+        aria-label={copied ? 'הקישור הועתק' : 'העתקת קישור'}
+        title={copied ? 'הועתק' : 'העתקת קישור'}
+        className={`flex h-10 w-10 items-center justify-center rounded-full text-white transition hover:brightness-95 ${
+          copied ? 'bg-[#008080]' : 'bg-[#6B6B6B]'
+        }`}
+      >
+        {copied ? (
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </svg>
+        )}
+      </button>
+
+      <span aria-live="polite" className="sr-only">
+        {copied ? 'הקישור הועתק' : ''}
+      </span>
     </div>
   )
 }

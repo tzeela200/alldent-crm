@@ -53,8 +53,17 @@ export default function ClassDentalPage() {
                 ))}
               </div>
 
-              {/* כפתור ה-WhatsApp המקורי והמדויק מהעיצוב שלך */}
-              <div className="mt-9">
+              {/* INC-3151 — הדף היה ללא יעד. התוכן הפעיל יושב ברשימת
+                  הקורסים והתוכניות, ולכן הוא הפעולה הראשית כאן. */}
+              <div className="mt-9 flex flex-wrap items-center gap-3">
+                <Link
+                  to="/dental-solutions"
+                  className="inline-flex min-h-[50px] items-center justify-center gap-2.5 rounded-[18px] bg-[#008080] px-7 py-3 text-[15px] font-bold text-white shadow-[0_12px_24px_rgba(0,128,128,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#006D6D]"
+                >
+                  לקורסים ולתוכניות הפעילות
+                  <ArrowRight className="h-4 w-4 rtl:scale-x-[-1]" aria-hidden="true" />
+                </Link>
+
                 <a
                   href="https://wa.me/972533951003"
                   target="_blank"

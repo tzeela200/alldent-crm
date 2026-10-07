@@ -73,6 +73,20 @@
     { "source": "/dentup/", "destination": "/dentup/index.html" },
     { "source": "/drshor", "destination": "/drshor/index.html" },
     { "source": "/drshor/", "destination": "/drshor/index.html" },
+    {
+      "source": "/dental-solutions",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Applebot|SkypeUriPreview|Embedly|Iframely|Googlebot|bingbot).*" }
+      ],
+      "destination": "/api/og?page=dental-solutions"
+    },
+    {
+      "source": "/dental-solutions/:slug([a-z0-9-]+)",
+      "has": [
+        { "type": "header", "key": "user-agent", "value": ".*(facebookexternalhit|Facebot|WhatsApp|Twitterbot|LinkedInBot|Slackbot|TelegramBot|Discordbot|Pinterest|redditbot|vkShare|Applebot|SkypeUriPreview|Embedly|Iframely|Googlebot|bingbot).*" }
+      ],
+      "destination": "/api/og?solution=:slug"
+    },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }

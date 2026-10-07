@@ -47,6 +47,8 @@ import PublicRoleJobsPage from '@/pages/PublicRoleJobsPage'
 import PublicRegionJobsPage from '@/pages/PublicRegionJobsPage'
 import UnderConstructionPage from '@/pages/UnderConstructionPage'
 import NotFoundPage from '@/pages/NotFoundPage'
+import DentalSolutionsPage from '@/pages/DentalSolutionsPage'
+import DentalSolutionPage from '@/pages/DentalSolutionPage'
 import JoinTalentPoolPage from '@/pages/JoinTalentPoolPage'
 import EmployersPage from '@/pages/EmployersPage'
 import EmployersDiscreetPage from '@/pages/EmployersDiscreetPage'
@@ -156,6 +158,9 @@ export default function App() {
         <Route path="/dental-assets/terms/request" element={<DentalAssetRequestPage />} />
         <Route path="/dental-assets/:slug" element={<DentalAssetSlugDispatch />} />
         <Route path="/class-dental" element={<ClassDentalPage />} />
+        {/* INC-3151 — פרסומים, קורסים ותוכניות */}
+        <Route path="/dental-solutions" element={<DentalSolutionsPage />} />
+        <Route path="/dental-solutions/:slug" element={<DentalSolutionPage />} />
 
         {/* Contact */}
         <Route path="/contact" element={<ContactPage />} />

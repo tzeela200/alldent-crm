@@ -7,6 +7,8 @@ import type { PublicJob } from '@/services/publicJobsService'
 import PublicJobCard from '@/components/public/PublicJobCard'
 import PublicJobSkeleton from '@/components/public/PublicJobSkeleton'
 import RevealOnScroll from '@/components/public/RevealOnScroll'
+import { FEATURED_SOLUTION } from '@/content/dentalSolutions'
+import { SolutionCard } from '@/components/dental-solutions/DentalSolutionBody'
 import { CareerCategoriesCarousel } from '@/components/home/CareerCategoriesCarousel'
 
 // ─── Typewriter ──────────────────────────────────────────────────────────────
@@ -459,6 +461,16 @@ function EcosystemShowcase() {
           </div>
         </RevealOnScroll>
 
+        {/* INC-3151 — פרסום אמיתי. מופרד מהקרוסלה שמתחתיו, שהיא עדיין
+            תוכן הדגמה, כדי שלא יתערבב אמיתי עם ממוצא. */}
+        {FEATURED_SOLUTION && (
+          <RevealOnScroll>
+            <div className="mb-10">
+              <SolutionCard solution={FEATURED_SOLUTION} />
+            </div>
+          </RevealOnScroll>
+        )}
+
         <div className="grid items-stretch gap-6 md:grid-cols-[1.8fr_1fr]">
           {/* Spotlight panel */}
           <div className="overflow-hidden rounded-2xl bg-[#242424]">
@@ -486,9 +498,6 @@ function EcosystemShowcase() {
               <p className="mt-2 text-[15px] leading-relaxed text-white/60">
                 {active.tagline}
               </p>
-              <button className="mt-6 inline-flex items-center gap-2 rounded-full bg-[#008080] px-5 py-2.5 text-[13px] font-bold text-white transition hover:bg-[#006D6D]">
-                לפרטים נוספים ←
-              </button>
             </div>
           </div>
 
