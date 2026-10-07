@@ -25,6 +25,7 @@ import {
   LIST_H4,
   LEAD,
   BODY,
+  SMALL,
   EYEBROW,
 } from '@/lib/publicType'
 
@@ -177,6 +178,11 @@ export function DentalSolutionBody({
                 </div>
               ))}
             </dl>
+            {solution.factsNote && (
+              <p className={`mt-4 ${SMALL} text-white/60`}>
+                {bidiSafe(solution.factsNote)}
+              </p>
+            )}
           </section>
         )}
 
