@@ -56,11 +56,20 @@ export function DentalSolutionBody({
       <section className="mx-auto max-w-[1280px] px-[clamp(24px,5vw,72px)] pb-[clamp(40px,5vw,72px)] pt-[clamp(28px,4vw,56px)]">
         <BackLink to="/dental-solutions">חזרה לשירותים ופתרונות</BackLink>
 
-        <div className="mt-7 grid items-center gap-[clamp(28px,4vw,56px)] lg:grid-cols-[1.05fr_1fr]">
+        <div className="mt-7 grid items-center gap-[clamp(28px,4vw,56px)] lg:grid-cols-[1.08fr_1fr]">
           <div>
             <span className={`${EYEBROW} text-[#F0A03C]`}>{solution.category}</span>
 
-            <h1 className={`mt-4 ${HERO_H1}`}>{bidiSafe(solution.title)}</h1>
+            {/* כותרת ארוכה ב-68px הופכת לקיר טקסט. החלק שלפני הנקודתיים
+                הוא פתיח ולא הכותרת עצמה, ולכן הוא יורד לשורה מובילה. */}
+            {solution.titleLead && (
+              <p className={`mt-4 ${SUB_H2} text-white/70`}>
+                {bidiSafe(solution.titleLead)}
+              </p>
+            )}
+            <h1 className={`${solution.titleLead ? 'mt-2' : 'mt-4'} ${HERO_H1}`}>
+              {bidiSafe(solution.title)}
+            </h1>
 
             {!!solution.partners?.length && (
               <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[14.5px] font-bold text-[#7CECEC]">
@@ -118,10 +127,14 @@ export function DentalSolutionBody({
 
             {!!section.items?.length && (
               <ul className="mt-7 grid list-none gap-3 p-0 md:grid-cols-2">
-                {section.items.map((item) => (
+                {section.items.map((item, i, arr) => (
                   <li
                     key={item}
-                    className="flex gap-3.5 rounded-xl border border-white/10 bg-white/[0.03] p-5"
+                    /* מספר אי-זוגי משאיר פריט בודד בשורה אחרונה.
+                       האחרון נפרש על שתי העמודות כדי שלא ייראה כשבר. */
+                    className={`flex gap-3.5 rounded-xl border border-white/10 bg-white/[0.03] p-5 ${
+                      arr.length % 2 === 1 && i === arr.length - 1 ? 'md:col-span-2' : ''
+                    }`}
                   >
                     <span
                       aria-hidden="true"
@@ -142,8 +155,14 @@ export function DentalSolutionBody({
           <section className="border-t border-white/10 py-[clamp(40px,5.5vw,80px)]">
             <h2 className={SECTION_H2}>{solution.factsHeading ?? 'פרטים'}</h2>
             <dl className="mt-7 grid gap-px overflow-hidden rounded-[18px] border border-white/10 bg-white/10 sm:grid-cols-2">
-              {solution.facts.map((f) => (
-                <div key={f.label} className="bg-[#1E1E1E] p-5">
+              {solution.facts.map((f, i, arr) => (
+                <div
+                  key={f.label}
+                  /* 5 תנאים בשתי עמודות השאירו קופסה ריקה בפינה. */
+                  className={`bg-[#1E1E1E] p-5 ${
+                    arr.length % 2 === 1 && i === arr.length - 1 ? 'sm:col-span-2' : ''
+                  }`}
+                >
                   <dt className={`${EYEBROW} text-white/50`}>{f.label}</dt>
                   <dd className={`m-0 mt-2 ${LIST_H4} text-white`}>
                     {bidiSafe(f.value)}
