@@ -44,8 +44,17 @@ export interface DentalSolution {
   /** הגופים השותפים, מוצגים כשורת שיוך מתחת לכותרת */
   partners?: string[]
 
-  /** נתיב מ-public. יחס 1.91:1 — משמש גם כתמונת השיתוף. */
+  /**
+   * יחס 1.91:1 — הכרטיס ברשימה ובדף הבית, וגם תמונת השיתוף.
+   * זהו היחס שפייסבוק דורש, ולכן הוא נעול.
+   */
   image: string
+  /**
+   * פוסטר מרובע/לאורך להירו. רצועה מלבנית בחצי עמודה מרחפת בתוך
+   * שטח ריק; פוסטר ממלא את הגובה ועומד מול הכותרת.
+   * אם חסר — ההירו נופל ל-image.
+   */
+  posterImage?: string
   imageAlt: string
 
   intro: string
@@ -85,6 +94,7 @@ export const DENTAL_SOLUTIONS: DentalSolution[] = [
     partners: ['מכבי שירותי בריאות', 'מכבידנט', 'אוניברסיטת אריאל בשומרון'],
 
     image: '/images/solutions/maccabident-hygiene-program.jpg',
+    posterImage: '/images/solutions/maccabident-hygiene-program-poster.jpg',
     imageAlt:
       'הקריירה שלכם/ן מתחילה כאן — לימודי תעודה בשיננות במסלול משולב עם תואר ראשון בניהול מערכות בריאות, במימון מלא. מכבי, מכבידנט ואוניברסיטת אריאל בשומרון.',
 

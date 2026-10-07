@@ -56,7 +56,7 @@ export function DentalSolutionBody({
       <section className="mx-auto max-w-[1280px] px-[clamp(24px,5vw,72px)] pb-[clamp(40px,5vw,72px)] pt-[clamp(28px,4vw,56px)]">
         <BackLink to="/dental-solutions">חזרה לשירותים ופתרונות</BackLink>
 
-        <div className="mt-7 grid items-center gap-[clamp(28px,4vw,56px)] lg:grid-cols-[1.08fr_1fr]">
+        <div className="mt-7 grid items-center gap-[clamp(28px,4vw,56px)] lg:grid-cols-[1.4fr_auto]">
           <div>
             <span className={`${EYEBROW} text-[#F0A03C]`}>{solution.category}</span>
 
@@ -89,14 +89,16 @@ export function DentalSolutionBody({
             <div className="mt-8">{cta}</div>
           </div>
 
-          <figure className="m-0 overflow-hidden rounded-[18px] ring-1 ring-white/10">
+          {/* פוסטר ולא הרצועה: מלבן 1.91:1 בחצי עמודה מרחף בתוך שטח
+              ריק מול כותרת בת שלוש שורות. הפוסטר עומד מולה בגובה.
+              ⚠️ מוגבל ל-460px — זו רזולוציית המקור, והגדלה מעבר לה
+              תיראה רכה. */}
+          <figure className="m-0 justify-self-center overflow-hidden rounded-[18px] ring-1 ring-white/10 lg:justify-self-end">
             <img
-              src={solution.image}
+              src={solution.posterImage ?? solution.image}
               alt={solution.imageAlt}
-              width={1200}
-              height={629}
               loading="eager"
-              className="block h-auto w-full"
+              className="block h-auto w-full max-w-[460px]"
             />
           </figure>
         </div>
