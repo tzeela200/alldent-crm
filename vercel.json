@@ -87,6 +87,8 @@
       ],
       "destination": "/api/og?solution=:slug"
     },
+    { "source": "/khademi", "destination": "/khademi/index.html" },
+    { "source": "/khademi/", "destination": "/khademi/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
