@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
+import { APPLICATION_ROLE_GROUPS, roleGroupNames } from '@/lib/applicationRoleGroups'
+import type { DictItem } from '@/types'
 import type { ApplicationRow, ApplicationFilters, ApplicationKPIs } from '@/types/applications'
 
 export const APPLICATIONS_PAGE_SIZE = 20
@@ -103,6 +105,10 @@ function applyApplicationFilters<T>(
       // so the "רופאים" chip returned every assistant row too (INC-3116).
       if (filters.job_role_names?.length)
         query = query.in('job_role', filters.job_role_names)
+      if (filters.job_code)
+        query = query.eq('job_code', filters.job_code)
+      if (filters.submitted_from)
+        query = query.gte('submission_date', filters.submitted_from)
       if (filters.date_from)
         query = query.gte('submission_date', filters.date_from)
       if (filters.date_to)
@@ -146,6 +152,25 @@ function applyApplicationFilters<T>(
   return query as T
 }
 
+/**
+ * מריץ `.in(...)` במנות של 200 ומאחד. שאילתה אחת עם אלפי מזהים חורגת מאורך
+ * URL סביר, וגם אם עברה — PostgREST מחזיר לכל היותר 1,000 שורות בשקט.
+ * שגיאה נזרקת במקום להיבלע, אחרת כישלון נראה כמו "אין נתון מקושר".
+ */
+async function fetchInChunks<T, K>(
+  keys: K[],
+  run: (chunk: K[]) => PromiseLike<{ data: T[] | null; error: { message: string } | null }>,
+): Promise<T[]> {
+  const CHUNK = 200
+  const all: T[] = []
+  for (let i = 0; i < keys.length; i += CHUNK) {
+    const { data, error } = await run(keys.slice(i, i + CHUNK))
+    if (error) throw new Error(error.message)
+    all.push(...((data ?? []) as T[]))
+  }
+  return all
+}
+
 /** Attach related contact + job fields onto application rows. */
 async function enrichApplicationRows(rowsIn: ApplicationRow[]): Promise<ApplicationRow[]> {
   let rows = rowsIn
@@ -153,10 +178,14 @@ async function enrichApplicationRows(rowsIn: ApplicationRow[]): Promise<Applicat
       // Enrich with contact data
       const candidateIds = [...new Set(rows.map((r) => r.candidate_link).filter(Boolean))] as number[]
       if (candidateIds.length > 0) {
-        const { data: contacts } = await supabase
-          .from('contact')
-          .select('contact_id, work_status, candidate_availability_ids, profile_type, role, city_id, region_id, has_cv, cv_link, cv_storage_path, cv_received_date, display_name')
-          .in('contact_id', candidateIds)
+        // חלוקה ל-chunks: `.in()` לא מוגבל חרג מתקרת 1,000 של PostgREST בייצוא
+        // גדול, והשורות שמעבר לכך יצאו בלי סטטוס תעסוקה/זמינות (INC-3116).
+        const contacts = await fetchInChunks(candidateIds, (chunk) =>
+          supabase
+            .from('contact')
+            .select('contact_id, work_status, candidate_availability_ids, profile_type, role, city_id, region_id, has_cv, cv_link, cv_storage_path, cv_received_date, display_name')
+            .in('contact_id', chunk),
+        )
         if (contacts) {
           const contactMap = new Map(contacts.map((c) => [c.contact_id, c]))
           rows = rows.map((r) => {
@@ -180,13 +209,45 @@ async function enrichApplicationRows(rowsIn: ApplicationRow[]): Promise<Applicat
         }
       }
 
+      // Unlinked rows: does a contact with this phone already exist?
+      // Advancing an application's status and linking it to the registry are two
+      // separate actions, so a row can reach "הועבר למעסיק" while still showing
+      // "חדש למאגר" even though the person has a card. 39 of 92 unlinked rows are
+      // in this state (INC-3116). Phone is the strongest identifier we have —
+      // same rule as submit_public_application.
+      const unlinkedPhones = [
+        ...new Set(rows.filter((r) => !r.candidate_link && r.phone_norm).map((r) => r.phone_norm)),
+      ] as string[]
+      if (unlinkedPhones.length > 0) {
+        const { data: matches, error: matchError } = await supabase
+          .from('contact')
+          .select('contact_id, phone_norm, full_name, display_name')
+          .in('phone_norm', unlinkedPhones)
+        if (matchError) throw matchError
+        if (matches?.length) {
+          const byPhone = new Map(matches.map((c) => [c.phone_norm, c]))
+          rows = rows.map((r) => {
+            if (r.candidate_link || !r.phone_norm) return r
+            const m = byPhone.get(r.phone_norm)
+            if (!m) return r
+            return {
+              ...r,
+              registry_match_contact_id: m.contact_id as number,
+              registry_match_name: (m.full_name ?? m.display_name) as string | null,
+            }
+          })
+        }
+      }
+
       // Enrich with job data
       const jobCodes = [...new Set(rows.map((r) => r.job_code).filter(Boolean))] as string[]
       if (jobCodes.length > 0) {
-        const { data: jobs } = await supabase
-          .from('job')
-          .select('job_code, job_status, job_title, job_role, city_id, region_id')
-          .in('job_code', jobCodes)
+        const jobs = await fetchInChunks(jobCodes, (chunk) =>
+          supabase
+            .from('job')
+            .select('job_code, job_status, job_title, job_role, city_id, region_id')
+            .in('job_code', chunk),
+        )
         if (jobs) {
           const jobMap = new Map(jobs.map((j) => [j.job_code, j]))
           rows = rows.map((r) => {
@@ -309,56 +370,116 @@ export function useApplicationRow(applicationId: number | null) {
   })
 }
 
-export function useApplicationKPIs() {
+/** תחילת השבוע (ראשון) ותחילת החודש, כ-ISO — לכרטיסי "השבוע"/"החודש". */
+export function startOfWeekIso(now = new Date()): string {
+  const d = new Date(now)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - d.getDay()) // יום ראשון
+  return d.toISOString()
+}
+export function startOfMonthIso(now = new Date()): string {
+  const d = new Date(now.getFullYear(), now.getMonth(), 1)
+  return d.toISOString()
+}
+
+/** ספירת שורות בלבד (head) עם הפילטרים שהועברו. */
+function countQuery() {
+  return supabase.from('applications').select('application_id', { count: 'exact', head: true })
+}
+
+/**
+ * כל קודי המשרה, מעומדים — כדי לחשב את "המשרה המובילה".
+ * PostgREST לא תומך ב-GROUP BY, ולכן הצבירה נעשית כאן. עמודה אחת בלבד.
+ */
+async function fetchAllJobCodes(): Promise<string[]> {
+  const PAGE = 1000
+  const all: string[] = []
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from('applications')
+      .select('job_code')
+      .not('job_code', 'is', null)
+      .range(from, from + PAGE - 1)
+    if (error) throw error
+    const batch = (data ?? []) as { job_code: string }[]
+    all.push(...batch.map((r) => r.job_code))
+    if (batch.length < PAGE) return all
+  }
+}
+
+export function useApplicationKPIs(roles?: DictItem[]) {
+  // שמות התפקידים נכנסים ל-queryKey: המילון נטען אסינכרונית, ובלעדיו
+  // ספירות התפקידים היו נתקעות על 0 מה-cache.
+  const roleKey = APPLICATION_ROLE_GROUPS.map((g) => roleGroupNames(g, roles).join('|')).join('~')
+
   return useQuery({
-    queryKey: ['applications-kpis'],
+    queryKey: ['applications-kpis', roleKey],
     queryFn: async () => {
-      // Same definition the "ללא קו״ח" filter uses, so the card and the list it
-      // opens can never disagree (INC-3116).
+      // אותה הגדרה שהפילטר "ללא קו״ח" משתמש בה, כדי שהכרטיס והרשימה
+      // שהוא פותח לא יוכלו לסתור (INC-3116).
       const contactsWithCv = await fetchLinkedContactsWithCv()
-      const [total, newApps, waitingHandling, advanced, hires, missingCv, waitingEmployer, archived] =
-        await Promise.all([
-          supabase.from('applications').select('application_id', { count: 'exact', head: true }),
-          supabase
-            .from('applications')
-            .select('application_id', { count: 'exact', head: true })
-            .eq('application_status', 1),
-          supabase
-            .from('applications')
-            .select('application_id', { count: 'exact', head: true })
-            .in('application_status', [1, 2]),
-          supabase
-            .from('applications')
-            .select('application_id', { count: 'exact', head: true })
-            .in('application_status', INTERVIEW_STAGE_STATUSES),
-          supabase
-            .from('applications')
-            .select('application_id', { count: 'exact', head: true })
-            .eq('application_status', 12),
-          applyMissingCvFilter(
-            supabase
-              .from('applications')
-              .select('application_id', { count: 'exact', head: true }),
-            contactsWithCv
-          ),
-          supabase
-            .from('applications')
-            .select('application_id', { count: 'exact', head: true })
-            .eq('application_status', 9),
-          supabase
-            .from('applications')
-            .select('application_id', { count: 'exact', head: true })
-            .eq('application_status', 15),
-        ])
+      const weekStart = startOfWeekIso()
+      const monthStart = startOfMonthIso()
+
+      const roleGroups = APPLICATION_ROLE_GROUPS.map((g) => ({
+        group: g,
+        names: roleGroupNames(g, roles),
+      }))
+
+      const [
+        total,
+        active,
+        newApps,
+        sentToEmployer,
+        missingCv,
+        thisWeek,
+        thisMonth,
+        jobCodes,
+        ...roleCounts
+      ] = await Promise.all([
+        countQuery(),
+        countQuery().not('application_status', 'in', `(${TERMINAL_STATUSES.join(',')})`),
+        countQuery().eq('application_status', 1),
+        countQuery().eq('application_status', 6),
+        applyMissingCvFilter(countQuery(), contactsWithCv),
+        countQuery().gte('submission_date', weekStart),
+        countQuery().gte('submission_date', monthStart),
+        fetchAllJobCodes(),
+        ...roleGroups.map(({ names }) =>
+          names.length
+            ? countQuery().in('job_role', names)
+            : Promise.resolve({ count: 0, error: null } as { count: number | null; error: null }),
+        ),
+      ])
+
+      // המשרה עם הכי הרבה הגשות
+      const tally = new Map<string, number>()
+      for (const code of jobCodes) tally.set(code, (tally.get(code) ?? 0) + 1)
+      let topJobCode: string | null = null
+      let topJobCount = 0
+      for (const [code, n] of tally) {
+        if (n > topJobCount) {
+          topJobCode = code
+          topJobCount = n
+        }
+      }
+
       return {
         total: total.count ?? 0,
+        active: active.count ?? 0,
         newApps: newApps.count ?? 0,
-        waitingHandling: waitingHandling.count ?? 0,
-        advanced: advanced.count ?? 0,
-        hires: hires.count ?? 0,
+        sentToEmployer: sentToEmployer.count ?? 0,
         missingCv: missingCv.count ?? 0,
-        waitingEmployer: waitingEmployer.count ?? 0,
-        archived: archived.count ?? 0,
+        thisWeek: thisWeek.count ?? 0,
+        thisMonth: thisMonth.count ?? 0,
+        byRole: roleGroups.map((rg, i) => ({
+          key: rg.group.key,
+          label: rg.group.label,
+          names: rg.names,
+          count: (roleCounts[i] as { count: number | null }).count ?? 0,
+        })),
+        topJobCode,
+        topJobCount,
       } as ApplicationKPIs
     },
     staleTime: 60_000,

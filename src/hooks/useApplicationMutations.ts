@@ -224,7 +224,11 @@ export function useApplicationMutations() {
           throw new Error('עדכון איש הקשר הקיים נכשל — ייתכן שאין הרשאה')
       }
 
-      const { error: updateError } = await supabase
+      // This is the write that actually links the application to the person.
+      // It ran without a rowcount check, so a no-op update still reported
+      // "מאושר למאגר — פרופיל נוצר": a contact was created and left orphaned,
+      // and the row kept showing "חדש למאגר" (INC-3116).
+      const { data: linkedRows, error: updateError } = await supabase
         .from('applications')
         .update({
           candidate_link: contactId,
@@ -233,7 +237,12 @@ export function useApplicationMutations() {
           updated_timestamp: new Date().toISOString(),
         })
         .eq('application_id', app.application_id)
+        .select('application_id')
       if (updateError) throw updateError
+      if (!linkedRows || linkedRows.length === 0)
+        throw new Error(
+          `איש הקשר נוצר (#${contactId}) אך ההגשה לא קושרה אליו — ייתכן שאין הרשאה. יש לקשר ידנית דרך "קישור למועמד קיים".`
+        )
 
       return contactId as number
     },

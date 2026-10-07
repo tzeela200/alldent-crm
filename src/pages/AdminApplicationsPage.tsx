@@ -19,8 +19,10 @@ import {
   useApplicationKPIs,
   fetchAllApplicationRows,
   APPLICATIONS_PAGE_SIZE,
-  INTERVIEW_STAGE_STATUSES,
+  startOfWeekIso,
+  startOfMonthIso,
 } from '@/hooks/useApplications'
+import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
 import { useApplicationMutations } from '@/hooks/useApplicationMutations'
 import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { formatDate } from '@/lib/timeAgo'
@@ -32,7 +34,7 @@ import { ApplicationsTable } from '@/components/applications/ApplicationsTable'
 import { ApplicationsGrid } from '@/components/applications/ApplicationsGrid'
 import { ALL_COLUMNS, DEFAULT_VISIBLE, type ColumnKey } from '@/components/applications/applicationColumns'
 import { toast } from 'sonner'
-import type { ApplicationFilters } from '@/types/applications'
+import type { ApplicationFilters, ApplicationRow } from '@/types/applications'
 
 type ViewMode = 'table' | 'grid'
 
@@ -86,6 +88,8 @@ export default function AdminApplicationsPage() {
   const handleSort = (key: string) => {
     if (sortBy === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortBy(key); setSortDir('asc') }
+    // בלי זה מיון מעמוד 5 משאיר אותך בעמוד 5 של הסדר החדש.
+    setPage(0)
   }
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [detailAppId, setDetailAppId] = useState<number | null>(null)
@@ -110,6 +114,8 @@ export default function AdminApplicationsPage() {
     () => loadPersistedView().visibleColumns ?? DEFAULT_VISIBLE
   )
   const [exporting, setExporting] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [linkingId, setLinkingId] = useState<number | null>(null)
 
   // Persist the user's working view (filters / sort / columns / layout).
   useEffect(() => {
@@ -124,13 +130,15 @@ export default function AdminApplicationsPage() {
   }, [filters, sortBy, sortDir, visibleColumns, viewMode])
 
   const { data, isLoading, error } = useApplicationRows(filters, page, sortBy, sortDir)
-  const { data: kpis } = useApplicationKPIs()
   const { data: dicts, error: dictsError } = useApplicationDicts()
+  // ספירות התפקידים נפתרות מהמילון החי, ולכן הוא חייב להיטען קודם.
+  const { data: kpis } = useApplicationKPIs(dicts?.roles)
   const {
     bulkUpdateStatus,
     bulkUpdateCheckStatus,
     bulkSetFollowUp,
     createContactFromApplication,
+    linkApplicationToContact,
     markSpam,
     sendToLeadsV2,
     archiveApplication,
@@ -138,7 +146,11 @@ export default function AdminApplicationsPage() {
 
   const rows = data?.rows ?? []
   const total = data?.total ?? 0
-  const hasActiveFilter = Object.keys(filters).length > 0
+  // לפי ערכים, לא לפי מפתחות: מפתח עם undefined גרם לדף להיתקע על
+  // "מסונן" אחרי כל לחיצת צ׳יפ (INC-3116).
+  const hasActiveFilter = Object.values(filters).some(
+    (v) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && v.length === 0)
+  )
 
   const allPageSelected =
     rows.length > 0 && rows.every((r) => selectedIds.includes(r.application_id))
@@ -163,6 +175,24 @@ export default function AdminApplicationsPage() {
     setVisibleColumns((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
     )
+
+  // קישור הגשה לכרטיס שזוהה לפי נייד — במקום ליצור כרטיס שני לאותו אדם.
+  const handleLinkToRegistry = async (app: ApplicationRow) => {
+    if (!app.registry_match_contact_id) return
+    const who = app.registry_match_name ?? 'הכרטיס שזוהה'
+    if (!confirm(`לקשר את ההגשה של ${app.candidate_name ?? 'מועמד זה'} אל ${who}?`)) return
+    setLinkingId(app.application_id)
+    try {
+      await linkApplicationToContact.mutateAsync({
+        applicationId: app.application_id,
+        contactId: app.registry_match_contact_id,
+      })
+    } catch {
+      // ה-mutation כבר הציג את השגיאה בטוסט.
+    } finally {
+      setLinkingId(null)
+    }
+  }
 
   const exportCsv = async (onlySelected = false) => {
     setExporting(true)
@@ -205,7 +235,15 @@ export default function AdminApplicationsPage() {
       a.click()
       document.body.removeChild(a)
       URL.revokeObjectURL(url)
-      toast.success(`הייצוא הושלם — ${source.length.toLocaleString()} רשומות`)
+      // הייצוא עוצר ב-5,000 שורות. דיווח "הושלם" על ייצוא חתוך הוא דיווח כוזב.
+      if (!onlySelected && source.length < total) {
+        toast.warning(
+          `יוצאו ${source.length.toLocaleString()} מתוך ${total.toLocaleString()} — הייצוא מוגבל ל-5,000 שורות. צמצמי את הסינון כדי לייצא את השאר.`,
+          { duration: 8000 },
+        )
+      } else {
+        toast.success(`הייצוא הושלם — ${source.length.toLocaleString()} רשומות`)
+      }
     } catch (err) {
       toast.error(`ייצוא נכשל: ${err instanceof Error ? err.message : 'שגיאה לא ידועה'}`)
     } finally {
@@ -391,12 +429,23 @@ export default function AdminApplicationsPage() {
           <ActionButton
             variant="ghost"
             icon={RefreshCw}
-            onClick={() => {
-              qc.invalidateQueries({ queryKey: ['applications'] })
-              qc.invalidateQueries({ queryKey: ['applications-kpis'] })
+            disabled={refreshing}
+            onClick={async () => {
+              // הכפתור עבד אבל לא נתן שום משוב, ולכן נראה מת כשהנתונים
+              // לא השתנו. מחכים לריענון בפועל ואז מדווחים (INC-3116).
+              setRefreshing(true)
+              try {
+                await Promise.all([
+                  qc.invalidateQueries({ queryKey: ['applications'] }),
+                  qc.invalidateQueries({ queryKey: ['applications-kpis'] }),
+                ])
+                toast.success('הנתונים רועננו')
+              } finally {
+                setRefreshing(false)
+              }
             }}
           >
-            רענון
+            {refreshing ? 'מרענן…' : 'רענון'}
           </ActionButton>
           <ActionButton
             variant="ghost"
@@ -421,52 +470,64 @@ export default function AdminApplicationsPage() {
         </div>
       )}
 
-      {/* KPI Row */}
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
-        <KPICard label="סה״כ" value={kpis?.total ?? 0} hint="כל ההגשות" />
+      {/* KPI — שורת תהליך. כל כרטיס מסנן בדיוק את מה שהוא סופר. */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         <KPICard
-          label="הגשות חדשות"
+          label="הגשות פעילות"
+          value={kpis?.active ?? 0}
+          hint="ללא ארכיון/סגורות"
+          onClick={() => { setFilters({ active_apps_only: true }); setPage(0) }}
+        />
+        <KPICard
+          label="הגשה חדשה"
           value={kpis?.newApps ?? 0}
-          hint="סטטוס חדש"
+          hint="טרם טופלו"
           onClick={() => { setFilters({ application_status: 1 }); setPage(0) }}
         />
         <KPICard
-          label="ממתינות לטיפול"
-          value={kpis?.waitingHandling ?? 0}
-          hint="סטטוסים 1-2"
-          onClick={() => { setFilters({ application_status_in: [1, 2] }); setPage(0) }}
-        />
-        <KPICard
-          label="בראיונות"
-          value={kpis?.advanced ?? 0}
-          hint="שלבים 6-8"
-          // Must select the same range the card counts, or the card shows a
-          // number and the click lands on an empty list (INC-3116).
-          onClick={() => { setFilters({ application_status_in: INTERVIEW_STAGE_STATUSES }); setPage(0) }}
-        />
-        <KPICard
-          label="השמות"
-          value={kpis?.hires ?? 0}
-          hint="סטטוס 12"
-          onClick={() => { setFilters({ application_status: 12 }); setPage(0) }}
+          label="הועבר למעסיק"
+          value={kpis?.sentToEmployer ?? 0}
+          onClick={() => { setFilters({ application_status: 6 }); setPage(0) }}
         />
         <KPICard
           label='חסר קו"ח'
           value={kpis?.missingCv ?? 0}
+          hint="גם לא בכרטיס המועמד"
           onClick={() => { setFilters({ cv_state: 'without' }); setPage(0) }}
         />
         <KPICard
-          label="ממתין למשוב"
-          value={kpis?.waitingEmployer ?? 0}
-          hint="סטטוס 9"
-          onClick={() => { setFilters({ application_status: 9 }); setPage(0) }}
+          label="השבוע"
+          value={kpis?.thisWeek ?? 0}
+          hint="מיום ראשון"
+          onClick={() => { setFilters({ submitted_from: startOfWeekIso() }); setPage(0) }}
         />
         <KPICard
-          label="ארכיון"
-          value={kpis?.archived ?? 0}
-          hint="סטטוס 15"
-          onClick={() => { setFilters({ application_status: 15 }); setPage(0) }}
+          label="החודש"
+          value={kpis?.thisMonth ?? 0}
+          hint="מתחילת החודש"
+          onClick={() => { setFilters({ submitted_from: startOfMonthIso() }); setPage(0) }}
         />
+      </div>
+
+      {/* KPI — לפי תפקיד. אותו SSOT של צ׳יפי הסינון, כך שכרטיס וצ׳יפ
+          לא יוכלו להציג מספרים סותרים. */}
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-8">
+        {(kpis?.byRole ?? []).map((g) => (
+          <KPICard
+            key={g.key}
+            label={g.label}
+            value={g.count}
+            onClick={() => { setFilters({ job_role_names: g.names }); setPage(0) }}
+          />
+        ))}
+        {kpis?.topJobCode && (
+          <KPICard
+            label="המשרה המובילה"
+            value={kpis.topJobCount}
+            hint={kpis.topJobCode}
+            onClick={() => { setFilters({ job_code: kpis.topJobCode! }); setPage(0) }}
+          />
+        )}
       </div>
 
       {/* Filters */}
@@ -510,13 +571,42 @@ export default function AdminApplicationsPage() {
           onMarkSpam={(app) => markSpam.mutate(app)}
           onSendToLeads={(app) => sendToLeadsV2.mutate(app)}
           onArchive={(id) => archiveApplication.mutate(id)}
+          onLinkToRegistry={handleLinkToRegistry}
+          linkingId={linkingId}
           sortBy={sortBy}
           sortDir={sortDir}
           onSort={handleSort}
         />
       ) : (
         <Toolbar>
-          <ApplicationsGrid rows={rows} onRowClick={setDetailAppId} />
+          {/* לתצוגת הכרטיסים לא היו מצבי טעינה/שגיאה ולא פאג׳ינציה —
+              רואים 20 שורות ואין דרך לעמוד הבא (INC-3116). */}
+          {error ? (
+            <div className="py-12 text-center text-[14px] font-semibold text-[#DC2626]">
+              שגיאה בטעינת ההגשות: {error instanceof Error ? error.message : 'שגיאה לא ידועה'}
+              <div className="mt-1 text-[13px] font-normal text-[#6B6B6B]">
+                זו תקלת טעינה — אין להסיק שאין הגשות במערכת.
+              </div>
+            </div>
+          ) : isLoading ? (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="h-32 animate-pulse rounded-[18px] bg-[#F3F4F6]" />
+              ))}
+            </div>
+          ) : rows.length === 0 ? (
+            <div className="py-12 text-center text-[14px] text-[#6B6B6B]">
+              {hasActiveFilter ? 'אין הגשות התואמות את הסינון' : 'אין עדיין הגשות'}
+            </div>
+          ) : (
+            <ApplicationsGrid rows={rows} onRowClick={setDetailAppId} />
+          )}
+          <AdminTablePagination
+            page={page + 1}
+            pageSize={APPLICATIONS_PAGE_SIZE}
+            total={total}
+            onPageChange={(next) => { setPage(next - 1); setSelectedIds([]) }}
+          />
         </Toolbar>
       )}
 

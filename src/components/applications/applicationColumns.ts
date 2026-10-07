@@ -6,6 +6,7 @@ export const ALL_COLUMNS = [
   { key: 'work_status', label: 'סטטוס תעסוקה' },
   { key: 'availability', label: 'זמינות' },
   { key: 'job_role', label: 'תפקיד משרה' },
+  { key: 'candidate_city', label: 'עיר מועמד' },
   { key: 'job_city', label: 'עיר משרה' },
   { key: 'job_region', label: 'אזור משרה' },
   { key: 'org_name', label: 'שם ארגון' },
@@ -15,19 +16,25 @@ export const ALL_COLUMNS = [
   { key: 'source', label: 'מקור' },
   { key: 'submission_date', label: 'תאריך הגשה' },
   { key: 'follow_up_date', label: 'תאריך פעולה הבאה' },
-  { key: 'notes', label: 'הערות' },
+  { key: 'candidate_notes', label: 'הערות מועמד' },
+  { key: 'notes', label: 'הערות פנימיות' },
 ] as const
 
 export type ColumnKey = (typeof ALL_COLUMNS)[number]['key']
 
+/**
+ * ברירת המחדל (INC-3116): "מקור" ו"הערות פנימיות" הוסרו — מקור זהה כמעט בכל
+ * השורות, והערות פנימיות מלאות ב-15% בלבד. במקומן נכנסו שתי הערים, לפי בקשת
+ * צאלה. "הערות מועמד" (מלא ב-41%) זמין בבורר העמודות.
+ */
 export const DEFAULT_VISIBLE: ColumnKey[] = [
   'registry_status',
   'job_role',
+  'candidate_city',
+  'job_city',
   'job_region',
   'org_name',
   'check_status',
   'cv',
-  'source',
   'submission_date',
-  'notes',
 ]

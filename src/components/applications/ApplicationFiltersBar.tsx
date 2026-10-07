@@ -1,36 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { SearchBar, SelectFilter } from '@/components/layout/Shell'
 import { CityRegionPicker } from '@/components/ui/CityRegionPicker'
 import type { ApplicationFilters } from '@/types/applications'
+import {
+  APPLICATION_ROLE_GROUPS,
+  roleGroupNames,
+  sameRoleNames,
+} from '@/lib/applicationRoleGroups'
 import type { DictItem } from '@/types'
-
-/**
- * Role groups by dict_roles id — mirrors KPI_ROLE_BLUEPRINTS in
- * AdminContactsPage so both screens group roles identically. Covers all 18
- * roles, so no role is unreachable (the old chips left "מנהל/ת דנטלי" with no
- * chip at all, and 3 chips that matched nothing).
- *
- * The ids are resolved to exact `dict_roles.name` values at render time and
- * matched with `.in()` — verified against Supabase that every non-null
- * `applications.job_role` equals a dict_roles.name (INC-3116).
- */
-const ROLE_GROUPS = [
-  { key: 'doctor', label: 'רופאי שיניים', roleIds: [1] },
-  { key: 'experts', label: 'מומחים', roleIds: [2, 3, 4, 5, 6, 7, 8] },
-  { key: 'assistant', label: 'סייעות', roleIds: [9] },
-  { key: 'hygienist', label: 'שינניות', roleIds: [10] },
-  { key: 'technician', label: 'טכנאים', roleIds: [11] },
-  { key: 'secretary', label: 'מזכירות', roleIds: [13] },
-  { key: 'manager', label: 'ניהול / גיוס', roleIds: [12, 14, 15, 16, 17, 18] },
-] as const
-
-/** Same set of names, order-insensitive — used to light up the active chip. */
-function sameNames(a: string[] | undefined, b: string[]): boolean {
-  if (!a || a.length !== b.length) return false
-  const set = new Set(a)
-  return b.every((name) => set.has(name))
-}
 
 // `regions` ו-`cities` הוסרו: הם הועברו כ-props ולא היו בשימוש —
 // CityRegionPicker טוען את המילונים שלו בעצמו (מעומד).
@@ -58,7 +36,38 @@ export function ApplicationFiltersBar({
   availabilities,
 }: Props) {
   const [showAdvanced, setShowAdvanced] = useState(false)
-  const set = (patch: Partial<ApplicationFilters>) => onChange({ ...filters, ...patch })
+
+  // החיפוש נמצא ב-queryKey, ולכן כל הקשה הפעילה שאילתת count: 'exact' מלאה
+  // + שתי שאילתות העשרה. מקלידים מקומית ומשדרים אחרי 350ms (INC-3116).
+  const [searchDraft, setSearchDraft] = useState(filters.search ?? '')
+  const lastPushedSearch = useRef(filters.search ?? '')
+  useEffect(() => {
+    // סנכרון כשהסינון התחלף מבחוץ (ניקוי סינון, לחיצה על כרטיס KPI).
+    if ((filters.search ?? '') !== lastPushedSearch.current) {
+      lastPushedSearch.current = filters.search ?? ''
+      setSearchDraft(filters.search ?? '')
+    }
+  }, [filters.search])
+  useEffect(() => {
+    if (searchDraft === lastPushedSearch.current) return
+    const t = setTimeout(() => {
+      lastPushedSearch.current = searchDraft
+      set({ search: searchDraft || undefined })
+    }, 350)
+    return () => clearTimeout(t)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchDraft])
+  // מפתח עם ערך undefined נשאר באובייקט ו-Object.keys() ממשיך לספור אותו,
+  // ולכן הדף "נדבק" על מסונן אחרי כל לחיצת צ׳יפ. מנקים אותם כאן (INC-3116).
+  const set = (patch: Partial<ApplicationFilters>) => {
+    const next = { ...filters, ...patch } as Record<string, unknown>
+    for (const key of Object.keys(next)) {
+      const v = next[key]
+      if (v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0))
+        delete next[key]
+    }
+    onChange(next as ApplicationFilters)
+  }
 
   const hasActive = !!(
     filters.search ||
@@ -100,14 +109,13 @@ export function ApplicationFiltersBar({
         >
           הכל
         </button>
-        {ROLE_GROUPS.map((group) => {
-          const names = group.roleIds
-            .map((id) => roles.find((r) => r.id === id)?.name)
-            .filter((n): n is string => !!n)
-          // A group whose roles are missing from the live dict would filter on
-          // an empty list and return nothing — hide it instead.
+        {APPLICATION_ROLE_GROUPS.map((group) => {
+          // אותו helper שמחשב את ספירות ה-KPI, כדי שכרטיס וצ׳יפ לא יסתרו.
+          const names = roleGroupNames(group, roles)
+          // קבוצה שתפקידיה חסרים מהמילון החי הייתה מסננת על רשימה ריקה
+          // ומחזירה כלום — מסתירים אותה במקום.
           if (!names.length) return null
-          const active = sameNames(filters.job_role_names, names)
+          const active = sameRoleNames(filters.job_role_names, names)
           return (
             <button
               key={group.key}
@@ -127,8 +135,8 @@ export function ApplicationFiltersBar({
       {/* Row 1 */}
       <div className="flex flex-wrap items-end gap-3">
         <SearchBar
-          value={filters.search ?? ''}
-          onChange={(v) => set({ search: v || undefined })}
+          value={searchDraft}
+          onChange={setSearchDraft}
           placeholder="חיפוש שם, טלפון, אימייל, קוד משרה..."
         />
         <SelectFilter

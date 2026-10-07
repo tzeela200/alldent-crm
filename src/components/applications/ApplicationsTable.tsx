@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Eye, UserPlus, Ban, Send, Archive } from 'lucide-react'
+import { Eye, UserPlus, Ban, Send, Archive, Link2 } from 'lucide-react'
 import { AdminTable, type AdminColumn } from '@/components/admin/AdminTable'
 import { AdminActionsMenu, type AdminActionMenuItem } from '@/components/admin/AdminActionsMenu'
 import { AdminTablePagination } from '@/components/admin/AdminTablePagination'
@@ -40,6 +40,9 @@ interface Props {
   onMarkSpam: (app: ApplicationRow) => void
   onSendToLeads: (app: ApplicationRow) => void
   onArchive: (id: number) => void
+  /** קישור הגשה לכרטיס קיים שזוהה לפי נייד (registry_match_contact_id). */
+  onLinkToRegistry: (app: ApplicationRow) => void
+  linkingId?: number | null
   sortBy: string
   sortDir: 'asc' | 'desc'
   onSort: (key: string) => void
@@ -67,6 +70,8 @@ export function ApplicationsTable({
   onMarkSpam,
   onSendToLeads,
   onArchive,
+  onLinkToRegistry,
+  linkingId,
   sortBy,
   sortDir,
   onSort,
@@ -86,6 +91,7 @@ export function ApplicationsTable({
       {
         key: 'candidate_phone',
         label: 'נייד',
+        sortable: true,
         nowrap: true,
         render: (row) =>
           row.candidate_phone ? (
@@ -100,16 +106,54 @@ export function ApplicationsTable({
         key: 'registry_status',
         colKey: 'registry_status',
         label: 'מצב במאגר',
-        render: (row) =>
-          row.is_new_candidate || !row.candidate_link ? (
+        render: (row) => {
+          if (row.candidate_link && !row.is_new_candidate)
+            return (
+              <span className="inline-flex rounded-[6px] bg-[#E6F3F3] px-2.5 py-0.5 text-[12px] font-semibold text-[#008080]">
+                קיים במאגר
+              </span>
+            )
+          // מצב שלישי: לאדם כבר יש כרטיס (אותו phone_norm), ההגשה פשוט מעולם
+          // לא קושרה אליו. 39 מתוך 92 ה"חדש למאגר" הם כאלה (INC-3116).
+          if (row.registry_match_contact_id)
+            return (
+              <div className="flex flex-col items-start gap-1">
+                <span className="inline-flex rounded-[6px] bg-[#EFF6FF] px-2.5 py-0.5 text-[12px] font-semibold text-[#1D4ED8]">
+                  קיים במאגר — לא מקושר
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onLinkToRegistry(row)
+                  }}
+                  disabled={linkingId === row.application_id}
+                  className="text-[11px] font-semibold text-[#008080] hover:underline disabled:opacity-50"
+                  title={row.registry_match_name ? `קישור אל ${row.registry_match_name}` : undefined}
+                >
+                  {linkingId === row.application_id ? 'מקשר…' : 'קשר לכרטיס ←'}
+                </button>
+              </div>
+            )
+          return (
             <span className="inline-flex rounded-[6px] bg-[#FDF3E7] px-2.5 py-0.5 text-[12px] font-semibold text-[#B45309]">
               חדש למאגר
             </span>
-          ) : (
-            <span className="inline-flex rounded-[6px] bg-[#E6F3F3] px-2.5 py-0.5 text-[12px] font-semibold text-[#008080]">
-              קיים במאגר
-            </span>
-          ),
+          )
+        },
+      },
+      {
+        key: 'candidate_city',
+        colKey: 'candidate_city',
+        label: 'עיר מועמד',
+        render: (row) => {
+          // רק כשהמועמד קיים במאגר (לפי בקשת צאלה). העיר מגיעה מהכרטיס
+          // המקושר, עם master_city כגיבוי לשורות ישנות.
+          if (!row.candidate_link) return '—'
+          const fromContact = getDictLabel(dicts?.cities, row.contact_city_id)
+          if (fromContact && fromContact !== '—') return fromContact
+          return row.master_city || '—'
+        },
       },
       {
         key: 'work_status',
@@ -138,6 +182,7 @@ export function ApplicationsTable({
         key: 'job_role',
         colKey: 'job_role',
         label: 'תפקיד משרה',
+        sortable: true,
         render: (row) =>
           row.job_role ? <RoleBadge roleId={row.job_role_id} label={row.job_role} /> : '—',
       },
@@ -145,12 +190,14 @@ export function ApplicationsTable({
         key: 'job_city',
         colKey: 'job_city',
         label: 'עיר משרה',
+        sortable: true,
         render: (row) => row.job_city ?? '—',
       },
       {
         key: 'job_region',
         colKey: 'job_region',
         label: 'אזור משרה',
+        sortable: true,
         render: (row) =>
           row.job_region ? <RegionBadge regionId={row.job_region_id} label={row.job_region} /> : '—',
       },
@@ -171,12 +218,14 @@ export function ApplicationsTable({
       {
         key: 'application_status',
         label: 'סטטוס הגשה',
+        sortable: true,
         render: (row) => <StatusBadge statusType="application" statusId={row.application_status} />,
       },
       {
         key: 'check_status',
         colKey: 'check_status',
         label: 'סטטוס בדיקה',
+        sortable: true,
         render: (row) =>
           row.check_status != null ? (
             <StatusBadge statusType="check" statusId={row.check_status} />
@@ -214,6 +263,7 @@ export function ApplicationsTable({
         key: 'source',
         colKey: 'source',
         label: 'מקור',
+        sortable: true,
         render: (row) => getDictLabel(dicts?.sources, row.source),
       },
       {
@@ -233,9 +283,16 @@ export function ApplicationsTable({
         render: (row) => (row.follow_up_date ? formatDate(row.follow_up_date) : '—'),
       },
       {
+        key: 'candidate_notes',
+        colKey: 'candidate_notes',
+        label: 'הערות מועמד',
+        cellClassName: 'max-w-[200px] truncate',
+        render: (row) => row.candidate_notes ?? '—',
+      },
+      {
         key: 'notes',
         colKey: 'notes',
-        label: 'הערות',
+        label: 'הערות פנימיות',
         cellClassName: 'max-w-[160px] truncate',
         render: (row) => row.internal_notes ?? '—',
       },
@@ -262,11 +319,24 @@ export function ApplicationsTable({
             })
           }
           if (isNewToRegistry) {
+            // כשכבר קיים כרטיס עם אותו נייד — לקשר אליו, לא ליצור כרטיס שני.
+            if (row.registry_match_contact_id) {
+              items.push({
+                key: 'link',
+                icon: <Link2 className="h-4 w-4" />,
+                label: row.registry_match_name
+                  ? `קשר לכרטיס: ${row.registry_match_name}`
+                  : 'קשר לכרטיס קיים',
+                separatorBefore: true,
+                disabled: linkingId === row.application_id,
+                onClick: () => onLinkToRegistry(row),
+              })
+            }
             items.push({
               key: 'approve',
               icon: <UserPlus className="h-4 w-4" />,
               label: 'מאושר למאגר',
-              separatorBefore: true,
+              separatorBefore: !row.registry_match_contact_id,
               onClick: () => onCreateContact(row),
             })
             items.push({
@@ -305,7 +375,7 @@ export function ApplicationsTable({
 
     // עמודות שאינן ניתנות להסתרה נשארות תמיד; השאר לפי בחירת המשתמש.
     return all.filter((c) => !c.colKey || showCol(c.colKey))
-  }, [dicts, visibleColumns, onRowClick, onCreateContact, onMarkSpam, onSendToLeads, onArchive])
+  }, [dicts, visibleColumns, onRowClick, onCreateContact, onMarkSpam, onSendToLeads, onArchive, onLinkToRegistry, linkingId])
 
   return (
     <AdminTable<ApplicationRow>

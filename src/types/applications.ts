@@ -52,6 +52,14 @@ export interface ApplicationRow {
   contact_has_cv?: boolean | null
   contact_cv_link?: string | null
   contact_cv_storage_path?: string | null
+
+  /**
+   * Set when the row has NO candidate_link but a contact with the same
+   * phone_norm already exists — i.e. the person is in the registry, this
+   * application was just never linked to them (INC-3116).
+   */
+  registry_match_contact_id?: number | null
+  registry_match_name?: string | null
   contact_cv_received_date?: string | null
   contact_display_name?: string | null
 
@@ -86,6 +94,10 @@ export interface ApplicationFilters {
    */
   job_role_names?: string[]
   job_city_id?: number
+  /** Exact job code — powers the "top job" KPI and the ?job= deep link. */
+  job_code?: string
+  /** ISO date; applications submitted on or after it (week/month KPI cards). */
+  submitted_from?: string
   job_status?: number
   contact_work_status?: number
   contact_availability?: number
@@ -102,13 +114,30 @@ export interface ApplicationFilters {
   account_name_search?: string
 }
 
+/** ספירה של קבוצת תפקיד אחת, עם השמות שבהם מסננים אותה. */
+export interface ApplicationRoleCount {
+  key: string
+  label: string
+  /** שמות `job_role` של הקבוצה — בדיוק מה שהלחיצה על הכרטיס תסנן. */
+  names: string[]
+  count: number
+}
+
+/**
+ * המדדים שמוצגים מעל הטבלה. הוחלפו (INC-3116) — הקודמים כללו שני כרטיסים
+ * שתמיד הציגו 0 (סטטוסים 12 ו-9 אינם בשימוש) ו"סה״כ" שכלל ארכיון וספאם.
+ */
 export interface ApplicationKPIs {
+  /** כל ההגשות, כולל טרמינליות — לשורת הכותרת, לא לכרטיס. */
   total: number
+  /** לא-טרמינליות (מחוץ ל-TERMINAL_STATUSES). */
+  active: number
   newApps: number
-  waitingHandling: number
-  advanced: number
-  hires: number
+  sentToEmployer: number
   missingCv: number
-  waitingEmployer: number
-  archived: number
+  thisWeek: number
+  thisMonth: number
+  byRole: ApplicationRoleCount[]
+  topJobCode: string | null
+  topJobCount: number
 }

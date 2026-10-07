@@ -16,7 +16,7 @@ import { useApplicationDicts, getDictLabel } from '@/hooks/useApplicationDicts'
 import { supabase } from '@/lib/supabase'
 import { useQuery } from '@tanstack/react-query'
 import { whatsappLink, formatPhone, isValidIlMobile } from '@/lib/normalizePhone'
-import { openApplicationCv, applicationHasCv } from '@/lib/cv'
+import { openApplicationCv, personHasCv } from '@/lib/cv'
 import { formatDate } from '@/lib/timeAgo'
 import { toast } from 'sonner'
 import type { Contact, Account, Job } from '@/types'
@@ -62,7 +62,7 @@ function isValidUrl(url: string | null | undefined): boolean {
 
 export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
   const navigate = useNavigate()
-  const { data: row, isLoading } = useApplicationRow(applicationId)
+  const { data: row, isLoading, error: rowError } = useApplicationRow(applicationId)
   const { data: dicts } = useApplicationDicts()
   const {
     updateApplication,
@@ -217,18 +217,50 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
     }
   }
 
+  // מזהה שנמחק/לא קיים החזיר ספינר אינסופי, ובמצב הזה לא היה footer ולכן
+  // גם לא כפתור סגירה. עכשיו יש שגיאה אמיתית ותמיד יש דרך לצאת (INC-3116).
+  if (rowError || (!isLoading && !row)) {
+    return (
+      <SidePanel
+        open
+        onClose={onClose}
+        header={<div className="px-5 py-4 text-[15px] font-bold text-[#2D2D2D]">פרטי הגשה</div>}
+        footer={<AdminPanelActions mode="view" onClose={onClose} />}
+      >
+        <div className="py-16 text-center">
+          <p className="text-[14px] font-semibold text-[#DC2626]">לא ניתן לטעון את ההגשה</p>
+          <p className="mt-1 text-[13px] text-[#6B6B6B]">
+            {rowError instanceof Error ? rowError.message : `הגשה #${applicationId} לא נמצאה — ייתכן שנמחקה.`}
+          </p>
+        </div>
+      </SidePanel>
+    )
+  }
+
   if (isLoading || !row) {
     return (
       <SidePanel
         open
         onClose={onClose}
         header={<div className="px-5 py-4 text-[15px] font-bold text-[#2D2D2D]">פרטי הגשה</div>}
+        footer={<AdminPanelActions mode="view" onClose={onClose} />}
       >
         <div className="flex items-center justify-center py-20">
           <div className="h-8 w-8 animate-spin rounded-full border-4 border-[#F3F4F6] border-t-[#008080]" />
         </div>
       </SidePanel>
     )
+  }
+
+  // הפאנל שולף את איש הקשר בנפרד (useApplicationRow לא מעשיר), ולכן
+  // מרכיבים כאן את מקור הקו״ח ברמת האדם — כמו בטבלה.
+  const cvSource = {
+    has_cv: row.has_cv,
+    cv_link: row.cv_link,
+    cv_storage_path: row.cv_storage_path,
+    contact_has_cv: contact?.has_cv,
+    contact_cv_link: contact?.cv_link,
+    contact_cv_storage_path: (contact as { cv_storage_path?: string | null } | null | undefined)?.cv_storage_path,
   }
 
   const phone = row.candidate_phone
@@ -276,10 +308,10 @@ export function ApplicationDetailPanel({ applicationId, onClose }: Props) {
             {formatPhone(phone)}
           </a>
         )}
-        {applicationHasCv(row) && (
+        {personHasCv(cvSource) && (
           <button
             type="button"
-            onClick={() => openApplicationCv(row)}
+            onClick={() => openApplicationCv(cvSource)}
             className="flex items-center gap-1.5 rounded-lg bg-[#EFF6FF] px-3 py-1.5 text-[12px] font-semibold text-[#3B82F6] transition hover:bg-[#DBEAFE]"
           >
             <FileText className="h-3.5 w-3.5" />
