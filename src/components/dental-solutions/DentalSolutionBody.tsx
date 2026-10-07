@@ -71,15 +71,20 @@ export function DentalSolutionBody({
               {bidiSafe(solution.title)}
             </h1>
 
+            {/* ⚠️ בלי מפרידים inline: כשהשורה נשברת במובייל, המפריד
+                נופל לתחילת השורה הבאה ונראה כשגיאה. תגיות עם רווח
+                נשברות נקי בכל רוחב. */}
             {!!solution.partners?.length && (
-              <p className="mt-5 flex flex-wrap items-center gap-x-2.5 gap-y-1.5 text-[14.5px] font-bold text-[#7CECEC]">
-                {solution.partners.map((p, i) => (
-                  <span key={p} className="inline-flex items-center gap-2.5">
-                    {i > 0 && <span aria-hidden="true" className="text-white/25">·</span>}
+              <ul className="mt-5 flex list-none flex-wrap gap-2 p-0">
+                {solution.partners.map((p) => (
+                  <li
+                    key={p}
+                    className="rounded-full border border-[#7CECEC]/25 bg-[#008080]/15 px-3 py-1.5 text-[13.5px] font-bold text-[#7CECEC]"
+                  >
                     {p}
-                  </span>
+                  </li>
                 ))}
-              </p>
+              </ul>
             )}
 
             <p className={`mt-5 max-w-[46ch] ${LEAD} text-white/75`}>
