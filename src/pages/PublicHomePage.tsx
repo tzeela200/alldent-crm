@@ -461,16 +461,6 @@ function EcosystemShowcase() {
           </div>
         </RevealOnScroll>
 
-        {/* INC-3151 — פרסום אמיתי. מופרד מהקרוסלה שמתחתיו, שהיא עדיין
-            תוכן הדגמה, כדי שלא יתערבב אמיתי עם ממוצא. */}
-        {FEATURED_SOLUTION && (
-          <RevealOnScroll>
-            <div className="mb-10">
-              <SolutionCard solution={FEATURED_SOLUTION} />
-            </div>
-          </RevealOnScroll>
-        )}
-
         <div className="grid items-stretch gap-6 md:grid-cols-[1.8fr_1fr]">
           {/* Spotlight panel */}
           <div className="overflow-hidden rounded-2xl bg-[#242424]">
@@ -608,6 +598,27 @@ export default function PublicHomePage() {
           )}
         </div>
       </section>
+
+      {/* INC-3151 — פרסום אמיתי בין המשרות לנכסים.
+          מיקום מכוון: "שירותים ופתרונות" הוא אזור B2B למרפאות (מעבדות,
+          ציוד, תוכנה), ואילו תוכנית הכשרה פונה לאדם שמחפש מקצוע — אותו
+          קהל של לוח המשרות. רקע בהיר כדי שהכרטיס הכהה יבלוט ולא יימרח
+          לתוך מקטע הנכסים הכהה שאחריו. */}
+      {FEATURED_SOLUTION && (
+        <section className="bg-white py-16 md:py-20" dir="rtl">
+          <div className="mx-auto max-w-7xl px-5 md:px-8">
+            <RevealOnScroll>
+              <p
+                className="mb-6 text-[12px] font-extrabold tracking-[0.24em] text-[#B45309] uppercase"
+                dir="ltr"
+              >
+                Featured Program
+              </p>
+              <SolutionCard solution={FEATURED_SOLUTION} />
+            </RevealOnScroll>
+          </div>
+        </section>
+      )}
 
       <PropertiesShowcase />
       <EcosystemShowcase />

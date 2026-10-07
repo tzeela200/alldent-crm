@@ -1,7 +1,20 @@
-// אזור שיתוף קטן שמופיע בכל דף ציבורי (מוזרק ב-PublicLayout).
-// משתף את כתובת הדף הנוכחית ב-WhatsApp ובפייסבוק.
+/**
+ * אזור שיתוף שמופיע בכל דף ציבורי (מוזרק ב-PublicLayout).
+ *
+ * ⚠️ מובייל מול דסקטופ — שתי התנהגויות שונות בכוונה:
+ *
+ * בדסקטופ יש מקום לרצועה אנכית של שלושה כפתורים בפינה.
+ * במובייל אותה רצועה היא 58x150 פיקסלים שמכסים תוכן בכל גלילה — נמדד
+ * שהיא הסתירה את תמונת הקורס. לכן במובייל יש **כפתור אחד**, והוא פותח
+ * את תפריט השיתוף של המכשיר דרך Web Share API: שם כבר יש וואטסאפ,
+ * פייסבוק, מסרונים וכל אפליקציה שהמשתמשת התקינה — יותר ממה שהרצועה
+ * הציעה, בשטח קטן יותר.
+ *
+ * אם הדפדפן אינו תומך ב-navigator.share (דסקטופ, דפדפנים ישנים) הכפתור
+ * פותח את אותה רצועה בלחיצה, כך שאף אחד לא נשאר בלי אפשרות לשתף.
+ */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type SocialShareProps = {
   elevatedOnMobile?: boolean
@@ -65,12 +78,54 @@ export default function SocialShare({
     ? 'bottom-24 md:bottom-5'
     : 'bottom-5'
 
+  /* תמיכה ב-Web Share נבדקת פעם אחת אחרי ה-mount ולא בזמן הרינדור,
+     כדי שהשרת והלקוח יסכימו על אותו HTML. */
+  const [canNativeShare, setCanNativeShare] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  useEffect(() => {
+    setCanNativeShare(typeof navigator !== 'undefined' && !!navigator.share)
+  }, [])
+
+  async function onNativeShare() {
+    try {
+      await navigator.share({ title: document.title, url: shareUrl() })
+    } catch {
+      /* המשתמשת ביטלה את התפריט — לא שגיאה */
+    }
+  }
+
   return (
-    <div
-      dir="rtl"
-      className={`fixed left-4 z-40 flex flex-col items-center gap-2 rounded-full border border-black/5 bg-white/95 p-2 shadow-[0_6px_20px_-6px_rgba(0,0,0,0.25)] backdrop-blur ${mobilePositionClass}`}
-      aria-label="שיתוף הדף"
-    >
+    <>
+      {/* ── מובייל: כפתור אחד ── */}
+      <div
+        dir="rtl"
+        className={`fixed start-4 z-40 md:hidden ${mobilePositionClass}`}
+      >
+        <button
+          onClick={() => (canNativeShare ? onNativeShare() : setMobileOpen((v) => !v))}
+          aria-label="שיתוף הדף"
+          aria-expanded={canNativeShare ? undefined : mobileOpen}
+          title="שיתוף הדף"
+          className="flex h-11 w-11 items-center justify-center rounded-full border border-black/5 bg-white/95 text-[#2D2D2D] shadow-[0_6px_20px_-6px_rgba(0,0,0,0.25)] backdrop-blur transition active:scale-95"
+        >
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+            <line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+          </svg>
+        </button>
+      </div>
+
+      {/* ── דסקטופ, ובמובייל רק כשאין Web Share והמשתמשת פתחה ── */}
+      <div
+        dir="rtl"
+        className={`fixed start-4 z-40 flex-col items-center gap-2 rounded-full border border-black/5 bg-white/95 p-2 shadow-[0_6px_20px_-6px_rgba(0,0,0,0.25)] backdrop-blur md:flex ${mobilePositionClass} ${
+          !canNativeShare && mobileOpen ? 'bottom-20 flex md:bottom-5' : 'hidden'
+        }`}
+        aria-label="שיתוף הדף"
+      >
       <span className="px-0.5 text-[10px] font-bold text-[#6B6B6B]">
         שיתוף
       </span>
@@ -129,9 +184,10 @@ export default function SocialShare({
         )}
       </button>
 
-      <span aria-live="polite" className="sr-only">
-        {copied ? 'הקישור הועתק' : ''}
-      </span>
-    </div>
+        <span aria-live="polite" className="sr-only">
+          {copied ? 'הקישור הועתק' : ''}
+        </span>
+      </div>
+    </>
   )
 }
