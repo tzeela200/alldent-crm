@@ -183,7 +183,7 @@ async function enrichApplicationRows(rowsIn: ApplicationRow[]): Promise<Applicat
         const contacts = await fetchInChunks(candidateIds, (chunk) =>
           supabase
             .from('contact')
-            .select('contact_id, work_status, candidate_availability_ids, profile_type, role, city_id, region_id, has_cv, cv_link, cv_storage_path, cv_received_date, display_name')
+            .select('contact_id, work_status, candidate_availability_ids, profile_type, role, city_id, region_id, locality_type, has_cv, cv_link, cv_storage_path, cv_received_date, display_name')
             .in('contact_id', chunk),
         )
         if (contacts) {
@@ -199,6 +199,7 @@ async function enrichApplicationRows(rowsIn: ApplicationRow[]): Promise<Applicat
               contact_role: c.role ?? null,
               contact_city_id: c.city_id ?? null,
               contact_region_id: c.region_id ?? null,
+              contact_locality_type: c.locality_type ?? null,
               contact_has_cv: c.has_cv ?? null,
               contact_cv_link: c.cv_link ?? null,
               contact_cv_storage_path: c.cv_storage_path ?? null,

@@ -49,6 +49,8 @@ export interface ApplicationRow {
   contact_role?: number | null
   contact_city_id?: number | null
   contact_region_id?: number | null
+  /** 'יישוב יהודי' | 'יישוב ערבי' — טקסט חופשי ב-DB, אין מילון. */
+  contact_locality_type?: string | null
   contact_has_cv?: boolean | null
   contact_cv_link?: string | null
   contact_cv_storage_path?: string | null

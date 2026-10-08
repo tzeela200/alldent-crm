@@ -42,11 +42,19 @@ type ViewMode = 'table' | 'grid'
 
 const VIEW_STORAGE_KEY = 'alldent:applications:view'
 
+/**
+ * גרסת ברירת המחדל של העמודות. בחירת העמודות נשמרת ב-localStorage, ולכן שינוי
+ * ב-DEFAULT_VISIBLE לא מגיע למי שכבר השתמש במסך. העלאת המספר מחזירה אותו
+ * פעם אחת לברירת המחדל החדשה — ומשאירה את הסינון והמיון כפי שהיו.
+ */
+const COLUMNS_VERSION = 2
+
 interface PersistedView {
   filters?: ApplicationFilters
   sortBy?: string
   sortDir?: 'asc' | 'desc'
   visibleColumns?: ColumnKey[]
+  columnsVersion?: number
   viewMode?: ViewMode
 }
 
@@ -110,9 +118,15 @@ export default function AdminApplicationsPage() {
   const [bulkStatus, setBulkStatus] = useState<number | ''>('')
   const [bulkCheck, setBulkCheck] = useState<number | ''>('')
   const [bulkFollowUp, setBulkFollowUp] = useState('')
-  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(
-    () => loadPersistedView().visibleColumns ?? DEFAULT_VISIBLE
-  )
+  const [visibleColumns, setVisibleColumns] = useState<ColumnKey[]>(() => {
+    const saved = loadPersistedView()
+    if (saved.columnsVersion !== COLUMNS_VERSION || !saved.visibleColumns?.length)
+      return DEFAULT_VISIBLE
+    // מסננים מפתחות שכבר לא קיימים, אחרת עמודה שהוסרה תשבור את הבורר.
+    const known = new Set<string>(ALL_COLUMNS.map((c) => c.key))
+    const kept = saved.visibleColumns.filter((k) => known.has(k))
+    return kept.length ? kept : DEFAULT_VISIBLE
+  })
   const [exporting, setExporting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [linkingId, setLinkingId] = useState<number | null>(null)
@@ -122,7 +136,7 @@ export default function AdminApplicationsPage() {
     try {
       localStorage.setItem(
         VIEW_STORAGE_KEY,
-        JSON.stringify({ filters, sortBy, sortDir, visibleColumns, viewMode })
+        JSON.stringify({ filters, sortBy, sortDir, visibleColumns, columnsVersion: COLUMNS_VERSION, viewMode })
       )
     } catch {
       /* storage full or unavailable — non-fatal */

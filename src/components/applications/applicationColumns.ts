@@ -1,14 +1,17 @@
 // הגדרות עמודות מסך ההגשות — משותפות לדף, לבורר העמודות ולטבלה,
 // כדי שלא יהיו שתי רשימות שמתפצלות.
+// הסדר כאן הוא סדר התצוגה בבורר העמודות; סדר העמודות בטבלה עצמה
+// נקבע ב-ApplicationsTable.
 
 export const ALL_COLUMNS = [
+  { key: 'candidate_city', label: 'עיר מועמד' },
+  { key: 'candidate_locality_type', label: 'סוג יישוב' },
   { key: 'registry_status', label: 'מצב במאגר' },
   { key: 'work_status', label: 'סטטוס תעסוקה' },
   { key: 'availability', label: 'זמינות' },
   { key: 'job_role', label: 'תפקיד משרה' },
-  { key: 'candidate_city', label: 'עיר מועמד' },
-  { key: 'job_city', label: 'עיר משרה' },
   { key: 'job_region', label: 'אזור משרה' },
+  { key: 'job_city', label: 'עיר משרה' },
   { key: 'org_name', label: 'שם ארגון' },
   { key: 'job_status', label: 'סטטוס משרה' },
   { key: 'check_status', label: 'סטטוס בדיקה' },
@@ -23,18 +26,18 @@ export const ALL_COLUMNS = [
 export type ColumnKey = (typeof ALL_COLUMNS)[number]['key']
 
 /**
- * ברירת המחדל (INC-3116): "מקור" ו"הערות פנימיות" הוסרו — מקור זהה כמעט בכל
- * השורות, והערות פנימיות מלאות ב-15% בלבד. במקומן נכנסו שתי הערים, לפי בקשת
- * צאלה. "הערות מועמד" (מלא ב-41%) זמין בבורר העמודות.
+ * ברירת המחדל. "הערות פנימיות", "מקור" ו"סטטוס בדיקה" הוסרו לבקשת צאלה —
+ * הם נשארו זמינים בבורר העמודות, פשוט לא קבועים.
+ * עיר מועמד וסוג יישוב נמשכים מכרטיס המועמד ומוצגים רק למי שקיים במאגר.
  */
 export const DEFAULT_VISIBLE: ColumnKey[] = [
+  'candidate_city',
+  'candidate_locality_type',
   'registry_status',
   'job_role',
-  'candidate_city',
-  'job_city',
   'job_region',
+  'job_city',
   'org_name',
-  'check_status',
   'cv',
   'submission_date',
 ]

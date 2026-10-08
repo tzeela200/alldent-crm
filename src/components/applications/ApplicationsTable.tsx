@@ -103,6 +103,30 @@ export function ApplicationsTable({
           ),
       },
       {
+        key: 'candidate_city',
+        colKey: 'candidate_city',
+        label: 'עיר מועמד',
+        render: (row) => {
+          // רק כשהמועמד קיים במאגר (לפי בקשת צאלה). העיר מגיעה מהכרטיס
+          // המקושר, עם master_city כגיבוי לשורות ישנות.
+          if (!row.candidate_link) return '—'
+          const fromContact = getDictLabel(dicts?.cities, row.contact_city_id)
+          if (fromContact && fromContact !== '—') return fromContact
+          return row.master_city || '—'
+        },
+      },
+      {
+        key: 'candidate_locality_type',
+        colKey: 'candidate_locality_type',
+        label: 'סוג יישוב',
+        render: (row) => {
+          // נגזר בטריגר מהעיר שעל כרטיס המועמד — ולכן רק למי שקיים במאגר.
+          // טקסט חופשי ב-DB (אין מילון); בפועל: "יישוב יהודי" / "יישוב ערבי".
+          if (!row.candidate_link) return '—'
+          return row.contact_locality_type || '—'
+        },
+      },
+      {
         key: 'registry_status',
         colKey: 'registry_status',
         label: 'מצב במאגר',
@@ -143,19 +167,6 @@ export function ApplicationsTable({
         },
       },
       {
-        key: 'candidate_city',
-        colKey: 'candidate_city',
-        label: 'עיר מועמד',
-        render: (row) => {
-          // רק כשהמועמד קיים במאגר (לפי בקשת צאלה). העיר מגיעה מהכרטיס
-          // המקושר, עם master_city כגיבוי לשורות ישנות.
-          if (!row.candidate_link) return '—'
-          const fromContact = getDictLabel(dicts?.cities, row.contact_city_id)
-          if (fromContact && fromContact !== '—') return fromContact
-          return row.master_city || '—'
-        },
-      },
-      {
         key: 'work_status',
         colKey: 'work_status',
         label: 'סטטוס תעסוקה',
@@ -187,19 +198,19 @@ export function ApplicationsTable({
           row.job_role ? <RoleBadge roleId={row.job_role_id} label={row.job_role} /> : '—',
       },
       {
-        key: 'job_city',
-        colKey: 'job_city',
-        label: 'עיר משרה',
-        sortable: true,
-        render: (row) => row.job_city ?? '—',
-      },
-      {
         key: 'job_region',
         colKey: 'job_region',
         label: 'אזור משרה',
         sortable: true,
         render: (row) =>
           row.job_region ? <RegionBadge regionId={row.job_region_id} label={row.job_region} /> : '—',
+      },
+      {
+        key: 'job_city',
+        colKey: 'job_city',
+        label: 'עיר משרה',
+        sortable: true,
+        render: (row) => row.job_city ?? '—',
       },
       {
         key: 'account_name',
